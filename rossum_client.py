@@ -6,7 +6,7 @@ class RossumClient:
         self.token = authorization_token
         self.api_url = f"{base_url}/{api_version}"
 
-    def get(self, object_name: str, object_id: str | int | None) -> dict | list[dict]:
+    def get(self, object_name: str, object_id: str | int) -> dict | list[dict]:
         object_id = str(object_id) if object_id else None
         endpoint_suffix = f"/{object_name}/{object_id}" if object_id else f"/{object_name}"
         response = requests.get(self.api_url + endpoint_suffix, headers={"Authorization" : f"Bearer {self.token}"})
@@ -19,7 +19,7 @@ class RossumClient:
         response = requests.post(self.api_url + endpoint_suffix, headers={"Authorization" : f"Bearer {self.token}"}, json=body)
         return self._process_response(response)
 
-    def post(self, object_name: str, object_id: str | int, body: dict) -> dict | list[dict]:
+    def patch(self, object_name: str, object_id: str | int, body: dict) -> dict | list[dict]:
         object_id = str(object_id) if object_id else None
         endpoint_suffix = f"/{object_name}/{object_id}" if object_id else f"/{object_name}"
         response = requests.patch(self.api_url + endpoint_suffix, headers={"Authorization" : f"Bearer {self.token}"}, json=body)
@@ -51,6 +51,6 @@ def auth(base_url: str, api_version: str, username: str, password: str) -> dict:
     body = {"username": username, "password": password}
     response = requests.post(f"{base_url}/{api_version}/auth/login", json=body)
     if response.status_code == 200:
-        return response.json()
+        return response.json()["key"]
     else:
         raise MessageException("error", response.text)
