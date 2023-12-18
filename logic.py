@@ -1,27 +1,27 @@
 from rossum_client import RossumClient
 
 def get_organizations(client: RossumClient):
-    objects = client.get("organizations")
+    objects = client.get("organizations", None)
     return objects
 
 def get_workspaces(client: RossumClient):
-    objects = client.get("workspaces")
+    objects = client.get("workspaces", None)
     return objects
 
 def get_queues(client: RossumClient):
-    objects = client.get("queues")
+    objects = client.get("queues", None)
     return objects
 
 def get_schemas(client: RossumClient):
-    objects = client.get("schemas")
+    objects = client.get("schemas", None)
     return objects
 
 def get_users(client: RossumClient):
-    objects = client.get("users")
+    objects = client.get("users", None)
     return objects
 
 def get_hooks(client: RossumClient):
-    objects = client.get("hooks")
+    objects = client.get("hooks", None)
     return objects
 
 def get_organization(client: RossumClient, id: str | int):
