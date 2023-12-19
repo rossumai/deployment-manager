@@ -48,26 +48,50 @@ def get_hook(client: RossumClient, id: str | int):
     object = client.get(f"hooks", id)
     return object
 
-def create_organization(client: RossumClient):
+def create_organization(client: RossumClient, body: dict):
     object = client.post(f"organizations")
     return object
 
-def create_workspace(client: RossumClient):
+def create_workspace(client: RossumClient, body: dict):
     object = client.post(f"workspaces")
     return object
 
-def create_queue(client: RossumClient):
+def create_queue(client: RossumClient, body: dict):
     object = client.post(f"queues")
     return object
 
-def create_schema(client: RossumClient):
+def create_schema(client: RossumClient, body: dict):
     object = client.post(f"schemas")
     return object
 
-def create_user(client: RossumClient):
+def create_user(client: RossumClient, body: dict):
     object = client.post(f"users")
     return object
 
-def create_hook(client: RossumClient):
+def create_hook(client: RossumClient, body: dict):
     object = client.post(f"hooks")
+    return object
+
+def update_organization(client: RossumClient, body: dict):
+    object = client.patch(f"organizations")
+    return object
+
+def update_workspace(client: RossumClient, body: dict):
+    object = client.patch(f"workspaces")
+    return object
+
+def update_queue(client: RossumClient, body: dict):
+    object = client.patch(f"queues")
+    return object
+
+def update_schema(client: RossumClient, body: dict):
+    object = client.patch(f"schemas")
+    return object
+
+def update_user(client: RossumClient, body: dict):
+    object = client.patch(f"users")
+    return object
+
+def update_hook(client: RossumClient, body: dict):
+    object = client.patch(f"hooks")
     return object

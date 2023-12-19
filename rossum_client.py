@@ -9,28 +9,29 @@ class RossumClient:
     def get(self, object_name: str, object_id: str | int) -> dict | list[dict]:
         object_id = str(object_id) if object_id else None
         endpoint_suffix = f"/{object_name}/{object_id}" if object_id else f"/{object_name}"
-        response = requests.get(self.api_url + endpoint_suffix, headers={"Authorization" : f"Bearer {self.token}"})
-        return self._process_response(response)
+        return self._process_request(url=self.api_url + endpoint_suffix, headers={"Authorization" : f"Bearer {self.token}"})
         
-
     def post(self, object_name: str, object_id: str | int, body: dict) -> dict | list[dict]:
         object_id = str(object_id) if object_id else None
         endpoint_suffix = f"/{object_name}/{object_id}" if object_id else f"/{object_name}"
-        response = requests.post(self.api_url + endpoint_suffix, headers={"Authorization" : f"Bearer {self.token}"}, json=body)
-        return self._process_response(response)
+        return self._process_request(url=self.api_url + endpoint_suffix, headers={"Authorization" : f"Bearer {self.token}"}, json=body)
 
     def patch(self, object_name: str, object_id: str | int, body: dict) -> dict | list[dict]:
         object_id = str(object_id) if object_id else None
         endpoint_suffix = f"/{object_name}/{object_id}" if object_id else f"/{object_name}"
-        response = requests.patch(self.api_url + endpoint_suffix, headers={"Authorization" : f"Bearer {self.token}"}, json=body)
-        return self._process_response(response)
+        return self._process_request(url=self.api_url + endpoint_suffix, headers={"Authorization" : f"Bearer {self.token}"}, json=body)
 
-    def _process_response(self, response: requests.Response) -> dict | list[dict]:
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise MessageException("error", response.text)
-
+    def _process_request(self, url:str, headers:dict, json=None) -> dict | list[dict]:
+        accumulator = []
+        while url:
+            response = requests.get(url=url, headers=headers, json=json) if json else requests.get(url=url, headers=headers)
+            if response.status_code == 200:
+                content = response.json()
+                accumulator += content["results"]
+                url = content.get("pagination", {}).get("next")
+            else:
+                raise MessageException("error", response.text)
+        return accumulator
 
 class MessageException(Exception):
     """
@@ -46,7 +47,6 @@ class MessageException(Exception):
         self.message_type = message_type
         self.message_content = message_content
 
-        
 def auth(base_url: str, api_version: str, username: str, password: str) -> dict:
     body = {"username": username, "password": password}
     response = requests.post(f"{base_url}/{api_version}/auth/login", json=body)
