@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     @property
     def API_URL(self):
-        return self.API_BASE + '/api/v1'
+        return self.API_BASE.rstrip('/') + '/api/v1'
 
 settings = Settings()
 

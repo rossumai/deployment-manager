@@ -1,6 +1,6 @@
 import click
 
-from project_rossum_deploy.commands.download import download_project
+from project_rossum_deploy.commands.download import download_organization
 from project_rossum_deploy.commands.initialize import init_project
 
 
@@ -10,5 +10,5 @@ def main():
     ...
 
 
-main.add_command(download_project)
+main.add_command(download_organization)
 main.add_command(init_project)
