@@ -12,9 +12,9 @@ dotenv.load_dotenv()
 
 
 class Settings(BaseSettings):
-    API_BASE: str
-    USERNAME: str
-    PASSWORD: str
+    API_BASE: str = ''
+    USERNAME: str = ''
+    PASSWORD: str = ''
 
     TO_API_BASE: Optional[str] = None
     TO_USERNAME: Optional[str] = None
@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     class Config:
         model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    @property
+    def API_URL(self):
+        return self.API_BASE + '/api/v1'
 
 settings = Settings()
 

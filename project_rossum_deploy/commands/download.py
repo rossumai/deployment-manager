@@ -1,6 +1,9 @@
 from rossum_api import ElisAPIClient
 import click
 
+from project_rossum_deploy.utils.consts import settings
+from project_rossum_deploy.utils.functions import coro
+
 
 @click.command(
     name="download",
@@ -10,9 +13,15 @@ Creates a local directory structure with the configs of these objects.
 If such a directory already exists, it gets overwritten.
                """,
 )
-def download_project():
-    # client = ElisAPIClient(base_url=base_url, token=token)
-    click.echo("")
+@coro
+async def download_project():
+    client = ElisAPIClient(
+        base_url=settings.API_URL,
+        username=settings.USERNAME,
+        password=settings.PASSWORD,
+    )
 
-    # return await client.retrieve_organization()
-    # print(o)
+    organization = await client.retrieve_own_organization()
+
+    # TODO: migrate organization metadata (like features) and ui settings?
+
