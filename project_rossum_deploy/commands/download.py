@@ -28,8 +28,7 @@ async def download_organization():
     organization = await client.retrieve_own_organization()
 
     org_path = Path(templatize_name_id(organization.name, organization.id))
-    if await org_path.exists():
-        click.echo(f'Path "{org_path}" already exists, cleaning it up first...')
+    if await org_path.exists() and click.confirm(f'Path "{org_path}" already exists, do you want to replace it with the new configuration?', abort=True):
         shutil.rmtree(org_path)
     await write_file(org_path / "organization.json", organization)
 
