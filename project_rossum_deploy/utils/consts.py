@@ -12,11 +12,11 @@ dotenv.load_dotenv()
 
 
 class Settings(BaseSettings):
-    API_BASE: str = 'https://you-forgot-to-cd-into-project.com'
-    USERNAME: str = ''
-    PASSWORD: str = ''
+    API_BASE: str = "https://you-forgot-to-cd-into-project.com"
+    USERNAME: str = ""
+    PASSWORD: str = ""
 
-    MAPPING_FILENAME: str = 'mapping.yaml'
+    MAPPING_FILENAME: str = "mapping.yaml"
 
     TO_API_BASE: Optional[str] = None
     TO_USERNAME: Optional[str] = None
@@ -27,7 +27,12 @@ class Settings(BaseSettings):
 
     @property
     def API_URL(self):
-        return self.API_BASE.rstrip('/') + '/api/v1'
+        return self.API_BASE.rstrip("/") + "/api/v1"
+
+    @property
+    def TO_API_URL(self):
+        return self.TO_API_BASE.rstrip("/") + "/api/v1"
+
 
 settings = Settings()
 

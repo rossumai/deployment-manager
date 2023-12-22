@@ -4,6 +4,14 @@ from project_rossum_deploy.commands.download.download import download_organizati
 from project_rossum_deploy.commands.initialize import init_project
 from project_rossum_deploy.commands.migrate import migrate_project
 
+# TODO: add inbox downloading and mapping
+# TODO: attribute_override updating in mapping
+
+# TODO: source/target dirs to each object type
+# download -> add source 
+# first migrate (without left hand side) -> add target
+
+# TODO: when second download happens, check right sides and don't create left sides if they are a target of something
 
 # TODO: deploy to Rossum
 # Update only what changed (programmatically call git to find out)
