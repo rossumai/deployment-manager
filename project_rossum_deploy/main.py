@@ -5,6 +5,15 @@ from project_rossum_deploy.commands.initialize import init_project
 
 # TODO: put queues into workspaces
 
+# TODO: deploy to Rossum
+# Update only what changed (programmatically call git to find out)
+
+# TODO: Migrate
+# emtpy right hand side (e.g., `39393:`) -> create new object
+# non-empty right hand side (e.g., `393939:77278`) -> update the object
+# IGNORE keyword
+# ! instead of templating, we could use mapping to replace all values (take the config, find id in the left side, replace with right side)
+
 @click.group()
 @click.version_option()
 def main():
