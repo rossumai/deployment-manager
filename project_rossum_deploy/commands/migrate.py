@@ -6,9 +6,9 @@ from project_rossum_deploy.utils.consts import settings
 @click.command(
     name="migrate",
     help="""
-Creates a new project directory with the specified name with basic files.
-Also initializes it as a git repository.
-The user is then expected to provide .env credentials and download Rossum objects.
+Applies selected changes onto other objects.
+If these objects don't exist, they get crated.
+The specifics of what objects to migrate where can be specified in a mapping.yaml file.
                """,
 )
 @click.option(

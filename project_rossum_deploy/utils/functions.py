@@ -30,3 +30,7 @@ async def write_yaml(path: Path, object: dict):
     await path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as wf:
         yaml.dump(object, wf)
+
+def read_yaml(path: Path):
+    with open(path, "r") as rf:
+        return yaml.safe_load(rf)
