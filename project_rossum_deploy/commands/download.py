@@ -1,5 +1,6 @@
 import dataclasses
 import json
+import os
 import shutil
 from anyio import Path
 from rossum_api import ElisAPIClient
@@ -27,15 +28,22 @@ async def download_organization():
 
     organization = await client.retrieve_own_organization()
 
-    org_path = Path(templatize_name_id(organization.name, organization.id))
-    if await org_path.exists() and click.confirm(f'Path "{org_path}" already exists, do you want to replace it with the new configuration?', abort=True):
-        shutil.rmtree(org_path)
-    await write_file(org_path / "organization.json", organization)
+    org_path = Path('./')
+    org_config_path = org_path / 'organization.json'
+    if await org_config_path.exists() and click.confirm(f'Project "{(await org_path.absolute()).name}" already has configuration files in it, do you want to replace it with the new configuration?', abort=True):
+        delete_current_configuration(org_path)
+
+    await write_file(org_config_path, organization)
 
     await download_workspaces(client, org_path)
     await download_schemas(client, org_path)
     await download_hooks(client, org_path)
 
+def delete_current_configuration(org_path: Path):
+    os.remove(org_path / 'organization.json')
+    paths_to_delete = ['workspaces', 'schemas', 'hooks']
+    for path in paths_to_delete:
+        shutil.rmtree(org_path / path)
 
 async def download_workspaces(client: ElisAPIClient, parent_dir: Path):
     async for workspace in client.list_all_workspaces():
