@@ -33,7 +33,6 @@ async def download_organization():
     await write_file(org_path / "organization.json", organization)
 
     await download_workspaces(client, org_path)
-    await download_queues(client, org_path)
     await download_schemas(client, org_path)
     await download_hooks(client, org_path)
 
@@ -47,7 +46,15 @@ async def download_workspaces(client: ElisAPIClient, parent_dir: Path):
             / "workspace.json"
         )
         await write_file(workspace_config_path, workspace)
+        await download_queues_for_workspace(client, workspace.id, workspace_config_path.parent)
 
+
+async def download_queues_for_workspace(client: ElisAPIClient, workspace_id: str, parent_dir: Path):
+    async for queue in client.list_all_queues(workspace=workspace_id):
+        queue_config_path = (
+            parent_dir / "queues" / f"{templatize_name_id(queue.name, queue.id)}.json"
+        )
+        await write_file(queue_config_path, queue)
 
 async def download_queues(client: ElisAPIClient, parent_dir: Path):
     async for queue in client.list_all_queues():

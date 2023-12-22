@@ -12,7 +12,7 @@ dotenv.load_dotenv()
 
 
 class Settings(BaseSettings):
-    API_BASE: str = ''
+    API_BASE: str = 'https://you-forgot-to-cd-into-project.com'
     USERNAME: str = ''
     PASSWORD: str = ''
 

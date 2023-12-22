@@ -3,7 +3,6 @@ import click
 from project_rossum_deploy.commands.download import download_organization
 from project_rossum_deploy.commands.initialize import init_project
 
-# TODO: put queues into workspaces
 
 # TODO: deploy to Rossum
 # Update only what changed (programmatically call git to find out)
