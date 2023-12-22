@@ -1,6 +1,6 @@
 import click
 
-from project_rossum_deploy.commands.download import download_organization
+from project_rossum_deploy.commands.download.download import download_organization
 from project_rossum_deploy.commands.initialize import init_project
 from project_rossum_deploy.commands.migrate import migrate_project
 

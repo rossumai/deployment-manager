@@ -2,16 +2,15 @@ import os
 import shutil
 from anyio import Path
 from rossum_api import ElisAPIClient
-from rossum_api.models import Organization, Workspace, Hook, Schema, Queue
+
 import click
+from project_rossum_deploy.commands.download.mapping import create_update_mapping
 
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     coro,
-    read_yaml,
     templatize_name_id,
     write_json,
-    write_yaml,
 )
 
 
@@ -54,68 +53,6 @@ async def download_organization():
         schema_mappings=schema_mappings,
         hook_mappings=hook_mappings,
     )
-
-
-async def create_update_mapping(
-    org_path: Path,
-    organization: Organization,
-    workspace_mappings: list[Workspace],
-    hook_mappings: list[Hook],
-    schema_mappings: list[Schema],
-):
-    mapping = {
-        "organization": {
-            "id": organization.id,
-            "name": organization.name,
-            "target": "",
-            "workspaces": [],
-            "hooks": [get_attributes_for_mapping(h) for h in hook_mappings],
-            "schemas": [get_attributes_for_mapping(s) for s in schema_mappings],
-        }
-    }
-
-    for workspace in workspace_mappings:
-        ws_mapping = {
-            **get_attributes_for_mapping(workspace),
-            "queues": [get_attributes_for_mapping(q) for q in workspace.queues],
-        }
-        mapping["organization"]["workspaces"].append(ws_mapping)
-
-    mapping_path = org_path / settings.MAPPING_FILENAME
-
-    if await mapping_path.exists():
-        old_mapping = read_yaml(mapping_path)
-        enrich_mappings_with_targets(old_mapping=old_mapping, new_mapping=mapping)
-
-    await write_yaml(mapping_path, mapping)
-
-
-def get_attributes_for_mapping(object: Organization | Queue | Hook | Schema):
-    return {"id": object.id, "name": object.name, "target": None}
-
-
-def enrich_mappings_with_targets(old_mapping: dict, new_mapping: dict):
-    hook_targets = {
-        s["id"]: s["target"] for s in old_mapping["organization"]["schemas"]
-    }
-    for schema in new_mapping["organization"]["schemas"]:
-        schema["target"] = hook_targets.get(schema["id"], None)
-
-    hook_targets = {h["id"]: h["target"] for h in old_mapping["organization"]["hooks"]}
-    for hook in new_mapping["organization"]["hooks"]:
-        hook["target"] = hook_targets.get(hook["id"], None)
-
-    workspace_and_queue_targets = {
-        ws["id"]: ws for ws in old_mapping["organization"]["workspaces"]
-    }
-    for ws in workspace_and_queue_targets.values():
-        ws['queues'] = {q["id"]: q["target"] for q in ws["queues"]}
-    for workspace in new_mapping["organization"]["workspaces"]:
-        ws["target"] = workspace_and_queue_targets[workspace["id"]]["target"]
-        for queue in workspace["queues"]:
-            queue["target"] = workspace_and_queue_targets[workspace["id"]]["queues"][
-                queue["id"]
-            ]
 
 
 def delete_current_configuration(org_path: Path):
