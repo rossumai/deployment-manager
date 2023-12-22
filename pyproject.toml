@@ -12,6 +12,8 @@ rossum-api = {git = "https://github.com/rossumai/rossum-sdk"}
 click = "^8.1.7"
 pydantic-settings = "^2.1.0"
 python-dotenv = "^1.0.0"
+pyyaml = "^6.0.1"
+anyio = "^4.2.0"
 
 [tool.poetry.scripts]
 prd = "project_rossum_deploy.main:main"

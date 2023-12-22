@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     USERNAME: str = ''
     PASSWORD: str = ''
 
+    MAPPING_FILENAME: str = 'mapping.yaml'
+
     TO_API_BASE: Optional[str] = None
     TO_USERNAME: Optional[str] = None
     TO_PASSWORD: Optional[str] = None
