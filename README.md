@@ -1,93 +1,95 @@
-# project-deployment
+## **Rossum deployment tool**  
 
+This command line tool is used to help users customizing and delivering projects on Rossum platform to easily track changes, deploy and release changes/entire project to different environments inside the same cluster.
 
+**Prerequisites**  
+*Git* - any git based versioning tool  
+*RDT* - installed Rossum deployment tool on your local machine (see guide here)  
+*Rossum account* - *admin* role credentials to at least one organization  
 
-## Getting started
+**Supported Rossum platform objects**  
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+    organizations, workspaces, queues, inboxs, schemas, hooks
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+**Terms**  
+*source* - organization/workspace, usually used for development and testing  
+*target* - organization/workspace, usually production, where the project and all its associated objects are pushed after development and testing is finished in the *source* organization/workspace  
+*local* - file storage of the local machine where git repository of the project is cloned  
+*remote* - organization and all the objects owned by the organization in Rossum platform
 
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
-
+**Folder & file structure**
 ```
-cd existing_repo
-git remote add origin https://gitlab.rossum.cloud/solution-engineering/tools/project-deployment.git
-git branch -M master
-git push -uf origin master
+├──source
+│   ├──organization.json
+│   │──workspaces
+│   │   ├──workspace.json
+│   │   └──queues
+│   │       ├──queue.json
+│   │       └──inboxes
+│   │           └──inbox.json
+│   ├──schemas
+│   │   └──schema.json
+│   └──hooks
+│       └──hook.json
+├──target
+│   ├──organization.json
+│   │──workspaces
+│   │   ├──workspace.json
+│   │   └──queues
+│   │       ├──queue.json
+│   │       └──inboxes
+│   │           └──inbox.json
+│   │──schemas
+│   │   └──schema.json
+│   └──hooks
+│      └──hook.json
+mapping.yaml
+config.yaml
+variables.yaml
 ```
 
-## Integrate with your tools
+**File structure**  
+`config.yaml` - base configuration file of the tool - contains rossum username/credentials as well as other global parameters  
+`mapping.yaml` - file containing metadata of all indexed objects of the `source` enevironment and their respective couterparts in the `target` environment  
+`variables.yaml` - file defining user variables that can be referenced in the `mapping.yaml` file  
 
-- [ ] [Set up project integrations](https://gitlab.rossum.cloud/solution-engineering/tools/project-deployment/-/settings/integrations)
 
-## Collaborate with your team
+**File definition**  
+***config.yaml***  
+`USERNAME` - Rossum admin account username that is used to generate auth token used for all Rossum API calls  
+`PASSWORD` - password for Rossum admin account username  
+`API_BASE` - base URL of Rossum API, ending with api version - ie https://elis.rossum.ai/api/v1  
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+***mapping.yaml***  
+Initialized when not existing or empty during `pull` command. Missing object records are automatically added to this file during `pull` command. Objects missing `target` attribute are copied to the `target` during the `release` and the file is then automatically updated with the `target` object IDs once completed.
 
-## Test and Deploy
+`ORGANIZATION | WORKSPACES | QUEUES | INBOX | SCHEMAS | HOOKS` - object type name, used primarily to define structure of the mappinf file  
+`id` - unique ID of the Rossum API object  
+`name` - name of the Rossum API object instance  
+`target` - ID of the counterpart object in the `target` environment  
+`ignore` - attribute controlling whether object is pushed to remote during `push` / `release` commands. Object with `ignore:true` are not pushed to `source` / `target` environments  
+`attribute_override` - keys representing attributes of the object on Rossum API are replaced with the value associated with the key during `release` call.  
+`attribute_override.{key}` - name of the attribute to be replaced with value of the key - for instance `settings` of a hook -- example: `attribute_override.name: "my production hook"`. `source` hook's name "my test hook" is renamed to "my production hook" when deploying the hook to `target` environment  
+`attribute_override.{key}.path` - path is used when only substring of the attribute's value should be overriden. Used to replace mainly queue IDs commonly referenced in various hook.settings.  
+`attribute_override.{key}.variable type` - used when path is defined. This attribute defines what value type is being overriden and looks for its counterpart in the `mapping.yaml` file (source<>target)  
+&nbsp;&nbsp;&nbsp;&nbsp;**_Example of attribute override with path:_**  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`attribute_override.settings.path.configurations[].queue_ids`  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`attribute_override.{key}.variable type:queue` - when `release` is called, `source` `hook.settings` is parsed, the path defined is found and all queue references (supports integers, strings and URLs) are replaced with their `target` counterparts. 
 
-Use the built-in continuous integration in GitLab.
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+**Commands**
 
-***
+    `pull`
+Pulls (downloads) all objects from the `source` environment and creates/updates folder/file structure in `source` folder in local repository. Environment (organization) used is the organization of the user. If no `mapping.yaml` file is existing, file is created and populated with records describing the pulled objects. If `mapping.yaml` is already existing, missing records for new objects are created and records for no longer existing objects are removed.
 
-# Editing this README
+    `pull target`
+Pulls (downloads) all objects from the `target` organization. This operation only creates folder/file structure in the `target` folder if necessary, but does not update `mapping.yaml` in any way. If there are new objects or updated objects in `target`, manual update of the objects in `source` need to be made and `mapping.yaml` updated accordingly.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+    `push`
+Pushes all eligible (see `mapping.yaml` definition) objects into the `source` organization in Rossum platform. 
 
-## Suggestions for a good README
+    `release`
+Pushes all eligible objects from local `source` to remote `target`. This command replaces all variables and overriden attributes as defined in `mapping.yaml`
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+    `release target`
+Pushes all eligible objects from local `target` to remote `target`. This command just pushes everything from local `target` to remote `target`.
