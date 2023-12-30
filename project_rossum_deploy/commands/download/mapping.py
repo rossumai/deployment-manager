@@ -1,6 +1,6 @@
 from re import L
 from anyio import Path
-from rossum_api.models import Organization, Workspace, Hook, Schema, Queue
+from rossum_api.models import Organization, Workspace, Hook, Schema, Queue, Inbox
 
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import read_yaml, write_yaml
@@ -21,7 +21,7 @@ async def create_update_mapping(
     for workspace in workspace_mappings:
         ws_mapping = {
             **get_attributes_for_mapping(workspace),
-            "queues": [get_attributes_for_mapping(q) for q in workspace.queues],
+            "queues": [{**get_attributes_for_mapping(q), "inbox": get_attributes_for_mapping(q.inbox)} for q in workspace.queues],
         }
         mapping["organization"]["workspaces"].append(ws_mapping)
 
@@ -55,7 +55,7 @@ def create_empty_mapping():
     }
 
 
-def get_attributes_for_mapping(object: Organization | Queue | Hook | Schema):
+def get_attributes_for_mapping(object: Organization | Queue | Hook | Schema | Inbox):
     return {"id": object.id, "name": object.name, "target": None}
 
 

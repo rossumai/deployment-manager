@@ -2,6 +2,7 @@ import os
 import shutil
 from anyio import Path
 from rossum_api import ElisAPIClient
+from rossum_api.api_client import Resource
 
 import click
 from project_rossum_deploy.commands.download.mapping import (
@@ -101,21 +102,33 @@ async def download_workspaces(client: ElisAPIClient, parent_dir: Path, targets: 
         await write_json(workspace_config_path, workspace)
 
         workspace.queues = await download_queues_for_workspace(
-            client, workspace_config_path.parent
+            client, workspace_config_path.parent, workspace.id
         )
 
     return workspaces
 
 
-async def download_queues_for_workspace(client: ElisAPIClient, parent_dir: Path):
-    queues = [queue async for queue in client.list_all_queues()]
+async def download_queues_for_workspace(
+    client: ElisAPIClient, parent_dir: Path, workspace_id: int
+):
+    queues = [queue async for queue in client.list_all_queues(workspace=workspace_id)]
     for queue in queues:
-        queue_config_path = (
-            parent_dir / "queues" / f"{templatize_name_id(queue.name, queue.id)}.json"
+        queue_path = (
+            parent_dir / "queues" / f"{templatize_name_id(queue.name, queue.id)}"
         )
-        await write_json(queue_config_path, queue)
+        await write_json(queue_path / "queue.json", queue)
+
+        inbox_id = queue.inbox.split("/")[-1]
+        queue.inbox = await download_inbox(client, queue_path, inbox_id)
 
     return queues
+
+
+async def download_inbox(client: ElisAPIClient, parent_dir: Path, inbox_id: int):
+    inbox = await client._http_client.fetch_one(Resource.Inbox, inbox_id)
+    inbox = client._deserializer(Resource.Inbox, inbox)
+    await write_json(parent_dir / "inbox.json", inbox)
+    return inbox
 
 
 async def download_schemas(client: ElisAPIClient, parent_dir: Path, targets: dict):

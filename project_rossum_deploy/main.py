@@ -4,7 +4,6 @@ from project_rossum_deploy.commands.download.download import download_organizati
 from project_rossum_deploy.commands.initialize import init_project
 from project_rossum_deploy.commands.migrate import migrate_project
 
-# TODO: add inbox downloading and mapping
 # TODO: attribute_override updating in mapping
 
 # TODO: first migrate (without left hand side) -> add target
