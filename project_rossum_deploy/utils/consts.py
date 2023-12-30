@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     TO_USERNAME: Optional[str] = None
     TO_PASSWORD: Optional[str] = None
 
+    SOURCE_DIRNAME: str = 'source'
+    TARGET_DIRNAME: str = 'target'
+
     class Config:
         model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

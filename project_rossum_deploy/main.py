@@ -7,9 +7,7 @@ from project_rossum_deploy.commands.migrate import migrate_project
 # TODO: add inbox downloading and mapping
 # TODO: attribute_override updating in mapping
 
-# TODO: source/target dirs to each object type
-# download -> add source 
-# first migrate (without left hand side) -> add target
+# TODO: first migrate (without left hand side) -> add target
 
 # TODO: when second download happens, check right sides and don't create left sides if they are a target of something
 
@@ -21,6 +19,8 @@ from project_rossum_deploy.commands.migrate import migrate_project
 # non-empty right hand side (e.g., `393939:77278`) -> update the object
 # IGNORE keyword
 # ! instead of templating, we could use mapping to replace all values (take the config, find id in the left side, replace with right side)
+
+# TODO: change .env to config.yaml
 
 @click.group()
 @click.version_option()
