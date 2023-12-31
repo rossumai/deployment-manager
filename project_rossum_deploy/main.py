@@ -10,8 +10,6 @@ from project_rossum_deploy.commands.migrate import migrate_project
 
 # TODO: first migrate (without left hand side) -> add target
 
-# TODO: when second download happens, check right sides and don't create left sides if they are a target of something
-
 # TODO: deploy to Rossum
 # Update only what changed (programmatically call git to find out)
 

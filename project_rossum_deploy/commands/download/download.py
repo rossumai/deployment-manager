@@ -66,6 +66,7 @@ async def download_organization():
         workspace_mappings=workspace_mappings,
         schema_mappings=schema_mappings,
         hook_mappings=hook_mappings,
+        previous_targets=previous_targets,
     )
 
 

@@ -5,7 +5,12 @@ from rossum_api import ElisAPIClient
 from project_rossum_deploy.common.upload import upload_schema
 
 from project_rossum_deploy.utils.consts import settings
-from project_rossum_deploy.utils.functions import coro, detemplatize_name_id, read_yaml, write_yaml
+from project_rossum_deploy.utils.functions import (
+    coro,
+    detemplatize_name_id,
+    read_yaml,
+    write_yaml,
+)
 
 
 @click.command(
@@ -24,8 +29,9 @@ The specifics of what objects to migrate where can be specified in a mapping.yam
 )
 @coro
 async def migrate_project(mapping: str):
+    mapping_file = mapping
     org_path = Path("./")
-    mapping = read_yaml(org_path / mapping)
+    mapping = read_yaml(org_path / mapping_file)
 
     target_organization = mapping["organization"]["target"]
     if not target_organization:
@@ -54,14 +60,16 @@ async def migrate_project(mapping: str):
 
     source_path = org_path / settings.SOURCE_DIRNAME
 
-    schemas_by_id = index_mapping_by_id(mapping["organization"]["schemas"])
     # Read through schemas, ignore queue deps, add to mapping
     async for schema_path in (source_path / "schemas").iterdir():
         name, id = detemplatize_name_id(schema_path.stem)
         schema = json.loads(await schema_path.read_text())
-        if not schemas_by_id[id].get("ignore", None):
-            result = await upload_schema(client, schema, schemas_by_id[id]["target"])
-            schemas_by_id[id]["target"] = result["id"]
+
+        schema_mapping = find_mapping_of_object(mapping["organization"]["schemas"], id)
+        if not schema_mapping.get("ignore", None):
+            result = await upload_schema(client, schema, schema_mapping["target"])
+            schema_mapping["target"] = result["id"]
+            break
 
     # Read through hooks, ignore queue deps, add to mapping
 
@@ -70,10 +78,11 @@ async def migrate_project(mapping: str):
     # Read inbox of queue ...
 
     # Update the mapping with righ hand sides (targets) created during migration
-    write_yaml(org_path / mapping)
+    await write_yaml(org_path / mapping_file, mapping)
 
-def index_mapping_by_id(sub_mapping: list[dict]):
-    indexed = {}
+
+def find_mapping_of_object(sub_mapping: list[dict], id: int):
     for object in sub_mapping:
-        indexed[object["id"]] = object
-    return indexed
+        if object["id"] == id:
+            return object
+    return None

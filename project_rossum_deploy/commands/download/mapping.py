@@ -11,6 +11,7 @@ async def create_update_mapping(
     workspace_mappings: list[Workspace],
     hook_mappings: list[Hook],
     schema_mappings: list[Schema],
+    previous_targets: dict[list],
 ):
     mapping = create_empty_mapping()
 
@@ -18,19 +19,37 @@ async def create_update_mapping(
     mapping["organization"]["name"] = organization.name
 
     for workspace in workspace_mappings:
+        if workspace.id in previous_targets["workspaces"]:
+            continue
+
         ws_mapping = {
             **get_attributes_for_mapping(workspace),
-            "queues": [{**get_attributes_for_mapping(q), "inbox": get_attributes_for_mapping(q.inbox)} for q in workspace.queues],
+            "queues": [],
         }
+        # There should never be queues and inboxes that are targets if the workspace is not
+        # The check is more for completness' sake
+        for q in workspace.queues:
+            if q.id in previous_targets["queues"]:
+                continue
+
+            queue_mapping = get_attributes_for_mapping(q)
+
+            if q.inbox.id not in previous_targets["inboxes"]:
+                queue_mapping["inbox"] = get_attributes_for_mapping(q.inbox)
+
+            ws_mapping["queues"].append(queue_mapping)
+
         mapping["organization"]["workspaces"].append(ws_mapping)
 
-    mapping["organization"]["hooks"] = [
-        get_attributes_for_mapping(h) for h in hook_mappings
-    ]
+    for hook in hook_mappings:
+        if hook.id in previous_targets["hooks"]:
+            continue
+        mapping["organization"]["hooks"].append(get_attributes_for_mapping(hook))
 
-    mapping["organization"]["schemas"] = [
-        get_attributes_for_mapping(s) for s in schema_mappings
-    ]
+    for schema in schema_mappings:
+        if schema.id in previous_targets["schemas"]:
+            continue
+        mapping["organization"]["schemas"].append(get_attributes_for_mapping(schema))
 
     # Take targets (right sides) from the previous mapping and reuse them where applicable
     mapping_path = org_path / settings.MAPPING_FILENAME
@@ -59,6 +78,8 @@ def get_attributes_for_mapping(object: Organization | Queue | Hook | Schema | In
 
 
 def enrich_mappings_with_targets(old_mapping: dict, new_mapping: dict):
+    new_mapping['organization']['target'] = old_mapping['organization']['target']
+
     schema_targets = {
         s["id"]: s["target"] for s in old_mapping["organization"]["schemas"]
     }
@@ -89,12 +110,15 @@ def extract_targets(mapping: dict) -> dict:
 
     targets["workspaces"] = []
     targets["queues"] = []
+    targets["inboxes"] = []
     for ws in mapping["organization"]["workspaces"]:
         if ws["target"]:
             targets["workspaces"].append(ws["target"])
         for q in ws["queues"]:
             if q["target"]:
                 targets["queues"].append(q["target"])
+            if q["inbox"]["target"]:
+                targets["inboxes"].append(q["inbox"]["target"])
 
     targets["schemas"] = []
     for schema in mapping["organization"]["schemas"]:
