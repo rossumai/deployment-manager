@@ -8,8 +8,6 @@ from project_rossum_deploy.commands.migrate import migrate_project
 
 # TODO: attribute_override updating in mapping
 
-# TODO: first migrate (without left hand side) -> add target
-
 # TODO: deploy to Rossum
 # Update only what changed (programmatically call git to find out)
 

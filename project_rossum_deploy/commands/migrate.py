@@ -9,6 +9,8 @@ from project_rossum_deploy.utils.functions import (
     coro,
     detemplatize_name_id,
     read_yaml,
+    templatize_name_id,
+    write_json,
     write_yaml,
 )
 
@@ -68,6 +70,9 @@ async def migrate_project(mapping: str):
         schema_mapping = find_mapping_of_object(mapping["organization"]["schemas"], id)
         if not schema_mapping.get("ignore", None):
             result = await upload_schema(client, schema, schema_mapping["target"])
+
+            schema_config_path = org_path / settings.TARGET_DIRNAME / 'schemas' / f"{templatize_name_id(result['name'], result['id'])}.json"
+            await write_json(schema_config_path, schema)
             schema_mapping["target"] = result["id"]
             break
 

@@ -18,7 +18,13 @@ async def create_update_mapping(
     mapping["organization"]["id"] = organization.id
     mapping["organization"]["name"] = organization.name
 
+    # Ids of both source and target objects
+    # Used to check that a target object was not deleted
+    # If yes, ignore old mapping that assigns this target to some left (source) object
+    new_ids = []
+
     for workspace in workspace_mappings:
+        new_ids.append(workspace.id)
         if workspace.id in previous_targets["workspaces"]:
             continue
 
@@ -26,27 +32,26 @@ async def create_update_mapping(
             **get_attributes_for_mapping(workspace),
             "queues": [],
         }
-        # There should never be queues and inboxes that are targets if the workspace is not
-        # The check is more for completness' sake
         for q in workspace.queues:
-            if q.id in previous_targets["queues"]:
-                continue
+            new_ids.append(q.id)
+            new_ids.append(q.inbox.id)
 
-            queue_mapping = get_attributes_for_mapping(q)
-
-            if q.inbox.id not in previous_targets["inboxes"]:
-                queue_mapping["inbox"] = get_attributes_for_mapping(q.inbox)
-
+            queue_mapping = {
+                **get_attributes_for_mapping(q),
+                "inbox": get_attributes_for_mapping(q.inbox),
+            }
             ws_mapping["queues"].append(queue_mapping)
 
         mapping["organization"]["workspaces"].append(ws_mapping)
 
     for hook in hook_mappings:
+        new_ids.append(hook.id)
         if hook.id in previous_targets["hooks"]:
             continue
         mapping["organization"]["hooks"].append(get_attributes_for_mapping(hook))
 
     for schema in schema_mappings:
+        new_ids.append(schema.id)
         if schema.id in previous_targets["schemas"]:
             continue
         mapping["organization"]["schemas"].append(get_attributes_for_mapping(schema))
@@ -55,7 +60,7 @@ async def create_update_mapping(
     mapping_path = org_path / settings.MAPPING_FILENAME
     if await mapping_path.exists():
         old_mapping = read_yaml(mapping_path)
-        enrich_mappings_with_targets(old_mapping=old_mapping, new_mapping=mapping)
+        enrich_mappings_with_targets(old_mapping=old_mapping, new_mapping=mapping, new_ids=new_ids)
 
     await write_yaml(mapping_path, mapping)
 
@@ -77,18 +82,20 @@ def get_attributes_for_mapping(object: Organization | Queue | Hook | Schema | In
     return {"id": object.id, "name": object.name, "target": None}
 
 
-def enrich_mappings_with_targets(old_mapping: dict, new_mapping: dict):
-    new_mapping['organization']['target'] = old_mapping['organization']['target']
+def enrich_mappings_with_targets(old_mapping: dict, new_mapping: dict, new_ids: list[int]):
+    new_mapping["organization"]["target"] = old_mapping["organization"]["target"]
 
     schema_targets = {
         s["id"]: s["target"] for s in old_mapping["organization"]["schemas"]
     }
     for schema in new_mapping["organization"]["schemas"]:
-        schema["target"] = schema_targets.get(schema["id"], None)
+        target = schema_targets.get(schema["id"], None)
+        schema["target"] = target if target in new_ids else None
 
     hook_targets = {h["id"]: h["target"] for h in old_mapping["organization"]["hooks"]}
     for hook in new_mapping["organization"]["hooks"]:
-        hook["target"] = hook_targets.get(hook["id"], None)
+        target = hook_targets.get(hook["id"], None)
+        hook["target"] = target if target in new_ids else None
 
     workspace_and_queue_targets = {
         ws["id"]: ws for ws in old_mapping["organization"]["workspaces"]
@@ -96,11 +103,11 @@ def enrich_mappings_with_targets(old_mapping: dict, new_mapping: dict):
     for ws in workspace_and_queue_targets.values():
         ws["queues"] = {q["id"]: q["target"] for q in ws["queues"]}
     for workspace in new_mapping["organization"]["workspaces"]:
-        ws["target"] = workspace_and_queue_targets[workspace["id"]]["target"]
+        ws_target = workspace_and_queue_targets[workspace["id"]].get("target", None)
+        ws["target"] = ws_target if ws_target in new_ids else None
         for queue in workspace["queues"]:
-            queue["target"] = workspace_and_queue_targets[workspace["id"]]["queues"][
-                queue["id"]
-            ]
+            queue_target =workspace_and_queue_targets[workspace["id"]]["queues"].get(queue['id'], None)
+            queue["target"] = queue_target if queue_target in new_ids else None
 
 
 def extract_targets(mapping: dict) -> dict:

@@ -30,7 +30,7 @@ async def upload_workspaces(client: ElisAPIClient):
 async def upload_schema(client: ElisAPIClient, schema: Schema, target: int):
     try:    
         if target:
-            return await client._http_client.upload(Resource.Schema, schema, target)
+            return await client._http_client.update(Resource.Schema, id_=target, data=schema)
         else:
             return await client._http_client.create(Resource.Schema, schema)
     except Exception as e:
