@@ -56,16 +56,16 @@ async def download_organization():
     )
     previous_targets = extract_targets(mapping)
 
-    workspace_mappings = await download_workspaces(client, org_path, previous_targets)
-    schema_mappings = await download_schemas(client, org_path, previous_targets)
-    hook_mappings = await download_hooks(client, org_path, previous_targets)
+    workspaces_for_mapping = await download_workspaces(client, org_path, previous_targets)
+    schemas_for_mapping = await download_schemas(client, org_path, previous_targets)
+    hooks_for_mapping = await download_hooks(client, org_path, previous_targets)
 
     await create_update_mapping(
         org_path=org_path,
         organization=organization,
-        workspace_mappings=workspace_mappings,
-        schema_mappings=schema_mappings,
-        hook_mappings=hook_mappings,
+        workspaces_for_mapping=workspaces_for_mapping,
+        schemas_for_mapping=schemas_for_mapping,
+        hooks_for_mapping=hooks_for_mapping,
         previous_targets=previous_targets,
     )
 
@@ -85,9 +85,11 @@ async def delete_current_configuration(org_path: Path):
 
 
 async def download_workspaces(client: ElisAPIClient, parent_dir: Path, targets: dict):
-    workspaces = [ws async for ws in client.list_all_workspaces()]
+    # workspaces = [ws async for ws in client.list_all_workspaces()]
+    workspaces = []
 
-    for workspace in workspaces:
+    async for workspace in client.list_all_workspaces():
+        workspace = await client.retrieve_workspace(workspace.id)
         workspace_config_path = (
             parent_dir
             / (
@@ -105,6 +107,7 @@ async def download_workspaces(client: ElisAPIClient, parent_dir: Path, targets: 
         workspace.queues = await download_queues_for_workspace(
             client, workspace_config_path.parent, workspace.id
         )
+        workspaces.append(workspace)
 
     return workspaces
 
@@ -112,8 +115,9 @@ async def download_workspaces(client: ElisAPIClient, parent_dir: Path, targets: 
 async def download_queues_for_workspace(
     client: ElisAPIClient, parent_dir: Path, workspace_id: int
 ):
-    queues = [queue async for queue in client.list_all_queues(workspace=workspace_id)]
-    for queue in queues:
+    queues = []
+    async for queue in client.list_all_queues(workspace=workspace_id):
+        queue = await client.retrieve_queue(queue.id)
         queue_path = (
             parent_dir / "queues" / f"{templatize_name_id(queue.name, queue.id)}"
         )
@@ -121,6 +125,7 @@ async def download_queues_for_workspace(
 
         inbox_id = queue.inbox.split("/")[-1]
         queue.inbox = await download_inbox(client, queue_path, inbox_id)
+        queues.append(queue)
 
     return queues
 
@@ -132,9 +137,11 @@ async def download_inbox(client: ElisAPIClient, parent_dir: Path, inbox_id: int)
     return inbox
 
 
+# Only schemas actually need to be retrieved individually (since when only listing them, their contents are missing)
 async def download_schemas(client: ElisAPIClient, parent_dir: Path, targets: dict):
-    schemas = [schema async for schema in client.list_all_schemas()]
+    schemas = []
     async for schema in client.list_all_schemas():
+        schema = await client.retrieve_schema(schema.id)
         schema_config_path = (
             parent_dir
             / (
@@ -146,13 +153,15 @@ async def download_schemas(client: ElisAPIClient, parent_dir: Path, targets: dic
             / f"{templatize_name_id(schema.name, schema.id)}.json"
         )
         await write_json(schema_config_path, schema)
+        schemas.append(schema)
 
     return schemas
 
 
 async def download_hooks(client: ElisAPIClient, parent_dir: Path, targets: dict):
-    hooks = [hook async for hook in client.list_all_hooks()]
+    hooks = []
     async for hook in client.list_all_hooks():
+        hook = await client.retrieve_hook(hook.id)
         hook_config_path = (
             parent_dir
             / (
@@ -164,5 +173,6 @@ async def download_hooks(client: ElisAPIClient, parent_dir: Path, targets: dict)
             / f"{templatize_name_id(hook.name, hook.id)}.json"
         )
         await write_json(hook_config_path, hook)
+        hooks.append(hook)
 
     return hooks

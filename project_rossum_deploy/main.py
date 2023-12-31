@@ -4,8 +4,6 @@ from project_rossum_deploy.commands.download.download import download_organizati
 from project_rossum_deploy.commands.initialize import init_project
 from project_rossum_deploy.commands.migrate import migrate_project
 
-# ! Download each object individually to get all of its details
-
 # TODO: attribute_override updating in mapping
 
 # TODO: deploy to Rossum

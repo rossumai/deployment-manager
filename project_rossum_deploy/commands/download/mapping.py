@@ -8,9 +8,9 @@ from project_rossum_deploy.utils.functions import read_yaml, write_yaml
 async def create_update_mapping(
     org_path: Path,
     organization: Organization,
-    workspace_mappings: list[Workspace],
-    hook_mappings: list[Hook],
-    schema_mappings: list[Schema],
+    workspaces_for_mapping: list[Workspace],
+    hooks_for_mapping: list[Hook],
+    schemas_for_mapping: list[Schema],
     previous_targets: dict[list],
 ):
     mapping = create_empty_mapping()
@@ -23,7 +23,7 @@ async def create_update_mapping(
     # If yes, ignore old mapping that assigns this target to some left (source) object
     new_ids = []
 
-    for workspace in workspace_mappings:
+    for workspace in workspaces_for_mapping:
         new_ids.append(workspace.id)
         if workspace.id in previous_targets["workspaces"]:
             continue
@@ -44,13 +44,13 @@ async def create_update_mapping(
 
         mapping["organization"]["workspaces"].append(ws_mapping)
 
-    for hook in hook_mappings:
+    for hook in hooks_for_mapping:
         new_ids.append(hook.id)
         if hook.id in previous_targets["hooks"]:
             continue
         mapping["organization"]["hooks"].append(get_attributes_for_mapping(hook))
 
-    for schema in schema_mappings:
+    for schema in schemas_for_mapping:
         new_ids.append(schema.id)
         if schema.id in previous_targets["schemas"]:
             continue
