@@ -38,10 +38,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-if not settings.TO_API_BASE:
-    settings.TO_API_BASE = settings.API_BASE
-if not settings.TO_USERNAME:
-    settings.TO_USERNAME = settings.USERNAME
-if not settings.TO_PASSWORD:
-    settings.TO_PASSWORD = settings.PASSWORD

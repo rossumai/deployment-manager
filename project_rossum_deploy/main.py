@@ -4,6 +4,8 @@ from project_rossum_deploy.commands.download.download import download_organizati
 from project_rossum_deploy.commands.initialize import init_project
 from project_rossum_deploy.commands.migrate import migrate_project
 
+# ! Download each object individually to get all of its details
+
 # TODO: attribute_override updating in mapping
 
 # TODO: first migrate (without left hand side) -> add target
@@ -14,10 +16,8 @@ from project_rossum_deploy.commands.migrate import migrate_project
 # Update only what changed (programmatically call git to find out)
 
 # TODO: Migrate
-# emtpy right hand side (e.g., `39393:`) -> create new object
-# non-empty right hand side (e.g., `393939:77278`) -> update the object
-# IGNORE keyword
-# ! instead of templating, we could use mapping to replace all values (take the config, find id in the left side, replace with right side)
+# ? PATCH dependency of hook to includes a queue: does the queue automatically get its dependency patched as wel?
+# TODO: Aggregate errors and log them into a single file and STDOUT
 
 # TODO: change .env to config.yaml
 

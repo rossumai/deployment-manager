@@ -1,4 +1,3 @@
-from re import L
 from anyio import Path
 from rossum_api.models import Organization, Workspace, Hook, Schema, Queue, Inbox
 
@@ -47,7 +46,7 @@ def create_empty_mapping():
         "organization": {
             "id": "",
             "name": "",
-            "target": "",
+            "target": None,
             "workspaces": [],
             "hooks": [],
             "schemas": [],

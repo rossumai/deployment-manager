@@ -16,6 +16,10 @@ def coro(f):
 def templatize_name_id(name, id):
     return f'{name}_[{id}]'
 
+def detemplatize_name_id(joint_name: str) -> tuple[str, int]:
+    parts = joint_name.split('_')
+    return parts[0], int(parts[1].removeprefix('[').removesuffix(']'))
+
 async def write_json(path: Path, object: dict):
     if dataclasses.is_dataclass(object):
         object = dataclasses.asdict(object)
