@@ -18,6 +18,8 @@ async def create_update_mapping(
     mapping["organization"]["id"] = organization.id
     mapping["organization"]["name"] = organization.name
 
+    # TODO: don't overwrite previous ignore and other attributes
+
     # Ids of both source and target objects
     # Used to check that a target object was not deleted
     # If yes, ignore old mapping that assigns this target to some left (source) object

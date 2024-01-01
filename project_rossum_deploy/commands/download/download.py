@@ -14,6 +14,7 @@ from project_rossum_deploy.commands.download.mapping import (
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     coro,
+    extract_id_from_url,
     read_yaml,
     templatize_name_id,
     write_json,
@@ -123,7 +124,7 @@ async def download_queues_for_workspace(
         )
         await write_json(queue_path / "queue.json", queue)
 
-        inbox_id = queue.inbox.split("/")[-1]
+        inbox_id = extract_id_from_url(queue.inbox)
         queue.inbox = await download_inbox(client, queue_path, inbox_id)
         queues.append(queue)
 
