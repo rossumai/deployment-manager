@@ -138,9 +138,9 @@ def enrich_mappings_with_existing_attributes(
         new_workspace_mapping["target"] = target if target in new_ids else None
 
         old_queue_mappings = index_mappings_by_object_id(
-            old_workspace_mapping["queues"]
+            old_workspace_mapping.get('queues', [])
         )
-        for new_queue_mapping in new_workspace_mapping["queues"]:
+        for new_queue_mapping in new_workspace_mapping.get("queues", []):
             old_queue_mapping = old_queue_mappings.get(new_queue_mapping["id"], {})
             enrich_mapping_with_previous_properties(
                 new_queue_mapping, old_queue_mapping
