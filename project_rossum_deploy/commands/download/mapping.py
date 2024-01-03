@@ -25,9 +25,6 @@ async def create_update_mapping(
 
     for workspace in workspaces_for_mapping:
         new_ids.append(workspace.id)
-        if workspace.id in previous_targets["workspaces"]:
-            continue
-
         ws_mapping = {
             **get_attributes_for_mapping(workspace),
             "queues": [],
@@ -42,6 +39,10 @@ async def create_update_mapping(
                 "inbox": get_attributes_for_mapping(q.inbox) if q.inbox else None,
             }
             ws_mapping["queues"].append(queue_mapping)
+
+        # Throw away the mapping, we just want the ids for objects that are targeted by something (based on the old mapping)
+        if workspace.id in previous_targets["workspaces"]:
+            continue
 
         mapping["organization"]["workspaces"].append(ws_mapping)
 
@@ -138,7 +139,7 @@ def enrich_mappings_with_existing_attributes(
         new_workspace_mapping["target"] = target if target in new_ids else None
 
         old_queue_mappings = index_mappings_by_object_id(
-            old_workspace_mapping.get('queues', [])
+            old_workspace_mapping.get("queues", [])
         )
         for new_queue_mapping in new_workspace_mapping.get("queues", []):
             old_queue_mapping = old_queue_mappings.get(new_queue_mapping["id"], {})
@@ -154,7 +155,7 @@ def enrich_mappings_with_existing_attributes(
                 enrich_mapping_with_previous_properties(
                     new_queue_mapping["inbox"], old_inbox_mapping
                 )
-                
+
                 target = old_inbox_mapping.get("target", None)
                 new_queue_mapping["inbox"]["target"] = (
                     target if target in new_ids else None

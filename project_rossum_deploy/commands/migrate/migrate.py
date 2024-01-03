@@ -167,6 +167,9 @@ async def migrate_queues_and_inboxes(
     workspace_mapping: dict,
     source_id_target_pairs: dict,
 ):
+    if not (await (ws_path / "queues").exists()):
+        return source_id_target_pairs
+
     async for queue_path in (ws_path / "queues").iterdir():
         try:
             name, id = detemplatize_name_id(queue_path.stem)
@@ -196,13 +199,12 @@ async def migrate_queues_and_inboxes(
             del inbox["email"]
 
             inbox_mapping = queue_mapping["inbox"]
-            
+
             # Inbox cannot be ignored because a queue depends on it
 
             inbox_result = await upload_inbox(client, inbox, inbox_mapping["target"])
             inbox_mapping["target"] = inbox_result["id"]
             source_id_target_pairs[inbox["id"]] = inbox_result
-            print(inbox_result)
         except Exception as e:
             logging.error(f"Error while migrating queue '{id}':")
             logging.exception(e)
@@ -214,29 +216,18 @@ if __name__ == "__main__":
     asyncio.run(
         _delete_migrated_objects(
             [
-                "https://deploymenttool.rossum.app/api/v1/schemas/1078213",
-                "https://deploymenttool.rossum.app/api/v1/schemas/1078214",
-                "https://deploymenttool.rossum.app/api/v1/schemas/1078215",
-                "https://deploymenttool.rossum.app/api/v1/schemas/1078216",
-                "https://deploymenttool.rossum.app/api/v1/schemas/1078217",
-                "https://deploymenttool.rossum.app/api/v1/schemas/1078218",
-                "https://deploymenttool.rossum.app/api/v1/schemas/1078219",
-                "https://deploymenttool.rossum.app/api/v1/schemas/1078220",
-                "https://deploymenttool.rossum.app/api/v1/schemas/1078221",
-                "https://deploymenttool.rossum.app/api/v1/schemas/1078222",
-                "https://deploymenttool.rossum.app/api/v1/schemas/1078223",
-                "https://deploymenttool.rossum.app/api/v1/hooks/224021",
-                "https://deploymenttool.rossum.app/api/v1/hooks/224022",
-                "https://deploymenttool.rossum.app/api/v1/workspaces/502480",
-                "https://deploymenttool.rossum.app/api/v1/queues/811897",
-                "https://deploymenttool.rossum.app/api/v1/inboxes/430635",
-                "https://deploymenttool.rossum.app/api/v1/queues/811898",
-                "https://deploymenttool.rossum.app/api/v1/inboxes/430636",
-                "https://deploymenttool.rossum.app/api/v1/queues/811899",
-                "https://deploymenttool.rossum.app/api/v1/inboxes/430637",
-                "https://deploymenttool.rossum.app/api/v1/workspaces/502481",
-                "https://deploymenttool.rossum.app/api/v1/queues/811900",
-                "https://deploymenttool.rossum.app/api/v1/inboxes/430638",
+                "https://rehoumir.rossum.app/api/v1/schemas/1078876",
+                "https://rehoumir.rossum.app/api/v1/schemas/1078877",
+                "https://rehoumir.rossum.app/api/v1/schemas/1078878",
+                "https://rehoumir.rossum.app/api/v1/hooks/224602",
+                "https://rehoumir.rossum.app/api/v1/workspaces/502598",
+                "https://rehoumir.rossum.app/api/v1/queues/813437",
+                "https://rehoumir.rossum.app/api/v1/inboxes/431156",
+                "https://rehoumir.rossum.app/api/v1/queues/813438",
+                "https://rehoumir.rossum.app/api/v1/inboxes/431157",
+                "https://rehoumir.rossum.app/api/v1/queues/813439",
+                "https://rehoumir.rossum.app/api/v1/inboxes/431158",
+                "https://rehoumir.rossum.app/api/v1/workspaces/502599",
             ]
         )
     )
