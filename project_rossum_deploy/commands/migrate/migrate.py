@@ -5,8 +5,10 @@ from anyio import Path
 
 import click
 from rossum_api import ElisAPIClient
+from project_rossum_deploy.commands.download.download import download_organization
 from project_rossum_deploy.commands.migrate.helpers import (
     _delete_migrated_objects,
+    check_same_org_migration,
     find_mapping_of_object,
     replace_dependency_url,
 )
@@ -29,7 +31,7 @@ from project_rossum_deploy.utils.functions import (
 
 
 @click.command(
-    name="migrate",
+    name=settings.MIGRATE_COMMAND_NAME,
     help="""
 Applies selected changes onto other objects.
 If these objects don't exist, they get crated.
@@ -54,7 +56,7 @@ async def migrate_project(mapping: str):
             "No target for organization. If you want to migrate inside the same organization, just target its own ID."
         )
 
-    if target_organization == mapping["organization"]["id"]:
+    if check_same_org_migration(target_organization, mapping):
         client = ElisAPIClient(
             base_url=settings.API_URL,
             username=settings.USERNAME,
@@ -98,11 +100,18 @@ async def migrate_project(mapping: str):
         _object_urls.append(object["url"])
     # await _delete_migrated_objects(_object_urls)
 
+    click.echo("These target objects were created/updated:")
     click.echo(_object_urls)
 
     # TODO: attribute override
 
-    # TODO: write all target jsons (by running download)
+    if check_same_org_migration(target_organization, mapping):
+        click.echo(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects.")
+        await download_organization()
+    else:
+        click.echo(
+            f'{settings.MIGRATE_COMMAND_NAME} to organization "{target_organization}" was successful. Please run the {settings.DOWNLOAD_COMMAND_NAME} in that organization project.'
+        )
 
 
 async def migrate_schemas(source_path: Path, client: ElisAPIClient, mapping: dict):

@@ -5,6 +5,9 @@ from rossum_api import ElisAPIClient
 
 from project_rossum_deploy.utils.functions import extract_id_from_url
 
+def check_same_org_migration(target_organization: int, mapping:dict):
+    return target_organization == mapping["organization"]["id"]
+
 def replace_dependency_url(object: dict, dependency: str, source_id_target_pairs: dict):
     if isinstance(object[dependency], list):
         new_urls = []

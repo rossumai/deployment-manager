@@ -27,6 +27,11 @@ class Settings(BaseSettings):
 
     ORGANIZATION_FIELDS: list[str] = ['ui_settings', 'metadata']
 
+    INITIALIZE_COMMAND_NAME: str = 'init'
+    DOWNLOAD_COMMAND_NAME: str = 'pull'
+    UPLOAD_COMMAND_NAME: str = 'push'
+    MIGRATE_COMMAND_NAME: str = 'release'
+
     class Config:
         model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -5,9 +5,11 @@ import subprocess
 
 import click
 
+from project_rossum_deploy.utils.consts import settings
+
 
 @click.command(
-    name="init",
+    name=settings.INITIALIZE_COMMAND_NAME,
     help="""
 Creates a new project directory with the specified name with basic files.
 Also initializes it as a git repository.

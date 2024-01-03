@@ -22,7 +22,7 @@ from project_rossum_deploy.utils.functions import (
 
 
 @click.command(
-    name="download",
+    name=settings.DOWNLOAD_COMMAND_NAME,
     help="""
 Downloads all Rossum objects from the user's default (first) organization.
 Creates a local organization directory structure with the configs of these objects.
@@ -30,6 +30,10 @@ In case the directory already exists, it first deletes its contents and then dow
                """,
 )
 @coro
+async def download_organization_wrapper():
+    # To be able to run the download progammatically without the CLI decorators
+    await download_organization()
+
 async def download_organization():
     client = ElisAPIClient(
         base_url=settings.API_URL,
