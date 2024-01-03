@@ -47,6 +47,11 @@ mapping.yaml
 config.yaml
 variables.yaml
 ```
+2. Install the tool:
+```
+pipx install .
+```
+3. Restart your terminal.
 
 **File structure**  
 `config.yaml` - base configuration file of the tool - contains rossum username/credentials as well as other global parameters  

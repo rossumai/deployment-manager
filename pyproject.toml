@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "project-rossum-deploy"
+version = "0.1.0"
+description = ""
+authors = ["Miroslav Rehounek <miroslav.rehounek@rossum.ai>", "Jan Sporek <jan.sporek@rossum.ai>", "Ondrej Polesny <ondrej.polesny@rossum.ai>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+httpx = "^0.25.2"
+rossum-api = {git = "https://github.com/rossumai/rossum-sdk"}
+click = "^8.1.7"
+pydantic-settings = "^2.1.0"
+python-dotenv = "^1.0.0"
+pyyaml = "^6.0.1"
+anyio = "^4.2.0"
+
+[tool.poetry.scripts]
+prd = "project_rossum_deploy.main:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

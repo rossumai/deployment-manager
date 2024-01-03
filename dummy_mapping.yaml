@@ -1,0 +1,56 @@
+organization:
+    id: 333
+    name: "Customer X"
+    target: 332
+    workspaces:
+        - id: 123
+          name: "test workspace"
+          target: 321
+          attribute override:
+            name: "{{parent.name}} {{variables.production.name.suffix}}"
+          queues:
+          - id: 123
+            ignore: true
+            target: 1234
+            name: "test queue 1"
+            inbox:
+              id: 222
+              name: queue 1 inbox
+              target: 223
+          - id: 456
+            target: 4567
+            name: "test queue 2"
+            inbox:
+              id: 226
+              name: queue 2 inbox
+              target: 227
+              attribute override:
+                email: "deploymenttool-prod-73f96c@deploymenttool.rossum.app"
+          - id: 124
+            name: "test workspace 2"
+        - id: 124
+          name: "second workspace"
+          target: 124
+          queues:
+          - id: 311
+            name: "test queue 3"
+            inbox:
+              id: 224
+              name: queue 3 inbox
+              target: 225
+    schemas:
+          - id: 555
+            name: "schema invoices EU"
+            target: 554
+          - id: 558
+            name: "schema invoices US"
+            ignore: true
+    hooks:
+          - id: 1
+            name: "DMv2 - vendor"
+            target: 2
+          - id: 3
+            name: "Value ops"
+            target: 4
+          - id: 5
+            name: "New hook"

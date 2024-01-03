@@ -1,2 +1,6 @@
 __pycache__/
-deployment_tool_config.py
+.venv
+*/**/__pycache__
+.env
+
+dummy_project
