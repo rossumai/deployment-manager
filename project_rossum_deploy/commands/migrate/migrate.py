@@ -96,7 +96,7 @@ async def migrate_project(mapping: str):
     _object_urls = []
     for object in source_id_target_pairs.values():
         _object_urls.append(object["url"])
-    await _delete_migrated_objects(_object_urls)
+    # await _delete_migrated_objects(_object_urls)
 
     click.echo(_object_urls)
 

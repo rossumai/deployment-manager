@@ -10,6 +10,10 @@ from project_rossum_deploy.commands.migrate.migrate import migrate_project
 
 # TODO: attribute_override updating in mapping
 
+# TODO: preserve comments in yaml
+
+# TODO: support token authentication (for support accounts)
+
 # TODO: deploy to Rossum
 # Update only what changed (programmatically call git to find out)
 

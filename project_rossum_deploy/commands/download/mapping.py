@@ -18,8 +18,6 @@ async def create_update_mapping(
     mapping["organization"]["id"] = organization.id
     mapping["organization"]["name"] = organization.name
 
-    # TODO: don't overwrite previous ignore and other attributes
-
     # Ids of both source and target objects
     # Used to check that a target object was not deleted
     # If yes, ignore old mapping that assigns this target to some left (source) object
@@ -59,11 +57,12 @@ async def create_update_mapping(
             continue
         mapping["organization"]["schemas"].append(get_attributes_for_mapping(schema))
 
-    # Take targets (right sides) from the previous mapping and reuse them where applicable
     mapping_path = org_path / settings.MAPPING_FILENAME
     if await mapping_path.exists():
         old_mapping = read_yaml(mapping_path)
-        enrich_mappings_with_targets(old_mapping=old_mapping, new_mapping=mapping, new_ids=new_ids)
+        enrich_mappings_with_existing_attributes(
+            old_mapping=old_mapping, new_mapping=mapping, new_ids=new_ids
+        )
 
     await write_yaml(mapping_path, mapping)
 
@@ -85,32 +84,81 @@ def get_attributes_for_mapping(object: Organization | Queue | Hook | Schema | In
     return {"id": object.id, "name": object.name, "target": None}
 
 
-def enrich_mappings_with_targets(old_mapping: dict, new_mapping: dict, new_ids: list[int]):
+def index_mappings_by_object_id(sub_mapping: list[dict]):
+    indexed = {sm["id"]: sm for sm in sub_mapping}
+    return indexed
+
+
+def enrich_mapping_with_previous_properties(
+    new_sub_mapping: dict, old_sub_mapping: dict
+):
+    for k, v in old_sub_mapping.items():
+        if k not in new_sub_mapping:
+            new_sub_mapping[k] = v
+
+
+def enrich_mappings_with_existing_attributes(
+    old_mapping: dict, new_mapping: dict, new_ids: list[int]
+):
+    """Use targets from the previous mapping, but only if the target objects were not deleted in Rossum"""
     new_mapping["organization"]["target"] = old_mapping["organization"]["target"]
 
-    schema_targets = {
-        s["id"]: s["target"] for s in old_mapping["organization"]["schemas"]
-    }
-    for schema in new_mapping["organization"]["schemas"]:
-        target = schema_targets.get(schema["id"], None)
-        schema["target"] = target if target in new_ids else None
+    old_schema_mappings = index_mappings_by_object_id(
+        old_mapping["organization"]["schemas"]
+    )
+    for new_schema_mapping in new_mapping["organization"]["schemas"]:
+        old_schema_mapping = old_schema_mappings.get(new_schema_mapping["id"], {})
+        enrich_mapping_with_previous_properties(new_schema_mapping, old_schema_mapping)
 
-    hook_targets = {h["id"]: h["target"] for h in old_mapping["organization"]["hooks"]}
-    for hook in new_mapping["organization"]["hooks"]:
-        target = hook_targets.get(hook["id"], None)
-        hook["target"] = target if target in new_ids else None
+        target = old_schema_mapping.get("target", None)
+        new_schema_mapping["target"] = target if target in new_ids else None
 
-    workspace_and_queue_targets = {
-        ws["id"]: ws for ws in old_mapping["organization"]["workspaces"]
-    }
-    for ws in workspace_and_queue_targets.values():
-        ws["queues"] = {q["id"]: q["target"] for q in ws["queues"]}
-    for workspace in new_mapping["organization"]["workspaces"]:
-        ws_target = workspace_and_queue_targets[workspace["id"]].get("target", None)
-        ws["target"] = ws_target if ws_target in new_ids else None
-        for queue in workspace["queues"]:
-            queue_target =workspace_and_queue_targets[workspace["id"]]["queues"].get(queue['id'], None)
-            queue["target"] = queue_target if queue_target in new_ids else None
+    old_hook_mappings = index_mappings_by_object_id(
+        old_mapping["organization"]["hooks"]
+    )
+    for new_hook_mapping in new_mapping["organization"]["hooks"]:
+        old_hook_mapping = old_hook_mappings.get(new_hook_mapping["id"], {})
+        enrich_mapping_with_previous_properties(new_hook_mapping, old_hook_mapping)
+
+        target = old_hook_mapping.get("target", None)
+        new_hook_mapping["target"] = target if target in new_ids else None
+
+    old_workspace_mappings = index_mappings_by_object_id(
+        old_mapping["organization"]["workspaces"]
+    )
+    for new_workspace_mapping in new_mapping["organization"]["workspaces"]:
+        old_workspace_mapping = old_workspace_mappings.get(
+            new_workspace_mapping["id"], {}
+        )
+        enrich_mapping_with_previous_properties(
+            new_workspace_mapping, old_workspace_mapping
+        )
+
+        target = old_workspace_mapping.get("target", None)
+        new_workspace_mapping["target"] = target if target in new_ids else None
+
+        old_queue_mappings = index_mappings_by_object_id(
+            old_workspace_mapping["queues"]
+        )
+        for new_queue_mapping in new_workspace_mapping["queues"]:
+            old_queue_mapping = old_queue_mappings.get(new_queue_mapping["id"], {})
+            enrich_mapping_with_previous_properties(
+                new_queue_mapping, old_queue_mapping
+            )
+
+            target = old_queue_mapping.get("target", None)
+            new_queue_mapping["target"] = target if target in new_ids else None
+
+            if new_queue_mapping.get("inbox", None):
+                old_inbox_mapping = old_queue_mapping.get("inbox", {})
+                enrich_mapping_with_previous_properties(
+                    new_queue_mapping["inbox"], old_inbox_mapping
+                )
+                
+                target = old_inbox_mapping.get("target", None)
+                new_queue_mapping["inbox"]["target"] = (
+                    target if target in new_ids else None
+                )
 
 
 def extract_targets(mapping: dict) -> dict:

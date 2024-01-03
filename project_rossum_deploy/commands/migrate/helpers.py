@@ -4,8 +4,6 @@ import httpx
 from rossum_api import ElisAPIClient
 
 from project_rossum_deploy.utils.functions import extract_id_from_url
-from project_rossum_deploy.utils.consts import settings
-
 
 def replace_dependency_url(object: dict, dependency: str, source_id_target_pairs: dict):
     if isinstance(object[dependency], list):
@@ -47,11 +45,6 @@ async def _delete_migrated_object(client: httpx.AsyncClient, object_url: str):
 
 # Debug function to clean up
 async def _delete_migrated_objects(object_urls: list[str]):
-    elis = ElisAPIClient(
-        base_url=settings.API_URL,
-        username=settings.USERNAME,
-        password=settings.PASSWORD,
-    )
     token = "0bc0524610e5c84253603811bd94d02c5296334d"
 
     async with httpx.AsyncClient(headers={"Authorization": f"Token {token}"}) as client:
