@@ -71,10 +71,10 @@ Initialized when not existing or empty during `pull` command. Missing object rec
 `attribute_override` - keys representing attributes of the object on Rossum API are replaced with the value associated with the key during `release` call.  
 `attribute_override.{key}` - name of the attribute to be replaced with value of the key - for instance `settings` of a hook -- example: `attribute_override.name: "my production hook"`. `source` hook's name "my test hook" is renamed to "my production hook" when deploying the hook to `target` environment  
 `attribute_override.{key}.path` - path is used when only substring of the attribute's value should be overriden. Used to replace mainly queue IDs commonly referenced in various hook.settings.  
-`attribute_override.{key}.variable type` - used when path is defined. This attribute defines what value type is being overriden and looks for its counterpart in the `mapping.yaml` file (source<>target)  
+`attribute_override.{key}.variable_type` - used when path is defined. This attribute defines what value type is being overriden and looks for its counterpart in the `mapping.yaml` file (source<>target)  
 &nbsp;&nbsp;&nbsp;&nbsp;**_Example of attribute override with path:_**  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`attribute_override.settings.path.configurations[].queue_ids`  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`attribute_override.{key}.variable type:queue` - when `release` is called, `source` `hook.settings` is parsed, the path defined is found and all queue references (supports integers, strings and URLs) are replaced with their `target` counterparts. 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`attribute_override.settings.path.configurations.queue_ids`  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`attribute_override.{key}.variable_type:queue` - when `release` is called, `source` `hook.settings` is parsed, the path defined is found and all queue references (supports integers, strings and URLs) are replaced with their `target` counterparts. 
 
 
 **Commands**
