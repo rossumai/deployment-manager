@@ -2,7 +2,11 @@ import click
 
 from project_rossum_deploy.commands.download.download import download_organization
 from project_rossum_deploy.commands.initialize import init_project
-from project_rossum_deploy.commands.migrate import migrate_project
+from project_rossum_deploy.commands.migrate.migrate import migrate_project
+
+# TODO: rename commands
+
+# TODO: uppercase schemas, hooks, queues...
 
 # TODO: attribute_override updating in mapping
 
@@ -10,10 +14,13 @@ from project_rossum_deploy.commands.migrate import migrate_project
 # Update only what changed (programmatically call git to find out)
 
 # TODO: Migrate
-# ? PATCH dependency of hook to includes a queue: does the queue automatically get its dependency patched as wel?
+# TODO: fix null inbox when migrating
 # TODO: Aggregate errors and log them into a single file and STDOUT
 
 # TODO: change .env to config.yaml
+
+# TODO: Push functionality
+# TODO: push --all
 
 @click.group()
 @click.version_option()

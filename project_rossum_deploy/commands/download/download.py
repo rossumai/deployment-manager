@@ -125,7 +125,8 @@ async def download_queues_for_workspace(
         await write_json(queue_path / "queue.json", queue)
 
         inbox_id = extract_id_from_url(queue.inbox)
-        queue.inbox = await download_inbox(client, queue_path, inbox_id)
+        if inbox_id:
+            queue.inbox = await download_inbox(client, queue_path, inbox_id)
         queues.append(queue)
 
     return queues

@@ -36,11 +36,12 @@ async def create_update_mapping(
         }
         for q in workspace.queues:
             new_ids.append(q.id)
-            new_ids.append(q.inbox.id)
+            if q.inbox:
+                new_ids.append(q.inbox.id)
 
             queue_mapping = {
                 **get_attributes_for_mapping(q),
-                "inbox": get_attributes_for_mapping(q.inbox),
+                "inbox": get_attributes_for_mapping(q.inbox) if q.inbox else None,
             }
             ws_mapping["queues"].append(queue_mapping)
 
@@ -126,7 +127,7 @@ def extract_targets(mapping: dict) -> dict:
         for q in ws["queues"]:
             if q["target"]:
                 targets["queues"].append(q["target"])
-            if q["inbox"]["target"]:
+            if q["inbox"] and q["inbox"]["target"]:
                 targets["inboxes"].append(q["inbox"]["target"])
 
     targets["schemas"] = []

@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     SOURCE_DIRNAME: str = 'source'
     TARGET_DIRNAME: str = 'target'
 
+    ORGANIZATION_FIELDS: list[str] = ['ui_settings', 'metadata']
+
     class Config:
         model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
