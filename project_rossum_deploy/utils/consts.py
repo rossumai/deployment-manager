@@ -22,15 +22,24 @@ class Settings(BaseSettings):
     TO_USERNAME: Optional[str] = None
     TO_PASSWORD: Optional[str] = None
 
-    SOURCE_DIRNAME: str = 'source'
-    TARGET_DIRNAME: str = 'target'
+    SOURCE_DIRNAME: str = "source"
+    TARGET_DIRNAME: str = "target"
 
-    ORGANIZATION_FIELDS: list[str] = ['ui_settings', 'metadata']
+    ORGANIZATION_FIELDS: list[str] = ["ui_settings", "metadata"]
 
-    INITIALIZE_COMMAND_NAME: str = 'init'
-    DOWNLOAD_COMMAND_NAME: str = 'pull'
-    UPLOAD_COMMAND_NAME: str = 'push'
-    MIGRATE_COMMAND_NAME: str = 'release'
+    MAPPING_UPPERCASE_FIELDS: list[str] = [
+        "organization",
+        "workspaces",
+        "queues",
+        "inbox",
+        "schemas",
+        "hooks",
+    ]
+
+    INITIALIZE_COMMAND_NAME: str = "init"
+    DOWNLOAD_COMMAND_NAME: str = "pull"
+    UPLOAD_COMMAND_NAME: str = "push"
+    MIGRATE_COMMAND_NAME: str = "release"
 
     class Config:
         model_config = SettingsConfigDict(env_file=".env", extra="ignore")

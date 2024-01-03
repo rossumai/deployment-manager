@@ -6,6 +6,7 @@ from anyio import Path
 import click
 from rossum_api import ElisAPIClient
 from project_rossum_deploy.commands.download.download import download_organization
+from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.migrate.helpers import (
     _delete_migrated_objects,
     check_same_org_migration,
@@ -25,8 +26,6 @@ from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     coro,
     detemplatize_name_id,
-    read_yaml,
-    write_yaml,
 )
 
 
@@ -48,7 +47,7 @@ The specifics of what objects to migrate where can be specified in a mapping.yam
 async def migrate_project(mapping: str):
     mapping_file = mapping
     org_path = Path("./")
-    mapping = read_yaml(org_path / mapping_file)
+    mapping = await read_mapping(org_path / mapping_file)
 
     target_organization = mapping["organization"]["target"]
     if not target_organization:
@@ -90,7 +89,7 @@ async def migrate_project(mapping: str):
         )
 
         # Update the mapping with right hand sides (targets) created during migration
-        await write_yaml(org_path / mapping_file, mapping)
+        await write_mapping(org_path / mapping_file, mapping)
     except Exception as e:
         logging.error("Unexpected error while migrating objects:")
         logging.exception(e)

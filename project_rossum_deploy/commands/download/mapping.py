@@ -2,7 +2,20 @@ from anyio import Path
 from rossum_api.models import Organization, Workspace, Hook, Schema, Queue, Inbox
 
 from project_rossum_deploy.utils.consts import settings
-from project_rossum_deploy.utils.functions import read_yaml, write_yaml
+from project_rossum_deploy.utils.functions import adjust_keys, read_yaml, write_yaml
+
+
+async def read_mapping(mapping_path: Path):
+    if await mapping_path.exists():
+        mapping = read_yaml(mapping_path)
+        return adjust_keys(mapping)
+
+    return None
+
+
+async def write_mapping(mapping_path: Path, mapping: dict):
+    mapping = adjust_keys(mapping, lower=False)
+    await write_yaml(mapping_path, mapping)
 
 
 async def create_update_mapping(
@@ -11,6 +24,7 @@ async def create_update_mapping(
     workspaces_for_mapping: list[Workspace],
     hooks_for_mapping: list[Hook],
     schemas_for_mapping: list[Schema],
+    old_mapping: dict,
     previous_targets: dict[list],
 ):
     mapping = create_empty_mapping()
@@ -58,14 +72,11 @@ async def create_update_mapping(
             continue
         mapping["organization"]["schemas"].append(get_attributes_for_mapping(schema))
 
-    mapping_path = org_path / settings.MAPPING_FILENAME
-    if await mapping_path.exists():
-        old_mapping = read_yaml(mapping_path)
-        enrich_mappings_with_existing_attributes(
-            old_mapping=old_mapping, new_mapping=mapping, new_ids=new_ids
-        )
+    enrich_mappings_with_existing_attributes(
+        old_mapping=old_mapping, new_mapping=mapping, new_ids=new_ids
+    )
 
-    await write_yaml(mapping_path, mapping)
+    await write_mapping(org_path / settings.MAPPING_FILENAME, mapping)
 
 
 def create_empty_mapping():
@@ -163,6 +174,9 @@ def enrich_mappings_with_existing_attributes(
 
 
 def extract_targets(mapping: dict) -> dict:
+    if not mapping:
+        mapping = create_empty_mapping()
+
     targets = {}
 
     targets["organization"] = mapping["organization"]["target"]

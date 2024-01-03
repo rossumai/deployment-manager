@@ -2,9 +2,12 @@ import asyncio
 from functools import wraps
 import dataclasses
 import json
+from typing import Any
 from anyio import Path
 
 import yaml
+
+from project_rossum_deploy.utils.consts import settings
 
 
 def coro(f):
@@ -50,3 +53,23 @@ async def write_yaml(path: Path, object: dict):
 def read_yaml(path: Path):
     with open(path, "r") as rf:
         return yaml.safe_load(rf)
+
+def adjust_keys(object: Any, lower: bool = True):
+    if isinstance(object, dict):
+        lowercased = {}
+        for k, v in object.items():
+            new_key = k
+            if lower:
+                new_key = k.lower()
+            elif not lower and k in settings.MAPPING_UPPERCASE_FIELDS:
+                new_key = k.upper()
+            lowercased[new_key] = adjust_keys(v, lower)
+        return lowercased
+    elif isinstance(object, list):
+        lowercased = []
+        for v in object:
+            lowercased.append(adjust_keys(v, lower))
+        return lowercased
+    else:
+        return object
+    

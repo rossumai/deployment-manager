@@ -6,16 +6,15 @@ from rossum_api.api_client import Resource
 
 import click
 from project_rossum_deploy.commands.download.mapping import (
-    create_empty_mapping,
     create_update_mapping,
     extract_targets,
+    read_mapping,
 )
 
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     coro,
     extract_id_from_url,
-    read_yaml,
     templatize_name_id,
     write_json,
 )
@@ -33,6 +32,7 @@ In case the directory already exists, it first deletes its contents and then dow
 async def download_organization_wrapper():
     # To be able to run the download progammatically without the CLI decorators
     await download_organization()
+
 
 async def download_organization():
     client = ElisAPIClient(
@@ -53,15 +53,12 @@ async def download_organization():
 
     await write_json(org_config_path, organization)
 
-    mapping_path = org_path / settings.MAPPING_FILENAME
-    mapping = (
-        read_yaml(mapping_path)
-        if await mapping_path.exists()
-        else create_empty_mapping()
-    )
+    mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
     previous_targets = extract_targets(mapping)
 
-    workspaces_for_mapping = await download_workspaces(client, org_path, previous_targets)
+    workspaces_for_mapping = await download_workspaces(
+        client, org_path, previous_targets
+    )
     schemas_for_mapping = await download_schemas(client, org_path, previous_targets)
     hooks_for_mapping = await download_hooks(client, org_path, previous_targets)
 
@@ -71,6 +68,7 @@ async def download_organization():
         workspaces_for_mapping=workspaces_for_mapping,
         schemas_for_mapping=schemas_for_mapping,
         hooks_for_mapping=hooks_for_mapping,
+        old_mapping=mapping,
         previous_targets=previous_targets,
     )
 
