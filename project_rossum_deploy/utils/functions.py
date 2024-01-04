@@ -39,7 +39,7 @@ async def write_json(path: Path, object: dict):
     if path.parent:
         await path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as wf:
-        json.dump(object, wf)
+        json.dump(object, wf, indent=2)
 
 
 async def write_yaml(path: Path, object: dict):
