@@ -14,13 +14,17 @@ def replace_dependency_url(object: dict, dependency: str, source_id_target_pairs
         for old_url in object[dependency]:
             old_id = extract_id_from_url(old_url)
             if new_object := source_id_target_pairs.get(old_id, None):
-                new_urls.append(new_object["url"])
+                new_url = old_url.replace(str(old_id), str(new_object['id']))
+                new_urls.append(new_url)
         object[dependency] = new_urls
     else:
         if new_object := source_id_target_pairs.get(
             extract_id_from_url(object[dependency]), None
         ):
-            object[dependency] = new_object["url"]
+            old_url = object[dependency]
+            old_id = extract_id_from_url(old_url)
+            new_url = old_url.replace(str(old_id), str(new_object['id']))
+            object[dependency] = new_url
 
 
 def find_mapping_of_object(sub_mapping: list[dict], id: int):

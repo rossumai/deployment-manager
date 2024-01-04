@@ -117,8 +117,10 @@ async def migrate_schemas(source_path: Path, client: ElisAPIClient, mapping: dic
     source_id_target_pairs = {}
     async for schema_path in (source_path / "schemas").iterdir():
         try:
-            name, id = detemplatize_name_id(schema_path.stem)
+            _, id = detemplatize_name_id(schema_path.stem)
             schema = json.loads(await schema_path.read_text())
+
+            schema["queues"] = []
 
             schema_mapping = find_mapping_of_object(
                 mapping["organization"]["schemas"], id
@@ -142,9 +144,11 @@ async def migrate_workspaces(
 ):
     async for ws_path in (source_path / "workspaces").iterdir():
         try:
-            name, id = detemplatize_name_id(ws_path.stem)
+            _, id = detemplatize_name_id(ws_path.stem)
             ws_config_path = ws_path / "workspace.json"
             workspace = json.loads(await ws_config_path.read_text())
+
+            workspace["queues"] = []
 
             workspace_mapping = find_mapping_of_object(
                 mapping["organization"]["workspaces"], id
@@ -180,14 +184,16 @@ async def migrate_queues_and_inboxes(
 
     async for queue_path in (ws_path / "queues").iterdir():
         try:
-            name, id = detemplatize_name_id(queue_path.stem)
+            _, id = detemplatize_name_id(queue_path.stem)
 
             queue_config_path = queue_path / "queue.json"
             queue = json.loads(await queue_config_path.read_text())
 
             replace_dependency_url(queue, "workspace", source_id_target_pairs)
             replace_dependency_url(queue, "schema", source_id_target_pairs)
+            # Both should be updated, otherwise Elis API uses 'webhooks' in case of a mismatch even though it is deprecated
             replace_dependency_url(queue, "hooks", source_id_target_pairs)
+            replace_dependency_url(queue, "webhooks", source_id_target_pairs)
             del queue["inbox"]
 
             queue_mapping = find_mapping_of_object(workspace_mapping["queues"], id)
