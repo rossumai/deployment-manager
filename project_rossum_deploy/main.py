@@ -11,8 +11,6 @@ from project_rossum_deploy.commands.upload import upload_project
 
 # TODO: preserve comments in yaml
 
-# TODO: support token authentication (for support accounts)
-
 # TODO: Migrate
 # TODO: Aggregate errors and log them into a single file and STDOUT
 

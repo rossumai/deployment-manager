@@ -38,6 +38,7 @@ async def upload_project(destination):
     if destination == settings.SOURCE_DIRNAME or is_org_targetting_itself(mapping):
         client = ElisAPIClient(
             base_url=settings.API_URL,
+            token=settings.TOKEN,
             username=settings.USERNAME,
             password=settings.PASSWORD,
         )

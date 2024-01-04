@@ -58,12 +58,14 @@ async def migrate_project(mapping: str):
     if is_org_targetting_itself(mapping):
         client = ElisAPIClient(
             base_url=settings.API_URL,
+            token=settings.TOKEN,
             username=settings.USERNAME,
             password=settings.PASSWORD,
         )
     else:
         client = ElisAPIClient(
             base_url=settings.TO_API_URL,
+            token=settings.TO_TOKEN,
             username=settings.TO_USERNAME,
             password=settings.TO_PASSWORD,
         )

@@ -39,11 +39,15 @@ async def download_organization_wrapper():
 async def download_organization():
     client = ElisAPIClient(
         base_url=settings.API_URL,
+        token=settings.TOKEN,
         username=settings.USERNAME,
         password=settings.PASSWORD,
     )
 
-    organization = await client.retrieve_own_organization()
+    organizations = [org async for org in client.list_all_organizations()]
+    if not len(organizations):
+        raise click.ClickException('No organization found.')
+    organization = await client.retrieve_organization(organizations[0].id)
 
     org_path = Path("./")
     org_config_path = org_path / "organization.json"
@@ -193,7 +197,7 @@ async def download_hooks(
         hook_config_path = (
             org_path
             / destination
-            / 'hooks'
+            / "hooks"
             / f"{templatize_name_id(hook.name, hook.id)}.json"
         )
         await write_json(hook_config_path, hook)

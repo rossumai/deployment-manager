@@ -1,6 +1,5 @@
 from enum import StrEnum
 import logging
-from typing import Optional
 
 import dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -14,14 +13,16 @@ dotenv.load_dotenv()
 
 class Settings(BaseSettings):
     API_BASE: str = "https://you-forgot-to-cd-into-project.com"
+    TOKEN: str = ""
     USERNAME: str = ""
     PASSWORD: str = ""
 
     MAPPING_FILENAME: str = "mapping.yaml"
 
-    TO_API_BASE: Optional[str] = None
-    TO_USERNAME: Optional[str] = None
-    TO_PASSWORD: Optional[str] = None
+    TO_API_BASE: str = ""
+    TO_TOKEN: str = ""
+    TO_USERNAME: str = ""
+    TO_PASSWORD: str = ""
 
     SOURCE_DIRNAME: str = "source"
     TARGET_DIRNAME: str = "target"
@@ -56,13 +57,12 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+
 class GIT_CHARACTERS(StrEnum):
-    DELETED = 'D'
-    UPDATED = 'M'
-    CREATED = '??'
+    DELETED = "D"
+    UPDATED = "M"
+    CREATED = "??"
+
 
 # Outside of Settings so that it can be referenced
-PUSH_IGNORED_FIELDS = [
-    settings.MAPPING_FILENAME,
-    '.gitignore'
-]
+PUSH_IGNORED_FIELDS = [settings.MAPPING_FILENAME, ".gitignore"]
