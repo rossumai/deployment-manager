@@ -1,13 +1,15 @@
-import os
-import shutil
 from anyio import Path
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
 import click
+from project_rossum_deploy.commands.download.helpers import (
+    determine_object_destination,
+    delete_current_configuration,
+    extract_sources_targets,
+)
 from project_rossum_deploy.commands.download.mapping import (
     create_update_mapping,
-    extract_targets,
     read_mapping,
 )
 
@@ -30,7 +32,7 @@ In case the directory already exists, it first deletes its contents and then dow
 )
 @coro
 async def download_organization_wrapper():
-    # To be able to run the download progammatically without the CLI decorators
+    # To be able to run the download command progammatically without the CLI decorators
     await download_organization()
 
 
@@ -54,13 +56,29 @@ async def download_organization():
     await write_json(org_config_path, organization)
 
     mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
-    previous_targets = extract_targets(mapping)
+    previous_sources, previous_targets = extract_sources_targets(mapping)
 
     workspaces_for_mapping = await download_workspaces(
-        client, org_path, previous_targets
+        client=client,
+        org_path=org_path,
+        mapping=mapping,
+        sources=previous_sources,
+        targets=previous_targets,
     )
-    schemas_for_mapping = await download_schemas(client, org_path, previous_targets)
-    hooks_for_mapping = await download_hooks(client, org_path, previous_targets)
+    schemas_for_mapping = await download_schemas(
+        client=client,
+        org_path=org_path,
+        mapping=mapping,
+        sources=previous_sources,
+        targets=previous_targets,
+    )
+    hooks_for_mapping = await download_hooks(
+        client=client,
+        org_path=org_path,
+        mapping=mapping,
+        sources=previous_sources,
+        targets=previous_targets,
+    )
 
     await create_update_mapping(
         org_path=org_path,
@@ -69,37 +87,27 @@ async def download_organization():
         schemas_for_mapping=schemas_for_mapping,
         hooks_for_mapping=hooks_for_mapping,
         old_mapping=mapping,
-        previous_targets=previous_targets,
     )
 
 
-async def delete_current_configuration(org_path: Path):
-    # We do not delete mapping.yaml on purposes
-    os.remove(org_path / "organization.json")
-    spaces = [settings.SOURCE_DIRNAME, settings.TARGET_DIRNAME]
-    paths_to_delete = ["workspaces", "schemas", "hooks"]
-    for space in spaces:
-        space_path = org_path / space
-        if await space_path.exists():
-            for path in paths_to_delete:
-                path = space_path / path
-                if await path.exists():
-                    shutil.rmtree(path)
-
-
-async def download_workspaces(client: ElisAPIClient, parent_dir: Path, targets: dict):
-    # workspaces = [ws async for ws in client.list_all_workspaces()]
+async def download_workspaces(
+    client: ElisAPIClient, org_path: Path, mapping: dict, sources: dict, targets: dict
+):
     workspaces = []
 
     async for workspace in client.list_all_workspaces():
         workspace = await client.retrieve_workspace(workspace.id)
+        destination = await determine_object_destination(
+            object=workspace,
+            object_type="workspace",
+            org_path=org_path,
+            mapping=mapping,
+            sources=sources,
+            targets=targets,
+        )
         workspace_config_path = (
-            parent_dir
-            / (
-                settings.TARGET_DIRNAME
-                if workspace.id in targets["workspaces"]
-                else settings.SOURCE_DIRNAME
-            )
+            org_path
+            / destination
             / "workspaces"
             / templatize_name_id(workspace.name, workspace.id)
             / "workspace.json"
@@ -110,7 +118,7 @@ async def download_workspaces(client: ElisAPIClient, parent_dir: Path, targets: 
         workspace.queues = await download_queues_for_workspace(
             client, workspace_config_path.parent, workspace.id
         )
-        workspaces.append(workspace)
+        workspaces.append((destination, workspace))
 
     return workspaces
 
@@ -141,42 +149,54 @@ async def download_inbox(client: ElisAPIClient, parent_dir: Path, inbox_id: int)
     return inbox
 
 
-# Only schemas actually need to be retrieved individually (since when only listing them, their contents are missing)
-async def download_schemas(client: ElisAPIClient, parent_dir: Path, targets: dict):
+# Only schemas actually need to be retrieved individually (since when listing them using GET /schemas, their contents are missing)
+async def download_schemas(
+    client: ElisAPIClient, org_path: Path, mapping: dict, sources: dict, targets: dict
+):
     schemas = []
     async for schema in client.list_all_schemas():
         schema = await client.retrieve_schema(schema.id)
+        destination = await determine_object_destination(
+            object=schema,
+            object_type="schema",
+            org_path=org_path,
+            mapping=mapping,
+            sources=sources,
+            targets=targets,
+        )
         schema_config_path = (
-            parent_dir
-            / (
-                settings.TARGET_DIRNAME
-                if schema.id in targets["schemas"]
-                else settings.SOURCE_DIRNAME
-            )
+            org_path
+            / destination
             / "schemas"
             / f"{templatize_name_id(schema.name, schema.id)}.json"
         )
         await write_json(schema_config_path, schema)
-        schemas.append(schema)
+        schemas.append((destination, schema))
 
     return schemas
 
 
-async def download_hooks(client: ElisAPIClient, parent_dir: Path, targets: dict):
+async def download_hooks(
+    client: ElisAPIClient, org_path: Path, mapping: dict, sources: dict, targets: dict
+):
     hooks = []
     async for hook in client.list_all_hooks():
         hook = await client.retrieve_hook(hook.id)
+        destination = await determine_object_destination(
+            object=hook,
+            object_type="hook",
+            org_path=org_path,
+            mapping=mapping,
+            sources=sources,
+            targets=targets,
+        )
         hook_config_path = (
-            parent_dir
-            / (
-                settings.TARGET_DIRNAME
-                if hook.id in targets["hooks"]
-                else settings.SOURCE_DIRNAME
-            )
-            / "hooks"
+            org_path
+            / destination
+            / 'hooks'
             / f"{templatize_name_id(hook.name, hook.id)}.json"
         )
         await write_json(hook_config_path, hook)
-        hooks.append(hook)
+        hooks.append((destination, hook))
 
     return hooks

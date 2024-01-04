@@ -25,7 +25,6 @@ async def create_update_mapping(
     hooks_for_mapping: list[Hook],
     schemas_for_mapping: list[Schema],
     old_mapping: dict,
-    previous_targets: dict[list],
 ):
     mapping = create_empty_mapping()
 
@@ -37,7 +36,7 @@ async def create_update_mapping(
     # If yes, ignore old mapping that assigns this target to some left (source) object
     new_ids = []
 
-    for workspace in workspaces_for_mapping:
+    for destination, workspace in workspaces_for_mapping:
         new_ids.append(workspace.id)
         ws_mapping = {
             **get_attributes_for_mapping(workspace),
@@ -55,20 +54,20 @@ async def create_update_mapping(
             ws_mapping["queues"].append(queue_mapping)
 
         # Throw away the mapping, we just want the ids for objects that are targeted by something (based on the old mapping)
-        if workspace.id in previous_targets["workspaces"]:
+        if destination == settings.TARGET_DIRNAME:
             continue
 
         mapping["organization"]["workspaces"].append(ws_mapping)
 
-    for hook in hooks_for_mapping:
+    for destination, hook in hooks_for_mapping:
         new_ids.append(hook.id)
-        if hook.id in previous_targets["hooks"]:
+        if destination == settings.TARGET_DIRNAME:
             continue
         mapping["organization"]["hooks"].append(get_attributes_for_mapping(hook))
 
-    for schema in schemas_for_mapping:
+    for destination, schema in schemas_for_mapping:
         new_ids.append(schema.id)
-        if schema.id in previous_targets["schemas"]:
+        if destination == settings.TARGET_DIRNAME:
             continue
         mapping["organization"]["schemas"].append(get_attributes_for_mapping(schema))
 
@@ -92,7 +91,9 @@ def create_empty_mapping():
     }
 
 
-def get_attributes_for_mapping(object: Organization | Queue | Hook | Schema | Inbox):
+def get_attributes_for_mapping(
+    object: Organization | Workspace | Queue | Hook | Schema | Inbox,
+):
     return {"id": object.id, "name": object.name, "target": None}
 
 
@@ -171,36 +172,3 @@ def enrich_mappings_with_existing_attributes(
                 new_queue_mapping["inbox"]["target"] = (
                     target if target in new_ids else None
                 )
-
-
-def extract_targets(mapping: dict) -> dict:
-    if not mapping:
-        mapping = create_empty_mapping()
-
-    targets = {}
-
-    targets["organization"] = mapping["organization"]["target"]
-
-    targets["workspaces"] = []
-    targets["queues"] = []
-    targets["inboxes"] = []
-    for ws in mapping["organization"]["workspaces"]:
-        if ws["target"]:
-            targets["workspaces"].append(ws["target"])
-        for q in ws["queues"]:
-            if q["target"]:
-                targets["queues"].append(q["target"])
-            if q["inbox"] and q["inbox"]["target"]:
-                targets["inboxes"].append(q["inbox"]["target"])
-
-    targets["schemas"] = []
-    for schema in mapping["organization"]["schemas"]:
-        if schema["target"]:
-            targets["schemas"].append(schema["target"])
-
-    targets["hooks"] = []
-    for hook in mapping["organization"]["hooks"]:
-        if hook["target"]:
-            targets["hooks"].append(hook["target"])
-
-    return targets
