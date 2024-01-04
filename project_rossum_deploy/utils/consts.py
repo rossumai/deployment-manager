@@ -1,3 +1,4 @@
+from enum import StrEnum
 import logging
 from typing import Optional
 
@@ -54,3 +55,14 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+class GIT_CHARACTERS(StrEnum):
+    DELETED = 'D'
+    UPDATED = 'M'
+    CREATED = '??'
+
+# Outside of Settings so that it can be referenced
+PUSH_IGNORED_FIELDS = [
+    settings.MAPPING_FILENAME,
+    '.gitignore'
+]

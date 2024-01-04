@@ -3,6 +3,7 @@ import click
 from project_rossum_deploy.commands.download.download import download_organization_wrapper
 from project_rossum_deploy.commands.initialize import init_project
 from project_rossum_deploy.commands.migrate.migrate import migrate_project
+from project_rossum_deploy.commands.upload import upload_project
 
 # TODO: handle unknown objects when pulling:
 # Check if that object is not in target already (to not reprompt the user)
@@ -36,4 +37,5 @@ def main():
 
 main.add_command(download_organization_wrapper)
 main.add_command(init_project)
+main.add_command(upload_project)
 main.add_command(migrate_project)

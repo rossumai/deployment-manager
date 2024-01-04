@@ -9,7 +9,7 @@ from project_rossum_deploy.commands.download.download import download_organizati
 from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.migrate.helpers import (
     _delete_migrated_objects,
-    check_same_org_migration,
+    is_org_targetting_itself,
     find_mapping_of_object,
     replace_dependency_url,
 )
@@ -55,7 +55,7 @@ async def migrate_project(mapping: str):
             "No target for organization. If you want to migrate inside the same organization, just target its own ID."
         )
 
-    if check_same_org_migration(target_organization, mapping):
+    if is_org_targetting_itself(mapping):
         client = ElisAPIClient(
             base_url=settings.API_URL,
             username=settings.USERNAME,
@@ -104,7 +104,7 @@ async def migrate_project(mapping: str):
 
     # TODO: attribute override
 
-    if check_same_org_migration(target_organization, mapping):
+    if is_org_targetting_itself(mapping):
         click.echo(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects.")
         await download_organization()
     else:
