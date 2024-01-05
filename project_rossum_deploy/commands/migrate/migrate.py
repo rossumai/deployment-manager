@@ -16,10 +16,7 @@ from project_rossum_deploy.commands.migrate.helpers import (
     replace_dependency_url,
 )
 from project_rossum_deploy.commands.migrate.hooks import migrate_hooks
-<<<<<<< HEAD
-=======
 from project_rossum_deploy.commands.upload import update_object
->>>>>>> d4ebea2 (Incorporate attribute_override to RELEASE command)
 from project_rossum_deploy.common.attribute_override import override_attributes
 from project_rossum_deploy.common.upload import (
     upload_inbox,
@@ -119,8 +116,6 @@ async def migrate_project(mapping: str):
         click.echo("These target objects were created:")
         click.echo(new_target_ids)
 
-<<<<<<< HEAD
-=======
     # In case of newly created objects, there could be references which did not exist at the time of the objects' creation
     # Attribute override is therefore run again for such objects.
     for mapping_object in traverse_mapping(previous_mapping):
@@ -133,7 +128,6 @@ async def migrate_project(mapping: str):
             new_object = override_attributes(mapping, mapping_object, new_object)
             await update_object(path=None, client=client, object=new_object)
 
->>>>>>> d4ebea2 (Incorporate attribute_override to RELEASE command)
     if is_org_targetting_itself(mapping):
         click.echo(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects.")
         await download_organization()
