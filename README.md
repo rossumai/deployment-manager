@@ -85,16 +85,14 @@ Initialized when not existing or empty during `pull` command. Missing object rec
 **Commands**
 
     `pull`
-Pulls (downloads) all objects from the `source` environment and creates/updates folder/file structure in `source` folder in local repository. Environment (organization) used is the organization of the user. If no `mapping.yaml` file is existing, file is created and populated with records describing the pulled objects. If `mapping.yaml` is already existing, missing records for new objects are created and records for no longer existing objects are removed.
-
-    `pull target`
-Pulls (downloads) all objects from the `target` organization. This operation only creates folder/file structure in the `target` folder if necessary, but does not update `mapping.yaml` in any way. If there are new objects or updated objects in `target`, manual update of the objects in `source` need to be made and `mapping.yaml` updated accordingly.
+Pulls (downloads) all objects from the `source` & `target` environment and creates/updates folder/file structure in `source` folder in local repository. Environment (organization) used is the organization of the user. If no `mapping.yaml` file is existing, file is created and populated with records describing the pulled objects. If `mapping.yaml` is already existing, missing records for new objects are created and records for no longer existing objects are removed.
 
     `push`
 Pushes all eligible (see `mapping.yaml` definition) objects into the `source` organization in Rossum platform. 
 
+    `push target`
+Pushes all eligible objects from local `target` to remote `target`. This command just pushes everything from local `target` to remote `target`.
+
     `release`
 Pushes all eligible objects from local `source` to remote `target`. This command replaces all variables and overriden attributes as defined in `mapping.yaml`
 
-    `release target`
-Pushes all eligible objects from local `target` to remote `target`. This command just pushes everything from local `target` to remote `target`.
