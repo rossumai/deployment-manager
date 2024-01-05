@@ -2,7 +2,7 @@
 #import yaml
 from rossum_api.models import Organization, Workspace, Hook, Schema, Queue, Inbox
 
-def override_attribute(complete_mapping, mapping: dict, object: Organization | Workspace | Hook | Schema | Queue | Inbox) -> Organization | Workspace | Hook | Schema | Queue | Inbox:
+def override_attributes(complete_mapping, mapping: dict, object: Organization | Workspace | Hook | Schema | Queue | Inbox) -> Organization | Workspace | Hook | Schema | Queue | Inbox:
     """ 
     Top level function for attribute_override. Either performs complex lookup in nested path or just replaces attribute with value as is.
     complete_mapping - mapping.yaml converted to JSON

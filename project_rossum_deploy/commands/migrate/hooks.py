@@ -9,6 +9,7 @@ from project_rossum_deploy.commands.migrate.helpers import (
     find_mapping_of_object,
     get_token_owner,
 )
+from project_rossum_deploy.common.attribute_override import override_attributes
 from project_rossum_deploy.common.upload import upload_hook
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
@@ -35,10 +36,17 @@ async def migrate_hooks(source_path: Path, client: ElisAPIClient, mapping: dict)
             hook["token_owner"] = token_owner.url
 
             hook_mapping = find_mapping_of_object(mapping["organization"]["hooks"], id)
-            if not hook_mapping.get("ignore", None):
-                result = await upload_hook(client, hook, hook_mapping["target"])
-                hook_mapping["target"] = result["id"]
-                source_id_target_pairs[id] = result
+            if hook_mapping.get("ignore", None):
+                continue
+
+            hook = override_attributes(
+                complete_mapping=mapping,
+                mapping=hook_mapping,
+                object=hook,
+            )
+            result = await upload_hook(client, hook, hook_mapping["target"])
+            hook_mapping["target"] = result["id"]
+            source_id_target_pairs[id] = result
         except Exception as e:
             logging.error(f"Error while migrating hook '{id}':")
             logging.exception(e)

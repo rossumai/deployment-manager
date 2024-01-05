@@ -7,8 +7,6 @@ from project_rossum_deploy.commands.initialize import init_project
 from project_rossum_deploy.commands.migrate.migrate import migrate_project
 from project_rossum_deploy.commands.upload import upload_project
 
-# TODO: attribute_override updating in mapping
-
 # TODO: preserve comments in yaml
 
 # TODO: Migrate

@@ -14,6 +14,7 @@ from project_rossum_deploy.commands.migrate.helpers import (
     replace_dependency_url,
 )
 from project_rossum_deploy.commands.migrate.hooks import migrate_hooks
+from project_rossum_deploy.common.attribute_override import override_attributes
 from project_rossum_deploy.common.upload import (
     upload_inbox,
     upload_organization,
@@ -104,8 +105,6 @@ async def migrate_project(mapping: str):
     click.echo("These target objects were created/updated:")
     click.echo(_object_urls)
 
-    # TODO: attribute override
-
     if is_org_targetting_itself(mapping):
         click.echo(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects.")
         await download_organization()
@@ -127,10 +126,15 @@ async def migrate_schemas(source_path: Path, client: ElisAPIClient, mapping: dic
             schema_mapping = find_mapping_of_object(
                 mapping["organization"]["schemas"], id
             )
-            if not schema_mapping.get("ignore", None):
-                result = await upload_schema(client, schema, schema_mapping["target"])
-                schema_mapping["target"] = result["id"]
-                source_id_target_pairs[id] = result
+            if schema_mapping.get("ignore", None):
+                continue
+
+            schema = override_attributes(
+                complete_mapping=mapping, mapping=schema_mapping, object=schema
+            )
+            result = await upload_schema(client, schema, schema_mapping["target"])
+            schema_mapping["target"] = result["id"]
+            source_id_target_pairs[id] = result
         except Exception as e:
             logging.error(f'Error while migrationg schema "{id}:')
             logging.exception(e)
@@ -158,6 +162,9 @@ async def migrate_workspaces(
             if workspace_mapping.get("ignore", None):
                 continue
 
+            workspace = override_attributes(
+                complete_mapping=mapping, mapping=workspace_mapping, object=workspace
+            )
             result = await upload_workspace(
                 client, workspace, workspace_mapping["target"]
             )
@@ -166,7 +173,11 @@ async def migrate_workspaces(
             source_id_target_pairs[id] = result
 
             source_id_target_pairs = await migrate_queues_and_inboxes(
-                ws_path, client, workspace_mapping, source_id_target_pairs
+                ws_path=ws_path,
+                client=client,
+                workspace_mapping=workspace_mapping,
+                mapping=mapping,
+                source_id_target_pairs=source_id_target_pairs,
             )
         except Exception as e:
             logging.error(f"Error while migrating workspace '{id}':")
@@ -179,6 +190,7 @@ async def migrate_queues_and_inboxes(
     ws_path: Path,
     client: ElisAPIClient,
     workspace_mapping: dict,
+    mapping: dict,
     source_id_target_pairs: dict,
 ):
     if not (await (ws_path / "queues").exists()):
@@ -202,6 +214,9 @@ async def migrate_queues_and_inboxes(
             if queue_mapping.get("ignore", None):
                 continue
 
+            queue = override_attributes(
+                complete_mapping=mapping, mapping=queue_mapping, object=queue
+            )
             queue_result = await upload_queue(client, queue, queue_mapping["target"])
 
             queue_mapping["target"] = queue_result["id"]
@@ -215,9 +230,10 @@ async def migrate_queues_and_inboxes(
             del inbox["email"]
 
             inbox_mapping = queue_mapping["inbox"]
-
             # Inbox cannot be ignored because a queue depends on it
-
+            inbox = override_attributes(
+                complete_mapping=mapping, mapping=inbox_mapping, object=inbox
+            )
             inbox_result = await upload_inbox(client, inbox, inbox_mapping["target"])
             inbox_mapping["target"] = inbox_result["id"]
             source_id_target_pairs[inbox["id"]] = inbox_result
