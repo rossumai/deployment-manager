@@ -9,10 +9,7 @@ from project_rossum_deploy.commands.migrate.helpers import (
     find_mapping_of_object,
     get_token_owner,
 )
-<<<<<<< HEAD
-=======
 from project_rossum_deploy.utils.consts import settings
->>>>>>> d4ebea2 (Incorporate attribute_override to RELEASE command)
 from project_rossum_deploy.common.attribute_override import override_attributes
 from project_rossum_deploy.common.upload import upload_hook
 from project_rossum_deploy.utils.functions import (
@@ -39,8 +36,6 @@ async def migrate_hooks(source_path: Path, client: ElisAPIClient, mapping: dict)
             if hook_mapping.get("ignore", None):
                 continue
 
-<<<<<<< HEAD
-=======
             if (
                 hook["type"] != "function"
                 and hook.get("config", {}).get("private", None)
@@ -49,7 +44,6 @@ async def migrate_hooks(source_path: Path, client: ElisAPIClient, mapping: dict)
                 # For updating already migrated private hooks, URL cannot be included in the payload
                 hook["config"]["url"] = settings.PRIVATE_HOOK_DUMMY_URL
 
->>>>>>> d4ebea2 (Incorporate attribute_override to RELEASE command)
             hook = override_attributes(
                 complete_mapping=mapping,
                 mapping=hook_mapping,

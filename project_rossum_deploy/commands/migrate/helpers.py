@@ -1,5 +1,4 @@
 from rossum_api import ElisAPIClient
-from project_rossum_deploy.commands.download.helpers import extract_sources_targets
 
 from project_rossum_deploy.utils.functions import extract_id_from_url
 
@@ -50,18 +49,3 @@ def traverse_mapping(mapping: dict):
         yield mapping
         for v in mapping.values():
             yield from traverse_mapping(v)
-
-
-def find_created_target_ids(previous_mapping: dict, source_id_target_pairs: dict):
-    _, previous_targets = extract_sources_targets(previous_mapping)
-    previous_target_ids = []
-    for objects in previous_targets.values():
-        if isinstance(objects, list):
-            previous_target_ids.extend(objects)
-    previous_target_ids = set(previous_target_ids)
-
-    all_target_ids = set()
-    for object in source_id_target_pairs.values():
-        all_target_ids.add(object["id"])
-
-    return all_target_ids.difference(previous_target_ids)
