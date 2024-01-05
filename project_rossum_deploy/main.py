@@ -8,6 +8,7 @@ from project_rossum_deploy.commands.migrate.migrate import migrate_project
 from project_rossum_deploy.commands.upload import upload_project
 
 # TODO: preserve comments in yaml
+# TODO: custom key sorting in yaml
 
 # TODO: Migrate
 # TODO: Aggregate errors and log them into a single file and STDOUT

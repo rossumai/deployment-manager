@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     TARGET_DIRNAME: str = "target"
 
     ORGANIZATION_FIELDS: list[str] = ["ui_settings", "metadata"]
-
+    PRIVATE_HOOK_DUMMY_URL: str = 'https://example.com'
     MAPPING_UPPERCASE_FIELDS: list[str] = [
         "organization",
         "workspaces",

@@ -9,6 +9,10 @@ from project_rossum_deploy.commands.migrate.helpers import (
     find_mapping_of_object,
     get_token_owner,
 )
+<<<<<<< HEAD
+=======
+from project_rossum_deploy.utils.consts import settings
+>>>>>>> d4ebea2 (Incorporate attribute_override to RELEASE command)
 from project_rossum_deploy.common.attribute_override import override_attributes
 from project_rossum_deploy.common.upload import upload_hook
 from project_rossum_deploy.utils.functions import (
@@ -26,10 +30,6 @@ async def migrate_hooks(source_path: Path, client: ElisAPIClient, mapping: dict)
             _, id = detemplatize_name_id(hook_path.stem)
             hook = json.loads(await hook_path.read_text())
 
-            # TODO: handling hook private issues
-            if hook["type"] != "function":
-                continue
-
             hook["run_after"] = []
             hook["queues"] = []
             # Change token owner to TO user (important for cross-org migrations)
@@ -39,6 +39,17 @@ async def migrate_hooks(source_path: Path, client: ElisAPIClient, mapping: dict)
             if hook_mapping.get("ignore", None):
                 continue
 
+<<<<<<< HEAD
+=======
+            if (
+                hook["type"] != "function"
+                and hook.get("config", {}).get("private", None)
+                and not hook_mapping["target"]
+            ):
+                # For updating already migrated private hooks, URL cannot be included in the payload
+                hook["config"]["url"] = settings.PRIVATE_HOOK_DUMMY_URL
+
+>>>>>>> d4ebea2 (Incorporate attribute_override to RELEASE command)
             hook = override_attributes(
                 complete_mapping=mapping,
                 mapping=hook_mapping,
@@ -48,14 +59,34 @@ async def migrate_hooks(source_path: Path, client: ElisAPIClient, mapping: dict)
             hook_mapping["target"] = result["id"]
             source_id_target_pairs[id] = result
         except Exception as e:
-            logging.error(f"Error while migrating hook '{id}':")
-            logging.exception(e)
+            logging.error(f"Error while migrating hook '{id}': {e}")
 
     await migrate_hook_dependency_graph(client, source_path, source_id_target_pairs)
 
     click.echo(
         "Hooks were successfully migrated to target. Please add any necessary secrets manually."
     )
+
+    private_dummy_url_hooks = list(
+        filter(
+            lambda x: x["config"].get("url", None) == settings.PRIVATE_HOOK_DUMMY_URL,
+            source_id_target_pairs.values(),
+        )
+    )
+    if len(private_dummy_url_hooks):
+        click.echo(
+            "Private hooks detected. Please replace dummy URL in the following hooks using Django Admin:",
+        )
+        click.echo(
+            "\n".join(
+                list(
+                    map(
+                        lambda x: f'{x["name"]} ({x["id"]}): {x["url"]}',
+                        private_dummy_url_hooks,
+                    )
+                )
+            )
+        )
 
     return source_id_target_pairs
 
@@ -88,5 +119,6 @@ async def migrate_hook_dependency_graph(
 
                 await upload_hook(client, {"run_after": run_after}, new_hook["id"])
         except Exception as e:
-            logging.error(f"Error while migrating hook '{source_path}':")
-            logging.exception(e)
+            logging.error(
+                f"Error while migrating dependency graph for hook '{source_path}': {e}"
+            )

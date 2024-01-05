@@ -69,7 +69,7 @@ async def upload_project(destination):
             case GIT_CHARACTERS.DELETED:
                 await delete_object(org_path / path, client)
             case GIT_CHARACTERS.UPDATED:
-                await update_object(org_path / path, client)
+                await update_object(client=client, path=org_path / path)
             case _:
                 raise click.ClickException(f'Unrecognized operator "{op}".')
 
@@ -78,13 +78,15 @@ async def upload_project(destination):
         await download_organization()
 
 
-async def update_object(path: Path, client: ElisAPIClient):
+async def update_object(client: ElisAPIClient, path: Path = None, object: dict = None):
     try:
-        object = json.loads(await path.read_text())
+        if not object:
+            object = json.loads(await path.read_text())
         id = object["id"]
-        resource = determine_object_type_from_path(path)
-        await client._http_client.update(resource, id, object)
+        resource = determine_object_type_from_url(object["url"])
+        result = await client._http_client.update(resource, id, object)
         click.echo(f'Successfully updated {resource} with ID "{id}".')
+        return result
     except Exception as e:
         logging.error(f'Error while updating object with path "{path}": {e}')
 
@@ -102,6 +104,16 @@ async def delete_object(path: Path, client: ElisAPIClient):
 def determine_object_type_from_path(path: Path) -> Resource:
     split_path = str(path).split("/")
     type = split_path[1] if len(split_path) > 1 else path.stem + "s"
+    allowed_types = set(resource.value for resource in Resource)
+    if type in allowed_types:
+        return Resource(type)
+    else:
+        raise Exception(f'Unknown resource "{type}".')
+
+
+def determine_object_type_from_url(url: str) -> Resource:
+    split_path = url.split("/")
+    type = split_path[-2]
     allowed_types = set(resource.value for resource in Resource)
     if type in allowed_types:
         return Resource(type)

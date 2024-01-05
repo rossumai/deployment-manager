@@ -1,4 +1,5 @@
 import asyncio
+from copy import deepcopy
 import json
 import logging
 from anyio import Path
@@ -6,6 +7,7 @@ from anyio import Path
 import click
 from rossum_api import ElisAPIClient
 from project_rossum_deploy.commands.download.download import download_organization
+from project_rossum_deploy.commands.download.helpers import extract_sources_targets
 from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.migrate.helpers import (
     _delete_migrated_objects,
@@ -14,6 +16,10 @@ from project_rossum_deploy.commands.migrate.helpers import (
     replace_dependency_url,
 )
 from project_rossum_deploy.commands.migrate.hooks import migrate_hooks
+<<<<<<< HEAD
+=======
+from project_rossum_deploy.commands.upload import update_object
+>>>>>>> d4ebea2 (Incorporate attribute_override to RELEASE command)
 from project_rossum_deploy.common.attribute_override import override_attributes
 from project_rossum_deploy.common.upload import (
     upload_inbox,
@@ -49,6 +55,7 @@ async def migrate_project(mapping: str):
     mapping_file = mapping
     org_path = Path("./")
     mapping = await read_mapping(org_path / mapping_file)
+    previous_mapping = deepcopy(mapping)
 
     target_organization = mapping["organization"]["target"]
     if not target_organization:
@@ -94,17 +101,39 @@ async def migrate_project(mapping: str):
         # Update the mapping with right hand sides (targets) created during migration
         await write_mapping(org_path / mapping_file, mapping)
     except Exception as e:
-        logging.error("Unexpected error while migrating objects:")
-        logging.exception(e)
+        logging.error(f"Unexpected error while migrating objects: {e}")
 
-    _object_urls = []
+    _, previous_targets = extract_sources_targets(previous_mapping)
+    previous_target_ids = []
+    for objects in previous_targets.values():
+        if isinstance(objects, list):
+            previous_target_ids.extend(objects)
+    previous_target_ids = set(previous_target_ids)
+
+    all_target_ids = set()
     for object in source_id_target_pairs.values():
-        _object_urls.append(object["url"])
-    # await _delete_migrated_objects(_object_urls)
+        all_target_ids.add(object["id"])
+    new_target_ids = all_target_ids.difference(previous_target_ids)
 
-    click.echo("These target objects were created/updated:")
-    click.echo(_object_urls)
+    if len(new_target_ids):
+        click.echo("These target objects were created:")
+        click.echo(new_target_ids)
 
+<<<<<<< HEAD
+=======
+    # In case of newly created objects, there could be references which did not exist at the time of the objects' creation
+    # Attribute override is therefore run again for such objects.
+    for mapping_object in traverse_mapping(previous_mapping):
+        if (
+            mapping_object.get("attribute_override", None)
+            and not mapping_object.get("target", None)
+            and not mapping_object.get("ignore", None)
+        ):
+            new_object = source_id_target_pairs[mapping_object["id"]]
+            new_object = override_attributes(mapping, mapping_object, new_object)
+            await update_object(path=None, client=client, object=new_object)
+
+>>>>>>> d4ebea2 (Incorporate attribute_override to RELEASE command)
     if is_org_targetting_itself(mapping):
         click.echo(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects.")
         await download_organization()
@@ -112,6 +141,16 @@ async def migrate_project(mapping: str):
         click.echo(
             f'{settings.MIGRATE_COMMAND_NAME} to organization "{target_organization}" was successful. Please run the {settings.DOWNLOAD_COMMAND_NAME} in that organization project.'
         )
+
+
+def traverse_mapping(mapping: dict):
+    if isinstance(mapping, list):
+        for el in mapping:
+            yield from traverse_mapping(el)
+    elif isinstance(mapping, dict):
+        yield mapping
+        for v in mapping.values():
+            yield from traverse_mapping(v)
 
 
 async def migrate_schemas(source_path: Path, client: ElisAPIClient, mapping: dict):
@@ -136,8 +175,7 @@ async def migrate_schemas(source_path: Path, client: ElisAPIClient, mapping: dic
             schema_mapping["target"] = result["id"]
             source_id_target_pairs[id] = result
         except Exception as e:
-            logging.error(f'Error while migrationg schema "{id}:')
-            logging.exception(e)
+            logging.error(f'Error while migrationg schema "{id}: {e}')
 
     return source_id_target_pairs
 
@@ -180,8 +218,7 @@ async def migrate_workspaces(
                 source_id_target_pairs=source_id_target_pairs,
             )
         except Exception as e:
-            logging.error(f"Error while migrating workspace '{id}':")
-            logging.exception(e)
+            logging.error(f"Error while migrating workspace '{id}': {e}")
 
     return source_id_target_pairs
 
@@ -238,8 +275,7 @@ async def migrate_queues_and_inboxes(
             inbox_mapping["target"] = inbox_result["id"]
             source_id_target_pairs[inbox["id"]] = inbox_result
         except Exception as e:
-            logging.error(f"Error while migrating queue '{id}':")
-            logging.exception(e)
+            logging.error(f"Error while migrating queue '{id}': {e}")
 
     return source_id_target_pairs
 
