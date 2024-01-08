@@ -19,6 +19,7 @@ brew install pipx
 pipx ensurepath
 pipx install .
 ```
+> If you are reinstalling the tool, use `pipx install . --force`.
 
 Restart the terminal.
 
@@ -30,7 +31,7 @@ Run `prd init <project_name>` which will initialize an empty GIT repository.
 Fill in the required credentials in the `.env` file - `API_BASE` (ie.: https://elis.rossum.ai/api/v1) and either `TOKEN` or `USERNAME` and `PASSWORD`.  
 &nbsp;&nbsp;&nbsp;&nbsp; - If you are going to deploy the code to different Rossum organization configure `TO_API_BASE` and either `TO_TOKEN` or `TO_USERNAME` and `TO_PASSWORD` accordingly.  
 
-If the `source` organization/worksapce(s) already contain some objects that can be pulled, inside the project directory run `prd pull` to download all supported objects.  
+If the `source` organization/workspsce(s) already contains some objects that can be pulled, inside the project directory run `prd pull` to download all supported objects and create a GIT commit.
 
 
 ## Overview and commands ##

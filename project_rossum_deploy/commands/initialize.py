@@ -26,7 +26,7 @@ def init_project(name):
 
     with open(name + "/.gitignore", "w") as wf:
         wf.write(".env")
-    env_example_path = Path(__file__).parent.parent.parent / '.env.example'
+    env_example_path = Path(__file__).parent.parent / '.env.example'
     shutil.copyfile(env_example_path, name + '/.env')
 
     os.chdir(name)
