@@ -1,6 +1,14 @@
+import io
+import os
+from anyio import Path
 import pytest
 
 from rossum_api import ElisAPIClient
+
+from project_rossum_deploy.commands.download.download import download_organization
+from project_rossum_deploy.commands.download.helpers import delete_current_configuration
+from tests.utils.compare import compare_projects
+from tests.utils.consts import REFERENCE_PROJECT_PATH
 
 # Download the reference org
 
@@ -23,7 +31,15 @@ from rossum_api import ElisAPIClient
 
 
 @pytest.mark.asyncio
-async def test_download_files(client: ElisAPIClient):
-    organizations = [org async for org in client.list_all_organizations()]
+async def test_fresh_download(client: ElisAPIClient, monkeypatch):
+    temp_path = Path("temp_project")
+    await temp_path.mkdir(exist_ok=True)
 
-    print(organizations)
+    # Should not be needed for fresh pulls without previous data
+    monkeypatch.setattr("sys.stdin", io.StringIO("y"))
+
+    await download_organization(client=client, org_path=temp_path)
+
+    await compare_projects(temp_path, REFERENCE_PROJECT_PATH)
+
+    await delete_current_configuration(temp_path)

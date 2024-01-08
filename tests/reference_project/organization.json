@@ -1,0 +1,21 @@
+{
+  "id": 251437,
+  "name": "rdttest",
+  "url": "https://rdttest.rossum.app/api/v1/organizations/251437",
+  "workspaces": [
+    "https://rdttest.rossum.app/api/v1/workspaces/503168"
+  ],
+  "users": [
+    "https://rdttest.rossum.app/api/v1/users/263683"
+  ],
+  "organization_group": "https://rdttest.rossum.app/api/v1/organization_groups/7177",
+  "is_trial": true,
+  "created_at": "2024-01-08T10:32:09.387481Z",
+  "trial_expires_at": "2024-02-07T10:32:09.380616Z",
+  "expires_at": null,
+  "oidc_provider": null,
+  "ui_settings": {},
+  "metadata": {
+    "source": "internal"
+  }
+}

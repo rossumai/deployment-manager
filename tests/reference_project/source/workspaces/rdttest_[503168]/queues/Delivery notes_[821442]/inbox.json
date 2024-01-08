@@ -1,0 +1,35 @@
+{
+  "id": 433758,
+  "name": "Delivery notes",
+  "url": "https://rdttest.rossum.app/api/v1/inboxes/433758",
+  "queues": [
+    "https://rdttest.rossum.app/api/v1/queues/821442"
+  ],
+  "email": "rdttest-13c4e1@rdttest.rossum.app",
+  "email_prefix": "rdttest",
+  "bounce_email_to": null,
+  "bounce_unprocessable_attachments": false,
+  "bounce_postponed_annotations": false,
+  "bounce_deleted_annotations": false,
+  "bounce_email_with_no_attachments": true,
+  "metadata": {},
+  "filters": {
+    "allowed_senders": [],
+    "denied_senders": [],
+    "document_rejection_conditions": {
+      "enabled": true,
+      "resolution_lower_than_px": [
+        1200,
+        600
+      ],
+      "file_size_less_than_b": null,
+      "mime_types": [
+        "image/gif"
+      ],
+      "file_name_regexes": [
+        "(?i)image.{7,}"
+      ]
+    }
+  },
+  "dmarc_check_action": "accept"
+}
