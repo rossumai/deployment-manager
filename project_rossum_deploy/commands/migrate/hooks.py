@@ -1,4 +1,3 @@
-import json
 import logging
 
 from rich.progress import Progress
@@ -16,6 +15,7 @@ from project_rossum_deploy.common.upload import upload_hook
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
     extract_id_from_url,
+    read_json,
 )
 
 
@@ -30,7 +30,7 @@ async def migrate_hooks(
     for hook_path in hook_paths:
         try:
             _, id = detemplatize_name_id(hook_path.stem)
-            hook = json.loads(await hook_path.read_text())
+            hook = await read_json(hook_path)
 
             hook["run_after"] = []
             hook["queues"] = []
@@ -99,7 +99,7 @@ async def migrate_hook_dependency_graph(
     async for hook_path in (source_path / "hooks").iterdir():
         try:
             _, old_hook_id = detemplatize_name_id(hook_path.stem)
-            old_hook = json.loads(await hook_path.read_text())
+            old_hook = await read_json(hook_path)
             new_hook = source_id_target_pairs.get(old_hook_id, None)
 
             # The hook was ignored, it has no target equivalent anyway

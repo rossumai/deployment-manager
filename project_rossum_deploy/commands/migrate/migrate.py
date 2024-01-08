@@ -1,5 +1,4 @@
 from copy import deepcopy
-import json
 import logging
 from anyio import Path
 from rich import print
@@ -30,6 +29,7 @@ from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     coro,
     detemplatize_name_id,
+    read_json,
 )
 
 
@@ -78,7 +78,7 @@ async def migrate_project(mapping: str):
     source_id_target_pairs = {}
 
     try:
-        organization = json.loads(await (org_path / "organization.json").read_text())
+        organization = await read_json(org_path / "organization.json")
         # Use only a subset of org fields where it makes sense to migrate
         organization_fields = {k: organization[k] for k in settings.ORGANIZATION_FIELDS}
         with Progress() as progress:
@@ -171,7 +171,7 @@ async def migrate_schemas(
     for schema_path in schema_paths:
         try:
             _, id = detemplatize_name_id(schema_path.stem)
-            schema = json.loads(await schema_path.read_text())
+            schema = await read_json(schema_path)
 
             schema["queues"] = []
 

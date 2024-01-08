@@ -27,7 +27,7 @@ def detemplatize_name_id(joint_name: str) -> tuple[str, int]:
     return parts[0], int(parts[1].removeprefix("[").removesuffix("]"))
 
 
-def extract_id_from_url(url: str) -> int :
+def extract_id_from_url(url: str) -> int:
     if not url:
         return None
     return int(url.split("/")[-1])
@@ -42,6 +42,9 @@ async def write_json(path: Path, object: dict):
         json.dump(object, wf, indent=2)
 
 
+async def read_json(path: Path):
+    return json.loads(await path.read_text())
+
 async def write_yaml(path: Path, object: dict):
     if dataclasses.is_dataclass(object):
         object = dataclasses.asdict(object)
@@ -53,6 +56,7 @@ async def write_yaml(path: Path, object: dict):
 def read_yaml(path: Path):
     with open(path, "r") as rf:
         return yaml.safe_load(rf)
+
 
 def adjust_keys(object: Any, lower: bool = True):
     if isinstance(object, dict):
@@ -72,4 +76,3 @@ def adjust_keys(object: Any, lower: bool = True):
         return lowercased
     else:
         return object
-    

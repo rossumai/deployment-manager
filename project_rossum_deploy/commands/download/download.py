@@ -13,6 +13,7 @@ from project_rossum_deploy.commands.download.helpers import (
     extract_sources_targets,
 )
 from project_rossum_deploy.commands.download.mapping import (
+    create_empty_mapping,
     create_update_mapping,
     read_mapping,
 )
@@ -40,30 +41,36 @@ async def download_organization_wrapper():
     await download_organization()
 
 
-async def download_organization():
-    client = ElisAPIClient(
-        base_url=settings.API_URL,
-        token=settings.TOKEN,
-        username=settings.USERNAME,
-        password=settings.PASSWORD,
-    )
+async def download_organization(client: ElisAPIClient = None, org_path: Path = None):
+    if not client:
+        client = ElisAPIClient(
+            base_url=settings.API_URL,
+            token=settings.TOKEN,
+            username=settings.USERNAME,
+            password=settings.PASSWORD,
+        )
 
     organizations = [org async for org in client.list_all_organizations()]
     if not len(organizations):
         raise click.ClickException("No organization found.")
     organization = await client.retrieve_organization(organizations[0].id)
 
-    org_path = Path("./")
+    if not org_path:
+        org_path = Path("./")
+
     org_config_path = org_path / "organization.json"
-    if await org_config_path.exists() and not Confirm.ask(
-        f'Project "{(await org_path.absolute()).name}" already has configuration files in it, do you want to replace it with the new configuration?',
-    ):
-        return
-    
-    await delete_current_configuration(org_path)
+    if await org_config_path.exists():
+        if not Confirm.ask(
+            f'Project "{(await org_path.absolute()).name}" already has configuration files in it, do you want to replace it with the new configuration?',
+        ):
+            return
+        await delete_current_configuration(org_path)
+
     await write_json(org_config_path, organization)
 
     mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
+    if not mapping:
+        mapping = create_empty_mapping()
     previous_sources, previous_targets = extract_sources_targets(mapping)
 
     with Progress() as progress:

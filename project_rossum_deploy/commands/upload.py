@@ -1,4 +1,3 @@
-import json
 import logging
 from anyio import Path
 import subprocess
@@ -18,7 +17,7 @@ from project_rossum_deploy.utils.consts import (
     PUSH_IGNORED_FIELDS,
     settings,
 )
-from project_rossum_deploy.utils.functions import coro, detemplatize_name_id
+from project_rossum_deploy.utils.functions import coro, detemplatize_name_id, read_json
 
 
 @click.command(
@@ -80,14 +79,16 @@ async def upload_project(destination):
 
     # Repulling is done to update mapping and (potentially) different filenames.
     if is_org_targetting_itself(mapping):
-        print(Panel(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects."))
+        print(
+            Panel(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects.")
+        )
         await download_organization()
 
 
 async def update_object(client: ElisAPIClient, path: Path = None, object: dict = None):
     try:
         if not object:
-            object = json.loads(await path.read_text())
+            object = await read_json(path)
         id = object["id"]
         resource = determine_object_type_from_url(object["url"])
         result = await client._http_client.update(resource, id, object)
