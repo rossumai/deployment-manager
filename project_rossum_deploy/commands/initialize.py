@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+from rich import print
+from rich.panel import Panel
 
 import click
 
@@ -30,6 +32,6 @@ def init_project(name):
     shutil.copyfile(env_example_path, name + '/.env')
 
     os.chdir(name)
-    subprocess.run(['git', 'init'])
+    subprocess.run(["git", "init"])
 
-    click.echo(f'Initialized a new directory "{name}".')
+    print(Panel(f'Initialized a new directory "{name}".'))

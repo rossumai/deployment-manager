@@ -1,12 +1,11 @@
-import asyncio
-import logging
-import httpx
 from rossum_api import ElisAPIClient
 
 from project_rossum_deploy.utils.functions import extract_id_from_url
 
-def is_org_targetting_itself(mapping:dict):
+
+def is_org_targetting_itself(mapping: dict):
     return mapping["organization"]["target"] == mapping["organization"]["id"]
+
 
 def replace_dependency_url(object: dict, dependency: str, source_id_target_pairs: dict):
     if isinstance(object[dependency], list):
@@ -14,7 +13,7 @@ def replace_dependency_url(object: dict, dependency: str, source_id_target_pairs
         for old_url in object[dependency]:
             old_id = extract_id_from_url(old_url)
             if new_object := source_id_target_pairs.get(old_id, None):
-                new_url = old_url.replace(str(old_id), str(new_object['id']))
+                new_url = old_url.replace(str(old_id), str(new_object["id"]))
                 new_urls.append(new_url)
         object[dependency] = new_urls
     else:
@@ -23,7 +22,7 @@ def replace_dependency_url(object: dict, dependency: str, source_id_target_pairs
         ):
             old_url = object[dependency]
             old_id = extract_id_from_url(old_url)
-            new_url = old_url.replace(str(old_id), str(new_object['id']))
+            new_url = old_url.replace(str(old_id), str(new_object["id"]))
             object[dependency] = new_url
 
 
@@ -42,19 +41,11 @@ async def get_token_owner(client: ElisAPIClient):
     return users[0]
 
 
-async def _delete_migrated_object(client: httpx.AsyncClient, object_url: str):
-    try:
-        res = await client.delete(object_url)
-        res.raise_for_status()
-    except Exception as e:
-        logging.exception(e)
-
-
-# Debug function to clean up
-async def _delete_migrated_objects(object_urls: list[str]):
-    token = "0bc0524610e5c84253603811bd94d02c5296334d"
-
-    async with httpx.AsyncClient(headers={"Authorization": f"Token {token}"}) as client:
-        await asyncio.gather(
-            *[_delete_migrated_object(client, url) for url in object_urls]
-        )
+def traverse_mapping(mapping: dict):
+    if isinstance(mapping, list):
+        for el in mapping:
+            yield from traverse_mapping(el)
+    elif isinstance(mapping, dict):
+        yield mapping
+        for v in mapping.values():
+            yield from traverse_mapping(v)
