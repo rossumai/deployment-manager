@@ -2,7 +2,7 @@ import copy
 from anyio import Path
 import os
 import shutil
-import click
+from rich.prompt import Confirm
 
 from rossum_api.models import Workspace, Hook, Schema, Queue, Inbox
 from project_rossum_deploy.commands.download.mapping import create_empty_mapping
@@ -43,7 +43,7 @@ async def determine_object_destination(
     ):
         destination = settings.TARGET_DIRNAME
     else:
-        user_decision = click.confirm(
+        user_decision = Confirm(
             f'Should the {object_type} "{object.name}" ({object.id}) be in {settings.SOURCE_DIRNAME}? Otherwise, it will be understood as {settings.TARGET_DIRNAME}.'
         )
         destination = (
@@ -57,7 +57,10 @@ async def find_object_in_project(
     object: Workspace | Queue | Hook | Schema | Inbox, base_path: Path
 ):
     file_name = templatize_name_id(object.name, object.id)
-    return await (base_path / file_name).exists() or await (base_path / (file_name + '.json')).exists()
+    return (
+        await (base_path / file_name).exists()
+        or await (base_path / (file_name + ".json")).exists()
+    )
 
 
 def extract_sources_targets(mapping: dict) -> tuple[dict, dict]:
