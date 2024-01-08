@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+from rich import print
+from rich.panel import Panel
 
 import click
 
@@ -26,10 +28,10 @@ def init_project(name):
 
     with open(name + "/.gitignore", "w") as wf:
         wf.write(".env")
-    env_example_path = Path(__file__).parent.parent.parent / '.env.example'
-    shutil.copyfile(env_example_path, name + '/.env')
+    env_example_path = Path(__file__).parent.parent.parent / ".env.example"
+    shutil.copyfile(env_example_path, name + "/.env")
 
     os.chdir(name)
-    subprocess.run(['git', 'init'])
+    subprocess.run(["git", "init"])
 
-    click.echo(f'Initialized a new directory "{name}".')
+    print(Panel(f'Initialized a new directory "{name}".'))

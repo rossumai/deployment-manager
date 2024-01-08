@@ -1,6 +1,10 @@
 from anyio import Path
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
+from rich import print
+from rich.panel import Panel
+from rich.prompt import Confirm
+from rich.progress import Progress
 
 import click
 from project_rossum_deploy.commands.download.helpers import (
@@ -46,43 +50,47 @@ async def download_organization():
 
     organizations = [org async for org in client.list_all_organizations()]
     if not len(organizations):
-        raise click.ClickException('No organization found.')
+        raise click.ClickException("No organization found.")
     organization = await client.retrieve_organization(organizations[0].id)
 
     org_path = Path("./")
     org_config_path = org_path / "organization.json"
-    if await org_config_path.exists() and click.confirm(
+    if await org_config_path.exists() and not Confirm.ask(
         f'Project "{(await org_path.absolute()).name}" already has configuration files in it, do you want to replace it with the new configuration?',
-        abort=True,
     ):
-        await delete_current_configuration(org_path)
-
+        return
+    
+    await delete_current_configuration(org_path)
     await write_json(org_config_path, organization)
 
     mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
     previous_sources, previous_targets = extract_sources_targets(mapping)
 
-    workspaces_for_mapping = await download_workspaces(
-        client=client,
-        org_path=org_path,
-        mapping=mapping,
-        sources=previous_sources,
-        targets=previous_targets,
-    )
-    schemas_for_mapping = await download_schemas(
-        client=client,
-        org_path=org_path,
-        mapping=mapping,
-        sources=previous_sources,
-        targets=previous_targets,
-    )
-    hooks_for_mapping = await download_hooks(
-        client=client,
-        org_path=org_path,
-        mapping=mapping,
-        sources=previous_sources,
-        targets=previous_targets,
-    )
+    with Progress() as progress:
+        workspaces_for_mapping = await download_workspaces(
+            client=client,
+            org_path=org_path,
+            mapping=mapping,
+            sources=previous_sources,
+            targets=previous_targets,
+            progress=progress,
+        )
+        schemas_for_mapping = await download_schemas(
+            client=client,
+            org_path=org_path,
+            mapping=mapping,
+            sources=previous_sources,
+            targets=previous_targets,
+            progress=progress,
+        )
+        hooks_for_mapping = await download_hooks(
+            client=client,
+            org_path=org_path,
+            mapping=mapping,
+            sources=previous_sources,
+            targets=previous_targets,
+            progress=progress,
+        )
 
     await create_update_mapping(
         org_path=org_path,
@@ -93,13 +101,26 @@ async def download_organization():
         old_mapping=mapping,
     )
 
+    print(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME}."))
+
 
 async def download_workspaces(
-    client: ElisAPIClient, org_path: Path, mapping: dict, sources: dict, targets: dict
+    client: ElisAPIClient,
+    org_path: Path,
+    mapping: dict,
+    sources: dict,
+    targets: dict,
+    progress: Progress,
 ):
     workspaces = []
-
-    async for workspace in client.list_all_workspaces():
+    paginated_workspaces = [
+        workspace async for workspace in client.list_all_workspaces()
+    ]
+    task = progress.add_task(
+        "Downloading workspaces and queues...", total=len(paginated_workspaces)
+    )
+    for workspace in paginated_workspaces:
+        # Refetch in case the paginated fields don't include
         workspace = await client.retrieve_workspace(workspace.id)
         destination = await determine_object_destination(
             object=workspace,
@@ -123,6 +144,7 @@ async def download_workspaces(
             client, workspace_config_path.parent, workspace.id
         )
         workspaces.append((destination, workspace))
+        progress.update(task, advance=1)
 
     return workspaces
 
@@ -153,12 +175,19 @@ async def download_inbox(client: ElisAPIClient, parent_dir: Path, inbox_id: int)
     return inbox
 
 
-# Only schemas actually need to be retrieved individually (since when listing them using GET /schemas, their contents are missing)
 async def download_schemas(
-    client: ElisAPIClient, org_path: Path, mapping: dict, sources: dict, targets: dict
+    client: ElisAPIClient,
+    org_path: Path,
+    mapping: dict,
+    sources: dict,
+    targets: dict,
+    progress: Progress,
 ):
     schemas = []
-    async for schema in client.list_all_schemas():
+    paginated_schemas = [schema async for schema in client.list_all_schemas()]
+    task = progress.add_task("Downloading schemas...", total=len(paginated_schemas))
+    for schema in paginated_schemas:
+        # Refetch because schema fields are not fully listed
         schema = await client.retrieve_schema(schema.id)
         destination = await determine_object_destination(
             object=schema,
@@ -176,15 +205,24 @@ async def download_schemas(
         )
         await write_json(schema_config_path, schema)
         schemas.append((destination, schema))
+        progress.update(task, advance=1)
 
     return schemas
 
 
 async def download_hooks(
-    client: ElisAPIClient, org_path: Path, mapping: dict, sources: dict, targets: dict
+    client: ElisAPIClient,
+    org_path: Path,
+    mapping: dict,
+    sources: dict,
+    targets: dict,
+    progress: Progress,
 ):
     hooks = []
-    async for hook in client.list_all_hooks():
+    paginated_hooks = [hook async for hook in client.list_all_hooks()]
+    task = progress.add_task("Downloading hooks...", total=len(paginated_hooks))
+    for hook in paginated_hooks:
+        # Refetch in case the paginated fields don't include
         hook = await client.retrieve_hook(hook.id)
         destination = await determine_object_destination(
             object=hook,
@@ -202,5 +240,6 @@ async def download_hooks(
         )
         await write_json(hook_config_path, hook)
         hooks.append((destination, hook))
+        progress.update(task, advance=1)
 
     return hooks

@@ -2,6 +2,9 @@ import json
 import logging
 from anyio import Path
 import subprocess
+from rich import print
+from rich.panel import Panel
+from rich.progress import track
 
 import click
 from rossum_api import ElisAPIClient
@@ -53,7 +56,7 @@ async def upload_project(destination):
     )
     changes = git_destination_diff.stdout.split("\n")
 
-    for change in changes:
+    for change in track(changes, description="Pushing changes to Rossum..."):
         change = change.strip()
         if not change:
             continue
@@ -73,8 +76,10 @@ async def upload_project(destination):
             case _:
                 raise click.ClickException(f'Unrecognized operator "{op}".')
 
+    print(Panel(f"Finished {settings.UPLOAD_COMMAND_NAME}."))
+
     if is_org_targetting_itself(mapping):
-        click.echo(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects.")
+        print(Panel(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects."))
         await download_organization()
 
 
@@ -85,7 +90,7 @@ async def update_object(client: ElisAPIClient, path: Path = None, object: dict =
         id = object["id"]
         resource = determine_object_type_from_url(object["url"])
         result = await client._http_client.update(resource, id, object)
-        click.echo(f'Successfully updated {resource} with ID "{id}".')
+        print(f'Successfully updated {resource} with ID "{id}".')
         return result
     except Exception as e:
         logging.error(f'Error while updating object with path "{path}": {e}')
@@ -96,7 +101,7 @@ async def delete_object(path: Path, client: ElisAPIClient):
         _, id = detemplatize_name_id(path.stem)
         resource = determine_object_type_from_path(path)
         await client._http_client.delete(resource, id)
-        click.echo(f'Successfully deleted {resource} with ID "{id}".')
+        print(f'Successfully deleted {resource} with ID "{id}".')
     except Exception as e:
         logging.error(f'Error while deleting object with path "{path}": {e}')
 
