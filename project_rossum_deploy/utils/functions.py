@@ -76,3 +76,8 @@ def adjust_keys(object: Any, lower: bool = True):
         return lowercased
     else:
         return object
+
+async def retrieve_with_progress(retrieve, progress, task):
+    result = await retrieve()
+    progress.update(task, advance=1)
+    return result

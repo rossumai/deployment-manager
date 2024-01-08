@@ -1,3 +1,5 @@
+import asyncio
+import functools
 from anyio import Path
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
@@ -22,6 +24,7 @@ from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     coro,
     extract_id_from_url,
+    retrieve_with_progress,
     templatize_name_id,
     write_json,
 )
@@ -120,15 +123,26 @@ async def download_workspaces(
     progress: Progress,
 ):
     workspaces = []
+
     paginated_workspaces = [
         workspace async for workspace in client.list_all_workspaces()
     ]
+    # Progress is split between downloading the workspace itself and downloading its queues
     task = progress.add_task(
-        "Downloading workspaces and queues...", total=len(paginated_workspaces)
+        "Downloading workspaces and queues...", total=2 * len(paginated_workspaces)
     )
-    for workspace in paginated_workspaces:
-        # Refetch in case the paginated fields don't include
-        workspace = await client.retrieve_workspace(workspace.id)
+
+    # Refetch in case the paginated fields don't include everything
+    full_workspaces = await asyncio.gather(
+        *[
+            retrieve_with_progress(
+                functools.partial(client.retrieve_workspace, ws.id), progress, task
+            )
+            for ws in paginated_workspaces
+        ]
+    )
+
+    for workspace in full_workspaces:
         destination = await determine_object_destination(
             object=workspace,
             object_type="workspace",
@@ -160,8 +174,14 @@ async def download_queues_for_workspace(
     client: ElisAPIClient, parent_dir: Path, workspace_id: int
 ):
     queues = []
-    async for queue in client.list_all_queues(workspace=workspace_id):
-        queue = await client.retrieve_queue(queue.id)
+
+    paginated_queues = [q async for q in client.list_all_queues(workspace=workspace_id)]
+    # Refetch in case the paginated fields don't include everything
+    full_queues = await asyncio.gather(
+        *[client.retrieve_queue(q.id) for q in paginated_queues]
+    )
+
+    for queue in full_queues:
         queue_path = (
             parent_dir / "queues" / f"{templatize_name_id(queue.name, queue.id)}"
         )
@@ -191,11 +211,21 @@ async def download_schemas(
     progress: Progress,
 ):
     schemas = []
+
     paginated_schemas = [schema async for schema in client.list_all_schemas()]
     task = progress.add_task("Downloading schemas...", total=len(paginated_schemas))
-    for schema in paginated_schemas:
-        # Refetch because schema fields are not fully listed
-        schema = await client.retrieve_schema(schema.id)
+
+    # Refetch because schema fields are not fully listed
+    full_schemas = await asyncio.gather(
+        *[
+            retrieve_with_progress(
+                functools.partial(client.retrieve_schema, schema.id), progress, task
+            )
+            for schema in paginated_schemas
+        ]
+    )
+
+    for schema in full_schemas:
         destination = await determine_object_destination(
             object=schema,
             object_type="schema",
@@ -212,7 +242,6 @@ async def download_schemas(
         )
         await write_json(schema_config_path, schema)
         schemas.append((destination, schema))
-        progress.update(task, advance=1)
 
     return schemas
 
@@ -226,11 +255,21 @@ async def download_hooks(
     progress: Progress,
 ):
     hooks = []
+
     paginated_hooks = [hook async for hook in client.list_all_hooks()]
     task = progress.add_task("Downloading hooks...", total=len(paginated_hooks))
-    for hook in paginated_hooks:
-        # Refetch in case the paginated fields don't include
-        hook = await client.retrieve_hook(hook.id)
+
+    full_hooks = await asyncio.gather(
+        *[
+            retrieve_with_progress(
+                functools.partial(client.retrieve_hook, hook.id), progress, task
+            )
+            for hook in paginated_hooks
+        ]
+    )
+
+    for hook in full_hooks:
+        # Refetch in case the paginated fields don't include everything
         destination = await determine_object_destination(
             object=hook,
             object_type="hook",
@@ -247,6 +286,5 @@ async def download_hooks(
         )
         await write_json(hook_config_path, hook)
         hooks.append((destination, hook))
-        progress.update(task, advance=1)
 
     return hooks
