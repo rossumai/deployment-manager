@@ -78,6 +78,7 @@ async def upload_project(destination):
 
     print(Panel(f"Finished {settings.UPLOAD_COMMAND_NAME}."))
 
+    # Repulling is done to update mapping and (potentially) different filenames.
     if is_org_targetting_itself(mapping):
         print(Panel(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects."))
         await download_organization()
