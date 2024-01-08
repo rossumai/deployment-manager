@@ -12,6 +12,8 @@ dotenv.load_dotenv()
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    
     API_BASE: str = "https://you-forgot-to-cd-into-project.com"
     TOKEN: str = ""
     USERNAME: str = ""
@@ -28,7 +30,7 @@ class Settings(BaseSettings):
     TARGET_DIRNAME: str = "target"
 
     ORGANIZATION_FIELDS: list[str] = ["ui_settings", "metadata"]
-    PRIVATE_HOOK_DUMMY_URL: str = 'https://example.com'
+    PRIVATE_HOOK_DUMMY_URL: str = "https://example.com"
     MAPPING_UPPERCASE_FIELDS: list[str] = [
         "organization",
         "workspaces",
@@ -42,9 +44,6 @@ class Settings(BaseSettings):
     DOWNLOAD_COMMAND_NAME: str = "pull"
     UPLOAD_COMMAND_NAME: str = "push"
     MIGRATE_COMMAND_NAME: str = "release"
-
-    class Config:
-        model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property
     def API_URL(self):
