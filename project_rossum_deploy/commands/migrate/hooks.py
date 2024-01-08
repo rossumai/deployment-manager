@@ -1,6 +1,7 @@
 import json
 import logging
 
+from rich.progress import Progress
 from anyio import Path
 import click
 from rossum_api import ElisAPIClient
@@ -18,11 +19,15 @@ from project_rossum_deploy.utils.functions import (
 )
 
 
-async def migrate_hooks(source_path: Path, client: ElisAPIClient, mapping: dict):
+async def migrate_hooks(
+    source_path: Path, client: ElisAPIClient, mapping: dict, progress: Progress
+):
     source_id_target_pairs = {}
     token_owner = await get_token_owner(client)
+    hook_paths = [hook_path async for hook_path in (source_path / "hooks").iterdir()]
+    task = progress.add_task("Releasing hooks...", total=len(hook_paths))
 
-    async for hook_path in (source_path / "hooks").iterdir():
+    for hook_path in hook_paths:
         try:
             _, id = detemplatize_name_id(hook_path.stem)
             hook = json.loads(await hook_path.read_text())
@@ -34,6 +39,7 @@ async def migrate_hooks(source_path: Path, client: ElisAPIClient, mapping: dict)
 
             hook_mapping = find_mapping_of_object(mapping["organization"]["hooks"], id)
             if hook_mapping.get("ignore", None):
+                progress.update(task, advance=1)
                 continue
 
             if (
@@ -52,6 +58,8 @@ async def migrate_hooks(source_path: Path, client: ElisAPIClient, mapping: dict)
             result = await upload_hook(client, hook, hook_mapping["target"])
             hook_mapping["target"] = result["id"]
             source_id_target_pairs[id] = result
+
+            progress.update(task, advance=1)
         except Exception as e:
             logging.error(f"Error while migrating hook '{id}': {e}")
 

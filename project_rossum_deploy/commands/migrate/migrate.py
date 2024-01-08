@@ -2,6 +2,10 @@ from copy import deepcopy
 import json
 import logging
 from anyio import Path
+from rich import print
+from rich.panel import Panel
+from rich.progress import Progress
+
 
 import click
 from rossum_api import ElisAPIClient
@@ -73,23 +77,24 @@ async def migrate_project(mapping: str):
 
     source_id_target_pairs = {}
 
-    # TODO: add messages to signal progress
-
     try:
         organization = json.loads(await (org_path / "organization.json").read_text())
         # Use only a subset of org fields where it makes sense to migrate
         organization_fields = {k: organization[k] for k in settings.ORGANIZATION_FIELDS}
-        await upload_organization(client, organization_fields, organization["id"])
+        with Progress() as progress:
+            task = progress.add_task("Releasing organization...", total=1)
+            await upload_organization(client, organization_fields, organization["id"])
+            progress.update(task, advance=1)
 
-        source_path = org_path / settings.SOURCE_DIRNAME
+            source_path = org_path / settings.SOURCE_DIRNAME
 
-        source_id_target_pairs = {
-            **(await migrate_schemas(source_path, client, mapping)),
-            **(await migrate_hooks(source_path, client, mapping)),
-        }
-        source_id_target_pairs = await migrate_workspaces(
-            source_path, client, mapping, source_id_target_pairs
-        )
+            source_id_target_pairs = {
+                **(await migrate_schemas(source_path, client, mapping, progress)),
+                **(await migrate_hooks(source_path, client, mapping, progress)),
+            }
+            source_id_target_pairs = await migrate_workspaces(
+                source_path, client, mapping, source_id_target_pairs, progress
+            )
 
         # Update the mapping with right hand sides (targets) created during migration
         await write_mapping(org_path / mapping_file, mapping)
@@ -124,12 +129,18 @@ async def migrate_project(mapping: str):
             new_object = override_attributes(mapping, mapping_object, new_object)
             await update_object(path=None, client=client, object=new_object)
 
+    print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
+
     if is_org_targetting_itself(mapping):
-        click.echo(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects.")
+        print(
+            Panel(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects.")
+        )
         await download_organization()
     else:
-        click.echo(
-            f'{settings.MIGRATE_COMMAND_NAME} to organization "{target_organization}" was successful. Please run the {settings.DOWNLOAD_COMMAND_NAME} in that organization project.'
+        print(
+            Panel(
+                f"Please run the {settings.DOWNLOAD_COMMAND_NAME} in the target organization project ({mapping['organization']['target']})."
+            )
         )
 
 
@@ -148,9 +159,16 @@ def find_created_target_ids(previous_mapping: dict, source_id_target_pairs: dict
     return all_target_ids.difference(previous_target_ids)
 
 
-async def migrate_schemas(source_path: Path, client: ElisAPIClient, mapping: dict):
+async def migrate_schemas(
+    source_path: Path, client: ElisAPIClient, mapping: dict, progress: Progress
+):
     source_id_target_pairs = {}
-    async for schema_path in (source_path / "schemas").iterdir():
+    schema_paths = [
+        schema_path async for schema_path in (source_path / "schemas").iterdir()
+    ]
+    task = progress.add_task("Releasing schemas...", total=len(schema_paths))
+
+    for schema_path in schema_paths:
         try:
             _, id = detemplatize_name_id(schema_path.stem)
             schema = json.loads(await schema_path.read_text())
@@ -161,6 +179,7 @@ async def migrate_schemas(source_path: Path, client: ElisAPIClient, mapping: dic
                 mapping["organization"]["schemas"], id
             )
             if schema_mapping.get("ignore", None):
+                progress.update(task, advance=1)
                 continue
 
             schema = override_attributes(
@@ -169,6 +188,8 @@ async def migrate_schemas(source_path: Path, client: ElisAPIClient, mapping: dic
             result = await upload_schema(client, schema, schema_mapping["target"])
             schema_mapping["target"] = result["id"]
             source_id_target_pairs[id] = result
+
+            progress.update(task, advance=1)
         except Exception as e:
             logging.error(f'Error while migrationg schema "{id}: {e}')
 

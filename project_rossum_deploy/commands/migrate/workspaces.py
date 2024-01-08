@@ -1,10 +1,18 @@
 import json
 import logging
 from anyio import Path
+from rich.progress import Progress
 from rossum_api import ElisAPIClient
-from project_rossum_deploy.commands.migrate.helpers import find_mapping_of_object, replace_dependency_url
+from project_rossum_deploy.commands.migrate.helpers import (
+    find_mapping_of_object,
+    replace_dependency_url,
+)
 from project_rossum_deploy.common.attribute_override import override_attributes
-from project_rossum_deploy.common.upload import upload_inbox, upload_queue, upload_workspace
+from project_rossum_deploy.common.upload import (
+    upload_inbox,
+    upload_queue,
+    upload_workspace,
+)
 
 from project_rossum_deploy.utils.functions import detemplatize_name_id
 
@@ -14,8 +22,15 @@ async def migrate_workspaces(
     client: ElisAPIClient,
     mapping: dict,
     source_id_target_pairs: dict,
+    progress: Progress,
 ):
-    async for ws_path in (source_path / "workspaces").iterdir():
+    workspace_paths = [
+        workspace_path
+        async for workspace_path in (source_path / "workspaces").iterdir()
+    ]
+    task = progress.add_task("Releasing workspaces...", total=len(workspace_paths))
+
+    for ws_path in workspace_paths:
         try:
             _, id = detemplatize_name_id(ws_path.stem)
             ws_config_path = ws_path / "workspace.json"
@@ -27,6 +42,7 @@ async def migrate_workspaces(
                 mapping["organization"]["workspaces"], id
             )
             if workspace_mapping.get("ignore", None):
+                progress.update(task, advance=1)
                 continue
 
             workspace = override_attributes(
@@ -46,6 +62,8 @@ async def migrate_workspaces(
                 mapping=mapping,
                 source_id_target_pairs=source_id_target_pairs,
             )
+
+            progress.update(task, advance=1)
         except Exception as e:
             logging.error(f"Error while migrating workspace '{id}': {e}")
 
