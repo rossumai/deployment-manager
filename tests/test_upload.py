@@ -39,6 +39,7 @@ async def updated_file_tuple(client: ElisAPIClient, tmp_path):
     subprocess.run(["git", "init"])
     subprocess.run(["git", "add", "."])
     subprocess.run(["git", "commit", "-m", "init"])
+    subprocess.run(["cd", '..'])
 
     updated_file_path = await anext(
         (tmp_path / settings.SOURCE_DIRNAME / "hooks").iterdir()
