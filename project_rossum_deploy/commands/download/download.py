@@ -40,7 +40,7 @@ In case the directory already exists, it first deletes its contents and then dow
 )
 @coro
 async def download_organization_wrapper():
-    # To be able to run the download command progammatically without the CLI decorators
+    # To be able to run the command progammatically without the CLI decorators
     await download_organization()
 
 

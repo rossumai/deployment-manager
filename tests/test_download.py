@@ -1,5 +1,4 @@
 import io
-from anyio import Path
 import pytest
 import pytest_asyncio
 
@@ -14,13 +13,6 @@ from tests.utils.compare import ensure_downloaded_object, compare_projects
 from tests.utils.consts import REFERENCE_PROJECT_PATH, UPDATED_NAME
 
 
-# To use anyio instead of pathlib
-@pytest.fixture(scope="function")
-def tmp_path(tmp_path):
-    return Path(tmp_path)
-
-
-@pytest.mark.skip
 @pytest.mark.asyncio
 async def test_fresh_download(client: ElisAPIClient, tmp_path):
     await download_organization(client=client, org_path=tmp_path)
@@ -28,7 +20,6 @@ async def test_fresh_download(client: ElisAPIClient, tmp_path):
     await compare_projects(tmp_path, REFERENCE_PROJECT_PATH)
 
 
-@pytest.mark.skip
 @pytest.mark.asyncio
 async def test_second_download_idempotency(
     client: ElisAPIClient, monkeypatch, tmp_path
@@ -56,7 +47,6 @@ async def new_workspace(client: ElisAPIClient):
     await client.delete_workspace(workspace.id)
 
 
-@pytest.mark.skip
 @pytest.mark.asyncio
 async def test_rossum_created_file_downloaded(
     client: ElisAPIClient, tmp_path, new_workspace
@@ -81,7 +71,6 @@ async def test_rossum_created_file_downloaded(
     )
 
 
-@pytest.mark.skip
 @pytest.mark.asyncio
 async def test_rossum_deleted_file_absent(client: ElisAPIClient, monkeypatch, tmp_path):
     deleted_ws = await client.create_new_workspace(
@@ -118,7 +107,6 @@ async def old_schema(client: ElisAPIClient):
     )
 
 
-@pytest.mark.skip
 @pytest.mark.asyncio
 async def test_rossum_updated_file_downloaded(
     client: ElisAPIClient, tmp_path, old_schema

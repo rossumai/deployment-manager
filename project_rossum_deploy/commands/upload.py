@@ -33,8 +33,15 @@ Only source files are taken into account by default.
     type=click.Choice([settings.SOURCE_DIRNAME, settings.TARGET_DIRNAME]),
 )
 @coro
-async def upload_project(destination):
-    org_path = Path("./")
+async def upload_project_wrapper(destination):
+    # To be able to run the command progammatically without the CLI decorators
+    await upload_project(destination)
+
+
+async def upload_project(destination: str, org_path: Path = None):
+    if not org_path:
+        org_path = Path("./")
+
     mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
 
     if destination == settings.SOURCE_DIRNAME or is_org_targetting_itself(mapping):
@@ -51,7 +58,7 @@ async def upload_project(destination):
 
     # Check both the destination dir and and the project root (e.g., organization.json)
     git_destination_diff = subprocess.run(
-        ["git", "status", destination, ".", "-s"], capture_output=True, text=True
+        ["git", "status", org_path / destination, ".", "-s"], capture_output=True, text=True
     )
     changes = git_destination_diff.stdout.split("\n")
 
