@@ -1,5 +1,6 @@
 from enum import StrEnum
 import logging
+import os
 import re
 
 import dotenv
@@ -9,10 +10,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.ERROR)
 
+dotenv.load_dotenv(dotenv_path='.env', override=True, verbose=True)
 
-dotenv.load_dotenv()
+DEBUG_MODE = os.environ.get("DEBUG", 'false').lower() == "true"
 
-API_SUFFIX_RE = re.compile(r'/api/v\d+$')
+API_SUFFIX_RE = re.compile(r"/api/v\d+$")
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -22,6 +25,9 @@ class Settings(BaseSettings):
     @field_validator("API_BASE")
     @classmethod
     def check_api_base_suffix(cls, v: str) -> str:
+        if DEBUG_MODE:
+            return v
+
         if not bool(API_SUFFIX_RE.search(v)):
             raise ValueError('API_BASE must end with "/api/v*".')
         return v
@@ -32,6 +38,9 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def check_token_or_username_password(self) -> "Settings":
+        if DEBUG_MODE:
+            return self
+
         if not self.TOKEN and (not self.USERNAME or not self.PASSWORD):
             raise ValueError(
                 "Either TOKEN or USERNAME+PASSWORD have to be defined in .env."
@@ -45,6 +54,9 @@ class Settings(BaseSettings):
     @field_validator("TO_API_BASE")
     @classmethod
     def check_to_api_base_suffix(cls, v: str) -> str:
+        if DEBUG_MODE:
+            return v
+
         if v and not bool(API_SUFFIX_RE.search(v)):
             raise ValueError('TO_API_BASE must end with "/api/v*".')
         return v
