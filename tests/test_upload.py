@@ -46,7 +46,7 @@ async def updated_file_tuple(client: ElisAPIClient, tmp_path):
     )
     updated_file = await read_json(updated_file_path)
     updated_file["active"] = False
-    updated_file = await write_json(updated_file_path, updated_file)
+    await write_json(updated_file_path, updated_file)
 
     yield tmp_path, updated_file_path, updated_file
 
