@@ -38,27 +38,32 @@ async def upload_project_wrapper(destination):
     await upload_project(destination)
 
 
-async def upload_project(destination: str, org_path: Path = None):
+async def upload_project(
+    destination: str, org_path: Path = None, client: ElisAPIClient = None
+):
     if not org_path:
         org_path = Path("./")
 
     mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
 
-    if destination == settings.SOURCE_DIRNAME or is_org_targetting_itself(mapping):
-        client = ElisAPIClient(
-            base_url=settings.API_URL,
-            token=settings.TOKEN,
-            username=settings.USERNAME,
-            password=settings.PASSWORD,
-        )
-    else:
-        raise click.ClickException(
-            "Cannot use push if target is a different organization. Go to that project and run the command there."
-        )
+    if not client:
+        if destination == settings.SOURCE_DIRNAME or is_org_targetting_itself(mapping):
+            client = ElisAPIClient(
+                base_url=settings.API_URL,
+                token=settings.TOKEN,
+                username=settings.USERNAME,
+                password=settings.PASSWORD,
+            )
+        else:
+            raise click.ClickException(
+                "Cannot use push if target is a different organization. Go to that project and run the command there."
+            )
 
     # Check both the destination dir and and the project root (e.g., organization.json)
     git_destination_diff = subprocess.run(
-        ["git", "status", org_path / destination, ".", "-s"], capture_output=True, text=True
+        ["git", "status", org_path / destination, ".", "-s"],
+        capture_output=True,
+        text=True,
     )
     changes = git_destination_diff.stdout.split("\n")
 
