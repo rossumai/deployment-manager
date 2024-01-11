@@ -77,29 +77,37 @@ async def download_organization(client: ElisAPIClient = None, org_path: Path = N
     previous_sources, previous_targets = extract_sources_targets(mapping)
 
     with Progress() as progress:
-        workspaces_for_mapping = await download_workspaces(
-            client=client,
-            org_path=org_path,
-            mapping=mapping,
-            sources=previous_sources,
-            targets=previous_targets,
-            progress=progress,
-        )
-        schemas_for_mapping = await download_schemas(
-            client=client,
-            org_path=org_path,
-            mapping=mapping,
-            sources=previous_sources,
-            targets=previous_targets,
-            progress=progress,
-        )
-        hooks_for_mapping = await download_hooks(
-            client=client,
-            org_path=org_path,
-            mapping=mapping,
-            sources=previous_sources,
-            targets=previous_targets,
-            progress=progress,
+        (
+            workspaces_for_mapping,
+            schemas_for_mapping,
+            hooks_for_mapping,
+        ) = await asyncio.gather(
+            *[
+                download_workspaces(
+                    client=client,
+                    org_path=org_path,
+                    mapping=mapping,
+                    sources=previous_sources,
+                    targets=previous_targets,
+                    progress=progress,
+                ),
+                download_schemas(
+                    client=client,
+                    org_path=org_path,
+                    mapping=mapping,
+                    sources=previous_sources,
+                    targets=previous_targets,
+                    progress=progress,
+                ),
+                download_hooks(
+                    client=client,
+                    org_path=org_path,
+                    mapping=mapping,
+                    sources=previous_sources,
+                    targets=previous_targets,
+                    progress=progress,
+                ),
+            ]
         )
 
     await create_update_mapping(
