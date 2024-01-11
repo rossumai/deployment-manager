@@ -11,6 +11,7 @@ from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import read_json, templatize_name_id
 from tests.utils.compare import ensure_downloaded_object, compare_projects
 from tests.utils.consts import REFERENCE_PROJECT_PATH, UPDATED_NAME
+from tests.utils.functions import create_self_targetting_org
 
 
 @pytest.mark.asyncio
@@ -144,10 +145,7 @@ async def test_rossum_updated_file_downloaded(
 @pytest_asyncio.fixture(scope="function")
 async def fixture_tuple(tmp_path, client: ElisAPIClient):
     await download_organization(client=client, org_path=tmp_path)
-    mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
-
-    mapping["organization"]["target"] = mapping["organization"]["id"]
-    await write_mapping(tmp_path / settings.MAPPING_FILENAME, mapping)
+    await create_self_targetting_org(tmp_path)
 
     schema = await client.create_new_schema({"name": "source schema", "content": []})
 

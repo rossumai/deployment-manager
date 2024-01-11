@@ -22,9 +22,12 @@ def templatize_name_id(name, id):
     return f"{name}_[{id}]"
 
 
+# ID_BRACKET_RE = re.compile(r"(\[\d+\])$")
+
+
 def detemplatize_name_id(joint_name: str) -> tuple[str, int]:
     parts = joint_name.split("_")
-    return parts[0], int(parts[1].removeprefix("[").removesuffix("]"))
+    return "_".join(parts[:-1]), int(parts[-1].removeprefix("[").removesuffix("]"))
 
 
 def extract_id_from_url(url: str) -> int:
@@ -44,6 +47,7 @@ async def write_json(path: Path, object: dict):
 
 async def read_json(path: Path):
     return json.loads(await path.read_text())
+
 
 async def write_yaml(path: Path, object: dict):
     if dataclasses.is_dataclass(object):
@@ -76,6 +80,7 @@ def adjust_keys(object: Any, lower: bool = True):
         return lowercased
     else:
         return object
+
 
 async def retrieve_with_progress(retrieve, progress, task):
     result = await retrieve()

@@ -49,6 +49,8 @@ The specifics of what objects to migrate where can be specified in a mapping.yam
 )
 @coro
 async def migrate_project(mapping: str):
+    # TODO: add org_path and client to download too
+
     mapping_file = mapping
     org_path = Path("./")
     mapping = await read_mapping(org_path / mapping_file)

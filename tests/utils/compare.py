@@ -10,13 +10,18 @@ from project_rossum_deploy.utils.functions import read_json
 from project_rossum_deploy.utils.consts import settings
 
 
-async def compare_projects(project_one_path: Path, project_two_path: Path):
-    # Compare mapping and organization files manually because the root folders could
-    # include more files where we don't want comparision (e.g. .env)
+async def compare_mappings(project_one_path: Path, project_two_path: Path):
     mapping_one, mapping_two = await read_mapping(
         project_one_path / settings.MAPPING_FILENAME
     ), await read_mapping(project_two_path / settings.MAPPING_FILENAME)
+
     assert mapping_one == mapping_two
+
+
+async def compare_projects(project_one_path: Path, project_two_path: Path):
+    # Compare mapping and organization files manually because the root folders could
+    # include more files where we don't want comparision (e.g. .env)
+    await compare_mappings(project_one_path, project_two_path)
 
     org_one, org_two = await asyncio.gather(
         *[

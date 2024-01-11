@@ -10,9 +10,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.ERROR)
 
-dotenv.load_dotenv(dotenv_path='.env', override=True, verbose=True)
+dotenv.load_dotenv(dotenv_path=".env", override=True, verbose=True)
 
-DEBUG_MODE = os.environ.get("DEBUG", 'false').lower() == "true"
+DEBUG_MODE = os.environ.get("DEBUG", "false").lower() == "true"
 
 API_SUFFIX_RE = re.compile(r"/api/v\d+$")
 
@@ -32,7 +32,8 @@ class Settings(BaseSettings):
             raise ValueError('API_BASE must end with "/api/v*".')
         return v
 
-    TOKEN: str = ""
+    # Empty string gives an API error even if there is username and password
+    TOKEN: str = "dummy_token"
     USERNAME: str = ""
     PASSWORD: str = ""
 
@@ -61,7 +62,7 @@ class Settings(BaseSettings):
             raise ValueError('TO_API_BASE must end with "/api/v*".')
         return v
 
-    TO_TOKEN: str = ""
+    TO_TOKEN: str = "dummy_token"
     TO_USERNAME: str = ""
     TO_PASSWORD: str = ""
 
@@ -100,7 +101,3 @@ class GIT_CHARACTERS(StrEnum):
     DELETED = "D"
     UPDATED = "M"
     CREATED = "??"
-
-
-# Outside of Settings so that it can be referenced
-PUSH_IGNORED_FIELDS = [settings.MAPPING_FILENAME, ".gitignore"]

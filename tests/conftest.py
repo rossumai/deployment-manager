@@ -1,7 +1,9 @@
+import os
 from anyio import Path
 import pytest
 from rossum_api import ElisAPIClient
 
+os.environ['DEBUG'] = 'true'
 
 @pytest.fixture
 def client():

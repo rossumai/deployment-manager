@@ -14,7 +14,6 @@ from project_rossum_deploy.commands.migrate.helpers import is_org_targetting_its
 
 from project_rossum_deploy.utils.consts import (
     GIT_CHARACTERS,
-    PUSH_IGNORED_FIELDS,
     settings,
 )
 from project_rossum_deploy.utils.functions import coro, detemplatize_name_id, read_json
@@ -38,12 +37,8 @@ async def upload_project_wrapper(destination):
     await upload_project(destination)
 
 
-async def upload_project(
-    destination: str, org_path: Path = None, client: ElisAPIClient = None
-):
-    if not org_path:
-        org_path = Path("./")
-
+async def upload_project(destination: str, client: ElisAPIClient = None):
+    org_path = Path("./")
     mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
 
     if not client:
@@ -61,7 +56,7 @@ async def upload_project(
 
     # Check both the destination dir and and the project root (e.g., organization.json)
     git_destination_diff = subprocess.run(
-        ["git", "status", org_path / destination, ".", "-s"],
+        ["git", "status", destination, "organization.json", "-s"],
         capture_output=True,
         text=True,
     )
@@ -73,8 +68,6 @@ async def upload_project(
             continue
 
         op, path = tuple(change.split(" ", maxsplit=1))
-        if path in PUSH_IGNORED_FIELDS:
-            continue
 
         path = path.strip('"')
         match op:
@@ -94,7 +87,7 @@ async def upload_project(
         print(
             Panel(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects.")
         )
-        await download_organization()
+        await download_organization(client=client, org_path=org_path)
 
 
 async def update_object(client: ElisAPIClient, path: Path = None, object: dict = None):
@@ -122,7 +115,7 @@ async def delete_object(path: Path, client: ElisAPIClient):
 
 def determine_object_type_from_path(path: Path) -> Resource:
     split_path = str(path).split("/")
-    type = split_path[1] if len(split_path) > 1 else path.stem + "s"
+    type = split_path[-2] if len(split_path) > 1 else path.stem + "s"
     allowed_types = set(resource.value for resource in Resource)
     if type in allowed_types:
         return Resource(type)

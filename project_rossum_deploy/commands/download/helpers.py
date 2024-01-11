@@ -34,14 +34,16 @@ async def determine_object_destination(
     sources: dict,
     targets: dict,
 ):
-    # Cross-org migration means that there is no target dir in this project
-    # Both organizations = projects only have the source dir
-    if not is_org_targetting_itself(mapping) or object.id in sources[object_type + "s"]:
-        destination = settings.SOURCE_DIRNAME
-    elif object.id in targets[object_type + "s"] or await find_object_in_project(
+    if object.id in targets[object_type + "s"] or await find_object_in_project(
         object, org_path / settings.TARGET_DIRNAME / (object_type + "s")
     ):
         destination = settings.TARGET_DIRNAME
+    # Cross-org migration means that there is no target dir in this project
+    # Both organizations = projects only have the source dir
+    elif (
+        not is_org_targetting_itself(mapping) or object.id in sources[object_type + "s"]
+    ):
+        destination = settings.SOURCE_DIRNAME
     else:
         user_decision = Confirm(
             f'Should the {object_type} "{object.name}" ({object.id}) be in {settings.SOURCE_DIRNAME}? Otherwise, it will be understood as {settings.TARGET_DIRNAME}.'
