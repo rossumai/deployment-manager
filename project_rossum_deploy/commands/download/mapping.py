@@ -2,7 +2,12 @@ from anyio import Path
 from rossum_api.models import Organization, Workspace, Hook, Schema, Queue, Inbox
 
 from project_rossum_deploy.utils.consts import settings
-from project_rossum_deploy.utils.functions import adjust_keys, read_yaml, write_yaml
+from project_rossum_deploy.utils.functions import (
+    adjust_keys,
+    create_empty_mapping,
+    read_yaml,
+    write_yaml,
+)
 
 
 async def read_mapping(mapping_path: Path):
@@ -76,19 +81,6 @@ async def create_update_mapping(
     )
 
     await write_mapping(org_path / settings.MAPPING_FILENAME, mapping)
-
-
-def create_empty_mapping():
-    return {
-        "organization": {
-            "id": "",
-            "name": "",
-            "target": None,
-            "workspaces": [],
-            "hooks": [],
-            "schemas": [],
-        }
-    }
 
 
 def get_attributes_for_mapping(

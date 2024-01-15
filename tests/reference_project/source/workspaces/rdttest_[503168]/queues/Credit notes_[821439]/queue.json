@@ -1,0 +1,107 @@
+{
+  "id": 821439,
+  "name": "Credit notes",
+  "url": "https://rdttest.rossum.app/api/v1/queues/821439",
+  "workspace": "https://rdttest.rossum.app/api/v1/workspaces/503168",
+  "connector": null,
+  "schema": "https://rdttest.rossum.app/api/v1/schemas/1082181",
+  "inbox": "https://rdttest.rossum.app/api/v1/inboxes/433757",
+  "counts": {
+    "importing": 0,
+    "failed_import": 0,
+    "split": 0,
+    "to_review": 1,
+    "reviewing": 0,
+    "in_workflow": 0,
+    "confirmed": 0,
+    "rejected": 0,
+    "exporting": 0,
+    "exported": 0,
+    "failed_export": 0,
+    "postponed": 0,
+    "deleted": 0,
+    "purged": 0
+  },
+  "session_timeout": "01:00:00",
+  "webhooks": [],
+  "hooks": [],
+  "users": [],
+  "rir_url": null,
+  "rir_params": null,
+  "automation_enabled": false,
+  "automation_level": "never",
+  "default_score_threshold": 0.975,
+  "locale": "en_US",
+  "metadata": {
+    "queueTemplate": "creditnote"
+  },
+  "settings": {
+    "columns": [
+      {
+        "schema_id": "document_id"
+      },
+      {
+        "schema_id": "date_issue"
+      },
+      {
+        "schema_id": "amount_total_tax"
+      },
+      {
+        "schema_id": "amount_due"
+      },
+      {
+        "schema_id": "sender_name"
+      }
+    ],
+    "hide_export_button": false,
+    "accepted_mime_types": [
+      "image/*",
+      "text/plain",
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/msword",
+      "application/vnd.ms-excel",
+      "application/zip"
+    ],
+    "suggested_edit": "suggest",
+    "rejection_config": {
+      "enabled": true
+    },
+    "suggested_recipients_sources": [
+      {
+        "source": "email_header"
+      },
+      {
+        "source": "queue_mailing_history"
+      }
+    ],
+    "email_notifications": {
+      "recipient": null,
+      "unprocessable_attachments": false,
+      "postponed_annotations": false,
+      "deleted_annotations": false,
+      "email_with_no_attachments": true
+    },
+    "dashboard_customization": {
+      "all_documents": true,
+      "to_review": true,
+      "postponed": true,
+      "confirmed": true,
+      "exported": true,
+      "rejected": true,
+      "deleted": true,
+      "labels": true
+    },
+    "workflows": {
+      "enabled": false,
+      "bypass_workflows_allowed": false
+    }
+  },
+  "dedicated_engine": null,
+  "generic_engine": "https://rdttest.rossum.app/api/v1/generic_engines/4",
+  "use_confirmed_state": true,
+  "document_lifetime": null,
+  "delete_after": null,
+  "status": "active"
+}

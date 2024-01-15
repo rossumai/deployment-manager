@@ -1,4 +1,3 @@
-import json
 import logging
 from anyio import Path
 from rich.progress import Progress
@@ -14,7 +13,7 @@ from project_rossum_deploy.common.upload import (
     upload_workspace,
 )
 
-from project_rossum_deploy.utils.functions import detemplatize_name_id
+from project_rossum_deploy.utils.functions import detemplatize_name_id, read_json
 
 
 async def migrate_workspaces(
@@ -34,7 +33,7 @@ async def migrate_workspaces(
         try:
             _, id = detemplatize_name_id(ws_path.stem)
             ws_config_path = ws_path / "workspace.json"
-            workspace = json.loads(await ws_config_path.read_text())
+            workspace = await read_json(ws_config_path)
 
             workspace["queues"] = []
 
@@ -85,7 +84,7 @@ async def migrate_queues_and_inboxes(
             _, id = detemplatize_name_id(queue_path.stem)
 
             queue_config_path = queue_path / "queue.json"
-            queue = json.loads(await queue_config_path.read_text())
+            queue = await read_json(queue_config_path)
 
             replace_dependency_url(queue, "workspace", source_id_target_pairs)
             replace_dependency_url(queue, "schema", source_id_target_pairs)
@@ -107,7 +106,7 @@ async def migrate_queues_and_inboxes(
             source_id_target_pairs[id] = queue_result
 
             inbox_config_path = queue_path / "inbox.json"
-            inbox = json.loads(await inbox_config_path.read_text())
+            inbox = await read_json(inbox_config_path)
 
             replace_dependency_url(inbox, "queues", source_id_target_pairs)
             # Should either create a new one or it is already present
