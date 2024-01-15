@@ -27,9 +27,9 @@ def init_project(name):
         return
 
     with open(name + "/.gitignore", "w") as wf:
-        wf.write(".env")
-    env_example_path = Path(__file__).parent.parent.parent / ".env.example"
-    shutil.copyfile(env_example_path, name + "/.env")
+        wf.write("credentials.json")
+    example_credentials_path = Path(__file__).parent.parent / "dummy_credentials.json"
+    shutil.copyfile(example_credentials_path, name + "/credentials.json")
 
     os.chdir(name)
     subprocess.run(["git", "init"])

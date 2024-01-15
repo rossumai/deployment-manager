@@ -2,6 +2,7 @@ __pycache__/
 .venv
 */**/__pycache__
 .env
+credentials.json
 
 dummy_project
 temp_project

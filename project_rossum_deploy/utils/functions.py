@@ -8,8 +8,6 @@ from anyio import Path
 
 import yaml
 
-from project_rossum_deploy.utils.consts import settings
-
 
 def coro(f):
     @wraps(f)
@@ -63,21 +61,21 @@ def read_yaml(path: Path):
         return yaml.safe_load(rf)
 
 
-def adjust_keys(object: Any, lower: bool = True):
+def adjust_keys(object: Any, uppercase_fields: list = [], lower: bool = True):
     if isinstance(object, dict):
         lowercased = {}
         for k, v in object.items():
             new_key = k
             if lower:
                 new_key = k.lower()
-            elif not lower and k in settings.MAPPING_UPPERCASE_FIELDS:
+            elif not lower and k in uppercase_fields:
                 new_key = k.upper()
-            lowercased[new_key] = adjust_keys(v, lower)
+            lowercased[new_key] = adjust_keys(v, uppercase_fields, lower)
         return lowercased
     elif isinstance(object, list):
         lowercased = []
         for v in object:
-            lowercased.append(adjust_keys(v, lower))
+            lowercased.append(adjust_keys(v, uppercase_fields, lower))
         return lowercased
     else:
         return object
@@ -87,6 +85,7 @@ async def retrieve_with_progress(retrieve, progress, task):
     result = await retrieve()
     progress.update(task, advance=1)
     return result
+
 
 def create_empty_mapping():
     return {
@@ -101,7 +100,9 @@ def create_empty_mapping():
     }
 
 
-def extract_sources_targets(mapping: dict, include_organization=True) -> tuple[dict, dict]:
+def extract_sources_targets(
+    mapping: dict, include_organization=True
+) -> tuple[dict, dict]:
     if not mapping:
         mapping = create_empty_mapping()
 

@@ -13,13 +13,13 @@ from project_rossum_deploy.utils.functions import (
 async def read_mapping(mapping_path: Path):
     if await mapping_path.exists():
         mapping = read_yaml(mapping_path)
-        return adjust_keys(mapping)
+        return adjust_keys(mapping, settings.MAPPING_UPPERCASE_FIELDS)
 
     return None
 
 
 async def write_mapping(mapping_path: Path, mapping: dict):
-    mapping = adjust_keys(mapping, lower=False)
+    mapping = adjust_keys(mapping, settings.MAPPING_UPPERCASE_FIELDS, lower=False)
     await write_yaml(mapping_path, mapping)
 
 
