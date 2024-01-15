@@ -12,7 +12,6 @@ import click
 from project_rossum_deploy.commands.download.helpers import (
     determine_object_destination,
     delete_current_configuration,
-    extract_sources_targets,
 )
 from project_rossum_deploy.commands.download.mapping import (
     create_empty_mapping,
@@ -24,6 +23,7 @@ from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     coro,
     extract_id_from_url,
+    extract_sources_targets,
     retrieve_with_progress,
     templatize_name_id,
     write_json,

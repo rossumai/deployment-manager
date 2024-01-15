@@ -9,7 +9,6 @@ from rich.progress import Progress
 import click
 from rossum_api import ElisAPIClient
 from project_rossum_deploy.commands.download.download import download_organization
-from project_rossum_deploy.commands.download.helpers import extract_sources_targets
 from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.migrate.helpers import (
     is_org_targetting_itself,
@@ -29,6 +28,7 @@ from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     coro,
     detemplatize_name_id,
+    extract_sources_targets,
     read_json,
 )
 
@@ -48,11 +48,18 @@ The specifics of what objects to migrate where can be specified in a mapping.yam
     help="Path to the mapping file to use.",
 )
 @coro
-async def migrate_project(mapping: str):
-    # TODO: add org_path and client to download too
+async def migrate_project_wrapper(mapping: str):
+    await migrate_project_wrapper(mapping)
 
+
+async def migrate_project(
+    mapping: str,
+    client: ElisAPIClient = None,
+    org_path: Path = None,
+):
     mapping_file = mapping
-    org_path = Path("./")
+    if not org_path:
+        org_path = Path("./")
     mapping = await read_mapping(org_path / mapping_file)
     previous_mapping = deepcopy(mapping)
 
@@ -62,20 +69,21 @@ async def migrate_project(mapping: str):
             "No target for organization. If you want to migrate inside the same organization, just target its own ID."
         )
 
-    if is_org_targetting_itself(mapping):
-        client = ElisAPIClient(
-            base_url=settings.API_URL,
-            token=settings.TOKEN,
-            username=settings.USERNAME,
-            password=settings.PASSWORD,
-        )
-    else:
-        client = ElisAPIClient(
-            base_url=settings.TO_API_URL,
-            token=settings.TO_TOKEN,
-            username=settings.TO_USERNAME,
-            password=settings.TO_PASSWORD,
-        )
+    if not client:
+        if is_org_targetting_itself(mapping):
+            client = ElisAPIClient(
+                base_url=settings.API_URL,
+                token=settings.TOKEN,
+                username=settings.USERNAME,
+                password=settings.PASSWORD,
+            )
+        else:
+            client = ElisAPIClient(
+                base_url=settings.TO_API_URL,
+                token=settings.TO_TOKEN,
+                username=settings.TO_USERNAME,
+                password=settings.TO_PASSWORD,
+            )
 
     source_id_target_pairs = {}
 
@@ -137,7 +145,7 @@ async def migrate_project(mapping: str):
         print(
             Panel(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects.")
         )
-        await download_organization()
+        await download_organization(client=client, org_path=org_path)
     else:
         print(
             Panel(

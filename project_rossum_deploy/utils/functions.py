@@ -1,4 +1,5 @@
 import asyncio
+import copy
 from functools import wraps
 import dataclasses
 import json
@@ -86,3 +87,67 @@ async def retrieve_with_progress(retrieve, progress, task):
     result = await retrieve()
     progress.update(task, advance=1)
     return result
+
+def create_empty_mapping():
+    return {
+        "organization": {
+            "id": "",
+            "name": "",
+            "target": None,
+            "workspaces": [],
+            "hooks": [],
+            "schemas": [],
+        }
+    }
+
+
+def extract_sources_targets(mapping: dict, include_organization=True) -> tuple[dict, dict]:
+    if not mapping:
+        mapping = create_empty_mapping()
+
+    targets = {
+        "workspaces": [],
+        "queues": [],
+        "inboxes": [],
+        "schemas": [],
+        "hooks": [],
+    }
+    sources = copy.deepcopy(targets)
+
+    if include_organization:
+        targets["organization"] = mapping["organization"]["target"]
+        sources["organization"] = mapping["organization"]["id"]
+
+    for ws in mapping["organization"]["workspaces"]:
+        sources["workspaces"].append(ws["id"])
+        if ws["target"]:
+            targets["workspaces"].append(ws["target"])
+
+        for q in ws["queues"]:
+            sources["queues"].append(q["id"])
+            if q["target"]:
+                targets["queues"].append(q["target"])
+
+            sources["inboxes"].append(q["inbox"]["id"])
+            if q["inbox"] and q["inbox"]["target"]:
+                targets["inboxes"].append(q["inbox"]["target"])
+
+    for schema in mapping["organization"]["schemas"]:
+        sources["schemas"].append(schema["id"])
+        if schema["target"]:
+            targets["schemas"].append(schema["target"])
+
+    for hook in mapping["organization"]["hooks"]:
+        sources["hooks"].append(hook["id"])
+        if hook["target"]:
+            targets["hooks"].append(hook["target"])
+
+    return sources, targets
+
+
+def extract_source_target_pairs(mapping: dict) -> dict:
+    sources, targets = extract_sources_targets(mapping, include_organization=False)
+    pairs = {}
+    for object_type, sources in sources.items():
+        pairs[object_type] = dict(zip(sources, targets[object_type]))
+    return pairs

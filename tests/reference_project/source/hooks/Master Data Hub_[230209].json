@@ -1,0 +1,86 @@
+{
+  "id": 230209,
+  "name": "Master Data Hub",
+  "url": "https://rdttest.rossum.app/api/v1/hooks/230209",
+  "active": true,
+  "config": {
+    "private": true,
+    "schedule": {},
+    "app": null,
+    "payload_logging_enabled": false,
+    "insecure_ssl": false,
+    "client_ssl_certificate": null,
+    "retry_on_any_non_2xx": false,
+    "timeout_s": 60
+  },
+  "test": {},
+  "guide": "<div>\r\n    <p>To manage and configure the behavior, use our configurator below.</p> \r\n    <p>Start by</p>\r\n    <ul>\r\n        <li>Selecting the queues that you want to use for this extension below</li>\r\n    </ul>\r\n    <p>Then open Master Data Hub and</p>\r\n    <ul>\r\n        <li>Import the dataset with Dataset Management</li>\r\n        <li>Create and set up a new configuration in Configurator</li>\r\n    </ul>\r\n    <p>For more information, take a look at our documentation <a href=\"https://rossum.ai/help/article/master-data-hub-extension\" target=\"_blank\">here</a>.</p>\r\n\r\n    <p><form action=\"https://rdttest.rossum.app/svc/master-data-hub/web/\" target=\"_blank\" rel=\"noopener noreferrer\">\r\n        <button type=\"submit\"style=\"\r\n            border: none;    \r\n            background: var(--color-primary);\r\n            border-radius: 4px;\r\n            padding: 6px 16px;\r\n            color: var(--white);\r\n            font-weight: 500;\"\r\n         >\r\n            Open configurator\r\n        </button>\r\n    </form></p>\r\n</div>",
+  "read_more_url": "https://elis.rossum.ai/svc/master-data-hub/api/docs",
+  "extension_image_url": "https://rossum.ai/help/wp-content/uploads/2023/11/Master-Data-Hub-6.png",
+  "type": "webhook",
+  "metadata": {},
+  "queues": [
+    "https://rdttest.rossum.app/api/v1/queues/821440"
+  ],
+  "run_after": [],
+  "events": [
+    "annotation_content.initialize",
+    "annotation_content.started",
+    "annotation_content.updated",
+    "invocation.manual"
+  ],
+  "settings": {
+    "configurations": [
+      {
+        "name": "Default configuration",
+        "source": {
+          "dataset": "vendors",
+          "queries": [
+            {
+              "find": {
+                "Vendor Name": "{sender_name}"
+              }
+            }
+          ]
+        },
+        "default": {
+          "label": "---",
+          "value": ""
+        },
+        "mapping": {
+          "dataset_key": "Vendor ID",
+          "label_template": "{\"Vendor ID\"}-{\"Vendor Name\"}",
+          "target_schema_id": "vendor_match"
+        },
+        "result_actions": {
+          "queue_ids": [],
+          "no_match_found": {
+            "message": {
+              "type": "error",
+              "content": "No match found"
+            }
+          },
+          "one_match_found": {
+            "select": "best_match"
+          },
+          "multiple_matches_found": {
+            "select": "default",
+            "message": {
+              "type": "warning",
+              "content": "Multiple matches found"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "settings_schema": null,
+  "secrets": {},
+  "extension_source": "rossum_store",
+  "sideload": [
+    "schemas"
+  ],
+  "token_owner": null,
+  "token_lifetime_s": 7200,
+  "description": "Enhance the extracted data with details from your master records."
+}

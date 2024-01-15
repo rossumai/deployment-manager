@@ -6,6 +6,9 @@ ORGANIZATION:
   - id: 227692
     name: Dummy Custom Function
     target: null
+  - id: 230209
+    name: Master Data Hub
+    target: null
   SCHEMAS:
   - id: 1082178
     name: Tax invoices (US) schema
