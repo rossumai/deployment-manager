@@ -8,8 +8,6 @@ import re
 import click
 
 
-from project_rossum_deploy.utils.functions import adjust_keys
-
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.ERROR)
@@ -32,7 +30,6 @@ class Settings:
             return
 
         credentials = json.loads(cred_path.read_text())
-        credentials = adjust_keys(credentials)
 
         self.SOURCE_API_BASE = credentials["source"]["api_base"]
         self.SOURCE_USERNAME = credentials["source"].get("username", None)
