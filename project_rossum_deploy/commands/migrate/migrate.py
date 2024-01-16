@@ -8,7 +8,9 @@ from rich.progress import Progress
 
 import click
 from rossum_api import ElisAPIClient
-from project_rossum_deploy.commands.download.download import download_organization
+from project_rossum_deploy.commands.download.download import (
+    download_organization_combined,
+)
 from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.migrate.helpers import (
     is_org_targetting_itself,
@@ -72,23 +74,25 @@ async def migrate_project(
     if not client:
         if is_org_targetting_itself(mapping):
             client = ElisAPIClient(
-                base_url=settings.API_URL,
-                token=settings.TOKEN,
-                username=settings.USERNAME,
-                password=settings.PASSWORD,
+                base_url=settings.SOURCE_API_URL,
+                token=settings.SOURCE_TOKEN,
+                username=settings.SOURCE_USERNAME,
+                password=settings.SOURCE_PASSWORD,
             )
         else:
             client = ElisAPIClient(
-                base_url=settings.TO_API_URL,
-                token=settings.TO_TOKEN,
-                username=settings.TO_USERNAME,
-                password=settings.TO_PASSWORD,
+                base_url=settings.TARGET_API_URL,
+                token=settings.TARGET_TOKEN,
+                username=settings.TARGET_USERNAME,
+                password=settings.TARGET_PASSWORD,
             )
 
     source_id_target_pairs = {}
 
     try:
-        organization = await read_json(org_path / "organization.json")
+        organization = await read_json(
+            org_path / settings.SOURCE_DIRNAME / "organization.json"
+        )
         # Use only a subset of org fields where it makes sense to migrate
         organization_fields = {k: organization[k] for k in settings.ORGANIZATION_FIELDS}
         with Progress() as progress:
@@ -145,7 +149,7 @@ async def migrate_project(
         print(
             Panel(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects.")
         )
-        await download_organization(client=client, org_path=org_path)
+        await download_organization_combined(client=client, org_path=org_path)
     else:
         print(
             Panel(

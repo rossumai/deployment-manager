@@ -32,8 +32,8 @@ async def compare_projects(project_one_path: Path, project_two_path: Path):
 
     org_one, org_two = await asyncio.gather(
         *[
-            read_json(project_one_path / "organization.json"),
-            read_json(project_two_path / "organization.json"),
+            read_json(project_one_path / settings.SOURCE_DIRNAME / "organization.json"),
+            read_json(project_two_path / settings.SOURCE_DIRNAME / "organization.json"),
         ]
     )
     assert org_one == org_two
