@@ -7,6 +7,7 @@ import re
 
 import click
 
+
 from project_rossum_deploy.utils.functions import adjust_keys
 
 
@@ -20,18 +21,23 @@ API_SUFFIX_RE = re.compile(r"/api/v\d+$")
 
 class Settings:
     def __init__(self):
+        if DEBUG_MODE:
+            return
+
         cred_path = Path("./") / self.CREDENTIALS_FILENAME
         if not cred_path.exists():
-            raise click.ClickException(
-                f"{self.CREDENTIALS_FILENAME} not found in the current directory."
+            click.echo(
+                f"WARNING: {self.CREDENTIALS_FILENAME} not found in the current directory."
             )
+            return
+
         credentials = json.loads(cred_path.read_text())
         credentials = adjust_keys(credentials)
 
-        self.API_BASE = credentials["source"]["api_base"]
-        self.USERNAME = credentials["source"].get("username", None)
-        self.PASSWORD = credentials["source"].get("password", None)
-        self.TOKEN = credentials["source"].get("token", None)
+        self.SOURCE_API_BASE = credentials["source"]["api_base"]
+        self.SOURCE_USERNAME = credentials["source"].get("username", None)
+        self.SOURCE_PASSWORD = credentials["source"].get("password", None)
+        self.SOURCE_TOKEN = credentials["source"].get("token", None)
 
         if not credentials.get("use_same_org_as_target", False):
             self.IS_PROJECT_IN_SAME_ORG = False
@@ -39,42 +45,42 @@ class Settings:
                 raise click.ClickException(
                     'Missing target credentials. If you are targetting the same org, set "use_same_org_as_target": true.'
                 )
-            self.TO_API_BASE = credentials["target"]["api_base"]
-            self.TO_USERNAME = credentials["target"].get("username", None)
-            self.TO_PASSWORD = credentials["target"].get("password", None)
-            self.TO_TOKEN = credentials["target"].get("token", None)
+            self.TARGET_API_BASE = credentials["target"]["api_base"]
+            self.TARGET_USERNAME = credentials["target"].get("username", None)
+            self.TARGET_PASSWORD = credentials["target"].get("password", None)
+            self.TARGET_TOKEN = credentials["target"].get("token", None)
 
             # Can't fool us that easily
-            if self.API_BASE == self.TO_API_BASE and (
+            if self.SOURCE_API_BASE == self.TARGET_API_BASE and (
                 (
-                    self.USERNAME == self.TO_USERNAME
-                    and self.PASSWORD == self.TO_PASSWORD
+                    self.SOURCE_USERNAME == self.TARGET_USERNAME
+                    and self.SOURCE_PASSWORD == self.TARGET_PASSWORD
                 )
-                or self.TOKEN == self.TO_TOKEN
+                or self.SOURCE_TOKEN == self.TARGET_TOKEN
             ):
                 self.IS_PROJECT_IN_SAME_ORG = True
         else:
             self.IS_PROJECT_IN_SAME_ORG = True
-            self.TO_API_BASE = credentials["source"]["api_base"]
-            self.TO_USERNAME = credentials["source"].get("username", None)
-            self.TO_PASSWORD = credentials["source"].get("password", None)
-            self.TO_TOKEN = credentials["source"].get("token", None)
+            self.TARGET_API_BASE = credentials["source"]["api_base"]
+            self.TARGET_USERNAME = credentials["source"].get("username", None)
+            self.TARGET_PASSWORD = credentials["source"].get("password", None)
+            self.TARGET_TOKEN = credentials["source"].get("token", None)
 
     IS_PROJECT_IN_SAME_ORG: bool = False
 
-    API_BASE: str = "https://you-forgot-to-cd-into-project.com"
+    SOURCE_API_BASE: str = "https://you-forgot-to-cd-into-project.com"
     # Empty string gives an API error even if there is username and password
-    TOKEN: str = "dummy_token"
-    USERNAME: str = ""
-    PASSWORD: str = ""
+    SOURCE_TOKEN: str = "dummy_token"
+    SOURCE_USERNAME: str = ""
+    SOURCE_PASSWORD: str = ""
 
     MAPPING_FILENAME: str = "mapping.yaml"
     CREDENTIALS_FILENAME: str = "credentials.json"
 
-    TO_API_BASE: str = ""
-    TO_TOKEN: str = "dummy_token"
-    TO_USERNAME: str = ""
-    TO_PASSWORD: str = ""
+    TARGET_API_BASE: str = ""
+    TARGET_TOKEN: str = "dummy_token"
+    TARGET_USERNAME: str = ""
+    TARGET_PASSWORD: str = ""
 
     SOURCE_DIRNAME: str = "source"
     TARGET_DIRNAME: str = "target"
@@ -96,12 +102,12 @@ class Settings:
     MIGRATE_COMMAND_NAME: str = "release"
 
     @property
-    def API_URL(self):
-        return self.API_BASE.rstrip("/")
+    def SOURCE_API_URL(self):
+        return self.SOURCE_API_BASE.rstrip("/")
 
     @property
-    def TO_API_URL(self):
-        return self.TO_API_BASE.rstrip("/")
+    def TARGET_API_URL(self):
+        return self.TARGET_API_BASE.rstrip("/")
 
 
 class GIT_CHARACTERS(StrEnum):

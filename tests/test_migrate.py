@@ -4,7 +4,7 @@ import pytest
 
 from rossum_api import ElisAPIClient
 
-from project_rossum_deploy.commands.download.download import download_organization
+from project_rossum_deploy.commands.download.download import download_organization_combined
 from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.migrate.helpers import find_mapping_of_object
 from project_rossum_deploy.commands.migrate.migrate import migrate_project
@@ -29,7 +29,7 @@ from tests.utils.functions import create_self_targetting_org, delete_migrated_ob
 async def test_migrate_fails_without_specific_org_target(
     client: ElisAPIClient, tmp_path
 ):
-    await download_organization(client, tmp_path)
+    await download_organization_combined(client, tmp_path)
     mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
     sources, _ = extract_sources_targets(mapping)
     try:
@@ -46,7 +46,7 @@ async def test_migrate_fails_without_specific_org_target(
 async def test_migrate_creates_new_objects_in_target(
     client: ElisAPIClient, tmp_path, monkeypatch
 ):
-    await download_organization(client, tmp_path)
+    await download_organization_combined(client, tmp_path)
     mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
     sources, _ = extract_sources_targets(mapping)
     try:
@@ -71,7 +71,7 @@ async def test_migrate_creates_new_objects_in_target(
 async def test_migrate_twice_is_idempotent(
     client: ElisAPIClient, tmp_path, monkeypatch
 ):
-    await download_organization(client, tmp_path)
+    await download_organization_combined(client, tmp_path)
     mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
     sources, _ = extract_sources_targets(mapping)
     try:
@@ -98,7 +98,7 @@ async def test_migrate_twice_is_idempotent(
 async def test_migrate_ignores_designated_object(
     client: ElisAPIClient, tmp_path, monkeypatch
 ):
-    await download_organization(client, tmp_path)
+    await download_organization_combined(client, tmp_path)
     await create_self_targetting_org(tmp_path)
     mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
     sources, _ = extract_sources_targets(mapping)
@@ -137,7 +137,7 @@ async def test_migrate_ignores_designated_object(
 async def test_migrate_adds_new_object_on_second_run(
     client: ElisAPIClient, tmp_path, monkeypatch
 ):
-    await download_organization(client, tmp_path)
+    await download_organization_combined(client, tmp_path)
     mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
     sources, _ = extract_sources_targets(mapping)
     try:
@@ -153,7 +153,7 @@ async def test_migrate_adds_new_object_on_second_run(
             {"name": "new source schema", "content": []}
         )
         monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-        await download_organization(client=client, org_path=tmp_path)
+        await download_organization_combined(client=client, org_path=tmp_path)
 
         monkeypatch.setattr("sys.stdin", io.StringIO("y"))
         await migrate_project(
@@ -183,7 +183,7 @@ async def test_migrate_adds_new_object_on_second_run(
 async def test_migrate_updates_object_on_second_run(
     client: ElisAPIClient, tmp_path, monkeypatch
 ):
-    await download_organization(client, tmp_path)
+    await download_organization_combined(client, tmp_path)
     mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
     sources, _ = extract_sources_targets(mapping)
     try:

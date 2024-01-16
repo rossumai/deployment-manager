@@ -11,6 +11,7 @@ from project_rossum_deploy.commands.upload import upload_project_wrapper
 # ? PULL: implicitly only source (if different orgs), target download would go to target/
 # Use env creds if both are there, otherwise it can only be either source or source+target (interorg) - download based on the command
 # If inter-org, source and target dirs would have the same organization.json, it should not matter
+# TODO: check repulling in commands - what about both orgs?
 
 # ? PUSH: probably OK to just take the env credentials based on destination
 # ? RELEASE: 

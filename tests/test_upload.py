@@ -3,7 +3,6 @@ import io
 import os
 import subprocess
 from anyio import Path
-import click
 import pytest
 import pytest_asyncio
 
@@ -11,7 +10,9 @@ from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
 
-from project_rossum_deploy.commands.download.download import download_organization
+from project_rossum_deploy.commands.download.download import (
+    download_organization_combined,
+)
 from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.upload import upload_project
 from project_rossum_deploy.utils.consts import settings
@@ -30,7 +31,7 @@ from tests.utils.functions import create_self_targetting_org
 
 
 async def setup_project(client: ElisAPIClient, tmp_path):
-    await download_organization(client=client, org_path=tmp_path)
+    await download_organization_combined(client=client, org_path=tmp_path)
 
     # Commit to a git repo so that the following update can be diffed
     current_path = Path(__file__).parent.parent
@@ -73,7 +74,7 @@ async def test_push_updated_file(
 
     # Confirm configuration overwriting
     monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-    await download_organization(client=client, org_path=tmp_path)
+    await download_organization_combined(client=client, org_path=tmp_path)
     redownloaded_file = await read_json(updated_file_path)
 
     assert redownloaded_file == updated_file
@@ -112,7 +113,7 @@ async def test_push_updated_file_name_changed(
 
     # Confirm configuration overwriting
     monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-    await download_organization(client=client, org_path=tmp_path)
+    await download_organization_combined(client=client, org_path=tmp_path)
     redownloaded_file = await read_json(
         previous_file_path.with_stem(
             templatize_name_id(UPDATED_NAME, updated_file["id"])
@@ -178,7 +179,7 @@ async def test_push_ignores_locally_created_file(
 
     # Confirm configuration overwriting
     monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-    await download_organization(client=client, org_path=tmp_path)
+    await download_organization_combined(client=client, org_path=tmp_path)
 
     await compare_mappings(tmp_path, REFERENCE_PROJECT_PATH)
 
@@ -192,7 +193,7 @@ async def source_and_target_schema(client: ElisAPIClient, tmp_path, monkeypatch)
         {"name": "target_schema", "content": []}
     )
 
-    await download_organization(client, org_path=tmp_path)
+    await download_organization_combined(client, org_path=tmp_path)
 
     mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
     mapping["organization"]["schemas"][0]["target"] = target_schema.id
@@ -243,7 +244,7 @@ async def test_push_ignores_file_from_target(
 
     # Confirm configuration overwriting
     monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-    await download_organization(client, org_path=tmp_path)
+    await download_organization_combined(client, org_path=tmp_path)
 
     assert not (await deleted_source_schema_path.exists())
     assert await deleted_target_schema_path.exists()
@@ -276,7 +277,7 @@ async def test_push_ignores_file_from_source(
 
     # Confirm configuration overwriting
     monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-    await download_organization(client, org_path=tmp_path)
+    await download_organization_combined(client, org_path=tmp_path)
 
     assert await deleted_source_schema_path.exists()
     assert not (await deleted_target_schema_path.exists())
@@ -288,7 +289,7 @@ async def target_schema(client: ElisAPIClient, tmp_path, monkeypatch):
         {"name": "target_schema", "content": []}
     )
 
-    await download_organization(client, org_path=tmp_path)
+    await download_organization_combined(client, org_path=tmp_path)
 
     mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
     mapping["organization"]["schemas"][0]["target"] = target_schema.id
@@ -301,21 +302,3 @@ async def target_schema(client: ElisAPIClient, tmp_path, monkeypatch):
     yield target_schema
 
     await client.delete_schema(target_schema.id)
-
-
-@pytest.mark.asyncio
-async def test_push_does_not_work_for_cross_org_target(
-    client: ElisAPIClient, tmp_path, target_schema
-):
-    deleted_target_schema_path = (
-        tmp_path
-        / settings.TARGET_DIRNAME
-        / "schemas"
-        / f"{templatize_name_id(target_schema.name, target_schema.id)}.json"
-    )
-    os.remove(deleted_target_schema_path)
-
-    # The command must be run from the directory because it is running 'git status' internally
-    os.chdir(tmp_path)
-    with pytest.raises(click.ClickException):
-        await upload_project(destination=settings.TARGET_DIRNAME)

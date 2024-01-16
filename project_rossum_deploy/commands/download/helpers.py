@@ -1,5 +1,5 @@
-from anyio import Path
 import os
+from anyio import Path
 import shutil
 from rich.prompt import Confirm
 
@@ -10,18 +10,24 @@ from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import templatize_name_id
 
 
-async def delete_current_configuration(org_path: Path):
-    # We do not delete mapping.yaml on purposes
-    os.remove(org_path / "organization.json")
-    spaces = [settings.SOURCE_DIRNAME, settings.TARGET_DIRNAME]
-    paths_to_delete = ["workspaces", "schemas", "hooks"]
-    for space in spaces:
-        space_path = org_path / space
-        if await space_path.exists():
+async def delete_current_configuration(org_path: Path, destination: str):
+    # We do not delete mapping.yaml on purpose
+    destinations = (
+        [destination]
+        if destination
+        else [settings.SOURCE_DIRNAME, settings.TARGET_DIRNAME]
+    )
+    paths_to_delete = ["workspaces", "schemas", "hooks", "organization.json"]
+    for destination in destinations:
+        destination_path = org_path / destination
+        if await destination_path.exists():
             for path in paths_to_delete:
-                path = space_path / path
+                path = destination_path / path
                 if await path.exists():
-                    shutil.rmtree(path)
+                    if await path.is_file():
+                        os.remove(path)
+                    else:
+                        shutil.rmtree(path)
 
 
 async def determine_object_destination(

@@ -5,7 +5,7 @@ import pytest_asyncio
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
-from project_rossum_deploy.commands.download.download import download_organization
+from project_rossum_deploy.commands.download.download import download_organization_combined
 from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import read_json, templatize_name_id
@@ -16,7 +16,7 @@ from tests.utils.functions import create_self_targetting_org
 
 @pytest.mark.asyncio
 async def test_fresh_download(client: ElisAPIClient, tmp_path):
-    await download_organization(client=client, org_path=tmp_path)
+    await download_organization_combined(client=client, org_path=tmp_path)
 
     await compare_projects(tmp_path, REFERENCE_PROJECT_PATH)
 
@@ -25,11 +25,11 @@ async def test_fresh_download(client: ElisAPIClient, tmp_path):
 async def test_second_download_idempotency(
     client: ElisAPIClient, monkeypatch, tmp_path
 ):
-    await download_organization(client=client, org_path=tmp_path)
+    await download_organization_combined(client=client, org_path=tmp_path)
 
     # Confirm configuration overwriting
     monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-    await download_organization(client=client, org_path=tmp_path)
+    await download_organization_combined(client=client, org_path=tmp_path)
 
     await compare_projects(tmp_path, REFERENCE_PROJECT_PATH)
 
@@ -52,7 +52,7 @@ async def new_workspace(client: ElisAPIClient):
 async def test_rossum_created_file_downloaded(
     client: ElisAPIClient, tmp_path, new_workspace
 ):
-    await download_organization(client=client, org_path=tmp_path)
+    await download_organization_combined(client=client, org_path=tmp_path)
 
     with pytest.raises(AssertionError):
         await compare_projects(tmp_path, REFERENCE_PROJECT_PATH)
@@ -81,12 +81,12 @@ async def test_rossum_deleted_file_absent(client: ElisAPIClient, monkeypatch, tm
         }
     )
     # Make sure the project was downloaded WITH the workspace
-    await download_organization(client=client, org_path=tmp_path)
+    await download_organization_combined(client=client, org_path=tmp_path)
     await client.delete_workspace(deleted_ws.id)
 
     # Confirm configuration overwriting
     monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-    await download_organization(client=client, org_path=tmp_path)
+    await download_organization_combined(client=client, org_path=tmp_path)
 
     await compare_projects(tmp_path, REFERENCE_PROJECT_PATH)
 
@@ -112,7 +112,7 @@ async def old_schema(client: ElisAPIClient):
 async def test_rossum_updated_file_downloaded(
     client: ElisAPIClient, tmp_path, old_schema
 ):
-    await download_organization(client=client, org_path=tmp_path)
+    await download_organization_combined(client=client, org_path=tmp_path)
 
     with pytest.raises(AssertionError):
         await compare_projects(tmp_path, REFERENCE_PROJECT_PATH)
@@ -144,7 +144,7 @@ async def test_rossum_updated_file_downloaded(
 
 @pytest_asyncio.fixture(scope="function")
 async def fixture_tuple(tmp_path, client: ElisAPIClient):
-    await download_organization(client=client, org_path=tmp_path)
+    await download_organization_combined(client=client, org_path=tmp_path)
     await create_self_targetting_org(tmp_path)
 
     schema = await client.create_new_schema({"name": "source schema", "content": []})
@@ -162,7 +162,7 @@ async def test_rossum_created_file_put_into_source(
 
     # Confirm the new object should be in source
     monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-    await download_organization(client=client, org_path=tmp_path)
+    await download_organization_combined(client=client, org_path=tmp_path)
 
     new_schema_path = (
         tmp_path
@@ -190,7 +190,7 @@ async def test_rossum_created_file_put_into_target(
     await write_mapping(tmp_path / settings.MAPPING_FILENAME, mapping)
 
     monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-    await download_organization(client=client, org_path=tmp_path)
+    await download_organization_combined(client=client, org_path=tmp_path)
 
     new_schema_path = (
         tmp_path

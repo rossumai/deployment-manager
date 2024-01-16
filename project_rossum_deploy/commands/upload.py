@@ -8,9 +8,9 @@ from rich.progress import track
 import click
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
-from project_rossum_deploy.commands.download.download import download_organization
-from project_rossum_deploy.commands.download.mapping import read_mapping
-from project_rossum_deploy.commands.migrate.helpers import is_org_targetting_itself
+from project_rossum_deploy.commands.download.download import (
+    download_organization_single,
+)
 
 from project_rossum_deploy.utils.consts import (
     GIT_CHARACTERS,
@@ -39,24 +39,30 @@ async def upload_project_wrapper(destination):
 
 async def upload_project(destination: str, client: ElisAPIClient = None):
     org_path = Path("./")
-    mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
 
     if not client:
-        if destination == settings.SOURCE_DIRNAME or is_org_targetting_itself(mapping):
-            client = ElisAPIClient(
-                base_url=settings.API_URL,
-                token=settings.TOKEN,
-                username=settings.USERNAME,
-                password=settings.PASSWORD,
-            )
-        else:
-            raise click.ClickException(
-                "Cannot use push if target is a different organization. Go to that project and run the command there."
-            )
+        match destination:
+            case settings.SOURCE_DIRNAME:
+                client = ElisAPIClient(
+                    base_url=settings.SOURCE_API_URL,
+                    token=settings.SOURCE_TOKEN,
+                    username=settings.SOURCE_USERNAME,
+                    password=settings.SOURCE_PASSWORD,
+                )
+            case settings.TARGET_DIRNAME:
+                client = ElisAPIClient(
+                    base_url=settings.TARGET_API_URL,
+                    token=settings.TARGET_TOKEN,
+                    username=settings.TARGET_USERNAME,
+                    password=settings.TARGET_PASSWORD,
+                )
+            case _:
+                raise click.ClickException(
+                    f'Unrecognized destination "{destination}" to use {settings.UPLOAD_COMMAND_NAME}.'
+                )
 
-    # Check both the destination dir and and the project root (e.g., organization.json)
     git_destination_diff = subprocess.run(
-        ["git", "status", destination, "organization.json", "-s"],
+        ["git", "status", destination, "-s"],
         capture_output=True,
         text=True,
     )
@@ -80,14 +86,21 @@ async def upload_project(destination: str, client: ElisAPIClient = None):
             case _:
                 raise click.ClickException(f'Unrecognized operator "{op}".')
 
-    print(Panel(f"Finished {settings.UPLOAD_COMMAND_NAME}."))
+    print(
+        Panel(
+            f"Finished {settings.UPLOAD_COMMAND_NAME}. Please commit the changes before running this command again."
+        )
+    )
+    print(
+        Panel(
+            f"Running {settings.DOWNLOAD_COMMAND_NAME} for {destination} because of potential changes to names and mapping."
+        )
+    )
 
     # Repulling is done to update mapping and (potentially) different filenames.
-    if is_org_targetting_itself(mapping):
-        print(
-            Panel(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects.")
-        )
-        await download_organization(client=client, org_path=org_path)
+    await download_organization_single(
+        client=client, org_path=org_path, destination=destination
+    )
 
 
 async def update_object(client: ElisAPIClient, path: Path = None, object: dict = None):
