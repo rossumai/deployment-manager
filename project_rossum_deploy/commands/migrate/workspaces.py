@@ -1,7 +1,10 @@
 import logging
 from anyio import Path
 from rich.progress import Progress
+from rich import print
+
 from rossum_api import ElisAPIClient
+
 from project_rossum_deploy.commands.migrate.helpers import (
     find_mapping_of_object,
     replace_dependency_url,
@@ -12,6 +15,7 @@ from project_rossum_deploy.common.upload import (
     upload_queue,
     upload_workspace,
 )
+from project_rossum_deploy.utils.consts import settings
 
 from project_rossum_deploy.utils.functions import detemplatize_name_id, read_json
 
@@ -36,6 +40,7 @@ async def migrate_workspaces(
             workspace = await read_json(ws_config_path)
 
             workspace["queues"] = []
+            workspace['organization'] = f"{settings.TARGET_API_URL}/organizations/{mapping['organization']['target']}"
 
             workspace_mapping = find_mapping_of_object(
                 mapping["organization"]["workspaces"], id
@@ -64,7 +69,7 @@ async def migrate_workspaces(
 
             progress.update(task, advance=1)
         except Exception as e:
-            logging.error(f"Error while migrating workspace '{id}': {e}")
+            print(f"Error while migrating workspace '{id}': {e}")
 
     return source_id_target_pairs
 

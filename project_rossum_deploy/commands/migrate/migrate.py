@@ -1,5 +1,4 @@
 from copy import deepcopy
-import logging
 from anyio import Path
 from rich import print
 from rich.panel import Panel
@@ -9,11 +8,10 @@ from rich.progress import Progress
 import click
 from rossum_api import ElisAPIClient
 from project_rossum_deploy.commands.download.download import (
-    download_organization_combined,
+    download_project,
 )
 from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.migrate.helpers import (
-    is_org_targetting_itself,
     find_mapping_of_object,
     traverse_mapping,
 )
@@ -43,26 +41,18 @@ If these objects don't exist, they get crated.
 The specifics of what objects to migrate where can be specified in a mapping.yaml file.
                """,
 )
-@click.option(
-    "--mapping",
-    default=settings.MAPPING_FILENAME,
-    show_default=True,
-    help="Path to the mapping file to use.",
-)
 @coro
-async def migrate_project_wrapper(mapping: str):
-    await migrate_project_wrapper(mapping)
+async def migrate_project_wrapper():
+    await migrate_project()
 
 
 async def migrate_project(
-    mapping: str,
     client: ElisAPIClient = None,
     org_path: Path = None,
 ):
-    mapping_file = mapping
     if not org_path:
         org_path = Path("./")
-    mapping = await read_mapping(org_path / mapping_file)
+    mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
     previous_mapping = deepcopy(mapping)
 
     target_organization = mapping["organization"]["target"]
@@ -72,7 +62,7 @@ async def migrate_project(
         )
 
     if not client:
-        if is_org_targetting_itself(mapping):
+        if settings.IS_PROJECT_IN_SAME_ORG:
             client = ElisAPIClient(
                 base_url=settings.SOURCE_API_URL,
                 token=settings.SOURCE_TOKEN,
@@ -87,7 +77,9 @@ async def migrate_project(
                 password=settings.TARGET_PASSWORD,
             )
 
-    source_id_target_pairs = {}
+    source_id_target_pairs = {
+        mapping["organization"]["id"]: mapping["organization"]["target"]
+    }
 
     try:
         organization = await read_json(
@@ -97,7 +89,7 @@ async def migrate_project(
         organization_fields = {k: organization[k] for k in settings.ORGANIZATION_FIELDS}
         with Progress() as progress:
             task = progress.add_task("Releasing organization...", total=1)
-            await upload_organization(client, organization_fields, organization["id"])
+            await upload_organization(client, organization_fields, target_organization)
             progress.update(task, advance=1)
 
             source_path = org_path / settings.SOURCE_DIRNAME
@@ -111,9 +103,9 @@ async def migrate_project(
             )
 
         # Update the mapping with right hand sides (targets) created during migration
-        await write_mapping(org_path / mapping_file, mapping)
+        await write_mapping(org_path / settings.MAPPING_FILENAME, mapping)
     except Exception as e:
-        logging.error(f"Unexpected error while migrating objects: {e}")
+        print(f"Unexpected error while migrating objects: {e}")
 
     _, previous_targets = extract_sources_targets(previous_mapping)
     previous_target_ids = []
@@ -145,17 +137,7 @@ async def migrate_project(
 
     print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
 
-    if is_org_targetting_itself(mapping):
-        print(
-            Panel(f"Running {settings.DOWNLOAD_COMMAND_NAME} for new target objects.")
-        )
-        await download_organization_combined(client=client, org_path=org_path)
-    else:
-        print(
-            Panel(
-                f"Please run the {settings.DOWNLOAD_COMMAND_NAME} in the target organization project ({mapping['organization']['target']})."
-            )
-        )
+    await download_project(client=client, org_path=org_path)
 
 
 def find_created_target_ids(previous_mapping: dict, source_id_target_pairs: dict):
@@ -205,6 +187,6 @@ async def migrate_schemas(
 
             progress.update(task, advance=1)
         except Exception as e:
-            logging.error(f'Error while migrationg schema "{id}: {e}')
+            print(f'Error while migrationg schema "{id}: {e}')
 
     return source_id_target_pairs
