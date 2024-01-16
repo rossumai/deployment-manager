@@ -28,6 +28,7 @@ from project_rossum_deploy.utils.functions import (
     retrieve_with_progress,
     templatize_name_id,
     write_json,
+    write_str,
 )
 
 
@@ -324,7 +325,30 @@ async def download_hooks(
             / "hooks"
             / f"{templatize_name_id(hook.name, hook.id)}.json"
         )
+        if hook.extension_source != "rossum_store":
+            hook_code = hook.config.get("code")
+            if hook_code:
+                hook_runtime = hook.config.get("runtime")
+                extension = "py" if "python" in hook_runtime else "js"
+                hook_code_path = (
+                    hook_config_path
+                    / "hooks"
+                    / f"{templatize_name_id(hook.name, hook.id)}.{extension}"
+                )
+                await write_str(hook_code_path, hook_code)
         await write_json(hook_config_path, hook)
+        if hook.extension_source != "rossum_store":
+            hook_code = hook.config.get("code")
+            if hook_code:
+                hook_runtime = hook.config.get("runtime")
+                extension = "py" if "python" in hook_runtime else "js"
+                hook_code_path = (
+                    org_path
+                    / destination
+                    / "hooks"
+                    / f"{templatize_name_id(hook.name, hook.id)}.{extension}"
+                )
+                await write_str(hook_code_path, hook_code)
         hooks.append((destination, hook))
 
     return hooks

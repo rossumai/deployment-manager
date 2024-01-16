@@ -8,6 +8,8 @@ from anyio import Path
 
 import yaml
 
+from project_rossum_deploy.utils.consts import GIT_CHARACTERS
+
 
 def coro(f):
     @wraps(f)
@@ -23,6 +25,30 @@ def templatize_name_id(name, id):
 
 # ID_BRACKET_RE = re.compile(r"(\[\d+\])$")
 
+async def merge_hook_changes(changes, org_path):
+    merged_changes = []
+    for change in changes:
+        if not change:
+            continue
+        change = change.strip()
+        op, path = tuple(change.strip().split(" ", maxsplit=1))
+        path = path.strip('"')
+        if op == GIT_CHARACTERS.UPDATED and (path.endswith("py") or path.endswith("js")):
+            with open(path, "r") as file:
+                code_str = file.read()
+                object_path = org_path / (path.removesuffix(".py").removesuffix(".js") + ".json")
+                hook_object = await read_json(object_path)
+                hook_object["config"]["code"] = code_str
+                await write_json(object_path, hook_object)
+                new_change = f"M \"{object_path}\""
+                if new_change not in merged_changes:
+                    print (new_change)
+                    merged_changes.append(new_change)
+        elif change not in merged_changes:
+            print (change)
+            merged_changes.append(change)
+    print (merged_changes)
+    return merged_changes
 
 def detemplatize_name_id(joint_name: str) -> tuple[str, int]:
     parts = joint_name.split("_")
@@ -34,6 +60,11 @@ def extract_id_from_url(url: str) -> int:
         return None
     return int(url.split("/")[-1])
 
+async def write_str(path: Path, code: str):
+    if path.parent:
+        await path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as wf:
+        wf.write(code)
 
 async def write_json(path: Path, object: dict):
     if dataclasses.is_dataclass(object):

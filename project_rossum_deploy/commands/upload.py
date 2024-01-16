@@ -16,7 +16,7 @@ from project_rossum_deploy.utils.consts import (
     GIT_CHARACTERS,
     settings,
 )
-from project_rossum_deploy.utils.functions import coro, detemplatize_name_id, read_json
+from project_rossum_deploy.utils.functions import coro, detemplatize_name_id, read_json, merge_hook_changes
 
 
 @click.command(
@@ -67,6 +67,7 @@ async def upload_project(destination: str, client: ElisAPIClient = None):
         text=True,
     )
     changes = git_destination_diff.stdout.split("\n")
+    changes = await merge_hook_changes(changes, org_path)
 
     for change in track(changes, description="Pushing changes to Rossum..."):
         change = change.strip()
