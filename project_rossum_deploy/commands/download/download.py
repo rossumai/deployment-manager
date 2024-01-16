@@ -1,6 +1,5 @@
 import asyncio
 import functools
-import shutil
 from anyio import Path
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
@@ -41,36 +40,71 @@ In case the directory already exists, it first deletes its contents and then dow
                """,
 )
 @coro
-async def download_organization_wrapper():
+async def download_project_wrapper():
     # To be able to run the command progammatically without the CLI decorators
+    await download_project()
+
+
+async def download_project(client: ElisAPIClient = None, org_path: Path = None):
     if settings.IS_PROJECT_IN_SAME_ORG:
-        await download_organization_combined()
-    else:
+        return await download_organization_combined(client, org_path)
+
+    if not org_path:
         org_path = Path("./")
 
-        source_client = ElisAPIClient(
-            base_url=settings.SOURCE_API_URL,
-            token=settings.SOURCE_TOKEN,
-            username=settings.SOURCE_USERNAME,
-            password=settings.SOURCE_PASSWORD,
-        )
-        await download_organization_single(
-            client=source_client,
-            org_path=org_path,
-            destination=settings.SOURCE_DIRNAME,
-        )
+    if len([path async for path in org_path.iterdir()]):
+        if not Confirm.ask(
+            f'Project "{(await (org_path).absolute()).name}" already has configuration files in it, do you want to replace it with the new configuration (both source and target)?',
+        ):
+            return
+        await delete_current_configuration(org_path)
 
-        target_client = ElisAPIClient(
-            base_url=settings.TARGET_API_URL,
-            token=settings.TARGET_TOKEN,
-            username=settings.TARGET_USERNAME,
-            password=settings.TARGET_PASSWORD,
-        )
-        await download_organization_single(
-            client=target_client,
-            org_path=org_path,
-            destination=settings.TARGET_DIRNAME,
-        )
+    mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
+    if not mapping:
+        mapping = create_empty_mapping()
+
+    source_client = ElisAPIClient(
+        base_url=settings.SOURCE_API_URL,
+        token=settings.SOURCE_TOKEN,
+        username=settings.SOURCE_USERNAME,
+        password=settings.SOURCE_PASSWORD,
+    )
+    (
+        source_organization,
+        source_workspaces,
+        source_schemas,
+        source_hooks,
+    ) = await download_organization_single(
+        client=source_client,
+        org_path=org_path,
+        destination=settings.SOURCE_DIRNAME,
+    )
+
+    target_client = ElisAPIClient(
+        base_url=settings.TARGET_API_URL,
+        token=settings.TARGET_TOKEN,
+        username=settings.TARGET_USERNAME,
+        password=settings.TARGET_PASSWORD,
+    )
+    (
+        _,
+        target_workspaces,
+        target_schemas,
+        target_hooks,
+    ) = await download_organization_single(
+        client=target_client,
+        org_path=org_path,
+        destination=settings.TARGET_DIRNAME,
+    )
+
+    await create_update_mapping(
+        org_path=org_path,
+        organization=source_organization,
+        workspaces_for_mapping=[*source_workspaces, *target_workspaces],
+        schemas_for_mapping=[*source_schemas, *target_schemas],
+        hooks_for_mapping=[*source_hooks, *target_hooks],
+        old_mapping=mapping,
+    )
 
 
 async def download_organization_single(
@@ -81,19 +115,8 @@ async def download_organization_single(
         raise click.ClickException("No organization found.")
     organization = await client.retrieve_organization(organizations[0].id)
 
-    if await (org_path / destination).exists():
-        if not Confirm.ask(
-            f'Project "{(await (org_path / destination).absolute()).parent.name} - {destination}" already has configuration files in it, do you want to replace it with the new configuration?',
-        ):
-            return
-        shutil.rmtree(org_path / destination)
-
     org_config_path = org_path / destination / "organization.json"
     await write_json(org_config_path, organization)
-
-    mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
-    if not mapping:
-        mapping = create_empty_mapping()
 
     with Progress() as progress:
         (
@@ -106,43 +129,32 @@ async def download_organization_single(
                     client=client,
                     org_path=org_path,
                     destination=destination,
-                    mapping=mapping,
                     progress=progress,
                 ),
                 download_schemas(
                     client=client,
                     org_path=org_path,
                     destination=destination,
-                    mapping=mapping,
                     progress=progress,
                 ),
                 download_hooks(
                     client=client,
                     org_path=org_path,
                     destination=destination,
-                    mapping=mapping,
                     progress=progress,
                 ),
             ]
         )
 
-    await create_update_mapping(
-        org_path=org_path,
-        organization=organization,
-        workspaces_for_mapping=workspaces_for_mapping,
-        schemas_for_mapping=schemas_for_mapping,
-        hooks_for_mapping=hooks_for_mapping,
-        old_mapping=mapping,
-    )
-
     print(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME} for {destination}."))
+    return organization, workspaces_for_mapping, schemas_for_mapping, hooks_for_mapping
 
 
 async def download_workspaces(
     client: ElisAPIClient,
     org_path: Path,
-    mapping: dict,
     progress: Progress,
+    mapping: dict = {},
     destination: str = "",
     sources: dict = {},
     targets: dict = {},
@@ -234,8 +246,8 @@ async def download_inbox(client: ElisAPIClient, parent_dir: Path, inbox_id: int)
 async def download_schemas(
     client: ElisAPIClient,
     org_path: Path,
-    mapping: dict,
     progress: Progress,
+    mapping: dict = {},
     destination: str = "",
     sources: dict = {},
     targets: dict = {},
@@ -284,8 +296,8 @@ async def download_schemas(
 async def download_hooks(
     client: ElisAPIClient,
     org_path: Path,
-    mapping: dict,
     progress: Progress,
+    mapping: dict = {},
     destination: str = "",
     sources: dict = {},
     targets: dict = {},

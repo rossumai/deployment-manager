@@ -9,7 +9,7 @@ import click
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 from project_rossum_deploy.commands.download.download import (
-    download_organization_single,
+    download_project,
 )
 
 from project_rossum_deploy.utils.consts import (
@@ -99,7 +99,7 @@ async def upload_project(destination: str, client: ElisAPIClient = None):
     )
 
     # Repulling is done to update mapping and (potentially) different filenames.
-    await download_organization_single(
+    await download_project(
         client=client, org_path=org_path, destination=destination
     )
 
