@@ -1,9 +1,8 @@
-import logging
-
 from rich.progress import Progress
 from anyio import Path
 import click
 from rossum_api import ElisAPIClient
+from rich import print
 
 from project_rossum_deploy.commands.migrate.helpers import (
     find_mapping_of_object,
@@ -28,6 +27,9 @@ async def migrate_hooks(
     task = progress.add_task("Releasing hooks...", total=len(hook_paths))
 
     for hook_path in hook_paths:
+        if hook_path.suffix != ".json":
+            continue
+
         try:
             _, id = detemplatize_name_id(hook_path.stem)
             hook = await read_json(hook_path)
@@ -61,7 +63,7 @@ async def migrate_hooks(
 
             progress.update(task, advance=1)
         except Exception as e:
-            logging.error(f"Error while migrating hook '{id}': {e}")
+            print(f"Error while migrating hook '{id}': {e}")
 
     await migrate_hook_dependency_graph(client, source_path, source_id_target_pairs)
 
@@ -97,6 +99,9 @@ async def migrate_hook_dependency_graph(
     client: ElisAPIClient, source_path: Path, source_id_target_pairs: dict
 ):
     async for hook_path in (source_path / "hooks").iterdir():
+        if hook_path.suffix != ".json":
+            continue
+
         try:
             _, old_hook_id = detemplatize_name_id(hook_path.stem)
             old_hook = await read_json(hook_path)
@@ -121,6 +126,6 @@ async def migrate_hook_dependency_graph(
 
                 await upload_hook(client, {"run_after": run_after}, new_hook["id"])
         except Exception as e:
-            logging.error(
+            print(
                 f"Error while migrating dependency graph for hook '{source_path}': {e}"
             )
