@@ -10,13 +10,10 @@ from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import templatize_name_id
 
 
-async def delete_current_configuration(org_path: Path, destination: str):
+async def delete_current_configuration(org_path: Path):
     # We do not delete mapping.yaml on purpose
-    destinations = (
-        [destination]
-        if destination
-        else [settings.SOURCE_DIRNAME, settings.TARGET_DIRNAME]
-    )
+    destinations = [settings.SOURCE_DIRNAME, settings.TARGET_DIRNAME]
+
     paths_to_delete = ["workspaces", "schemas", "hooks", "organization.json"]
     for destination in destinations:
         destination_path = org_path / destination
