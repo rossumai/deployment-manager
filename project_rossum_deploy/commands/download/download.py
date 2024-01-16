@@ -325,21 +325,20 @@ async def download_hooks(
             / "hooks"
             / f"{templatize_name_id(hook.name, hook.id)}.json"
         )
+
+        await write_json(hook_config_path, hook)
+        hooks.append((destination, hook))
+
         if hook.extension_source != "rossum_store":
             hook_code = hook.config.get("code")
             if hook_code:
                 hook_runtime = hook.config.get("runtime")
-                extension = "py" if "python" in hook_runtime else "js"
-                hook_code_path = (
-                    hook_config_path
-                    / "hooks"
-                    / f"{templatize_name_id(hook.name, hook.id)}.{extension}"
-                )
+                extension = ".py" if "python" in hook_runtime else ".js"
+                hook_code_path = hook_config_path.with_suffix(extension)
                 await write_str(hook_code_path, hook_code)
-        await write_json(hook_config_path, hook)
-        hooks.append((destination, hook))
 
     return hooks
+
 
 # TODO: might be obsolete even for interorg
 async def download_organization_combined(
