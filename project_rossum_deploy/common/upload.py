@@ -1,4 +1,3 @@
-import logging
 from rossum_api import ElisAPIClient
 from rossum_api.models import Schema, Hook, Workspace, Queue, Inbox, Organization
 from rossum_api.api_client import Resource
@@ -15,8 +14,7 @@ async def upload_organization(
             Resource.Organization, id_=target, data=organization
         )
     except Exception as e:
-        logging.error("Error while uploading organization:")
-        logging.exception(e)
+        print(f"Error while uploading organization {organization.id}: {e}")
 
 
 async def upload_workspace(client: ElisAPIClient, workspace: Workspace, target: int):
