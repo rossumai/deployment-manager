@@ -337,18 +337,6 @@ async def download_hooks(
                 )
                 await write_str(hook_code_path, hook_code)
         await write_json(hook_config_path, hook)
-        if hook.extension_source != "rossum_store":
-            hook_code = hook.config.get("code")
-            if hook_code:
-                hook_runtime = hook.config.get("runtime")
-                extension = "py" if "python" in hook_runtime else "js"
-                hook_code_path = (
-                    org_path
-                    / destination
-                    / "hooks"
-                    / f"{templatize_name_id(hook.name, hook.id)}.{extension}"
-                )
-                await write_str(hook_code_path, hook_code)
         hooks.append((destination, hook))
 
     return hooks
