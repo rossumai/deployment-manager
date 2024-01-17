@@ -186,7 +186,7 @@ async def test_rossum_created_file_put_into_target(
 
     # Pretend the schema is a target
     mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
-    mapping["organization"]["schemas"][0]["target"] = new_schema.id
+    mapping["organization"]["schemas"][0]["target_object"] = new_schema.id
     await write_mapping(tmp_path / settings.MAPPING_FILENAME, mapping)
 
     monkeypatch.setattr("sys.stdin", io.StringIO("y"))

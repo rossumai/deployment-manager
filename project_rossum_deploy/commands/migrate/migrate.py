@@ -55,7 +55,7 @@ async def migrate_project(
     mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
     previous_mapping = deepcopy(mapping)
 
-    target_organization = mapping["organization"]["target"]
+    target_organization = mapping["organization"]["target_object"]
     if not target_organization:
         raise click.ClickException(
             "No target for organization. If you want to migrate inside the same organization, just target its own ID."
@@ -78,7 +78,7 @@ async def migrate_project(
             )
 
     source_id_target_pairs = {
-        mapping["organization"]["id"]: mapping["organization"]["target"]
+        mapping["organization"]["id"]: mapping["organization"]["target_object"]
     }
 
     try:
@@ -128,7 +128,7 @@ async def migrate_project(
     for mapping_object in traverse_mapping(previous_mapping):
         if (
             mapping_object.get("attribute_override", None)
-            and not mapping_object.get("target", None)
+            and not mapping_object.get("target_object", None)
             and not mapping_object.get("ignore", None)
         ):
             new_object = source_id_target_pairs[mapping_object["id"]]
@@ -181,8 +181,8 @@ async def migrate_schemas(
             schema = override_attributes(
                 complete_mapping=mapping, mapping=schema_mapping, object=schema
             )
-            result = await upload_schema(client, schema, schema_mapping["target"])
-            schema_mapping["target"] = result["id"]
+            result = await upload_schema(client, schema, schema_mapping["target_object"])
+            schema_mapping["target_object"] = result["id"]
             source_id_target_pairs[id] = result
 
             progress.update(task, advance=1)

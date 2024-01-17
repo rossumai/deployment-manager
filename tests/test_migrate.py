@@ -164,7 +164,7 @@ async def test_migrate_adds_new_object_on_second_run(
         source_schema_in_mapping = find_mapping_of_object(
             mapping["organization"]["schemas"], schema.id
         )
-        target_schema_id = source_schema_in_mapping["target"]
+        target_schema_id = source_schema_in_mapping["target_object"]
         assert target_schema_id
 
         target_schema_path = (

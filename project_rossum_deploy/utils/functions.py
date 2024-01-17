@@ -123,7 +123,7 @@ def create_empty_mapping():
         "organization": {
             "id": "",
             "name": "",
-            "target": None,
+            "target_object": None,
             "workspaces": [],
             "hooks": [],
             "schemas": [],
@@ -147,32 +147,32 @@ def extract_sources_targets(
     sources = copy.deepcopy(targets)
 
     if include_organization:
-        targets["organization"] = mapping["organization"]["target"]
+        targets["organization"] = mapping["organization"]["target_object"]
         sources["organization"] = mapping["organization"]["id"]
 
     for ws in mapping["organization"]["workspaces"]:
         sources["workspaces"].append(ws["id"])
-        if ws["target"]:
-            targets["workspaces"].append(ws["target"])
+        if ws["target_object"]:
+            targets["workspaces"].append(ws["target_object"])
 
         for q in ws["queues"]:
             sources["queues"].append(q["id"])
-            if q["target"]:
-                targets["queues"].append(q["target"])
+            if q["target_object"]:
+                targets["queues"].append(q["target_object"])
 
             sources["inboxes"].append(q["inbox"]["id"])
-            if q["inbox"] and q["inbox"]["target"]:
-                targets["inboxes"].append(q["inbox"]["target"])
+            if q["inbox"] and q["inbox"]["target_object"]:
+                targets["inboxes"].append(q["inbox"]["target_object"])
 
     for schema in mapping["organization"]["schemas"]:
         sources["schemas"].append(schema["id"])
-        if schema["target"]:
-            targets["schemas"].append(schema["target"])
+        if schema["target_object"]:
+            targets["schemas"].append(schema["target_object"])
 
     for hook in mapping["organization"]["hooks"]:
         sources["hooks"].append(hook["id"])
-        if hook["target"]:
-            targets["hooks"].append(hook["target"])
+        if hook["target_object"]:
+            targets["hooks"].append(hook["target_object"])
 
     return sources, targets
 

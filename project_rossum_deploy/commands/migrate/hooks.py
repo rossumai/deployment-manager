@@ -47,7 +47,7 @@ async def migrate_hooks(
             if (
                 hook["type"] != "function"
                 and hook.get("config", {}).get("private", None)
-                and not hook_mapping["target"]
+                and not hook_mapping["target_object"]
             ):
                 # For updating already migrated private hooks, URL cannot be included in the payload
                 hook["config"]["url"] = settings.PRIVATE_HOOK_DUMMY_URL
@@ -57,8 +57,8 @@ async def migrate_hooks(
                 mapping=hook_mapping,
                 object=hook,
             )
-            result = await upload_hook(client, hook, hook_mapping["target"])
-            hook_mapping["target"] = result["id"]
+            result = await upload_hook(client, hook, hook_mapping["target_object"])
+            hook_mapping["target_object"] = result["id"]
             source_id_target_pairs[id] = result
 
             progress.update(task, advance=1)

@@ -9,13 +9,20 @@ from project_rossum_deploy.commands.upload import upload_project_wrapper
 
 # TODO: think about ways to make it work within a single repo
 
-# ? RELEASE: 
+# TODO: token owner in different org (take it from credentials)
+
+# TODO: multitarget in mapping
+# List of objects: id, attribute_override
+# Put attr_override under target objects
+
+# TODO: custom key sorting in yaml
+
+# TODO: push differentiate staged/unstaged changes (ignore those)
 
 # TODO: specify in mapping you want to target ALL queues etc. (not by ID)
 # TODO: specify in mapping you want to update only certain fields
 
 # TODO: preserve comments in yaml
-# TODO: custom key sorting in yaml
 
 # TODO: array of targets in mapping (incl. attribute_override for each)
 # Preserve a single ID
@@ -27,8 +34,6 @@ from project_rossum_deploy.commands.upload import upload_project_wrapper
 # TODO: queues should have the delete_after: 0 query param set so that their schema can be deleted immediately
 
 # TODO: sanitize names of Rossum objects when saving them locally (e.g. '/')
-
-# TODO: INIT: option to use an existing folder
 
 # TODO: Migrate
 # TODO: Aggregate errors and log them into a single file and STDOUT

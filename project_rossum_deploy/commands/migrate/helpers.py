@@ -4,7 +4,7 @@ from project_rossum_deploy.utils.functions import extract_id_from_url
 
 
 def is_org_targetting_itself(mapping: dict):
-    return mapping["organization"]["target"] == mapping["organization"]["id"]
+    return mapping["organization"]["target_object"] == mapping["organization"]["id"]
 
 
 def replace_dependency_url(object: dict, dependency: str, source_id_target_pairs: dict):

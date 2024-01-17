@@ -196,7 +196,7 @@ async def source_and_target_schema(client: ElisAPIClient, tmp_path, monkeypatch)
     await download_organization_combined(client, org_path=tmp_path)
 
     mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
-    mapping["organization"]["schemas"][0]["target"] = target_schema.id
+    mapping["organization"]["schemas"][0]["target_object"] = target_schema.id
     await write_mapping(tmp_path / settings.MAPPING_FILENAME, mapping)
 
     # Confirm configuration overwriting
@@ -292,7 +292,7 @@ async def target_schema(client: ElisAPIClient, tmp_path, monkeypatch):
     await download_organization_combined(client, org_path=tmp_path)
 
     mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
-    mapping["organization"]["schemas"][0]["target"] = target_schema.id
+    mapping["organization"]["schemas"][0]["target_object"] = target_schema.id
     await write_mapping(tmp_path / settings.MAPPING_FILENAME, mapping)
 
     # Confirm configuration overwriting
