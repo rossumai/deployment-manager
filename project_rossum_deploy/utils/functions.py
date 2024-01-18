@@ -5,7 +5,7 @@ import dataclasses
 import json
 from typing import Any
 from anyio import Path
-
+from rich.progress import Progress
 import yaml
 
 from project_rossum_deploy.utils.consts import GIT_CHARACTERS
@@ -25,6 +25,7 @@ def templatize_name_id(name, id):
 
 # ID_BRACKET_RE = re.compile(r"(\[\d+\])$")
 
+
 async def merge_hook_changes(changes, org_path):
     merged_changes = []
     for change in changes:
@@ -33,22 +34,27 @@ async def merge_hook_changes(changes, org_path):
         change = change.strip()
         op, path = tuple(change.strip().split(" ", maxsplit=1))
         path = path.strip('"')
-        if op == GIT_CHARACTERS.UPDATED and (path.endswith("py") or path.endswith("js")):
+        if op == GIT_CHARACTERS.UPDATED and (
+            path.endswith("py") or path.endswith("js")
+        ):
             with open(path, "r") as file:
                 code_str = file.read()
-                object_path = org_path / (path.removesuffix(".py").removesuffix(".js") + ".json")
+                object_path = org_path / (
+                    path.removesuffix(".py").removesuffix(".js") + ".json"
+                )
                 hook_object = await read_json(object_path)
                 hook_object["config"]["code"] = code_str
                 await write_json(object_path, hook_object)
-                new_change = f"M \"{object_path}\""
+                new_change = f'M "{object_path}"'
                 if new_change not in merged_changes:
-                    print (new_change)
+                    print(new_change)
                     merged_changes.append(new_change)
         elif change not in merged_changes:
-            print (change)
+            print(change)
             merged_changes.append(change)
-    print (merged_changes)
+    print(merged_changes)
     return merged_changes
+
 
 def detemplatize_name_id(joint_name: str) -> tuple[str, int]:
     parts = joint_name.split("_")
@@ -60,11 +66,13 @@ def extract_id_from_url(url: str) -> int:
         return None
     return int(url.split("/")[-1])
 
+
 async def write_str(path: Path, code: str):
     if path.parent:
         await path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as wf:
         wf.write(code)
+
 
 async def write_json(path: Path, object: dict):
     if dataclasses.is_dataclass(object):
@@ -183,3 +191,22 @@ def extract_source_target_pairs(mapping: dict) -> dict:
     for object_type, sources in sources.items():
         pairs[object_type] = dict(zip(sources, targets[object_type]))
     return pairs
+
+# https://stackoverflow.com/questions/73464511/rich-prompt-confirm-not-working-in-rich-progress-context-python
+class PauseProgress:
+    def __init__(self, progress: Progress) -> None:
+        self._progress = progress
+
+    def _clear_line(self) -> None:
+        UP = "\x1b[1A"
+        CLEAR = "\x1b[2K"
+        for _ in self._progress.tasks:
+            print(UP + CLEAR + UP)
+
+    def __enter__(self):
+        self._progress.stop()
+        self._clear_line()
+        return self._progress
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self._progress.start()

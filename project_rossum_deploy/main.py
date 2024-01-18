@@ -9,8 +9,6 @@ from project_rossum_deploy.commands.upload import upload_project_wrapper
 
 # TODO: think about ways to make it work within a single repo
 
-# TODO: token owner in different org (take it from credentials)
-
 # TODO: multitarget in mapping
 # List of objects: id, attribute_override
 # Put attr_override under target objects
