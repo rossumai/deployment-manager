@@ -7,13 +7,9 @@ from project_rossum_deploy.commands.initialize import init_project
 from project_rossum_deploy.commands.migrate.migrate import migrate_project_wrapper
 from project_rossum_deploy.commands.upload import upload_project_wrapper
 
-# TODO: think about ways to make it work within a single repo
-
 # TODO: multitarget in mapping
 # List of objects: id, attribute_override
 # Put attr_override under target objects
-
-# TODO: custom key sorting in yaml
 
 # TODO: push differentiate staged/unstaged changes (ignore those)
 

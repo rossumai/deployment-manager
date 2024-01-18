@@ -5,6 +5,7 @@ from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     adjust_keys,
     create_empty_mapping,
+    get_mapping_key_index,
     read_yaml,
     write_yaml,
 )
@@ -20,6 +21,11 @@ async def read_mapping(mapping_path: Path):
 
 async def write_mapping(mapping_path: Path, mapping: dict):
     mapping = adjust_keys(mapping, settings.MAPPING_UPPERCASE_FIELDS, lower=False)
+
+    # Python dictionaries are sorted
+    mapping = dict(
+        sorted(mapping.items(), key=lambda item: get_mapping_key_index(item[0]))
+    )
     await write_yaml(mapping_path, mapping)
 
 
@@ -106,7 +112,9 @@ def enrich_mappings_with_existing_attributes(
     old_mapping: dict, new_mapping: dict, new_ids: list[int]
 ):
     """Use targets from the previous mapping, but only if the target objects were not deleted in Rossum"""
-    new_mapping["organization"]["target_object"] = old_mapping["organization"]["target_object"]
+    new_mapping["organization"]["target_object"] = old_mapping["organization"][
+        "target_object"
+    ]
 
     old_schema_mappings = index_mappings_by_object_id(
         old_mapping["organization"]["schemas"]

@@ -8,7 +8,7 @@ from anyio import Path
 from rich.progress import Progress
 import yaml
 
-from project_rossum_deploy.utils.consts import GIT_CHARACTERS
+from project_rossum_deploy.utils.consts import GIT_CHARACTERS, Settings
 
 
 def coro(f):
@@ -74,11 +74,19 @@ async def write_str(path: Path, code: str):
         wf.write(code)
 
 
+def get_mapping_key_index(key: str):
+    try:
+        return Settings.MAPPING_KEYS_ORDER.index(key)
+    except Exception:
+        return -1
+
+
 async def write_json(path: Path, object: dict):
     if dataclasses.is_dataclass(object):
         object = dataclasses.asdict(object)
     if path.parent:
         await path.parent.mkdir(parents=True, exist_ok=True)
+
     with open(path, "w") as wf:
         json.dump(object, wf, indent=2)
 
@@ -92,7 +100,7 @@ async def write_yaml(path: Path, object: dict):
         object = dataclasses.asdict(object)
     await path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as wf:
-        yaml.dump(object, wf)
+        yaml.dump(object, wf, sort_keys=False)
 
 
 def read_yaml(path: Path):
@@ -191,6 +199,7 @@ def extract_source_target_pairs(mapping: dict) -> dict:
     for object_type, sources in sources.items():
         pairs[object_type] = dict(zip(sources, targets[object_type]))
     return pairs
+
 
 # https://stackoverflow.com/questions/73464511/rich-prompt-confirm-not-working-in-rich-progress-context-python
 class PauseProgress:
