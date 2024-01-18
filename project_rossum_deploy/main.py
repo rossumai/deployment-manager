@@ -27,8 +27,6 @@ from project_rossum_deploy.commands.upload import upload_project_wrapper
 # TODO: workspaces can only be deleted after they have no queues
 # TODO: queues should have the delete_after: 0 query param set so that their schema can be deleted immediately
 
-# TODO: sanitize names of Rossum objects when saving them locally (e.g. '/')
-
 # TODO: Migrate
 # TODO: Aggregate errors and log them into a single file and STDOUT
 

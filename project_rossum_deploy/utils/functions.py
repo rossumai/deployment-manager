@@ -3,6 +3,7 @@ import copy
 from functools import wraps
 import dataclasses
 import json
+import re
 from typing import Any
 from anyio import Path
 from rich.progress import Progress
@@ -19,8 +20,11 @@ def coro(f):
     return wrapper
 
 
-def templatize_name_id(name, id):
-    return f"{name}_[{id}]"
+FORBIDDEN_CHARS_REGEX = re.compile(r"[/\\]")
+
+
+def templatize_name_id(name: str, id: int):
+    return f"{re.sub(FORBIDDEN_CHARS_REGEX, '', name)}_[{id}]"
 
 
 # ID_BRACKET_RE = re.compile(r"(\[\d+\])$")
@@ -57,6 +61,7 @@ async def merge_hook_changes(changes, org_path):
 
 
 def detemplatize_name_id(joint_name: str) -> tuple[str, int]:
+    """Beware, the name might not correspond to a real name if it included forbidden characters (e.g., '/')"""
     parts = joint_name.split("_")
     return "_".join(parts[:-1]), int(parts[-1].removeprefix("[").removesuffix("]"))
 
