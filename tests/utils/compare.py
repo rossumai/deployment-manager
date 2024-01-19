@@ -137,6 +137,8 @@ async def ensure_hooks_have_same_dependency_graph(mapping: dict, tmp_path: Path)
     async for source_hook_path in (
         tmp_path / settings.SOURCE_DIRNAME / "hooks"
     ).iterdir():
+        if source_hook_path.suffix != ".json":
+            continue
         source_hook = await read_json(source_hook_path)
 
         target_hook_id = source_target_pairs["hooks"][source_hook["id"]]

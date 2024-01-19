@@ -1,10 +1,13 @@
 import io
+from anyio import Path
 import click
 import pytest
 
 from rossum_api import ElisAPIClient
 
-from project_rossum_deploy.commands.download.download import download_organization_combined
+from project_rossum_deploy.commands.download.download import (
+    download_organization_combined,
+)
 from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.migrate.helpers import find_mapping_of_object
 from project_rossum_deploy.commands.migrate.migrate import migrate_project
@@ -20,9 +23,14 @@ from tests.utils.compare import (
     ensure_source_objects_have_target_counter_part,
 )
 from tests.utils.functions import create_self_targetting_org, delete_migrated_objects
-
-
-# TEST: migrate to a different org
+from tests.conftest import (
+    base_url,
+    username,
+    password,
+    target_username,
+    target_password,
+    target_base_url,
+)
 
 
 @pytest.mark.asyncio
@@ -34,9 +42,7 @@ async def test_migrate_fails_without_specific_org_target(
     sources, _ = extract_sources_targets(mapping)
     try:
         with pytest.raises(click.ClickException):
-            await migrate_project(
-                mapping=settings.MAPPING_FILENAME, client=client, org_path=tmp_path
-            )
+            await migrate_project(client=client, org_path=tmp_path)
     finally:
         # Cleanup
         await delete_migrated_objects(sources, client)
@@ -52,11 +58,10 @@ async def test_migrate_creates_new_objects_in_target(
     try:
         await create_self_targetting_org(tmp_path)
 
+        settings.IS_PROJECT_IN_SAME_ORG = True
         # Confirm configuration overwriting
-        monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-        await migrate_project(
-            mapping=settings.MAPPING_FILENAME, client=client, org_path=tmp_path
-        )
+        monkeypatch.setattr("sys.stdin", io.StringIO("y\ny"))
+        await migrate_project(client=client, org_path=tmp_path)
 
         # check each object in mapping has a target and a json file in target dir
         mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
@@ -79,13 +84,9 @@ async def test_migrate_twice_is_idempotent(
 
         # Confirm configuration overwriting
         monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-        await migrate_project(
-            mapping=settings.MAPPING_FILENAME, client=client, org_path=tmp_path
-        )
+        await migrate_project(client=client, org_path=tmp_path)
         monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-        await migrate_project(
-            mapping=settings.MAPPING_FILENAME, client=client, org_path=tmp_path
-        )
+        await migrate_project(client=client, org_path=tmp_path)
 
         mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
         await ensure_source_objects_have_target_counter_part(mapping, tmp_path)
@@ -108,9 +109,7 @@ async def test_migrate_ignores_designated_object(
         await write_mapping(tmp_path / settings.MAPPING_FILENAME, mapping)
 
         monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-        await migrate_project(
-            mapping=settings.MAPPING_FILENAME, client=client, org_path=tmp_path
-        )
+        await migrate_project(client=client, org_path=tmp_path)
 
         mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
         post_migration_ignored_hook_mapping = find_mapping_of_object(
@@ -145,9 +144,7 @@ async def test_migrate_adds_new_object_on_second_run(
 
         # Confirm configuration overwriting
         monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-        await migrate_project(
-            mapping=settings.MAPPING_FILENAME, client=client, org_path=tmp_path
-        )
+        await migrate_project(client=client, org_path=tmp_path)
 
         schema = await client.create_new_schema(
             {"name": "new source schema", "content": []}
@@ -156,9 +153,7 @@ async def test_migrate_adds_new_object_on_second_run(
         await download_organization_combined(client=client, org_path=tmp_path)
 
         monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-        await migrate_project(
-            mapping=settings.MAPPING_FILENAME, client=client, org_path=tmp_path
-        )
+        await migrate_project(client=client, org_path=tmp_path)
 
         mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
         source_schema_in_mapping = find_mapping_of_object(
@@ -191,9 +186,7 @@ async def test_migrate_updates_object_on_second_run(
 
         # Confirm configuration overwriting
         monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-        await migrate_project(
-            mapping=settings.MAPPING_FILENAME, client=client, org_path=tmp_path
-        )
+        await migrate_project(client=client, org_path=tmp_path)
 
         some_hook_path = await anext(
             (tmp_path / settings.SOURCE_DIRNAME / "hooks").iterdir()
@@ -203,9 +196,7 @@ async def test_migrate_updates_object_on_second_run(
         await write_json(some_hook_path, some_hook)
 
         monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-        await migrate_project(
-            mapping=settings.MAPPING_FILENAME, client=client, org_path=tmp_path
-        )
+        await migrate_project(client=client, org_path=tmp_path)
 
         mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
         some_hook_in_mapping = find_mapping_of_object(
@@ -215,7 +206,7 @@ async def test_migrate_updates_object_on_second_run(
             tmp_path
             / settings.TARGET_DIRNAME
             / "hooks"
-            / f"{templatize_name_id(some_hook['name'], some_hook_in_mapping['target'])}.json"
+            / f"{templatize_name_id(some_hook['name'], some_hook_in_mapping['target_object'])}.json"
         )
         assert await target_hook_after_migration_path.exists()
         target_hook_after_migration = await read_json(target_hook_after_migration_path)
@@ -223,3 +214,39 @@ async def test_migrate_updates_object_on_second_run(
     finally:
         # Cleanup
         await delete_migrated_objects(sources, client)
+
+
+@pytest.mark.asyncio
+async def test_migrate_creates_new_objects_in_different_org(
+    client: ElisAPIClient,
+    target_client: ElisAPIClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    await download_organization_combined(client, tmp_path)
+    mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
+
+    organizations = [org async for org in target_client.list_all_organizations()]
+    if not len(organizations):
+        raise Exception("No target organization found.")
+    mapping["organization"]["target_object"] = organizations[0].id
+    await write_mapping(tmp_path / settings.MAPPING_FILENAME, mapping)
+    sources, _ = extract_sources_targets(mapping)
+
+    try:
+        settings.SOURCE_API_BASE = base_url
+        settings.SOURCE_USERNAME = username
+        settings.SOURCE_PASSWORD = password
+        settings.TARGET_API_BASE = target_base_url
+        settings.TARGET_USERNAME = target_username
+        settings.TARGET_PASSWORD = target_password
+        users = [user async for user in target_client.list_all_users()]
+        monkeypatch.setattr("sys.stdin", io.StringIO(f"{users[0].id}\ny"))
+        await migrate_project(client=target_client, org_path=tmp_path)
+
+        # check each object in mapping has a target and a json file in target dir
+        mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
+        await ensure_source_objects_have_target_counter_part(mapping, tmp_path)
+    finally:
+        # Cleanup
+        await delete_migrated_objects(sources, target_client)

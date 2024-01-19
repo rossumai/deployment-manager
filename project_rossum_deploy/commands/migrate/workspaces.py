@@ -40,7 +40,7 @@ async def migrate_workspaces(
             workspace = await read_json(ws_config_path)
 
             workspace["queues"] = []
-            workspace['organization'] = f"{settings.TARGET_API_URL}/organizations/{mapping['organization']['target']}"
+            workspace['organization'] = f"{settings.TARGET_API_URL}/organizations/{mapping['organization']['target_object']}"
 
             workspace_mapping = find_mapping_of_object(
                 mapping["organization"]["workspaces"], id

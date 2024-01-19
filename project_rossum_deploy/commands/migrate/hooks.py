@@ -49,9 +49,10 @@ async def migrate_hooks(
             hook["run_after"] = []
             hook["queues"] = []
             # Change token owner to TARGET user (important for cross-org migrations)
-            hook["token_owner"] = (
-                settings.TARGET_API_URL + f"/users/{target_token_owner_id}"
-            )
+            if not settings.IS_PROJECT_IN_SAME_ORG:
+                hook["token_owner"] = (
+                    settings.TARGET_API_URL + f"/users/{target_token_owner_id}"
+                )
 
             hook_mapping = find_mapping_of_object(mapping["organization"]["hooks"], id)
             if hook_mapping.get("ignore", None):

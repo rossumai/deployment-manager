@@ -14,7 +14,7 @@ async def upload_organization(
             Resource.Organization, id_=target, data=organization
         )
     except Exception as e:
-        print(f"Error while uploading organization {organization.id}: {e}")
+        print(f"Error while uploading organization: {e}")
 
 
 async def upload_workspace(client: ElisAPIClient, workspace: Workspace, target: int):
