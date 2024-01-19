@@ -51,12 +51,9 @@ async def merge_hook_changes(changes, org_path):
                 await write_json(object_path, hook_object)
                 new_change = f'M "{object_path}"'
                 if new_change not in merged_changes:
-                    print(new_change)
                     merged_changes.append(new_change)
         elif change not in merged_changes:
-            print(change)
             merged_changes.append(change)
-    print(merged_changes)
     return merged_changes
 
 
