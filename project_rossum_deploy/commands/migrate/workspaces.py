@@ -40,7 +40,7 @@ async def migrate_workspaces(
             workspace = await read_json(ws_config_path)
 
             workspace["queues"] = []
-            workspace['organization'] = f"{settings.TARGET_API_URL}/organizations/{mapping['organization']['target']}"
+            workspace['organization'] = f"{settings.TARGET_API_URL}/organizations/{mapping['organization']['target_object']}"
 
             workspace_mapping = find_mapping_of_object(
                 mapping["organization"]["workspaces"], id
@@ -53,10 +53,10 @@ async def migrate_workspaces(
                 complete_mapping=mapping, mapping=workspace_mapping, object=workspace
             )
             result = await upload_workspace(
-                client, workspace, workspace_mapping["target"]
+                client, workspace, workspace_mapping["target_object"]
             )
 
-            workspace_mapping["target"] = result["id"]
+            workspace_mapping["target_object"] = result["id"]
             source_id_target_pairs[id] = result
 
             source_id_target_pairs = await migrate_queues_and_inboxes(
@@ -105,9 +105,9 @@ async def migrate_queues_and_inboxes(
             queue = override_attributes(
                 complete_mapping=mapping, mapping=queue_mapping, object=queue
             )
-            queue_result = await upload_queue(client, queue, queue_mapping["target"])
+            queue_result = await upload_queue(client, queue, queue_mapping["target_object"])
 
-            queue_mapping["target"] = queue_result["id"]
+            queue_mapping["target_object"] = queue_result["id"]
             source_id_target_pairs[id] = queue_result
 
             inbox_config_path = queue_path / "inbox.json"
@@ -122,8 +122,8 @@ async def migrate_queues_and_inboxes(
             inbox = override_attributes(
                 complete_mapping=mapping, mapping=inbox_mapping, object=inbox
             )
-            inbox_result = await upload_inbox(client, inbox, inbox_mapping["target"])
-            inbox_mapping["target"] = inbox_result["id"]
+            inbox_result = await upload_inbox(client, inbox, inbox_mapping["target_object"])
+            inbox_mapping["target_object"] = inbox_result["id"]
             source_id_target_pairs[inbox["id"]] = inbox_result
         except Exception as e:
             logging.error(f"Error while migrating queue '{id}': {e}")

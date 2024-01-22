@@ -76,12 +76,12 @@ def find_target_id(ref_objects, value):
         for object in objects:
             if object["id"] == converted_value:
                 if type == "str":
-                    return str(object["target"])
+                    return str(object["target_object"])
                 elif type == "int":
-                    return object["target"]
+                    return object["target_object"]
                 elif type == "url":
                     parts = value.split("/")[:-1]
-                    parts.append(str(object["target"]))
+                    parts.append(str(object["target_object"]))
                     return "".join(parts)
 
 
@@ -115,8 +115,8 @@ mapping = open("/Users/jan.sporek@rossum.ai/Projects/projectdeployment/project_r
 yaml_object = yaml.safe_load(mapping)
 mapping = json.loads(json.dumps(yaml_object))
 
-mapping_dm = {"id": 279307, "name": "my DMv2", "target": 123, "attribute_override": {"settings": {"path": "configurations.queue_ids", "type": "QUEUES"}}}
-mapping_queue = {"id": 725687, "name": "queue 1", "target": 1234, "attribute_override": {"name": "new name of a queue"}}
+mapping_dm = {"id": 279307, "name": "my DMv2", "target_object": 123, "attribute_override": {"settings": {"path": "configurations.queue_ids", "type": "QUEUES"}}}
+mapping_queue = {"id": 725687, "name": "queue 1", "target_object": 1234, "attribute_override": {"name": "new name of a queue"}}
 
 with open("/Users/jan.sporek@rossum.ai/Projects/projectdeployment/project_rossum_deploy/common/dm.json") as f:
     payload = json.loads(f.read())

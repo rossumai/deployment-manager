@@ -16,6 +16,7 @@
   "oidc_provider": null,
   "ui_settings": {},
   "metadata": {
-    "source": "internal"
+    "source": "internal",
+    "using_rdt": true
   }
 }

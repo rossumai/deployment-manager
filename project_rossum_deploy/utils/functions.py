@@ -12,7 +12,7 @@ from rossum_api import ElisAPIClient
 
 import yaml
 
-from project_rossum_deploy.utils.consts import GIT_CHARACTERS
+from project_rossum_deploy.utils.consts import GIT_CHARACTERS, Settings
 
 
 def coro(f):
@@ -23,8 +23,11 @@ def coro(f):
     return wrapper
 
 
-def templatize_name_id(name, id):
-    return f"{name}_[{id}]"
+FORBIDDEN_CHARS_REGEX = re.compile(r"[/\\]")
+
+
+def templatize_name_id(name: str, id: int):
+    return f"{re.sub(FORBIDDEN_CHARS_REGEX, '', name)}_[{id}]"
 
 
 # ID_BRACKET_RE = re.compile(r"(\[\d+\])$")
@@ -117,7 +120,9 @@ async def merge_hook_changes(changes, org_path):
         if op == GIT_CHARACTERS.UPDATED and (path.endswith("py") or path.endswith("js")):
             with open(path, "r") as file:
                 code_str = file.read()
-                object_path = org_path / (path.removesuffix(".py").removesuffix(".js") + ".json")
+                object_path = org_path / (
+                    path.removesuffix(".py").removesuffix(".js") + ".json"
+                )
                 hook_object = await read_json(object_path)
                 hook_object["config"]["code"] = code_str
                 await write_json(object_path, hook_object)
@@ -149,17 +154,27 @@ def extract_id_from_url(url: str) -> int:
         return None
     return int(url.split("/")[-1])
 
+
 async def write_str(path: Path, code: str):
     if path.parent:
         await path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as wf:
         wf.write(code)
 
+
+def get_mapping_key_index(key: str):
+    try:
+        return Settings.MAPPING_KEYS_ORDER.index(key)
+    except Exception:
+        return -1
+
+
 async def write_json(path: Path, object: dict):
     if dataclasses.is_dataclass(object):
         object = dataclasses.asdict(object)
     if path.parent:
         await path.parent.mkdir(parents=True, exist_ok=True)
+
     with open(path, "w") as wf:
         json.dump(object, wf, indent=2)
 
@@ -173,7 +188,7 @@ async def write_yaml(path: Path, object: dict):
         object = dataclasses.asdict(object)
     await path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as wf:
-        yaml.dump(object, wf)
+        yaml.dump(object, wf, sort_keys=False)
 
 
 def read_yaml(path: Path):
@@ -212,7 +227,7 @@ def create_empty_mapping():
         "organization": {
             "id": "",
             "name": "",
-            "target": None,
+            "target_object": None,
             "workspaces": [],
             "hooks": [],
             "schemas": [],
@@ -236,32 +251,32 @@ def extract_sources_targets(
     sources = copy.deepcopy(targets)
 
     if include_organization:
-        targets["organization"] = mapping["organization"]["target"]
+        targets["organization"] = mapping["organization"]["target_object"]
         sources["organization"] = mapping["organization"]["id"]
 
     for ws in mapping["organization"]["workspaces"]:
         sources["workspaces"].append(ws["id"])
-        if ws["target"]:
-            targets["workspaces"].append(ws["target"])
+        if ws["target_object"]:
+            targets["workspaces"].append(ws["target_object"])
 
         for q in ws["queues"]:
             sources["queues"].append(q["id"])
-            if q["target"]:
-                targets["queues"].append(q["target"])
+            if q["target_object"]:
+                targets["queues"].append(q["target_object"])
 
             sources["inboxes"].append(q["inbox"]["id"])
-            if q["inbox"] and q["inbox"]["target"]:
-                targets["inboxes"].append(q["inbox"]["target"])
+            if q["inbox"] and q["inbox"]["target_object"]:
+                targets["inboxes"].append(q["inbox"]["target_object"])
 
     for schema in mapping["organization"]["schemas"]:
         sources["schemas"].append(schema["id"])
-        if schema["target"]:
-            targets["schemas"].append(schema["target"])
+        if schema["target_object"]:
+            targets["schemas"].append(schema["target_object"])
 
     for hook in mapping["organization"]["hooks"]:
         sources["hooks"].append(hook["id"])
-        if hook["target"]:
-            targets["hooks"].append(hook["target"])
+        if hook["target_object"]:
+            targets["hooks"].append(hook["target_object"])
 
     return sources, targets
 
@@ -272,3 +287,23 @@ def extract_source_target_pairs(mapping: dict) -> dict:
     for object_type, sources in sources.items():
         pairs[object_type] = dict(zip(sources, targets[object_type]))
     return pairs
+
+
+# https://stackoverflow.com/questions/73464511/rich-prompt-confirm-not-working-in-rich-progress-context-python
+class PauseProgress:
+    def __init__(self, progress: Progress) -> None:
+        self._progress = progress
+
+    def _clear_line(self) -> None:
+        UP = "\x1b[1A"
+        CLEAR = "\x1b[2K"
+        for _ in self._progress.tasks:
+            print(UP + CLEAR + UP)
+
+    def __enter__(self):
+        self._progress.stop()
+        self._clear_line()
+        return self._progress
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self._progress.start()

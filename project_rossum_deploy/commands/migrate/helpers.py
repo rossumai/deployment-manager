@@ -1,10 +1,11 @@
 from rossum_api import ElisAPIClient
+from project_rossum_deploy.utils.consts import settings
 
 from project_rossum_deploy.utils.functions import extract_id_from_url
 
 
 def is_org_targetting_itself(mapping: dict):
-    return mapping["organization"]["target"] == mapping["organization"]["id"]
+    return mapping["organization"]["target_object"] == mapping["organization"]["id"]
 
 
 def replace_dependency_url(object: dict, dependency: str, source_id_target_pairs: dict):
@@ -34,11 +35,11 @@ def find_mapping_of_object(sub_mapping: list[dict], id: int):
 
 
 async def get_token_owner(client: ElisAPIClient):
-    users = [
-        user
-        async for user in client.list_all_users(username=client._http_client.username)
-    ]
-    return users[0]
+    async for user in client.list_all_users(username=client._http_client.username):
+        if user.username == settings.TARGET_USERNAME:
+            return user
+
+    return None
 
 
 def traverse_mapping(mapping: dict):

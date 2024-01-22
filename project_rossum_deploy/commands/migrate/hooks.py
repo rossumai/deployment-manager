@@ -3,6 +3,7 @@ from anyio import Path
 import click
 from rossum_api import ElisAPIClient
 from rich import print
+from rich.prompt import Prompt
 
 from project_rossum_deploy.commands.migrate.helpers import (
     find_mapping_of_object,
@@ -12,6 +13,7 @@ from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.common.attribute_override import override_attributes
 from project_rossum_deploy.common.upload import upload_hook
 from project_rossum_deploy.utils.functions import (
+    PauseProgress,
     detemplatize_name_id,
     extract_id_from_url,
     read_json,
@@ -22,9 +24,19 @@ async def migrate_hooks(
     source_path: Path, client: ElisAPIClient, mapping: dict, progress: Progress
 ):
     source_id_target_pairs = {}
-    token_owner = await get_token_owner(client)
     hook_paths = [hook_path async for hook_path in (source_path / "hooks").iterdir()]
     task = progress.add_task("Releasing hooks...", total=len(hook_paths))
+
+    target_token_owner_id = ""
+    if not settings.IS_PROJECT_IN_SAME_ORG:
+        target_org_token_owner = await get_token_owner(client)
+        if not target_org_token_owner:
+            with PauseProgress(progress):
+                target_token_owner_id = Prompt.ask(
+                    "Please input user ID of the hook token owner (e.g., 938382)"
+                )
+        else:
+            target_token_owner_id = target_org_token_owner.id
 
     for hook_path in hook_paths:
         if hook_path.suffix != ".json":
@@ -36,8 +48,11 @@ async def migrate_hooks(
 
             hook["run_after"] = []
             hook["queues"] = []
-            # Change token owner to TO user (important for cross-org migrations)
-            hook["token_owner"] = token_owner.url
+            # Change token owner to TARGET user (important for cross-org migrations)
+            if not settings.IS_PROJECT_IN_SAME_ORG:
+                hook["token_owner"] = (
+                    settings.TARGET_API_URL + f"/users/{target_token_owner_id}"
+                )
 
             hook_mapping = find_mapping_of_object(mapping["organization"]["hooks"], id)
             if hook_mapping.get("ignore", None):
@@ -47,7 +62,7 @@ async def migrate_hooks(
             if (
                 hook["type"] != "function"
                 and hook.get("config", {}).get("private", None)
-                and not hook_mapping["target"]
+                and not hook_mapping["target_object"]
             ):
                 # For updating already migrated private hooks, URL cannot be included in the payload
                 hook["config"]["url"] = settings.PRIVATE_HOOK_DUMMY_URL
@@ -57,8 +72,8 @@ async def migrate_hooks(
                 mapping=hook_mapping,
                 object=hook,
             )
-            result = await upload_hook(client, hook, hook_mapping["target"])
-            hook_mapping["target"] = result["id"]
+            result = await upload_hook(client, hook, hook_mapping["target_object"])
+            hook_mapping["target_object"] = result["id"]
             source_id_target_pairs[id] = result
 
             progress.update(task, advance=1)

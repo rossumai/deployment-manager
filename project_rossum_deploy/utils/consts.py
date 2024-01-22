@@ -73,6 +73,7 @@ class Settings:
 
     MAPPING_FILENAME: str = "mapping.yaml"
     CREDENTIALS_FILENAME: str = "credentials.json"
+    MAPPING_KEYS_ORDER: list = ['id', 'name', 'target_object']
 
     TARGET_API_BASE: str = ""
     TARGET_TOKEN: str = "dummy_token"
