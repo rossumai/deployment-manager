@@ -5,8 +5,10 @@ from functools import wraps
 import dataclasses
 import json
 import os
+import re
 from typing import Any
 from anyio import Path
+from click import progressbar
 from rich.prompt import Confirm
 from rossum_api import ElisAPIClient
 
@@ -291,7 +293,7 @@ def extract_source_target_pairs(mapping: dict) -> dict:
 
 # https://stackoverflow.com/questions/73464511/rich-prompt-confirm-not-working-in-rich-progress-context-python
 class PauseProgress:
-    def __init__(self, progress: Progress) -> None:
+    def __init__(self, progress: progressbar) -> None:
         self._progress = progress
 
     def _clear_line(self) -> None:
