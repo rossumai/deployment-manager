@@ -117,7 +117,7 @@ async def merge_hook_changes(changes, org_path):
     merged_changes = []
     for change in changes:
         op, path = change
-        if op == GIT_CHARACTERS.UPDATED and (path.endswith("py") or path.endswith("js")):
+        if op == GIT_CHARACTERS.UPDATED and (str(path).endswith("py") or str(path).endswith("js")):
             with open(path, "r") as file:
                 code_str = file.read()
                 object_path = org_path / (
