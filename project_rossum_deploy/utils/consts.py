@@ -111,6 +111,7 @@ class GIT_CHARACTERS(StrEnum):
     DELETED = "D"
     UPDATED = "M"
     CREATED = "??"
+    CREATED_STAGED = "A"
 
 
 settings = Settings()
