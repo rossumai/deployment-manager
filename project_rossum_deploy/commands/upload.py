@@ -12,19 +12,14 @@ from rossum_api.api_client import Resource
 from project_rossum_deploy.commands.download.download import (
     download_project,
 )
+from project_rossum_deploy.commands.download.mapping import read_mapping
+from project_rossum_deploy.common.attribute_override import find_mapping_section
 
 from project_rossum_deploy.utils.consts import (
     GIT_CHARACTERS,
     settings,
 )
-from project_rossum_deploy.utils.functions import (
-    coro,
-    detemplatize_name_id,
-    read_json,
-    merge_hook_changes,
-)
-
-GIT_STATUS_REGEX = re.compile(r'(\w+)(\s{1,2})(.*)')
+from project_rossum_deploy.utils.functions import coro, detemplatize_name_id, read_json, merge_hook_changes, evaluate_delete_dependencies, evaluate_create_dependencies, write_json
 
 @click.command(
     name=settings.UPLOAD_COMMAND_NAME,
@@ -73,26 +68,28 @@ async def upload_project(destination: str, client: ElisAPIClient = None):
         capture_output=True,
         text=True,
     )
-    changes = git_destination_diff.stdout.split("\n")
-    changes = await merge_hook_changes(changes, org_path)
-
-    for change in track(changes, description="Pushing changes to Rossum..."):
+    changes_raw = git_destination_diff.stdout.split("\n")
+    changes = []
+    for change in changes_raw:
+        change = change.strip()
         if not change:
             continue
+        op, path = tuple(change.split(" ", maxsplit=1))
+        path = Path(path.strip().strip('"'))
+        changes.append((op,path))
 
-        splits = re.findall(GIT_STATUS_REGEX, change)
-        if len(splits) != 1:
-            continue
+    changes = await merge_hook_changes(changes, org_path)
+    changes = await evaluate_delete_dependencies(changes, org_path)
+    changes = await evaluate_create_dependencies(changes, org_path, client)
 
-        op, is_staged_whitespace, path = splits[0]
-        # This is relying on git status semantics
-        if len(is_staged_whitespace) != 2:
-            continue
-
-        path = path.strip('"')
+    
+    for change in track(changes, description="Pushing changes to Rossum..."):
+        op, path = change
         match op:
-            case GIT_CHARACTERS.CREATED | GIT_CHARACTERS.CREATED_STAGED:
-                click.echo("Creating new objects is currently not supported, ignoring.")
+            case GIT_CHARACTERS.CREATED:
+                await create_object(org_path / path, client)
+            case GIT_CHARACTERS.CREATED_STAGED:
+                await create_object(org_path / path, client)
             case GIT_CHARACTERS.DELETED:
                 await delete_object(org_path / path, client)
             case GIT_CHARACTERS.UPDATED:
@@ -112,7 +109,9 @@ async def upload_project(destination: str, client: ElisAPIClient = None):
     )
 
     # Repulling is done to update mapping and (potentially) different filenames.
-    await download_project(client=client, org_path=org_path)
+    await download_project(
+        client=client, org_path=org_path
+    )
 
 
 async def update_object(client: ElisAPIClient, path: Path = None, object: dict = None):
@@ -128,9 +127,21 @@ async def update_object(client: ElisAPIClient, path: Path = None, object: dict =
         logging.error(f'Error while updating object with path "{path}": {e}')
 
 
+async def create_object(path: Path, client: ElisAPIClient):
+    try:
+        object = await read_json(path)
+        object["id"] = None
+        resource = determine_object_type_from_path(path)
+        created_object = await client._http_client.create(resource, object)
+        await write_json(path, created_object)
+        print(f'Successfully create {resource} with ID "{created_object["id"]}".')
+    except Exception as e:
+        logging.error(f'Error while creating object with path "{path}": {e}')
+
+
 async def delete_object(path: Path, client: ElisAPIClient):
     try:
-        _, id = detemplatize_name_id(path.stem)
+        _, id = detemplatize_name_id(path)
         resource = determine_object_type_from_path(path)
         await client._http_client.delete(resource, id)
         print(f'Successfully deleted {resource} with ID "{id}".')
@@ -145,7 +156,12 @@ def determine_object_type_from_path(path: Path) -> Resource:
     if type in allowed_types:
         return Resource(type)
     else:
-        raise Exception(f'Unknown resource "{type}".')
+        type = split_path[-3] if len(split_path) > 1 else path.stem + "s"
+        allowed_types = set(resource.value for resource in Resource)
+        if type in allowed_types:
+            return Resource(type)
+        else:
+            raise Exception(f'Unknown resource "{type}".')
 
 
 def determine_object_type_from_url(url: str) -> Resource:
