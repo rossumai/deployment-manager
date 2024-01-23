@@ -194,6 +194,6 @@ async def migrate_schemas(
 
             progress.update(task, advance=1)
         except Exception as e:
-            print(f'Error while migrationg schema "{id}: {e}')
+            print(f"Error while migrationg schema: {e}")
 
     return source_id_target_pairs

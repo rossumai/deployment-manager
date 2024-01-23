@@ -78,7 +78,7 @@ async def migrate_hooks(
 
             progress.update(task, advance=1)
         except Exception as e:
-            print(f"Error while migrating hook '{id}': {e}")
+            print(f"Error while migrating hook: {e}")
 
     await migrate_hook_dependency_graph(client, source_path, source_id_target_pairs)
 

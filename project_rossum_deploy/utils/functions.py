@@ -34,6 +34,7 @@ def templatize_name_id(name: str, id: int):
 
 # ID_BRACKET_RE = re.compile(r"(\[\d+\])$")
 
+
 async def evaluate_delete_dependencies(changes, org_path):
     changes_updated = []
     for change in changes:
@@ -41,12 +42,16 @@ async def evaluate_delete_dependencies(changes, org_path):
         if op == GIT_CHARACTERS.DELETED:
             if str(path).endswith("workspace.json"):
                 if not Confirm.ask(
-                    f'You are about to delete a workspace - the tool will cascade delete all associated queues/inboxes with the workspace. Are you sure you want to proceed?',
+                    "You are about to delete a workspace - the tool will cascade delete all associated queues/inboxes with the workspace. Are you sure you want to proceed?",
                 ):
                     continue
-                changes_updated = await cascade_delete_ops(path, change, changes_updated, org_path)
+                changes_updated = await cascade_delete_ops(
+                    path, change, changes_updated, org_path
+                )
             elif str(path).endswith("queue.json"):
-                changes_updated = await cascade_delete_ops(path, change, changes_updated, org_path)
+                changes_updated = await cascade_delete_ops(
+                    path, change, changes_updated, org_path
+                )
             else:
                 if not is_change_existing(change, changes_updated):
                     changes_updated.append(change)
@@ -67,7 +72,9 @@ async def cascade_delete_ops(path, change, changes_updated, org_path):
             file_set.add(rel_file)
     for object in file_set:
         new_path = Path("source") / org_path / Path(object)
-        if new_path.stem == "inbox": #ignore deleting inboxes, it will be deleted when queue is deleted
+        if (
+            new_path.stem == "inbox"
+        ):  # ignore deleting inboxes, it will be deleted when queue is deleted
             continue
         op_obj = ("D", new_path)
         if not is_change_existing(op_obj, changes_updated):
@@ -76,7 +83,8 @@ async def cascade_delete_ops(path, change, changes_updated, org_path):
         changes_updated.append(change)
     return changes_updated
 
-async def evaluate_create_dependencies(changes, org_path, client:ElisAPIClient):
+
+async def evaluate_create_dependencies(changes, org_path, client: ElisAPIClient):
     changes_updated = []
     for change in changes:
         op, path = change
@@ -105,8 +113,12 @@ async def evaluate_create_dependencies(changes, org_path, client:ElisAPIClient):
                     obj = client.retrieve_schema(id)
                 if not obj and not is_change_existing(change, changes_updated):
                     changes_updated.append(change)
-            elif str(path).endswith("inbox.json") or str(path).endswith("organization.json"):
-                logging.warning(f'Creating organization or inbox is not supported.{path}')
+            elif str(path).endswith("inbox.json") or str(path).endswith(
+                "organization.json"
+            ):
+                logging.warning(
+                    f"Creating organization or inbox is not supported.{path}"
+                )
             else:
                 if not is_change_existing(change, changes_updated):
                     changes_updated.append(change)
@@ -114,6 +126,7 @@ async def evaluate_create_dependencies(changes, org_path, client:ElisAPIClient):
             changes_updated.append(change)
 
     return changes_updated
+
 
 async def merge_hook_changes(changes, org_path):
     merged_changes = []
@@ -128,7 +141,7 @@ async def merge_hook_changes(changes, org_path):
                 hook_object = await read_json(object_path)
                 hook_object["config"]["code"] = code_str
                 await write_json(object_path, hook_object)
-                new_change = f"M \"{object_path}\""
+                new_change = f'M "{object_path}"'
                 exists = is_change_existing(new_change, merged_changes)
                 if not exists:
                     merged_changes.append(new_change)
@@ -136,7 +149,12 @@ async def merge_hook_changes(changes, org_path):
             merged_changes.append(change)
     return merged_changes
 
-def detemplatize_name_id(path: Path) -> tuple[str, int]:
+
+def detemplatize_name_id(path: Path | str) -> tuple[str, int]:
+    if isinstance(path, str):
+        parts = path.split("_")
+        return "_".join(parts[:-1]), int(parts[-1].removeprefix("[").removesuffix("]"))
+
     if str(path.stem) in ["queue", "workspace"]:
         parts = path.parent.stem.split("_")
         return "_".join(parts[:-1]), int(parts[-1].removeprefix("[").removesuffix("]"))
@@ -144,12 +162,14 @@ def detemplatize_name_id(path: Path) -> tuple[str, int]:
         parts = path.stem.split("_")
         return "_".join(parts[:-1]), int(parts[-1].removeprefix("[").removesuffix("]"))
 
+
 def is_change_existing(change, changes):
     c_op, c_path = change
     for op, path in changes:
         if c_op == op and str(c_path) == str(path):
             return True
     return False
+
 
 def extract_id_from_url(url: str) -> int:
     if not url:

@@ -69,7 +69,7 @@ async def migrate_workspaces(
 
             progress.update(task, advance=1)
         except Exception as e:
-            print(f"Error while migrating workspace '{id}': {e}")
+            print(f"Error while migrating workspace: {e}")
 
     return source_id_target_pairs
 
@@ -126,6 +126,6 @@ async def migrate_queues_and_inboxes(
             inbox_mapping["target_object"] = inbox_result["id"]
             source_id_target_pairs[inbox["id"]] = inbox_result
         except Exception as e:
-            logging.error(f"Error while migrating queue '{id}': {e}")
+            logging.error(f"Error while migrating queue: {e}")
 
     return source_id_target_pairs

@@ -11,8 +11,6 @@ from project_rossum_deploy.commands.upload import upload_project_wrapper
 # List of objects: id, attribute_override
 # Put attr_override under target objects
 
-# TODO: push differentiate staged/unstaged changes (ignore those)
-
 # TODO: specify in mapping you want to target ALL queues etc. (not by ID)
 # TODO: specify in mapping you want to update only certain fields
 
