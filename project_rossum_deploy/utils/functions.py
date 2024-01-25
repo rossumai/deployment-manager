@@ -132,16 +132,16 @@ async def merge_hook_changes(changes, org_path):
     merged_changes = []
     for change in changes:
         op, path = change
-        if op == GIT_CHARACTERS.UPDATED and (str(path).endswith("py") or str(path).endswith("js")):
+        if (op == GIT_CHARACTERS.UPDATED or op == GIT_CHARACTERS.CREATED or op == GIT_CHARACTERS.CREATED_STAGED) and (str(path).endswith("py") or str(path).endswith("js")):
             with open(path, "r") as file:
                 code_str = file.read()
                 object_path = org_path / (
-                    path.removesuffix(".py").removesuffix(".js") + ".json"
+                    Path(str(path).removesuffix(".py").removesuffix(".js") + ".json")
                 )
                 hook_object = await read_json(object_path)
                 hook_object["config"]["code"] = code_str
                 await write_json(object_path, hook_object)
-                new_change = f'M "{object_path}"'
+                new_change = ("M", object_path)
                 exists = is_change_existing(new_change, merged_changes)
                 if not exists:
                     merged_changes.append(new_change)
