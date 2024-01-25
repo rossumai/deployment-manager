@@ -55,9 +55,9 @@ async def evaluate_delete_dependencies(changes, org_path):
             else:
                 if not is_change_existing(change, changes_updated):
                     changes_updated.append(change)
-    else:
-        if not is_change_existing(change, changes_updated):
-            changes_updated.append(change)
+        else:
+            if not is_change_existing(change, changes_updated):
+                changes_updated.append(change)
 
     return changes_updated
 
