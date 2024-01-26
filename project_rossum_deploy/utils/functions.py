@@ -95,22 +95,22 @@ async def evaluate_create_dependencies(changes, org_path, client: ElisAPIClient)
             obj = None
             if str(path).endswith("workspace.json"):
                 if id:
-                    obj = client.retrieve_workspace(id)
+                    obj = await client.retrieve_workspace(id)
                 if not obj and not is_change_existing(change, changes_updated):
                     changes_updated.append(change)
             elif str(path).endswith("queue.json"):
                 if id:
-                    obj = client.retrieve_queue(id)
+                    obj = await client.retrieve_queue(id)
                 if not obj and not is_change_existing(change, changes_updated):
                     changes_updated.append(change)
             elif str(path.parent).endswith("hooks"):
                 if id:
-                    obj = client.retrieve_hook(id)
+                    obj = await client.retrieve_hook(id)
                 if not obj and not is_change_existing(change, changes_updated):
                     changes_updated.append(change)
             elif str(path.parent).endswith("schemas"):
                 if id:
-                    obj = client.retrieve_schema(id)
+                    obj = await client.retrieve_schema(id)
                 if not obj and not is_change_existing(change, changes_updated):
                     changes_updated.append(change)
             elif str(path).endswith("inbox.json") or str(path).endswith(
