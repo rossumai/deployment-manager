@@ -99,6 +99,8 @@ class Settings:
     UPLOAD_COMMAND_NAME: str = "push"
     MIGRATE_COMMAND_NAME: str = "release"
 
+    IGNORED_KEYS: dict = {"queue" : ["counts"]}
+
     @property
     def SOURCE_API_URL(self):
         return self.SOURCE_API_BASE.rstrip("/")

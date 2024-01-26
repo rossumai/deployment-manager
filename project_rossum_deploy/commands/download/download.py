@@ -116,7 +116,7 @@ async def download_organization_single(
     organization = await client.retrieve_organization(organizations[0].id)
 
     org_config_path = org_path / destination / "organization.json"
-    await write_json(org_config_path, organization)
+    await write_json(org_config_path, organization, "organization")
 
     with Progress() as progress:
         (
@@ -200,7 +200,7 @@ async def download_workspaces(
             / "workspace.json"
         )
 
-        await write_json(workspace_config_path, workspace)
+        await write_json(workspace_config_path, workspace, "workspace")
 
         workspace.queues = await download_queues_for_workspace(
             client, workspace_config_path.parent, workspace.id
@@ -226,7 +226,7 @@ async def download_queues_for_workspace(
         queue_path = (
             parent_dir / "queues" / f"{templatize_name_id(queue.name, queue.id)}"
         )
-        await write_json(queue_path / "queue.json", queue)
+        await write_json(queue_path / "queue.json", queue, "queue")
 
         inbox_id = extract_id_from_url(queue.inbox)
         if inbox_id:
@@ -239,7 +239,7 @@ async def download_queues_for_workspace(
 async def download_inbox(client: ElisAPIClient, parent_dir: Path, inbox_id: int):
     inbox = await client._http_client.fetch_one(Resource.Inbox, inbox_id)
     inbox = client._deserializer(Resource.Inbox, inbox)
-    await write_json(parent_dir / "inbox.json", inbox)
+    await write_json(parent_dir / "inbox.json", inbox, "inbox")
     return inbox
 
 
@@ -287,7 +287,7 @@ async def download_schemas(
             / "schemas"
             / f"{templatize_name_id(schema.name, schema.id)}.json"
         )
-        await write_json(schema_config_path, schema)
+        await write_json(schema_config_path, schema, "schema")
         schemas.append((destination, schema))
 
     return schemas
@@ -338,7 +338,7 @@ async def download_hooks(
             / f"{templatize_name_id(hook.name, hook.id)}.json"
         )
 
-        await write_json(hook_config_path, hook)
+        await write_json(hook_config_path, hook, "hook")
         hooks.append((destination, hook))
 
         if hook.extension_source != "rossum_store":
@@ -380,7 +380,7 @@ async def download_organization_combined(
             return
         await delete_current_configuration(org_path)
 
-    await write_json(org_config_path, organization)
+    await write_json(org_config_path, organization, "organization")
 
     mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
     if not mapping:

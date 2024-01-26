@@ -79,13 +79,9 @@ async def upload_project(destination: str, client: ElisAPIClient = None):
         changes.append((op,path))
         
     if changes:
-        print ("1" + str(changes))
         changes = await merge_hook_changes(changes, org_path)
-        print ("2" + str(changes))
         changes = await evaluate_delete_dependencies(changes, org_path)
-        print ("3" + str(changes))
         changes = await evaluate_create_dependencies(changes, org_path, client)
-        print ("4" + str(changes))
 
     
     for change in track(changes, description="Pushing changes to Rossum..."):

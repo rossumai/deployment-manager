@@ -191,12 +191,17 @@ def get_mapping_key_index(key: str):
         return -1
 
 
-async def write_json(path: Path, object: dict):
+async def write_json(path: Path, object: dict, type: str = None):
     if dataclasses.is_dataclass(object):
         object = dataclasses.asdict(object)
     if path.parent:
         await path.parent.mkdir(parents=True, exist_ok=True)
-
+    if type:
+        ignored_keys = Settings.IGNORED_KEYS.get(type)
+        if ignored_keys:
+            for key in ignored_keys:
+                if key in object:
+                    del object[key]
     with open(path, "w") as wf:
         json.dump(object, wf, indent=2)
 
