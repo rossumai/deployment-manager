@@ -7,6 +7,16 @@ from project_rossum_deploy.commands.initialize import init_project
 from project_rossum_deploy.commands.migrate.migrate import migrate_project_wrapper
 from project_rossum_deploy.commands.upload import upload_project_wrapper
 
+# TODO: selective pull
+# When pushing changes, repull only the last_modified_date from the API, not everything
+# When pulling, local and remote LMD must be equal, otherwise raise a warning/prompt
+# If they are equal, nothing gets overriden
+# Detect files that were not remotely found and delete them
+
+# TODO: selective push
+# First, check that all files have LMD equal to remote, otherwise, prompt
+# Second: upload individual files (and repull the new LMD)
+
 # TODO: multitarget in mapping
 # List of objects: id, attribute_override
 # Put attr_override under target objects
@@ -15,6 +25,10 @@ from project_rossum_deploy.commands.upload import upload_project_wrapper
 # TODO: specify in mapping you want to update only certain fields
 
 # TODO: preserve comments in yaml
+
+# TODO: Push --force param (will push everything even if you have no changes)
+
+# TODO: Pull ignores some keys (e.g., count for queues) which get updated all the time
 
 # TODO: array of targets in mapping (incl. attribute_override for each)
 # Preserve a single ID
