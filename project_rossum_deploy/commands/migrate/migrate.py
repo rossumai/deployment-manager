@@ -118,7 +118,6 @@ async def migrate_project(
             previous_target_ids.extend(objects)
     previous_target_ids = set(previous_target_ids)
 
-    print(source_id_target_pairs)
     all_target_ids = set()
     for object in source_id_target_pairs.values():
         all_target_ids.add(object["id"])

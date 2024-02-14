@@ -8,6 +8,10 @@ def is_org_targetting_itself(mapping: dict):
     return mapping["organization"]["target_object"] == mapping["organization"]["id"]
 
 
+def is_first_time_migration(submapping: dict):
+    return not submapping["target_object"]
+
+
 def replace_dependency_url(object: dict, dependency: str, source_id_target_pairs: dict):
     if isinstance(object[dependency], list):
         new_urls = []
