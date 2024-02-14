@@ -132,7 +132,11 @@ async def merge_hook_changes(changes, org_path):
     merged_changes = []
     for change in changes:
         op, path = change
-        if (op == GIT_CHARACTERS.UPDATED or op == GIT_CHARACTERS.CREATED or op == GIT_CHARACTERS.CREATED_STAGED) and (str(path).endswith("py") or str(path).endswith("js")):
+        if (
+            op == GIT_CHARACTERS.UPDATED
+            or op == GIT_CHARACTERS.CREATED
+            or op == GIT_CHARACTERS.CREATED_STAGED
+        ) and (str(path).endswith("py") or str(path).endswith("js")):
             with open(path, "r") as file:
                 code_str = file.read()
                 object_path = org_path / (
@@ -291,9 +295,10 @@ def extract_sources_targets(
             if q["target_object"]:
                 targets["queues"].append(q["target_object"])
 
-            sources["inboxes"].append(q["inbox"]["id"])
-            if q["inbox"] and q["inbox"]["target_object"]:
-                targets["inboxes"].append(q["inbox"]["target_object"])
+            if inbox_id := q.get("inbox", {}).get("id", None):
+                sources["inboxes"].append(inbox_id)
+                if inbox_target_id := q["inbox"]["target_object"]:
+                    targets["inboxes"].append(inbox_target_id)
 
     for schema in mapping["organization"]["schemas"]:
         sources["schemas"].append(schema["id"])
