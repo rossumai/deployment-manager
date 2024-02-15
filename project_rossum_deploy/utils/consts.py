@@ -38,7 +38,7 @@ class Settings:
 
         if not credentials.get("use_same_org_as_target", False):
             self.IS_PROJECT_IN_SAME_ORG = False
-            if "target" not in credentials:
+            if "target" not in credentials or not credentials.get('target', {}).get('api_base', ''):
                 raise click.ClickException(
                     'Missing target credentials. If you are targetting the same org, set "use_same_org_as_target": true.'
                 )
