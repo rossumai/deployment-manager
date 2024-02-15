@@ -5,14 +5,9 @@
   "autopilot": true,
   "organization": "https://rdttest.rossum.app/api/v1/organizations/251437",
   "queues": [
-    "https://rdttest.rossum.app/api/v1/queues/821436",
     "https://rdttest.rossum.app/api/v1/queues/821437",
-    "https://rdttest.rossum.app/api/v1/queues/821438",
     "https://rdttest.rossum.app/api/v1/queues/821439",
-    "https://rdttest.rossum.app/api/v1/queues/821440",
-    "https://rdttest.rossum.app/api/v1/queues/821441",
-    "https://rdttest.rossum.app/api/v1/queues/821442",
-    "https://rdttest.rossum.app/api/v1/queues/821443"
+    "https://rdttest.rossum.app/api/v1/queues/821440"
   ],
   "metadata": {}
 }

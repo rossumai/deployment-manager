@@ -6,22 +6,6 @@
   "connector": null,
   "schema": "https://rdttest.rossum.app/api/v1/schemas/1082182",
   "inbox": "https://rdttest.rossum.app/api/v1/inboxes/433763",
-  "counts": {
-    "importing": 0,
-    "failed_import": 0,
-    "split": 0,
-    "to_review": 4,
-    "reviewing": 0,
-    "in_workflow": 0,
-    "confirmed": 0,
-    "rejected": 0,
-    "exporting": 0,
-    "exported": 0,
-    "failed_export": 0,
-    "postponed": 0,
-    "deleted": 0,
-    "purged": 0
-  },
   "session_timeout": "01:00:00",
   "webhooks": [
     "https://rdttest.rossum.app/api/v1/webhooks/227691",

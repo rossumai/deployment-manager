@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from anyio import Path
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
@@ -8,7 +9,9 @@ from project_rossum_deploy.utils.consts import settings
 
 async def create_self_targetting_org(tmp_path: Path, undo=False):
     mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
-    mapping["organization"]["target_object"] = None if undo else mapping["organization"]["id"]
+    mapping["organization"]["target_object"] = (
+        None if undo else mapping["organization"]["id"]
+    )
     await write_mapping(tmp_path / settings.MAPPING_FILENAME, mapping)
 
 
@@ -43,32 +46,51 @@ async def delete_migrated_objects(ids_to_retain: list[dict], client: ElisAPIClie
         if inbox.id not in ids_to_retain["inboxes"]:
             to_delete["inboxes"].append(inbox.id)
 
-    await asyncio.gather(
-        *[
-            client._http_client.delete(Resource.Hook, hook_id)
-            for hook_id in to_delete["hooks"]
-        ]
-    )
-    await asyncio.gather(
-        *[
-            client._http_client.delete(Resource.Inbox, inbox_id)
-            for inbox_id in to_delete["inboxes"]
-        ]
-    )
-    await asyncio.gather(
-        *[
-            client._http_client._request(
-                "DELETE", f"queues/{queue_id}", params={"delete_after": "0"}
-            )
-            for queue_id in to_delete["queues"]
-        ]
-    )
-    await asyncio.gather(
-        *[
-            client.delete_workspace(workspace_id)
-            for workspace_id in to_delete["workspaces"]
-        ]
-    )
-    await asyncio.gather(
-        *[client.delete_schema(schema_id) for schema_id in to_delete["schemas"]]
-    )
+    try:
+        await asyncio.gather(
+            *[
+                client._http_client.delete(Resource.Hook, hook_id)
+                for hook_id in to_delete["hooks"]
+            ]
+        )
+    except Exception as e:
+        logging.error(f"Error while deleting hooks: {e}")
+
+    try:
+        await asyncio.gather(
+            *[
+                client._http_client.delete(Resource.Inbox, inbox_id)
+                for inbox_id in to_delete["inboxes"]
+            ]
+        )
+    except Exception as e:
+        logging.error(f"Error while deleting inboxes: {e}")
+
+    try:
+        await asyncio.gather(
+            *[
+                client._http_client._request(
+                    "DELETE", f"queues/{queue_id}", params={"delete_after": "0"}
+                )
+                for queue_id in to_delete["queues"]
+            ]
+        )
+    except Exception as e:
+        logging.error(f"Error while deleting queues: {e}")
+
+    try:
+        await asyncio.gather(
+            *[
+                client.delete_workspace(workspace_id)
+                for workspace_id in to_delete["workspaces"]
+            ]
+        )
+    except Exception as e:
+        logging.error(f"Error while deleting workspaces: {e}")
+
+    try:
+        await asyncio.gather(
+            *[client.delete_schema(schema_id) for schema_id in to_delete["schemas"]]
+        )
+    except Exception as e:
+        logging.error(f"Error while deleting schemas: {e}")
