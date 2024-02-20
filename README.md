@@ -8,7 +8,7 @@ This command line tool is used to help users customizing and delivering projects
 
 ### Terms ###
 *source* - in the context of this tool references to a dev/test organization and/or workspace(s) where Rossum project and all the associated objects (hooks, queues, ...) are created.  
-*target* - a "production" environment (organization and/or workspaces(s)) where the project is deployed for customer use. Eventually changed will be released here from the source environment.  
+*target* - a "production" environment (organization and/or workspaces(s)) where the project is deployed for customer use. Eventually changes will be released here from the source environment.  
 *local* - file storage of the local machine where git repository of the project is cloned  
 *remote* - organization and all the objects owned by the organization in Rossum platform
 
@@ -23,10 +23,12 @@ pipx install .
 
 Restart the terminal.
 
+If you are reinstalling, you might need `pipx install . --force`.
+
 </br>
 <h2><font color="#004795"> User guide </font></h2>
 
-**It's important to understand that this tool, at the current state, DOES NOT do any git commits/reverts/MRs whatsoever. User is responsible to commit (or revert), switch to another branch, whatever is necessary when it is required (ie released new working version, at that point a manual commit is required). This has a reasoning - process of testing/releasing is usually iterative and doing automatic commits would simply flood git repository with meaningless commits and it would be hard to return to a certain working snapshot of the project.**
+**It's important to understand that this tool, at the current state, DOES NOT do any git commits/reverts/MRs whatsoever. User is responsible to commit (or revert), switch to another branch, whatever is necessary when it is required (i.e., released new working version, at that point a manual commit is required). This has a reasoning - process of testing/releasing is usually iterative and doing automatic commits would simply flood git repository with meaningless commits and it would be hard to return to a certain working snapshot of the project.**
 
 
 <span style="color:#004795"> **Initialize empty project** </span>  
@@ -34,15 +36,15 @@ Restart the terminal.
 
 Run `prd init <project_name>` which will initialize an empty GIT repository.
 
-Fill in the required credentials in the `credentials.json` file that was created in the project folder - `API_BASE` (ie.: https://elis.rossum.ai/api/v1) and either `TOKEN` or `USERNAME` and `PASSWORD`. Make sure `use_same_org_as_target:false`, unless you are going to release to different organization.  
-If you are going to deploy the code to different Rossum organization configure `TO_API_BASE` and either `TO_TOKEN` or `TO_USERNAME` and `TO_PASSWORD` accordingly.  
+Fill in the required credentials in the `credentials.json` file that was created in the project folder - `source.api_base` (ie.: https://elis.rossum.ai/api/v1) and either `source.token` or `source.username` and `source.password`.  
+If you are going to deploy the code to different Rossum organization configure `target.api_base` and either `target.token` or `target.username` and `target.password` accordingly. In that case, you should also switch `use_same_org_as_target` to `false`.
 
 > ℹ️ This command creates local git repository. If you want to connect it to an existing remote repository, call `git remote add <reponame> <giturl>`. If you already have an existing remote repository, it might be easier to clone it from the remote and create an `credentials.json` file manually in the root folder.
 
 
 <span style="color:#004795">**Pull (download) configuration of existing project**</span>
 
-Run `pull` command inside the project root folder. This will load all objects stored in the organization, creates `mapping.yaml` file. If this project already contains test and production objects, you will need to modify created `mapping.yaml` file to link the test and production objects (in the context of this readme, these will be refered to as `source` and `target`)
+Run `pull` command inside the project root folder. This will load all objects stored in the organization and create `mapping.yaml` file. If this project already contains test and production objects, you will need to modify created `mapping.yaml` file to link the test and production objects (in the context of this readme, these will be referred to as `source` and `target`)
 
 Sample `mapping.yaml` after `pull` of simple project. Notice how `target_object` is null, that's because there are no "production" versions of these objects yet. More about that later.
 ```
@@ -153,7 +155,7 @@ Once the production release is successful, commit all the changes in the `target
 
 <span style="color:#004795">**Production release went bad, I need to revert**</span>
 
-Either the `release` command failed unexpectedly or the released version does not work in production. Revert all changes in the `target` folder and call `push target` command. This will release all objects from `target` folder as they are (no attribute override is performed).
+Either the `release` command failed unexpectedly or the released version does not work in production. Assuming you already committed the new objects in `target`, you can revert all changes in the `target` folder by just deleting it locally and calling `push target`. Or just change several files to be correct and run `push target` after that.
 
 </br>
 <h2><font color="#004795"> Available commands </font></h2>
@@ -184,7 +186,7 @@ Pushes all eligible objects from local `source` to remote `target`. This command
 </br>
 <h2><font color="#004795"> Supported objects </font></h2>
 
-    organizations, workspaces, queues, inboxs, schemas, hooks
+    organizations, workspaces, queues, inboxes, schemas, hooks
 
 </br>
 <h2><font color="#004795"> Folder & file structure </font></h2>
@@ -219,14 +221,28 @@ mapping.yaml
 ```
 
 `credentials.json` - base configuration file of the tool - contains rossum username/credentials as well as other global parameters  
-`mapping.yaml` - file containing metadata of all indexed objects of the `source` enevironment and their respective couterparts in the `target` environment  
+`mapping.yaml` - file containing metadata of all indexed objects of the `source` environment and their respective couterparts in the `target` environment  
 
 #### credentials.json #### 
-`API_BASE` - base URL of Rossum API, ending with api version - ie https://elis.rossum.ai/api/v1  
-`TOKEN` - valid token generated for admin rossum account. Recommended is to use PASSWORD and USERNAME.
-`USERNAME` - Rossum admin account username that is used to generate auth token used for all Rossum API calls  
-`PASSWORD` - password for Rossum admin account username  
-`USE_SAME_ORG_AS_TARGET` - must be se to true if both source and target environments are in the same organization
+```
+{
+    "source": {
+        "api_base": "...",
+        "username": "...",
+        "password": "..."
+    },
+    "use_same_org_as_target": true,
+    "target": {
+        "api_base": "...",
+        "username": "...",
+        "password": "..."
+    }
+}
+```
+`api_base` - base URL of Rossum API, ending with api version - ie https://elis.rossum.ai/api/v1  
+`token` - valid token generated for admin rossum account. Recommended is to use PASSWORD and USERNAME.
+`username` - Rossum admin account username that is used to generate auth token used for all Rossum API calls  
+`password` - password for Rossum admin account username  
 
 #### mapping.yaml ####  
 Initialized when not existing or empty during `pull` command. Missing object records are automatically added to this file during `pull` command. Objects missing `target` attribute are copied to the `target` during the `release` and the file is then automatically updated with the `target` object IDs once completed.
