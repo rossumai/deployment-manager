@@ -118,7 +118,6 @@ async def migrate_project(
             previous_target_ids.extend(objects)
     previous_target_ids = set(previous_target_ids)
 
-    print(source_id_target_pairs)
     all_target_ids = set()
     for object in source_id_target_pairs.values():
         all_target_ids.add(object["id"])
@@ -138,6 +137,8 @@ async def migrate_project(
         ):
             new_object = source_id_target_pairs[mapping_object["id"]]
             new_object = override_attributes(mapping, mapping_object, new_object)
+            if 'inbox' in new_object:
+                del new_object['inbox']
             await update_object(path=None, client=client, object=new_object)
 
     print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
