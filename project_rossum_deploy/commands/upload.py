@@ -12,8 +12,6 @@ from rossum_api.api_client import Resource
 from project_rossum_deploy.commands.download.download import (
     download_project,
 )
-from project_rossum_deploy.commands.download.mapping import read_mapping
-from project_rossum_deploy.common.attribute_override import find_mapping_section
 
 from project_rossum_deploy.utils.consts import (
     GIT_CHARACTERS,
@@ -63,8 +61,9 @@ async def upload_project(destination: str, client: ElisAPIClient = None):
                     f'Unrecognized destination "{destination}" to use {settings.UPLOAD_COMMAND_NAME}.'
                 )
 
+    # The -u flag is there to show each individual file (and not a subdir)
     git_destination_diff = subprocess.run(
-        ["git", "status", destination, "-s"],
+        ["git", "status", destination, "-su"],
         capture_output=True,
         text=True,
     )

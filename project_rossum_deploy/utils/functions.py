@@ -25,7 +25,7 @@ def coro(f):
     return wrapper
 
 
-FORBIDDEN_CHARS_REGEX = re.compile(r"[/\\]")
+FORBIDDEN_CHARS_REGEX = re.compile(r"[/\\\"\'\`]")
 
 
 def templatize_name_id(name: str, id: int):
