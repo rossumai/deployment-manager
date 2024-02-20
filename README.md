@@ -34,10 +34,10 @@ Restart the terminal.
 
 Run `prd init <project_name>` which will initialize an empty GIT repository.
 
-Fill in the required credentials in the `.env` file that was created in the project folder - `API_BASE` (ie.: https://elis.rossum.ai/api/v1) and either `TOKEN` or `USERNAME` and `PASSWORD`.  
+Fill in the required credentials in the `credentials.json` file that was created in the project folder - `API_BASE` (ie.: https://elis.rossum.ai/api/v1) and either `TOKEN` or `USERNAME` and `PASSWORD`. Make sure `use_same_org_as_target:false`, unless you are going to release to different organization.  
 If you are going to deploy the code to different Rossum organization configure `TO_API_BASE` and either `TO_TOKEN` or `TO_USERNAME` and `TO_PASSWORD` accordingly.  
 
-> ℹ️ This command creates local git repository. If you want to connect it to an existing remote repository, call `git remote add <reponame> <giturl>`. If you already have an existing remote repository, it might be easier to clone it from the remote and create an `.env` file manually in the root folder.
+> ℹ️ This command creates local git repository. If you want to connect it to an existing remote repository, call `git remote add <reponame> <giturl>`. If you already have an existing remote repository, it might be easier to clone it from the remote and create an `credentials.json` file manually in the root folder.
 
 
 <span style="color:#004795">**Pull (download) configuration of existing project**</span>
@@ -93,7 +93,10 @@ source
 
 <span style="color:#004795">**Push (upload) configuration for testing**</span>
 
-You've made your changes to the configuration - changed schema, hook settings etc in the `source` folder object's JSON definition . Run `push` command - this command calls git to see all changes in your local repository in `source` folder and pushes all changed objects to Rossum. 
+You've made your changes to the configuration - changed schema, hook settings etc in the `source` folder object's JSON definition . Run `push` command - this command calls git to see all changes in your local repository in `source` folder and pushes all changed objects to Rossum. New files are treated as new objects of the respective category and instead of patching existing object the tool attempts to create new instance of that object.
+
+> ⚠️ Be careful when deleting files (=objects). Changes marked as deleted in your git repository will result in deleting the counterpart object in Rossum. This includes for instance entire workspace - cascade delete is called on all child objects of the workspace.
+
 
 <span style="color:#004795">**Release tested configuration to production**</span>
 
@@ -158,7 +161,7 @@ Either the `release` command failed unexpectedly or the released version does no
 ```
 pull
 ```   
-Pulls (downloads) all objects from the `source` & `target` environment and updates (or creates) folder & file structure in `source` and `target` folder in the project's local repository. Environment used is the organization of the user (determined from the credentials provided in .env file).  
+Pulls (downloads) all objects from the `source` & `target` environment and updates (or creates) folder & file structure in `source` and `target` folder in the project's local repository. Environment used is the organization of the user (determined from the credentials provided in credentials.json file).  
 
 If `mapping.yaml` file does not exist, file is created and populated with all pulled objects. In this case all objects are considered `source` (in the case of existing test/production deployment, the `mapping.yaml` file needs to be updated to link objects with their `target`). After this is done and `push` command is called, the `mapping.yaml` file is cleaned and only `source` objects remain while `target` objects remain referenced in the _target_ section of each object.
 
@@ -211,18 +214,19 @@ Pushes all eligible objects from local `source` to remote `target`. This command
 │   │   └──schema.json
 │   └──hooks
 │      └──hook.json
-.env
+credentials.json
 mapping.yaml
 ```
 
-`.env` - base configuration file of the tool - contains rossum username/credentials as well as other global parameters  
+`credentials.json` - base configuration file of the tool - contains rossum username/credentials as well as other global parameters  
 `mapping.yaml` - file containing metadata of all indexed objects of the `source` enevironment and their respective couterparts in the `target` environment  
 
-#### .env #### 
+#### credentials.json #### 
 `API_BASE` - base URL of Rossum API, ending with api version - ie https://elis.rossum.ai/api/v1  
 `TOKEN` - valid token generated for admin rossum account. Recommended is to use PASSWORD and USERNAME.
 `USERNAME` - Rossum admin account username that is used to generate auth token used for all Rossum API calls  
 `PASSWORD` - password for Rossum admin account username  
+`USE_SAME_ORG_AS_TARGET` - must be se to true if both source and target environments are in the same organization
 
 #### mapping.yaml ####  
 Initialized when not existing or empty during `pull` command. Missing object records are automatically added to this file during `pull` command. Objects missing `target` attribute are copied to the `target` during the `release` and the file is then automatically updated with the `target` object IDs once completed.
