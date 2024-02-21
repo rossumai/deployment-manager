@@ -1,21 +1,21 @@
 {
-  "id": 821440,
+  "id": 897939,
   "name": "Tax invoices (EU)",
-  "url": "https://rdttest.rossum.app/api/v1/queues/821440",
-  "workspace": "https://rdttest.rossum.app/api/v1/workspaces/503168",
+  "url": "https://rdttest.rossum.app/api/v1/queues/897939",
+  "workspace": "https://rdttest.rossum.app/api/v1/workspaces/508768",
   "connector": null,
-  "schema": "https://rdttest.rossum.app/api/v1/schemas/1082182",
-  "inbox": "https://rdttest.rossum.app/api/v1/inboxes/433763",
+  "schema": "https://rdttest.rossum.app/api/v1/schemas/1115844",
+  "inbox": "https://rdttest.rossum.app/api/v1/inboxes/459976",
   "session_timeout": "01:00:00",
   "webhooks": [
-    "https://rdttest.rossum.app/api/v1/webhooks/227691",
-    "https://rdttest.rossum.app/api/v1/webhooks/227692",
-    "https://rdttest.rossum.app/api/v1/webhooks/230209"
+    "https://rdttest.rossum.app/api/v1/webhooks/256581",
+    "https://rdttest.rossum.app/api/v1/webhooks/256582",
+    "https://rdttest.rossum.app/api/v1/webhooks/256583"
   ],
   "hooks": [
-    "https://rdttest.rossum.app/api/v1/hooks/227691",
-    "https://rdttest.rossum.app/api/v1/hooks/227692",
-    "https://rdttest.rossum.app/api/v1/hooks/230209"
+    "https://rdttest.rossum.app/api/v1/hooks/256581",
+    "https://rdttest.rossum.app/api/v1/hooks/256582",
+    "https://rdttest.rossum.app/api/v1/hooks/256583"
   ],
   "users": [],
   "rir_url": null,

@@ -1,10 +1,10 @@
 {
-  "id": 1082181,
+  "id": 1115845,
   "name": "Credit notes schema",
   "queues": [
-    "https://rdttest.rossum.app/api/v1/queues/821439"
+    "https://rdttest.rossum.app/api/v1/queues/897938"
   ],
-  "url": "https://rdttest.rossum.app/api/v1/schemas/1082181",
+  "url": "https://rdttest.rossum.app/api/v1/schemas/1115845",
   "content": [
     {
       "category": "section",

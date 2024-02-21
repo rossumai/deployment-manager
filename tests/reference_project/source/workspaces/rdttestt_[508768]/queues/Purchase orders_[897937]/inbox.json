@@ -1,11 +1,11 @@
 {
-  "id": 433763,
-  "name": "Tax invoices (EU)",
-  "url": "https://rdttest.rossum.app/api/v1/inboxes/433763",
+  "id": 459974,
+  "name": "Purchase orders",
+  "url": "https://rdttest.rossum.app/api/v1/inboxes/459974",
   "queues": [
-    "https://rdttest.rossum.app/api/v1/queues/821440"
+    "https://rdttest.rossum.app/api/v1/queues/897937"
   ],
-  "email": "rdttest-d588a0@rdttest.rossum.app",
+  "email": "rdttest-c3c989@rdttest.rossum.app",
   "email_prefix": "rdttest",
   "bounce_email_to": null,
   "bounce_unprocessable_attachments": false,

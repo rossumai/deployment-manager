@@ -3,7 +3,8 @@
   "name": "rdttest",
   "url": "https://rdttest.rossum.app/api/v1/organizations/251437",
   "workspaces": [
-    "https://rdttest.rossum.app/api/v1/workspaces/503168"
+    "https://rdttest.rossum.app/api/v1/workspaces/508768",
+    "https://rdttest.rossum.app/api/v1/workspaces/508783"
   ],
   "users": [
     "https://rdttest.rossum.app/api/v1/users/263683"
