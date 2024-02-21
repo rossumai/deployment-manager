@@ -3,7 +3,7 @@ from anyio import Path
 from rich import print
 from rich.panel import Panel
 from rich.progress import Progress
-
+import asyncio
 
 import click
 from rossum_api import ElisAPIClient
@@ -31,6 +31,7 @@ from project_rossum_deploy.utils.functions import (
     extract_sources_targets,
     read_json,
 )
+from tests.utils.functions import delete_migrated_objects
 
 
 @click.command(
@@ -98,11 +99,13 @@ async def migrate_project(
 
             source_path = org_path / settings.SOURCE_DIRNAME
 
-            source_id_target_pairs = {
-                **(await migrate_schemas(source_path, client, mapping, progress)),
-                **(await migrate_hooks(source_path, client, mapping, progress)),
-            }
-            source_id_target_pairs = await migrate_workspaces(
+            await migrate_schemas(
+                source_path, client, mapping, source_id_target_pairs, progress
+            )
+            await migrate_hooks(
+                source_path, client, mapping, source_id_target_pairs, progress
+            )
+            await migrate_workspaces(
                 source_path, client, mapping, source_id_target_pairs, progress
             )
 
@@ -168,15 +171,18 @@ def find_created_target_ids(previous_mapping: dict, source_id_target_pairs: dict
 
 
 async def migrate_schemas(
-    source_path: Path, client: ElisAPIClient, mapping: dict, progress: Progress
+    source_path: Path,
+    client: ElisAPIClient,
+    mapping: dict,
+    source_id_target_pairs: dict,
+    progress: Progress,
 ):
-    source_id_target_pairs = {}
     schema_paths = [
         schema_path async for schema_path in (source_path / "schemas").iterdir()
     ]
     task = progress.add_task("Releasing schemas...", total=len(schema_paths))
 
-    for schema_path in schema_paths:
+    async def migrate_schema(schema_path: Path):
         try:
             _, id = detemplatize_name_id(schema_path.stem)
             schema = await read_json(schema_path)
@@ -188,7 +194,7 @@ async def migrate_schemas(
             )
             if schema_mapping.get("ignore", None):
                 progress.update(task, advance=1)
-                continue
+                return
 
             schema = override_attributes(
                 complete_mapping=mapping, mapping=schema_mapping, object=schema
@@ -203,4 +209,31 @@ async def migrate_schemas(
         except Exception as e:
             print(f"Error while migrationg schema: {e}")
 
-    return source_id_target_pairs
+    await asyncio.gather(
+        *[migrate_schema(schema_path=schema_path) for schema_path in schema_paths]
+    )
+
+
+if __name__ == "__main__":
+    base_url = "https://rdttest.rossum.app/api/v1"
+    username = "jan.sporek+rdttest@rossum.ai"
+    password = "^sE*bXs28%Hk%tMi9%Qtk@"
+
+    client = ElisAPIClient(
+        base_url=base_url,
+        username=username,
+        password=password,
+    )
+
+    async def run():
+        from anyio import Path
+
+        mapping = await read_mapping(Path("./") / settings.MAPPING_FILENAME)
+        sources, _ = extract_sources_targets(mapping)
+        print(sources)
+
+        await delete_migrated_objects(sources, client)
+
+    import asyncio
+
+    asyncio.run(run())

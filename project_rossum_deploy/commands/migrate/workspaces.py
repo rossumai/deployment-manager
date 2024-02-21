@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from anyio import Path
 from rich.progress import Progress
@@ -33,21 +34,23 @@ async def migrate_workspaces(
     ]
     task = progress.add_task("Releasing workspaces...", total=len(workspace_paths))
 
-    for ws_path in workspace_paths:
+    async def migrate_workspace(ws_path: Path):
         try:
             _, id = detemplatize_name_id(ws_path.stem)
             ws_config_path = ws_path / "workspace.json"
             workspace = await read_json(ws_config_path)
 
             workspace["queues"] = []
-            workspace['organization'] = f"{settings.TARGET_API_URL}/organizations/{mapping['organization']['target_object']}"
+            workspace[
+                "organization"
+            ] = f"{settings.TARGET_API_URL}/organizations/{mapping['organization']['target_object']}"
 
             workspace_mapping = find_mapping_of_object(
                 mapping["organization"]["workspaces"], id
             )
             if workspace_mapping.get("ignore", None):
                 progress.update(task, advance=1)
-                continue
+                return
 
             workspace = override_attributes(
                 complete_mapping=mapping, mapping=workspace_mapping, object=workspace
@@ -59,7 +62,7 @@ async def migrate_workspaces(
             workspace_mapping["target_object"] = result["id"]
             source_id_target_pairs[id] = result
 
-            source_id_target_pairs = await migrate_queues_and_inboxes(
+            await migrate_queues_and_inboxes(
                 ws_path=ws_path,
                 client=client,
                 workspace_mapping=workspace_mapping,
@@ -71,7 +74,9 @@ async def migrate_workspaces(
         except Exception as e:
             print(f"Error while migrating workspace: {e}")
 
-    return source_id_target_pairs
+    await asyncio.gather(
+        *[migrate_workspace(ws_path=ws_path) for ws_path in workspace_paths]
+    )
 
 
 async def migrate_queues_and_inboxes(
@@ -82,9 +87,11 @@ async def migrate_queues_and_inboxes(
     source_id_target_pairs: dict,
 ):
     if not (await (ws_path / "queues").exists()):
-        return source_id_target_pairs
+        return
 
-    async for queue_path in (ws_path / "queues").iterdir():
+    queue_paths = [queue_path async for queue_path in (ws_path / "queues").iterdir()]
+
+    async def migrate_queue_and_inbox(queue_path: Path):
         try:
             _, id = detemplatize_name_id(queue_path.stem)
 
@@ -100,12 +107,14 @@ async def migrate_queues_and_inboxes(
 
             queue_mapping = find_mapping_of_object(workspace_mapping["queues"], id)
             if queue_mapping.get("ignore", None):
-                continue
+                return
 
             queue = override_attributes(
                 complete_mapping=mapping, mapping=queue_mapping, object=queue
             )
-            queue_result = await upload_queue(client, queue, queue_mapping["target_object"])
+            queue_result = await upload_queue(
+                client, queue, queue_mapping["target_object"]
+            )
 
             queue_mapping["target_object"] = queue_result["id"]
             source_id_target_pairs[id] = queue_result
@@ -122,10 +131,14 @@ async def migrate_queues_and_inboxes(
             inbox = override_attributes(
                 complete_mapping=mapping, mapping=inbox_mapping, object=inbox
             )
-            inbox_result = await upload_inbox(client, inbox, inbox_mapping["target_object"])
+            inbox_result = await upload_inbox(
+                client, inbox, inbox_mapping["target_object"]
+            )
             inbox_mapping["target_object"] = inbox_result["id"]
             source_id_target_pairs[inbox["id"]] = inbox_result
         except Exception as e:
             logging.error(f"Error while migrating queue: {e}")
 
-    return source_id_target_pairs
+    await asyncio.gather(
+        *[migrate_queue_and_inbox(queue_path=queue_path) for queue_path in queue_paths]
+    )

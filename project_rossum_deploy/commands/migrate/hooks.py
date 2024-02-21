@@ -1,3 +1,4 @@
+import asyncio
 from rich.progress import Progress
 from anyio import Path
 import click
@@ -21,9 +22,12 @@ from project_rossum_deploy.utils.functions import (
 
 
 async def migrate_hooks(
-    source_path: Path, client: ElisAPIClient, mapping: dict, progress: Progress
+    source_path: Path,
+    client: ElisAPIClient,
+    mapping: dict,
+    source_id_target_pairs: dict,
+    progress: Progress,
 ):
-    source_id_target_pairs = {}
     hook_paths = [hook_path async for hook_path in (source_path / "hooks").iterdir()]
     task = progress.add_task("Releasing hooks...", total=len(hook_paths))
 
@@ -38,9 +42,10 @@ async def migrate_hooks(
         else:
             target_token_owner_id = target_org_token_owner.id
 
-    for hook_path in hook_paths:
+    async def migrate_hook(hook_path: Path):
         if hook_path.suffix != ".json":
-            continue
+            progress.update(task, advance=1)
+            return
 
         try:
             _, id = detemplatize_name_id(hook_path.stem)
@@ -57,7 +62,7 @@ async def migrate_hooks(
             hook_mapping = find_mapping_of_object(mapping["organization"]["hooks"], id)
             if hook_mapping.get("ignore", None):
                 progress.update(task, advance=1)
-                continue
+                return
 
             if (
                 hook["type"] != "function"
@@ -80,6 +85,10 @@ async def migrate_hooks(
         except Exception as e:
             print(f"Error while migrating hook: {e}")
 
+    await asyncio.gather(
+        *[migrate_hook(hook_path=hook_path) for hook_path in hook_paths]
+    )
+
     await migrate_hook_dependency_graph(client, source_path, source_id_target_pairs)
 
     click.echo(
@@ -88,7 +97,7 @@ async def migrate_hooks(
 
     private_dummy_url_hooks = list(
         filter(
-            lambda x: x["config"].get("url", None) == settings.PRIVATE_HOOK_DUMMY_URL,
+            lambda x: x.get("config", {}).get("url", None) == settings.PRIVATE_HOOK_DUMMY_URL,
             source_id_target_pairs.values(),
         )
     )
@@ -106,8 +115,6 @@ async def migrate_hooks(
                 )
             )
         )
-
-    return source_id_target_pairs
 
 
 async def migrate_hook_dependency_graph(
