@@ -31,7 +31,6 @@ from project_rossum_deploy.utils.functions import (
     extract_sources_targets,
     read_json,
 )
-from tests.utils.functions import delete_migrated_objects
 
 
 @click.command(
@@ -212,28 +211,3 @@ async def migrate_schemas(
     await asyncio.gather(
         *[migrate_schema(schema_path=schema_path) for schema_path in schema_paths]
     )
-
-
-if __name__ == "__main__":
-    base_url = "https://rdttest.rossum.app/api/v1"
-    username = "jan.sporek+rdttest@rossum.ai"
-    password = "^sE*bXs28%Hk%tMi9%Qtk@"
-
-    client = ElisAPIClient(
-        base_url=base_url,
-        username=username,
-        password=password,
-    )
-
-    async def run():
-        from anyio import Path
-
-        mapping = await read_mapping(Path("./") / settings.MAPPING_FILENAME)
-        sources, _ = extract_sources_targets(mapping)
-        print(sources)
-
-        await delete_migrated_objects(sources, client)
-
-    import asyncio
-
-    asyncio.run(run())
