@@ -129,6 +129,7 @@ async def migrate_project(
 
     # In case of newly created objects, there could be references which did not exist at the time of the objects' creation
     # Attribute override is therefore run again for such objects.
+    print("Running attribute_override again...")
     for mapping_object in traverse_mapping(previous_mapping):
         if (
             mapping_object.get("attribute_override", None)
@@ -136,10 +137,15 @@ async def migrate_project(
             and not mapping_object.get("ignore", None)
         ):
             new_object = source_id_target_pairs[mapping_object["id"]]
-            new_object = override_attributes(mapping, mapping_object, new_object)
-            if 'inbox' in new_object:
-                del new_object['inbox']
-            await update_object(path=None, client=client, object=new_object)
+            overriden_keys = mapping_object.get("attribute_override", {})
+            # Get only the subset because not all created objects are in sync (e.g., hooks don't have references to queues -> updating the whole object would delete their link)
+            new_object_subset = {
+                k: new_object[k] for k in new_object if k in overriden_keys
+            }
+            new_object_subset = override_attributes(
+                mapping, mapping_object, new_object_subset
+            )
+            await update_object(path=None, client=client, object=new_object_subset)
 
     print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
 
