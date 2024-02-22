@@ -1,7 +1,7 @@
 {
-  "id": 256582,
+  "id": 257318,
   "name": "Master Data Hub",
-  "url": "https://rdttest.rossum.app/api/v1/hooks/256582",
+  "url": "https://rdttest.rossum.app/api/v1/hooks/257318",
   "active": true,
   "config": {
     "private": true,
@@ -20,7 +20,7 @@
   "type": "webhook",
   "metadata": {},
   "queues": [
-    "https://rdttest.rossum.app/api/v1/queues/897939"
+    "https://rdttest.rossum.app/api/v1/queues/899854"
   ],
   "run_after": [],
   "events": [

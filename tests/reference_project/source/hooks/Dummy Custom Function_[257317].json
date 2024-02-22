@@ -1,7 +1,7 @@
 {
-  "id": 256583,
+  "id": 257317,
   "name": "Dummy Custom Function",
-  "url": "https://rdttest.rossum.app/api/v1/hooks/256583",
+  "url": "https://rdttest.rossum.app/api/v1/hooks/257317",
   "active": true,
   "config": {
     "schedule": {
@@ -20,10 +20,10 @@
   "type": "function",
   "metadata": {},
   "queues": [
-    "https://rdttest.rossum.app/api/v1/queues/897939"
+    "https://rdttest.rossum.app/api/v1/queues/899854"
   ],
   "run_after": [
-    "https://rdttest.rossum.app/api/v1/hooks/256581"
+    "https://rdttest.rossum.app/api/v1/hooks/257319"
   ],
   "events": [
     "annotation_content.updated",

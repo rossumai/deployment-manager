@@ -1,10 +1,10 @@
 {
-  "id": 1115843,
+  "id": 1116695,
   "name": "Purchase orders schema",
   "queues": [
-    "https://rdttest.rossum.app/api/v1/queues/897937"
+    "https://rdttest.rossum.app/api/v1/queues/899853"
   ],
-  "url": "https://rdttest.rossum.app/api/v1/schemas/1115843",
+  "url": "https://rdttest.rossum.app/api/v1/schemas/1116695",
   "content": [
     {
       "category": "section",

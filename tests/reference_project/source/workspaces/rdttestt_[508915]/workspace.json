@@ -1,0 +1,13 @@
+{
+  "id": 508915,
+  "name": "rdttestt",
+  "url": "https://rdttest.rossum.app/api/v1/workspaces/508915",
+  "autopilot": true,
+  "organization": "https://rdttest.rossum.app/api/v1/organizations/251437",
+  "queues": [
+    "https://rdttest.rossum.app/api/v1/queues/899853",
+    "https://rdttest.rossum.app/api/v1/queues/899854",
+    "https://rdttest.rossum.app/api/v1/queues/899855"
+  ],
+  "metadata": {}
+}

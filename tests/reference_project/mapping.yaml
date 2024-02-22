@@ -3,48 +3,48 @@ ORGANIZATION:
   name: rdttest
   target_object: null
   WORKSPACES:
-  - id: 508768
+  - id: 508915
     name: rdttestt
     target_object: null
     QUEUES:
-    - id: 897937
+    - id: 899853
       name: Purchase orders
       target_object: null
       INBOX:
-        id: 459974
+        id: 460672
         name: Purchase orders
         target_object: null
-    - id: 897938
-      name: Credit notes
-      target_object: null
-      INBOX:
-        id: 459975
-        name: Credit notes
-        target_object: null
-    - id: 897939
+    - id: 899854
       name: Tax invoices (EU)
       target_object: null
       INBOX:
-        id: 459976
+        id: 460673
         name: Tax invoices (EU)
         target_object: null
+    - id: 899855
+      name: Credit notes
+      target_object: null
+      INBOX:
+        id: 460674
+        name: Credit notes
+        target_object: null
   HOOKS:
-  - id: 256581
-    name: Find & Replace Values
-    target_object: null
-  - id: 256582
-    name: Master Data Hub
-    target_object: null
-  - id: 256583
+  - id: 257317
     name: Dummy Custom Function
     target_object: null
-  SCHEMAS:
-  - id: 1115843
-    name: Purchase orders schema
+  - id: 257318
+    name: Master Data Hub
     target_object: null
-  - id: 1115844
+  - id: 257319
+    name: Find & Replace Values
+    target_object: null
+  SCHEMAS:
+  - id: 1116693
     name: Tax invoices (EU) schema
     target_object: null
-  - id: 1115845
+  - id: 1116694
     name: Credit notes schema
+    target_object: null
+  - id: 1116695
+    name: Purchase orders schema
     target_object: null

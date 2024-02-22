@@ -1,11 +1,11 @@
 {
-  "id": 459975,
+  "id": 460674,
   "name": "Credit notes",
-  "url": "https://rdttest.rossum.app/api/v1/inboxes/459975",
+  "url": "https://rdttest.rossum.app/api/v1/inboxes/460674",
   "queues": [
-    "https://rdttest.rossum.app/api/v1/queues/897938"
+    "https://rdttest.rossum.app/api/v1/queues/899855"
   ],
-  "email": "rdttest-edd2fd@rdttest.rossum.app",
+  "email": "rdttest-2370e6@rdttest.rossum.app",
   "email_prefix": "rdttest",
   "bounce_email_to": null,
   "bounce_unprocessable_attachments": false,

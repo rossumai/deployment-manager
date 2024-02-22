@@ -1,10 +1,10 @@
 {
-  "id": 1115844,
+  "id": 1116693,
   "name": "Tax invoices (EU) schema",
   "queues": [
-    "https://rdttest.rossum.app/api/v1/queues/897939"
+    "https://rdttest.rossum.app/api/v1/queues/899854"
   ],
-  "url": "https://rdttest.rossum.app/api/v1/schemas/1115844",
+  "url": "https://rdttest.rossum.app/api/v1/schemas/1116693",
   "content": [
     {
       "category": "section",
