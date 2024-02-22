@@ -18,14 +18,20 @@ def override_attributes(
         keys = list(mapping["attribute_override"].keys())
         for key in keys:
             if isinstance(mapping["attribute_override"][key], dict):
-                path = mapping["attribute_override"][key]["path"]
-                reference_type = mapping["attribute_override"][key]["reference_type"].lower()
-                replace_reference_on_path(
-                    complete_mapping=complete_mapping,
-                    path=[key] + path.split("."),
-                    reference_type=reference_type,
-                    object=object,
-                )
+                overrides = [mapping["attribute_override"][key]]
+            elif isinstance(mapping["attribute_override"][key], list):
+                overrides = mapping["attribute_override"][key]
+                                       
+            if isinstance(overrides, list):
+                for override in overrides:
+                    path = override["path"]
+                    reference_type = override["reference_type"].lower()
+                    replace_reference_on_path(
+                        complete_mapping=complete_mapping,
+                        path=[key] + path.split("."),
+                        reference_type=reference_type,
+                        object=object,
+                    )
             else:
                 object[key] = mapping["attribute_override"][key]
     return object
