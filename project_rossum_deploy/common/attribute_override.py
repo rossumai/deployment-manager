@@ -21,6 +21,8 @@ def override_attributes(
                 overrides = [mapping["attribute_override"][key]]
             elif isinstance(mapping["attribute_override"][key], list):
                 overrides = mapping["attribute_override"][key]
+            else:
+                overrides = mapping["attribute_override"][key]
                                        
             if isinstance(overrides, list):
                 for override in overrides:
@@ -33,7 +35,7 @@ def override_attributes(
                         object=object,
                     )
             else:
-                object[key] = mapping["attribute_override"][key]
+                object[key] = overrides
     return object
 
 
