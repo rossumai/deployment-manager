@@ -10,7 +10,6 @@ from project_rossum_deploy.commands.migrate.helpers import (
     find_mapping_of_object,
     replace_dependency_url,
 )
-from project_rossum_deploy.common.attribute_override import override_attributes
 from project_rossum_deploy.common.upload import (
     upload_inbox,
     upload_queue,
@@ -52,9 +51,6 @@ async def migrate_workspaces(
                 progress.update(task, advance=1)
                 return
 
-            workspace = override_attributes(
-                complete_mapping=mapping, mapping=workspace_mapping, object=workspace
-            )
             result = await upload_workspace(
                 client, workspace, workspace_mapping["target_object"]
             )
@@ -109,9 +105,6 @@ async def migrate_queues_and_inboxes(
             if queue_mapping.get("ignore", None):
                 return
 
-            queue = override_attributes(
-                complete_mapping=mapping, mapping=queue_mapping, object=queue
-            )
             queue_result = await upload_queue(
                 client, queue, queue_mapping["target_object"]
             )
@@ -128,9 +121,6 @@ async def migrate_queues_and_inboxes(
 
             inbox_mapping = queue_mapping["inbox"]
             # Inbox cannot be ignored because a queue depends on it
-            inbox = override_attributes(
-                complete_mapping=mapping, mapping=inbox_mapping, object=inbox
-            )
             inbox_result = await upload_inbox(
                 client, inbox, inbox_mapping["target_object"]
             )

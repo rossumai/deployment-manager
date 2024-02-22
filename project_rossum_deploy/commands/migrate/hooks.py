@@ -11,7 +11,6 @@ from project_rossum_deploy.commands.migrate.helpers import (
     get_token_owner,
 )
 from project_rossum_deploy.utils.consts import settings
-from project_rossum_deploy.common.attribute_override import override_attributes
 from project_rossum_deploy.common.upload import upload_hook
 from project_rossum_deploy.utils.functions import (
     PauseProgress,
@@ -72,11 +71,6 @@ async def migrate_hooks(
                 # For updating already migrated private hooks, URL cannot be included in the payload
                 hook["config"]["url"] = settings.PRIVATE_HOOK_DUMMY_URL
 
-            hook = override_attributes(
-                complete_mapping=mapping,
-                mapping=hook_mapping,
-                object=hook,
-            )
             result = await upload_hook(client, hook, hook_mapping["target_object"])
             hook_mapping["target_object"] = result["id"]
             source_id_target_pairs[id] = result
@@ -97,7 +91,8 @@ async def migrate_hooks(
 
     private_dummy_url_hooks = list(
         filter(
-            lambda x: x.get("config", {}).get("url", None) == settings.PRIVATE_HOOK_DUMMY_URL,
+            lambda x: x.get("config", {}).get("url", None)
+            == settings.PRIVATE_HOOK_DUMMY_URL,
             source_id_target_pairs.values(),
         )
     )

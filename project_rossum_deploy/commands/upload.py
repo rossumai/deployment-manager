@@ -1,3 +1,4 @@
+import json
 import logging
 from anyio import Path
 import subprocess
@@ -16,7 +17,16 @@ from project_rossum_deploy.utils.consts import (
     GIT_CHARACTERS,
     settings,
 )
-from project_rossum_deploy.utils.functions import coro, detemplatize_name_id, read_json, merge_hook_changes, evaluate_delete_dependencies, evaluate_create_dependencies, write_json
+from project_rossum_deploy.utils.functions import (
+    coro,
+    detemplatize_name_id,
+    read_json,
+    merge_hook_changes,
+    evaluate_delete_dependencies,
+    evaluate_create_dependencies,
+    write_json,
+)
+
 
 @click.command(
     name=settings.UPLOAD_COMMAND_NAME,
@@ -74,14 +84,13 @@ async def upload_project(destination: str, client: ElisAPIClient = None):
             continue
         op, path = tuple(change.split(" ", maxsplit=1))
         path = Path(path.strip().strip('"'))
-        changes.append((op,path))
-        
+        changes.append((op, path))
+
     if changes:
         changes = await merge_hook_changes(changes, org_path)
         changes = await evaluate_delete_dependencies(changes, org_path)
         changes = await evaluate_create_dependencies(changes, org_path, client)
 
-    
     for change in track(changes, description="Pushing changes to Rossum..."):
         op, path = change
         match op:
@@ -108,22 +117,32 @@ async def upload_project(destination: str, client: ElisAPIClient = None):
     )
 
     # Repulling is done to update mapping and (potentially) different filenames.
-    await download_project(
-        client=client, org_path=org_path
-    )
+    await download_project(client=client, org_path=org_path)
 
 
 async def update_object(client: ElisAPIClient, path: Path = None, object: dict = None):
     try:
         if not object:
             object = await read_json(path)
-        id = object["id"]
-        resource = determine_object_type_from_url(object["url"])
+
+        id, url = object.get("id", None), object.get("url", None)
+        if not id:
+            raise Exception("Missing object ID")
+        if not url:
+            raise Exception("Missing object URL")
+
+        resource = determine_object_type_from_url(url)
         result = await client._http_client.update(resource, id, object)
+
         print(f'Successfully updated {resource} with ID "{id}".')
         return result
     except Exception as e:
-        logging.error(f'Error while updating object with path "{path}": {e}')
+        if path:
+            logging.error(f'Error while updating object with path "{path}": {e}')
+        else:
+            id = object.get("id", None)
+            descriptor = id if id else json.dump(object)
+            logging.error(f"Error while updating object {descriptor}: {e}")
 
 
 async def create_object(path: Path, client: ElisAPIClient):

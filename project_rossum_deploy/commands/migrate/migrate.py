@@ -129,20 +129,18 @@ async def migrate_project(
         click.echo("These target objects were created:")
         click.echo(new_target_ids)
 
-    # In case of newly created objects, there could be references which did not exist at the time of the objects' creation
-    # Attribute override is therefore run again for such objects.
-    print("Running attribute_override again...")
-    for mapping_object in traverse_mapping(previous_mapping):
-        if (
-            mapping_object.get("attribute_override", None)
-            and not mapping_object.get("target_object", None)
-            and not mapping_object.get("ignore", None)
+    print("Running attribute_override...")
+    for mapping_object in traverse_mapping(mapping):
+        if mapping_object.get("attribute_override", None) and not mapping_object.get(
+            "ignore", None
         ):
             new_object = source_id_target_pairs[mapping_object["id"]]
             overriden_keys = mapping_object.get("attribute_override", {})
             # Get only the subset because not all created objects are in sync (e.g., hooks don't have references to queues -> updating the whole object would delete their link)
             new_object_subset = {
-                k: new_object[k] for k in new_object if k in overriden_keys
+                "id": new_object["id"],
+                "url": new_object["url"],
+                **{k: new_object[k] for k in new_object if k in overriden_keys},
             }
             new_object_subset = override_attributes(
                 mapping, mapping_object, new_object_subset
@@ -195,9 +193,6 @@ async def migrate_schemas(
                 progress.update(task, advance=1)
                 return
 
-            schema = override_attributes(
-                complete_mapping=mapping, mapping=schema_mapping, object=schema
-            )
             result = await upload_schema(
                 client, schema, schema_mapping["target_object"]
             )

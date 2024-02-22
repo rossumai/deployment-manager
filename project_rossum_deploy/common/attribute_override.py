@@ -23,6 +23,7 @@ def override_attributes(
                 overrides = mapping["attribute_override"][key]
             else:
                 overrides = mapping["attribute_override"][key]
+
             if isinstance(overrides, list):
                 for override in overrides:
                     path = override["path"]
@@ -60,9 +61,7 @@ def replace_reference_on_path(
     elif object and isinstance(object, dict):
         replace_reference_on_path(complete_mapping, path, reference_type, object)
     elif object:
-        new_val = replace_value_of_type(
-                    complete_mapping, reference_type, object
-                )
+        new_val = replace_value_of_type(complete_mapping, reference_type, object)
         if new_val:
             object = new_val
 
