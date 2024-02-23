@@ -8,6 +8,7 @@ from project_rossum_deploy.utils.consts import (
     ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD,
     ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD,
 )
+from project_rossum_deploy.utils.functions import flatten
 
 
 def override_attributes_v2(
@@ -28,6 +29,7 @@ def override_attribute_v2(
     parent, key = parse_parent_and_key(key_query)
 
     search = perform_search(parent, object)
+    search = flatten(search)
 
     for override_parent in search:
         value_to_override = override_parent[key]

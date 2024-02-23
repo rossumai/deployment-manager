@@ -35,6 +35,16 @@ def templatize_name_id(name: str, id: int):
 # ID_BRACKET_RE = re.compile(r"(\[\d+\])$")
 
 
+def flatten(x):
+    result = []
+    for el in x:
+        if isinstance(el, list):
+            result.extend(flatten(el))
+        else:
+            result.append(el)
+    return result
+
+
 async def evaluate_delete_dependencies(changes, org_path):
     changes_updated = []
     for change in changes:
