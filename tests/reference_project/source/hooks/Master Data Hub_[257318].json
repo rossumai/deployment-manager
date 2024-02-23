@@ -20,6 +20,7 @@
   "type": "webhook",
   "metadata": {},
   "queues": [
+    "https://rdttest.rossum.app/api/v1/queues/899853",
     "https://rdttest.rossum.app/api/v1/queues/899854"
   ],
   "run_after": [],
@@ -52,8 +53,11 @@
           "label_template": "{\"Vendor ID\"}-{\"Vendor Name\"}",
           "target_schema_id": "vendor_match"
         },
+        "queue_ids": [
+          899854,
+          899855
+        ],
         "result_actions": {
-          "queue_ids": [],
           "no_match_found": {
             "message": {
               "type": "error",
@@ -80,7 +84,7 @@
   "sideload": [
     "schemas"
   ],
-  "token_owner": null,
+  "token_owner": "https://rdttest.rossum.app/api/v1/users/263683",
   "token_lifetime_s": 7200,
   "description": "Enhance the extracted data with details from your master records."
 }

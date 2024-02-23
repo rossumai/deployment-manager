@@ -25,6 +25,7 @@ async def migrate_workspaces(
     client: ElisAPIClient,
     mapping: dict,
     source_id_target_pairs: dict,
+    sources_by_source_id_map: dict,
     progress: Progress,
 ):
     workspace_paths = [
@@ -38,6 +39,7 @@ async def migrate_workspaces(
             _, id = detemplatize_name_id(ws_path.stem)
             ws_config_path = ws_path / "workspace.json"
             workspace = await read_json(ws_config_path)
+            sources_by_source_id_map[id] = workspace
 
             workspace["queues"] = []
             workspace[
@@ -63,6 +65,7 @@ async def migrate_workspaces(
                 client=client,
                 workspace_mapping=workspace_mapping,
                 mapping=mapping,
+                sources_by_source_id_map=sources_by_source_id_map,
                 source_id_target_pairs=source_id_target_pairs,
             )
 
@@ -80,6 +83,7 @@ async def migrate_queues_and_inboxes(
     client: ElisAPIClient,
     workspace_mapping: dict,
     mapping: dict,
+    sources_by_source_id_map: dict,
     source_id_target_pairs: dict,
 ):
     if not (await (ws_path / "queues").exists()):
@@ -93,6 +97,7 @@ async def migrate_queues_and_inboxes(
 
             queue_config_path = queue_path / "queue.json"
             queue = await read_json(queue_config_path)
+            sources_by_source_id_map[id] = queue
 
             replace_dependency_url(queue, "workspace", source_id_target_pairs)
             replace_dependency_url(queue, "schema", source_id_target_pairs)
@@ -114,6 +119,7 @@ async def migrate_queues_and_inboxes(
 
             inbox_config_path = queue_path / "inbox.json"
             inbox = await read_json(inbox_config_path)
+            sources_by_source_id_map[inbox["id"]] = inbox
 
             replace_dependency_url(inbox, "queues", source_id_target_pairs)
             # Should either create a new one or it is already present

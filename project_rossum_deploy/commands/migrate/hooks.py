@@ -26,6 +26,7 @@ async def migrate_hooks(
     client: ElisAPIClient,
     mapping: dict,
     source_id_target_pairs: dict,
+    sources_by_source_id_map: dict,
     progress: Progress,
 ):
     hook_paths = [hook_path async for hook_path in (source_path / "hooks").iterdir()]
@@ -50,6 +51,7 @@ async def migrate_hooks(
         try:
             _, id = detemplatize_name_id(hook_path.stem)
             hook = await read_json(hook_path)
+            sources_by_source_id_map[id] = hook
 
             hook["run_after"] = []
             hook["queues"] = []

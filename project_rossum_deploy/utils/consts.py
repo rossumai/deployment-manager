@@ -8,13 +8,15 @@ import re
 import click
 
 
-
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.ERROR)
 
 DEBUG_MODE = os.environ.get("DEBUG", "false").lower() == "true"
 
 API_SUFFIX_RE = re.compile(r"/api/v\d+$")
+
+ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD = "$prd_ref"
+ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD = "$source_value"
 
 
 class Settings:
@@ -38,7 +40,9 @@ class Settings:
 
         if not credentials.get("use_same_org_as_target", False):
             self.IS_PROJECT_IN_SAME_ORG = False
-            if "target" not in credentials or not credentials.get('target', {}).get('api_base', ''):
+            if "target" not in credentials or not credentials.get("target", {}).get(
+                "api_base", ""
+            ):
                 raise click.ClickException(
                     'Missing target credentials. If you are targetting the same org, set "use_same_org_as_target": true.'
                 )
@@ -73,7 +77,7 @@ class Settings:
 
     MAPPING_FILENAME: str = "mapping.yaml"
     CREDENTIALS_FILENAME: str = "credentials.json"
-    MAPPING_KEYS_ORDER: list = ['id', 'name', 'target_object']
+    MAPPING_KEYS_ORDER: list = ["id", "name", "target_object"]
 
     TARGET_API_BASE: str = ""
     TARGET_TOKEN: str = "dummy_token"
@@ -99,7 +103,7 @@ class Settings:
     UPLOAD_COMMAND_NAME: str = "push"
     MIGRATE_COMMAND_NAME: str = "release"
 
-    IGNORED_KEYS: dict = {"queue" : ["counts"]}
+    IGNORED_KEYS: dict = {"queue": ["counts"]}
 
     @property
     def SOURCE_API_URL(self):

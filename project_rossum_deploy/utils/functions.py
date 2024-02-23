@@ -269,6 +269,7 @@ def create_empty_mapping():
 def extract_sources_targets(
     mapping: dict, include_organization=True
 ) -> tuple[dict, dict]:
+    """Guarantees same order of both types of objects"""
     if not mapping:
         mapping = create_empty_mapping()
 
@@ -319,6 +320,14 @@ def extract_source_target_pairs(mapping: dict) -> dict:
     for object_type, sources in sources.items():
         pairs[object_type] = dict(zip(sources, targets[object_type]))
     return pairs
+
+
+def extract_flat_lookup_table(mapping: dict) -> dict:
+    sources, targets = extract_sources_targets(mapping, include_organization=False)
+    table = {}
+    for object_type, sources in sources.items():
+        table = {**table, **dict(zip(sources, targets[object_type]))}
+    return table
 
 
 # https://stackoverflow.com/questions/73464511/rich-prompt-confirm-not-working-in-rich-progress-context-python

@@ -1,6 +1,100 @@
 # import json
 # import yaml
+from anyio import Path
+import jmespath
 from rossum_api.models import Organization, Workspace, Hook, Schema, Queue, Inbox
+
+from project_rossum_deploy.utils.consts import (
+    ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD,
+    ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD,
+)
+
+
+def override_attributes_v2(
+    lookup_table: dict,
+    submapping: dict,
+    object: Organization | Workspace | Hook | Schema | Queue | Inbox,
+) -> Organization | Workspace | Hook | Schema | Queue | Inbox:
+    attribute_overrides = submapping.get("attribute_override", {})
+    for key, value in attribute_overrides.items():
+        override_attribute_v2(
+            key_query=key, new_value=value, object=object, lookup_table=lookup_table
+        )
+
+
+def override_attribute_v2(
+    key_query: str, new_value: str, object: dict, lookup_table: dict
+):
+    parent, key = parse_parent_and_key(key_query)
+
+    search = perform_search(parent, object)
+
+    for override_parent in search:
+        value_to_override = override_parent[key]
+
+        # Referencing the value in source -> replace the '$' placeholder
+        if ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD in new_value:
+            if isinstance(value_to_override, list) or isinstance(
+                value_to_override, dict
+            ):
+                raise Exception(
+                    f'Cannot override non-primitive value "{value_to_override}" with "{new_value}".'
+                )
+            override_parent[key] = new_value.replace(
+                ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD, value_to_override
+            )
+        # Referencing a value from target -> perform lookup based on source value
+        elif new_value == ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD:
+            if isinstance(value_to_override, dict):
+                raise Exception(
+                    f'Cannot override non-primitive value "{value_to_override}" with "{new_value}".'
+                )
+            elif isinstance(value_to_override, list):
+                new_values = []
+                for source_reference in value_to_override:
+                    looked_up_value = lookup_table.get(source_reference, None)
+                    if looked_up_value:
+                        new_values.append(looked_up_value)
+                override_parent[key] = new_values
+            else:
+                looked_up_value = lookup_table.get(value_to_override, None)
+                if not looked_up_value:
+                    raise Exception(
+                        f'Found no target value for source key "{key}" and value "{value_to_override}".'
+                    )
+                override_parent[key] = looked_up_value
+        # Value is not using any reference -> just replace
+        else:
+            override_parent[key] = new_value
+
+
+def parse_parent_and_key(key_query: str):
+    try:
+        parent, key = ".".join(key_query.split(".")[:-1]), key_query.split(".")[-1]
+    except Exception:
+        raise Exception(
+            f'Invalid query "{key_query}" - the last part must be a single object key.'
+        )
+    return parent, key
+
+
+def perform_search(parent: str, object: dict):
+    # The query targets a key of the top-most object, no need to search
+    if not parent:
+        search = object
+    else:
+        search = jmespath.search(parent, object)
+        if not search:
+            raise Exception(f'Query "{parent}" returned no result.')
+
+    if not isinstance(search, list):
+        search = [search]
+
+    return search
+
+
+def preview_attribute_override(path: Path | str, object: dict, query_key: str):
+    ...
 
 
 def override_attributes(

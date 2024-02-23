@@ -18,7 +18,7 @@ from project_rossum_deploy.commands.migrate.helpers import (
 from project_rossum_deploy.commands.migrate.hooks import migrate_hooks
 from project_rossum_deploy.commands.migrate.workspaces import migrate_workspaces
 from project_rossum_deploy.commands.upload import update_object
-from project_rossum_deploy.common.attribute_override import override_attributes
+from project_rossum_deploy.common.attribute_override import override_attributes_v2
 from project_rossum_deploy.common.upload import (
     upload_organization,
     upload_schema,
@@ -28,6 +28,7 @@ from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     coro,
     detemplatize_name_id,
+    extract_flat_lookup_table,
     extract_sources_targets,
     read_json,
 )
@@ -77,18 +78,25 @@ async def migrate_project(
                 password=settings.TARGET_PASSWORD,
             )
 
-    source_id_target_pairs = {
-        mapping["organization"]["id"]: {"id": mapping["organization"]["target_object"]}
-    }
+    source_id_target_pairs = {}
+    sources_by_source_id_map = {}
+
+    # TODO: dry-run / preview before releasing
+    # ! References might not yet exist -> have to use dummies
 
     try:
-        organization = await read_json(
-            org_path / settings.SOURCE_DIRNAME / "organization.json"
-        )
-        # Use only a subset of org fields where it makes sense to migrate
-        organization_fields = {k: organization[k] for k in settings.ORGANIZATION_FIELDS}
         with Progress() as progress:
             task = progress.add_task("Releasing organization...", total=1)
+
+            organization = await read_json(
+                org_path / settings.SOURCE_DIRNAME / "organization.json"
+            )
+            sources_by_source_id_map[organization["id"]] = organization
+            # Use only a subset of org fields where it makes sense to migrate
+            organization_fields = {
+                k: organization[k] for k in settings.ORGANIZATION_FIELDS
+            }
+
             source_id_target_pairs[
                 mapping["organization"]["id"]
             ] = await upload_organization(
@@ -99,13 +107,28 @@ async def migrate_project(
             source_path = org_path / settings.SOURCE_DIRNAME
 
             await migrate_schemas(
-                source_path, client, mapping, source_id_target_pairs, progress
+                source_path=source_path,
+                client=client,
+                mapping=mapping,
+                source_id_target_pairs=source_id_target_pairs,
+                sources_by_source_id_map=sources_by_source_id_map,
+                progress=progress,
             )
             await migrate_hooks(
-                source_path, client, mapping, source_id_target_pairs, progress
+                source_path=source_path,
+                client=client,
+                mapping=mapping,
+                source_id_target_pairs=source_id_target_pairs,
+                sources_by_source_id_map=sources_by_source_id_map,
+                progress=progress,
             )
             await migrate_workspaces(
-                source_path, client, mapping, source_id_target_pairs, progress
+                source_path=source_path,
+                client=client,
+                mapping=mapping,
+                source_id_target_pairs=source_id_target_pairs,
+                sources_by_source_id_map=sources_by_source_id_map,
+                progress=progress,
             )
 
         # Update the mapping with right hand sides (targets) created during migration
@@ -114,16 +137,16 @@ async def migrate_project(
         print(f"Unexpected error while migrating objects: {e}")
 
     _, previous_targets = extract_sources_targets(previous_mapping)
+    lookup_table = extract_flat_lookup_table(mapping)
+    current_target_ids = set(lookup_table.values())
+
     previous_target_ids = []
     for objects in previous_targets.values():
         if isinstance(objects, list):
             previous_target_ids.extend(objects)
     previous_target_ids = set(previous_target_ids)
 
-    all_target_ids = set()
-    for object in source_id_target_pairs.values():
-        all_target_ids.add(object["id"])
-    new_target_ids = all_target_ids.difference(previous_target_ids)
+    new_target_ids = current_target_ids.difference(previous_target_ids)
 
     if len(new_target_ids):
         click.echo("These target objects were created:")
@@ -134,18 +157,18 @@ async def migrate_project(
         if mapping_object.get("attribute_override", None) and not mapping_object.get(
             "ignore", None
         ):
-            new_object = source_id_target_pairs[mapping_object["id"]]
-            overriden_keys = mapping_object.get("attribute_override", {})
-            # Get only the subset because not all created objects are in sync (e.g., hooks don't have references to queues -> updating the whole object would delete their link)
-            new_object_subset = {
-                "id": new_object["id"],
-                "url": new_object["url"],
-                **{k: new_object[k] for k in new_object if k in overriden_keys},
-            }
-            new_object_subset = override_attributes(
-                mapping, mapping_object, new_object_subset
+            target_object = source_id_target_pairs[mapping_object["id"]]
+
+            target_object = await client._http_client.request_json(
+                "GET", target_object["url"]
             )
-            await update_object(path=None, client=client, object=new_object_subset)
+            override_attributes_v2(
+                lookup_table=lookup_table,
+                submapping=mapping_object,
+                object=target_object,
+            )
+
+            await update_object(path=None, client=client, object=target_object)
 
     print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
 
@@ -172,6 +195,7 @@ async def migrate_schemas(
     client: ElisAPIClient,
     mapping: dict,
     source_id_target_pairs: dict,
+    sources_by_source_id_map: dict,
     progress: Progress,
 ):
     schema_paths = [
@@ -183,6 +207,7 @@ async def migrate_schemas(
         try:
             _, id = detemplatize_name_id(schema_path.stem)
             schema = await read_json(schema_path)
+            sources_by_source_id_map[id] = schema
 
             schema["queues"] = []
 

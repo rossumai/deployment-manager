@@ -1,8 +1,13 @@
+import jmespath
 import pytest
 import pytest_asyncio
-from project_rossum_deploy.common.attribute_override import override_attributes
+from project_rossum_deploy.common.attribute_override import override_attributes_v2
 
-from project_rossum_deploy.utils.consts import settings
+from project_rossum_deploy.utils.consts import (
+    ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD,
+    ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD,
+    settings,
+)
 from project_rossum_deploy.commands.download.mapping import read_mapping
 from project_rossum_deploy.utils.functions import read_json
 from tests.utils.consts import REFERENCE_PROJECT_PATH
@@ -22,15 +27,15 @@ async def test_simple_override(loaded_mapping: dict):
         REFERENCE_PROJECT_PATH / settings.SOURCE_DIRNAME / "organization.json"
     )
 
-    overriden_organization = override_attributes(
-        loaded_mapping, loaded_mapping["organization"], organization
+    override_attributes_v2(
+        lookup_table={}, submapping=loaded_mapping["organization"], object=organization
     )
 
-    assert NAME == overriden_organization["name"]
+    assert NAME == organization["name"]
 
 
 @pytest.mark.asyncio
-async def test_override_adding_keys(loaded_mapping: dict):
+async def test_override_not_adding_keys(loaded_mapping: dict):
     KEY = "some_key"
     loaded_mapping["organization"]["attribute_override"] = {KEY: "some_value"}
 
@@ -38,11 +43,33 @@ async def test_override_adding_keys(loaded_mapping: dict):
         REFERENCE_PROJECT_PATH / settings.SOURCE_DIRNAME / "organization.json"
     )
 
-    overriden_organization = override_attributes(
-        loaded_mapping, loaded_mapping["organization"], organization
+    with pytest.raises(Exception):
+        override_attributes_v2(
+            lookup_table={},
+            submapping=loaded_mapping["organization"],
+            object=organization,
+        )
+
+    assert not organization.get(KEY, None)
+
+
+@pytest.mark.asyncio
+async def test_override_cannot_find_invalid_target_reference(loaded_mapping: dict):
+    KEY = "name"
+    loaded_mapping["organization"]["attribute_override"] = {
+        KEY: ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD
+    }
+
+    organization = await read_json(
+        REFERENCE_PROJECT_PATH / settings.SOURCE_DIRNAME / "organization.json"
     )
 
-    assert overriden_organization.get(KEY, None)
+    with pytest.raises(Exception):
+        override_attributes_v2(
+            lookup_table={},
+            submapping=loaded_mapping["organization"],
+            object=organization,
+        )
 
 
 @pytest.mark.asyncio
@@ -54,24 +81,131 @@ async def test_override_dict_value(loaded_mapping: dict):
         REFERENCE_PROJECT_PATH / settings.SOURCE_DIRNAME / "organization.json"
     )
 
-    overriden_organization = override_attributes(
-        loaded_mapping, loaded_mapping["organization"], organization
+    override_attributes_v2(
+        lookup_table={},
+        submapping=loaded_mapping["organization"],
+        object=organization,
     )
 
-    for key in METADATA:
-        assert key in overriden_organization["metadata"]
+    assert organization["metadata"] == METADATA
 
 
 @pytest.mark.asyncio
-async def test_override_nested_reference(loaded_mapping: dict):
-    ...
+async def test_override_simple_target_reference(loaded_mapping: dict):
+    SOURCE_REF, TARGET_REF = 123, 456
+    PATH = "metadata.reference"
+    lookup_table = {SOURCE_REF: TARGET_REF}
+
+    loaded_mapping["organization"]["attribute_override"] = {
+        PATH: ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD
+    }
+
+    organization = await read_json(
+        REFERENCE_PROJECT_PATH / settings.SOURCE_DIRNAME / "organization.json"
+    )
+    organization["metadata"]["reference"] = SOURCE_REF
+
+    override_attributes_v2(
+        lookup_table=lookup_table,
+        submapping=loaded_mapping["organization"],
+        object=organization,
+    )
+
+    assert jmespath.search(PATH, organization) == TARGET_REF
 
 
 @pytest.mark.asyncio
-async def test_override_multiple_values_of_same_object(loaded_mapping: dict):
-    ...
+async def test_override_list_of_target_references(loaded_mapping: dict):
+    SOURCE_REF, SOURCE_REF_2, TARGET_REF, TARGET_REF_2 = 123, 456, "haha", "hehe"
+    PATH = "metadata.references"
+    lookup_table = {SOURCE_REF: TARGET_REF, SOURCE_REF_2: TARGET_REF_2}
+
+    loaded_mapping["organization"]["attribute_override"] = {
+        PATH: ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD
+    }
+    organization = await read_json(
+        REFERENCE_PROJECT_PATH / settings.SOURCE_DIRNAME / "organization.json"
+    )
+    organization["metadata"]["references"] = [SOURCE_REF, SOURCE_REF_2]
+
+    override_attributes_v2(
+        lookup_table=lookup_table,
+        submapping=loaded_mapping["organization"],
+        object=organization,
+    )
+
+    assert jmespath.search(PATH, organization) == list(lookup_table.values())
 
 
 @pytest.mark.asyncio
-async def test_override_multiple_paths(loaded_mapping: dict):
-    ...
+async def test_override_target_references_in_different_objects(loaded_mapping: dict):
+    SOURCE_REF, SOURCE_REF_2, TARGET_REF, TARGET_REF_2 = 123, 456, "haha", "hehe"
+    PATH = "metadata.references[*].key"
+    lookup_table = {SOURCE_REF: TARGET_REF, SOURCE_REF_2: TARGET_REF_2}
+
+    loaded_mapping["organization"]["attribute_override"] = {
+        PATH: ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD
+    }
+    organization = await read_json(
+        REFERENCE_PROJECT_PATH / settings.SOURCE_DIRNAME / "organization.json"
+    )
+    organization["metadata"]["references"] = [
+        {"key": [SOURCE_REF, SOURCE_REF_2]},
+        {"key": [SOURCE_REF]},
+    ]
+
+    override_attributes_v2(
+        lookup_table=lookup_table,
+        submapping=loaded_mapping["organization"],
+        object=organization,
+    )
+
+    assert jmespath.search(PATH, organization) == [
+        [TARGET_REF, TARGET_REF_2],
+        [TARGET_REF],
+    ]
+
+
+@pytest.mark.asyncio
+async def test_override_multiple_values_in_same_object(loaded_mapping: dict):
+    PATH_1, PATH_2 = "metadata.foo", "metadata.bar"
+    NEW_VALUE_1, NEW_VALUE_2 = "new_1", "new_2"
+
+    loaded_mapping["organization"]["attribute_override"] = {
+        PATH_1: NEW_VALUE_1,
+        PATH_2: NEW_VALUE_2,
+    }
+
+    organization = await read_json(
+        REFERENCE_PROJECT_PATH / settings.SOURCE_DIRNAME / "organization.json"
+    )
+    organization["metadata"]["foo"] = "whatever"
+    organization["metadata"]["bar"] = "whatever"
+
+    override_attributes_v2(
+        lookup_table={},
+        submapping=loaded_mapping["organization"],
+        object=organization,
+    )
+
+    assert jmespath.search(PATH_1, organization) == NEW_VALUE_1
+    assert jmespath.search(PATH_2, organization) == NEW_VALUE_2
+
+
+@pytest.mark.asyncio
+async def test_override_uses_source_value_reference(loaded_mapping: dict):
+    OLD_NAME, NEW_NAME = "OLD_NAME", "oooh weeh"
+    loaded_mapping["organization"]["attribute_override"] = {
+        "name": f"{NEW_NAME} - {ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD}"
+    }
+
+    organization = await read_json(
+        REFERENCE_PROJECT_PATH / settings.SOURCE_DIRNAME / "organization.json"
+    )
+    organization["name"] = OLD_NAME
+
+    override_attributes_v2(
+        lookup_table={}, submapping=loaded_mapping["organization"], object=organization
+    )
+
+    assert f"{NEW_NAME} - {OLD_NAME}" == organization["name"]
