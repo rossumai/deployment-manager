@@ -1,5 +1,6 @@
 import asyncio
 import copy
+from itertools import zip_longest
 import logging
 from functools import wraps
 import dataclasses
@@ -35,6 +36,33 @@ def templatize_name_id(name: str, id: int):
 # ID_BRACKET_RE = re.compile(r"(\[\d+\])$")
 
 
+def convert_source_to_target_value(source_value, lookup_table: dict):
+    """Finds a counterpart id in the lookup table file and replace it based on the type of the original value"""
+    type, source_id = convert_reference_to_int_id(source_value)
+    target_id = lookup_table.get(source_id, None)
+    if target_id is not None:
+        match type:
+            case "str":
+                return str(target_id)
+            case "url":
+                parts = source_value.split("/")[:-1]
+                parts.append(str(target_id))
+                return "".join(parts)
+            case "int":
+                return target_id
+    return None
+
+
+def convert_reference_to_int_id(value):
+    """Converts value into int if necessary and returns the original type - supports int, str and url (ie. https://elis.rossum.ai/api/v1/queues/156)"""
+    if isinstance(value, int):
+        return "int", value
+    elif isinstance(value, str) and "https" in value:
+        return "url", int(value.split("/")[-1])
+    elif isinstance(value, str):
+        return "str", int(value)
+
+
 def flatten(x):
     result = []
     for el in x:
@@ -43,6 +71,10 @@ def flatten(x):
         else:
             result.append(el)
     return result
+
+
+async def find_all_object_paths(base_directory: Path):
+    return [file async for file in base_directory.glob("**/*.json")]
 
 
 async def evaluate_delete_dependencies(changes, org_path):
@@ -336,7 +368,7 @@ def extract_flat_lookup_table(mapping: dict) -> dict:
     sources, targets = extract_sources_targets(mapping, include_organization=False)
     table = {}
     for object_type, sources in sources.items():
-        table = {**table, **dict(zip(sources, targets[object_type]))}
+        table = {**table, **dict(zip_longest(sources, targets[object_type]))}
     return table
 
 

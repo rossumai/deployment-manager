@@ -1,4 +1,5 @@
 from copy import deepcopy
+import re
 from anyio import Path
 from rich import print
 from rich.panel import Panel
@@ -30,6 +31,7 @@ from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
     extract_flat_lookup_table,
     extract_sources_targets,
+    find_all_object_paths,
     read_json,
 )
 
@@ -81,8 +83,28 @@ async def migrate_project(
     source_id_target_pairs = {}
     sources_by_source_id_map = {}
 
-    # TODO: dry-run / preview before releasing
-    # ! References might not yet exist -> have to use dummies
+    print("Validating attribute_override...")
+    source_paths = await find_all_object_paths(org_path / settings.SOURCE_DIRNAME)
+    source_objects = [await read_json(path) for path in source_paths]
+    for mapping_object in traverse_mapping(mapping):
+        if mapping_object.get("attribute_override", None) and not mapping_object.get(
+            "ignore", None
+        ):
+            source_object = None
+            for source_candidate in source_objects:
+                if source_candidate["id"] == mapping_object["id"]:
+                    source_object = source_candidate
+                    break
+
+            override_attributes_v2(
+                lookup_table=extract_flat_lookup_table(mapping),
+                submapping=mapping_object,
+                object=source_object,
+                is_dryrun=True,
+            )
+    print(
+        f"Attribute override dry run found no errors, proceeding with {settings.MIGRATE_COMMAND_NAME}."
+    )
 
     try:
         with Progress() as progress:
@@ -152,23 +174,13 @@ async def migrate_project(
         click.echo("These target objects were created:")
         click.echo(new_target_ids)
 
-    print("Running attribute_override...")
-    for mapping_object in traverse_mapping(mapping):
-        if mapping_object.get("attribute_override", None) and not mapping_object.get(
-            "ignore", None
-        ):
-            target_object = source_id_target_pairs[mapping_object["id"]]
-
-            target_object = await client._http_client.request_json(
-                "GET", target_object["url"]
-            )
-            override_attributes_v2(
-                lookup_table=lookup_table,
-                submapping=mapping_object,
-                object=target_object,
-            )
-
-            await update_object(path=None, client=client, object=target_object)
+    await override_migrated_objects_attributes(
+        mapping=mapping,
+        client=client,
+        sources_by_source_id_map=sources_by_source_id_map,
+        source_id_target_pairs=source_id_target_pairs,
+        lookup_table=lookup_table,
+    )
 
     print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
 
@@ -231,3 +243,43 @@ async def migrate_schemas(
     await asyncio.gather(
         *[migrate_schema(schema_path=schema_path) for schema_path in schema_paths]
     )
+
+
+async def override_migrated_objects_attributes(
+    mapping: dict,
+    client: ElisAPIClient,
+    sources_by_source_id_map: dict,
+    source_id_target_pairs: dict,
+    lookup_table: dict,
+):
+    print("Running attribute_override...")
+    for mapping_object in traverse_mapping(mapping):
+        if mapping_object.get("attribute_override", None) and not mapping_object.get(
+            "ignore", None
+        ):
+            source_object = sources_by_source_id_map[mapping_object["id"]]
+            source_object_subset = get_attributes_from_object(
+                source_object, mapping_object["attribute_override"]
+            )
+            target_object = source_id_target_pairs[mapping_object["id"]]
+
+            source_object_subset["id"] = target_object["id"]
+            source_object_subset["url"] = target_object["url"]
+
+            override_attributes_v2(
+                lookup_table=lookup_table,
+                submapping=mapping_object,
+                object=source_object_subset,
+            )
+
+            await update_object(path=None, client=client, object=source_object_subset)
+
+
+def get_attributes_from_object(object: dict, attribute_override_spec: dict):
+    ROOT_KEY_REGEX = re.compile(r"^(\w+)")
+    object_subset = {}
+    for query_key in attribute_override_spec:
+        regex_search = ROOT_KEY_REGEX.findall(query_key)
+        if len(regex_search) and (root_key := regex_search[0]) not in object_subset:
+            object_subset[root_key] = object[root_key]
+    return object_subset
