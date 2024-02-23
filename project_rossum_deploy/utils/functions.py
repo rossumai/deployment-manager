@@ -357,18 +357,37 @@ def extract_sources_targets(
 
 
 def extract_source_target_pairs(mapping: dict) -> dict:
-    sources, targets = extract_sources_targets(mapping, include_organization=False)
-    pairs = {}
-    for object_type, sources in sources.items():
-        pairs[object_type] = dict(zip(sources, targets[object_type]))
+    pairs = {
+        "workspaces": {},
+        "queues": {},
+        "inboxes": {},
+        "schemas": {},
+        "hooks": {},
+    }
+
+    for ws in mapping["organization"]["workspaces"]:
+        pairs["workspaces"][ws["id"]] = ws.get("target_object", None)
+
+        for q in ws["queues"]:
+            pairs["queues"][q["id"]] = q.get("target_object", None)
+
+            if inbox_id := q.get("inbox", {}).get("id", None):
+                pairs["inboxes"][inbox_id] = q["inbox"].get("target_object", None)
+
+    for schema in mapping["organization"]["schemas"]:
+        pairs["schemas"][schema["id"]] = schema.get("target_object", None)
+
+    for hook in mapping["organization"]["hooks"]:
+        pairs["hooks"][hook["id"]] = hook.get("target_object", None)
+
     return pairs
 
 
 def extract_flat_lookup_table(mapping: dict) -> dict:
-    sources, targets = extract_sources_targets(mapping, include_organization=False)
+    pairs_by_type = extract_source_target_pairs(mapping)
     table = {}
-    for object_type, sources in sources.items():
-        table = {**table, **dict(zip_longest(sources, targets[object_type]))}
+    for pairs in pairs_by_type.values():
+        table = {**table, **pairs}
     return table
 
 

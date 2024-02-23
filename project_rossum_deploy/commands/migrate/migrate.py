@@ -83,27 +83,8 @@ async def migrate_project(
     source_id_target_pairs = {}
     sources_by_source_id_map = {}
 
-    print("Validating attribute_override...")
-    source_paths = await find_all_object_paths(org_path / settings.SOURCE_DIRNAME)
-    source_objects = [await read_json(path) for path in source_paths]
-    for mapping_object in traverse_mapping(mapping):
-        if mapping_object.get("attribute_override", None) and not mapping_object.get(
-            "ignore", None
-        ):
-            source_object = None
-            for source_candidate in source_objects:
-                if source_candidate["id"] == mapping_object["id"]:
-                    source_object = source_candidate
-                    break
-
-            override_attributes_v2(
-                lookup_table=extract_flat_lookup_table(mapping),
-                submapping=mapping_object,
-                object=source_object,
-                is_dryrun=True,
-            )
-    print(
-        f"Attribute override dry run found no errors, proceeding with {settings.MIGRATE_COMMAND_NAME}."
+    await validate_override_migrated_objects_attributes(
+        org_path / settings.SOURCE_DIRNAME, mapping
     )
 
     try:
@@ -245,6 +226,33 @@ async def migrate_schemas(
     )
 
 
+async def validate_override_migrated_objects_attributes(base_path: Path, mapping: dict):
+    print(Panel("Validating attribute_override..."))
+    source_paths = await find_all_object_paths(base_path)
+    source_objects = [await read_json(path) for path in source_paths]
+    for mapping_object in traverse_mapping(mapping):
+        if mapping_object.get("attribute_override", None) and not mapping_object.get(
+            "ignore", None
+        ):
+            source_object = None
+            for source_candidate in source_objects:
+                if source_candidate["id"] == mapping_object["id"]:
+                    source_object = source_candidate
+                    break
+
+            override_attributes_v2(
+                lookup_table=extract_flat_lookup_table(mapping),
+                submapping=mapping_object,
+                object=source_object,
+                is_dryrun=True,
+            )
+    print(
+        Panel(
+            f"Attribute override dry run found no errors, proceeding with {settings.MIGRATE_COMMAND_NAME}."
+        )
+    )
+
+
 async def override_migrated_objects_attributes(
     mapping: dict,
     client: ElisAPIClient,
@@ -252,7 +260,7 @@ async def override_migrated_objects_attributes(
     source_id_target_pairs: dict,
     lookup_table: dict,
 ):
-    print("Running attribute_override...")
+    print(Panel("Running attribute_override..."))
     for mapping_object in traverse_mapping(mapping):
         if mapping_object.get("attribute_override", None) and not mapping_object.get(
             "ignore", None
