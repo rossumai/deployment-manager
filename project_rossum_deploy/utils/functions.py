@@ -1,6 +1,5 @@
 import asyncio
 import copy
-from itertools import zip_longest
 import logging
 from functools import wraps
 import dataclasses
@@ -311,7 +310,6 @@ def create_empty_mapping():
 def extract_sources_targets(
     mapping: dict, include_organization=True
 ) -> tuple[dict, dict]:
-    """Guarantees same order of both types of objects"""
     if not mapping:
         mapping = create_empty_mapping()
 

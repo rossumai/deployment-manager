@@ -252,12 +252,27 @@ Initialized when not existing or empty during `pull` command. Missing object rec
 `name` - name of the Rossum API object instance.  
 `target` - ID of the counterpart object in the `target` environment.  
 `ignore` - attribute controlling whether object is pushed to remote during `release` command. Object with `ignore:true` are not pushed to `target` environment. `source` is unaffected and `push` command always releases all changes from the `source` folder.  
-`attribute_override` - keys representing attributes of the object on Rossum API are replaced with the value associated with the key during `release` call.  
-`attribute_override.{key}` - name of the attribute to be replaced with value of the key - `name`, `url` etc. (basically any writable attribute of the API object).  
+`attribute_override` - includes key:value pairs. The jeys are JMESPath queries. The values replace whatever is found with these queries during `release` call. The values can also include special keywords:
+
+1. `$prd_ref` - replaces the value or list of values in source (found with the JMESPath query) with their target counterparts. This can be only used for IDs. For example, `queue_ids` in hook configurations.
+2. `$source_value` - replaces the keyword with the original (source) attribute's value. Can be used in a string like `$source_value - PROD` (overriding name in this case).
  
-> Example: `attribute_override.name: "my production hook"`. `source` hook's name "my test hook" is renamed to "my production hook" when deploying the hook to `target` environment.  
+> Example:
+```
+attribute_override:
+  name: "my production hook"
+```
+`source` hook's name "my test hook" is renamed to "my production hook" when deploying the hook to `target` environment.  
 
-`attribute_override.{key}.path` - used when only substring of the attribute's value should be overriden. For instance use to replace queue IDs commonly referenced in various hook.settings (MDH).  
-`attribute_override.{key}.reference_type` - only when `path` is defined. This attribute specifies what value type is being overriden and looks for its counterpart in the `mapping.yaml` file. Possible values `ORGANIZATION | WORKSPACES | QUEUES | INBOX | SCHEMAS | HOOKS`.    
+> Example: 
+```
+attribute_override:
+  "settings.configurations[*].queue_ids: $prd_ref"
+```
+When the `release` command is called, this query makes PRD look into all objects insude the array under `settings.configurations` and override their `queue_ids` attribute with a target ID counterpart.
 
-> Example: parameters are set as follows - `attribute_override.settings.path:configurations.queue_ids` and `attribute_override.settings.reference_type:QUEUES` - when `release` command is called, `source` object's `hook.settings` is parsed, the `path` is found and all queue references (supports integers, strings and URLs) are replaced with their `target` counterparts.  
+The JMESPath query for override can be used to replace non-primitive values (e.g., you can replace the whole `settings` object), but the value must be statically defined in attribute_override (no keywords).
+
+When using keywords, the JMESPath query should end with an attribute which is a single value or a list of such values (`3333` or [`333`, `13993`, `93`]).
+
+The last part of the JMESPath query should be a single specific field (e.g., not `settings`)
