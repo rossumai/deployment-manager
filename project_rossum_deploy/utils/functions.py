@@ -274,7 +274,7 @@ def adjust_keys(object: Any, uppercase_fields: list = [], lower: bool = True):
         lowercased = {}
         for k, v in object.items():
             new_key = k
-            if lower:
+            if lower and k.lower() in uppercase_fields:
                 new_key = k.lower()
             elif not lower and k in uppercase_fields:
                 new_key = k.upper()

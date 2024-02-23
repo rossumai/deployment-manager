@@ -21,7 +21,7 @@ def override_attributes_v2(
     is_dryrun: bool = False,
 ) -> Organization | Workspace | Hook | Schema | Queue | Inbox:
     if is_dryrun:
-        lookup_table = {k: 'dummy' for k in lookup_table}
+        lookup_table = {k: "dummy" for k in lookup_table}
 
     def override_attribute_v2(
         key_query: str,
@@ -35,7 +35,10 @@ def override_attributes_v2(
             value_to_override = override_parent[key]
 
             # Referencing the value in source -> replace the '$' placeholder
-            if ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD in new_value:
+            if (
+                isinstance(new_value, str)
+                and ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD in new_value
+            ):
                 if isinstance(value_to_override, list) or isinstance(
                     value_to_override, dict
                 ):
