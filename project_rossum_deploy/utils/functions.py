@@ -132,7 +132,7 @@ async def evaluate_create_dependencies(changes, org_path, client: ElisAPIClient)
         if op == GIT_CHARACTERS.CREATED or op == GIT_CHARACTERS.CREATED_STAGED:
             object_path = org_path / path
             object = await read_json(object_path)
-            id = object["id"]
+            id = object.get("id", None)
             obj = None
             if str(path).endswith("workspace.json"):
                 if id:
@@ -336,7 +336,8 @@ def extract_sources_targets(
             if q["target_object"]:
                 targets["queues"].append(q["target_object"])
 
-            if inbox_id := q.get("inbox", {}).get("id", None):
+            inbox = q.get("inbox", {})
+            if inbox and (inbox_id := inbox.get("id", None)):
                 sources["inboxes"].append(inbox_id)
                 if inbox_target_id := q["inbox"]["target_object"]:
                     targets["inboxes"].append(inbox_target_id)

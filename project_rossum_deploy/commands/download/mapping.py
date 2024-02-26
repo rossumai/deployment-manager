@@ -103,6 +103,8 @@ def index_mappings_by_object_id(sub_mapping: list[dict]):
 def enrich_mapping_with_previous_properties(
     new_sub_mapping: dict, old_sub_mapping: dict
 ):
+    if not old_sub_mapping:
+        old_sub_mapping = {}
     for k, v in old_sub_mapping.items():
         if k not in new_sub_mapping:
             new_sub_mapping[k] = v
@@ -162,8 +164,9 @@ def enrich_mappings_with_existing_attributes(
             target = old_queue_mapping.get("target_object", None)
             new_queue_mapping["target_object"] = target if target in new_ids else None
 
-            if new_queue_mapping.get("inbox", None):
-                old_inbox_mapping = old_queue_mapping.get("inbox", {})
+            if new_queue_mapping.get("inbox", None) and (
+                old_inbox_mapping := old_queue_mapping.get("inbox", {})
+            ):
                 enrich_mapping_with_previous_properties(
                     new_queue_mapping["inbox"], old_inbox_mapping
                 )
