@@ -4,9 +4,8 @@ import logging
 import os
 from pathlib import Path
 import re
-
 import click
-
+import httpx
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.ERROR)
@@ -20,7 +19,14 @@ ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD = "$source_value"
 
 
 class Settings:
+       
     def __init__(self):
+        def validate_token(base_url: str, token: str) -> bool:
+            req = httpx.get(url=base_url + "/auth/user", headers={"Authorization": f"Bearer {token}"})
+            if req.status_code==200:
+                return True
+            return False
+        
         if DEBUG_MODE:
             return
 
@@ -37,6 +43,12 @@ class Settings:
         self.SOURCE_USERNAME = credentials["source"].get("username", None)
         self.SOURCE_PASSWORD = credentials["source"].get("password", None)
         self.SOURCE_TOKEN = credentials["source"].get("token", None)
+        if self.SOURCE_TOKEN:
+            token_valid = validate_token(self.SOURCE_API_BASE, self.SOURCE_TOKEN)
+            if not token_valid:
+                raise click.ClickException(
+                    'Source token is invalid or expired.'
+                )
 
         if not credentials.get("use_same_org_as_target", False):
             self.IS_PROJECT_IN_SAME_ORG = False
@@ -50,7 +62,12 @@ class Settings:
             self.TARGET_USERNAME = credentials["target"].get("username", None)
             self.TARGET_PASSWORD = credentials["target"].get("password", None)
             self.TARGET_TOKEN = credentials["target"].get("token", None)
-
+            if self.TARGET_TOKEN:
+                token_valid = validate_token(self.TARGET_API_BASE, self.TARGET_TOKEN)
+                if not token_valid:
+                    raise click.ClickException(
+                        'Target token is invalid or expired.'
+                    )
             # Can't fool us that easily
             if self.SOURCE_API_BASE == self.TARGET_API_BASE and (
                 (
