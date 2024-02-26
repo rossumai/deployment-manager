@@ -254,7 +254,7 @@ Initialized when not existing or empty during `pull` command. Missing object rec
 `ignore` - attribute controlling whether object is pushed to remote during `release` command. Object with `ignore:true` are not pushed to `target` environment. `source` is unaffected and `push` command always releases all changes from the `source` folder.  
 `attribute_override` - includes key:value pairs. The jeys are JMESPath queries. The values replace whatever is found with these queries during `release` call. The values can also include special keywords:
 
-1. `$prd_ref` - replaces the value or list of values in source (found with the JMESPath query) with their target counterparts. This can be only used for IDs. For example, `queue_ids` in hook configurations.
+1. `$prd_ref` - replaces the value or list of values in source (found with the [JMESPath](https://jmespath.org/tutorial.html) query) with their target counterparts. This can be only used for IDs. For example, `queue_ids` in hook configurations.
 2. `$source_value` - replaces the keyword with the original (source) attribute's value. Can be used in a string like `$source_value - PROD` (overriding name in this case).
  
 > Example:
