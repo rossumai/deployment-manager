@@ -1,8 +1,8 @@
 import asyncio
-import logging
 from anyio import Path
 from rich.progress import Progress
 from rich import print
+from rich.panel import Panel
 
 from rossum_api import ElisAPIClient
 
@@ -71,7 +71,7 @@ async def migrate_workspaces(
 
             progress.update(task, advance=1)
         except Exception as e:
-            print(f"Error while migrating workspace: {e}")
+            print(Panel(f"Error while migrating workspace: {e}"))
 
     await asyncio.gather(
         *[migrate_workspace(ws_path=ws_path) for ws_path in workspace_paths]
@@ -133,7 +133,7 @@ async def migrate_queues_and_inboxes(
             inbox_mapping["target_object"] = inbox_result["id"]
             source_id_target_pairs[inbox["id"]] = inbox_result
         except Exception as e:
-            logging.error(f"Error while migrating queue: {e}")
+            print(Panel(f"Error while migrating queue: {e}"))
 
     await asyncio.gather(
         *[migrate_queue_and_inbox(queue_path=queue_path) for queue_path in queue_paths]

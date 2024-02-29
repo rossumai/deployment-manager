@@ -4,6 +4,7 @@ from anyio import Path
 import click
 from rossum_api import ElisAPIClient
 from rich import print
+from rich.panel import Panel
 from rich.prompt import Prompt
 
 from project_rossum_deploy.commands.migrate.helpers import (
@@ -84,7 +85,7 @@ async def migrate_hooks(
 
             progress.update(task, advance=1)
         except Exception as e:
-            print(f"Error while migrating hook: {e}")
+            print(Panel(f"Error while migrating hook: {e}"))
 
     await asyncio.gather(
         *[migrate_hook(hook_path=hook_path) for hook_path in hook_paths]
@@ -92,8 +93,10 @@ async def migrate_hooks(
 
     await migrate_hook_dependency_graph(client, source_path, source_id_target_pairs)
 
-    click.echo(
-        "Hooks were successfully migrated to target. Please add any necessary secrets manually."
+    print(
+        Panel(
+            "Hooks were successfully migrated to target. Please add any necessary secrets manually."
+        )
     )
 
     private_dummy_url_hooks = list(
@@ -104,9 +107,12 @@ async def migrate_hooks(
         )
     )
     if len(private_dummy_url_hooks):
-        click.echo(
-            "Private hooks detected. Please replace dummy URL in the following hooks using Django Admin:",
+        print(
+            Panel(
+                "Private hooks detected. Please replace dummy URL in the following hooks using Django Admin:"
+            )
         )
+
         click.echo(
             "\n".join(
                 list(
@@ -210,5 +216,7 @@ async def migrate_hook_dependency_graph(
                 await upload_hook(client, {"run_after": run_after}, new_hook["id"])
         except Exception as e:
             print(
-                f"Error while migrating dependency graph for hook '{source_path}': {e}"
+                Panel(
+                    f"Error while migrating dependency graph for hook '{source_path}': {e}"
+                )
             )

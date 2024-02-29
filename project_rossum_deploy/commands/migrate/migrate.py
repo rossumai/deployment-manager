@@ -1,4 +1,5 @@
 from copy import deepcopy
+import logging
 import re
 from anyio import Path
 from rich import print
@@ -40,54 +41,66 @@ from project_rossum_deploy.utils.functions import (
     name=settings.MIGRATE_COMMAND_NAME,
     help="""
 Applies selected changes onto other objects.
-If these objects don't exist, they get crated.
-The specifics of what objects to migrate where can be specified in a mapping.yaml file.
+If these objects don't exist, they get created.
+The specifics of what objects to migrate and where to migrate them are specified in a mapping.yaml file.
                """,
 )
+@click.option(
+    "--validate-only",
+    "-v",
+    help=f"Checks the defined attribute_override without the actual {settings.MIGRATE_COMMAND_NAME}.",
+    default=False,
+    is_flag=True,
+)
 @coro
-async def migrate_project_wrapper():
-    await migrate_project()
+async def migrate_project_wrapper(validate_only: bool):
+    await migrate_project(validate_only=validate_only)
 
 
 async def migrate_project(
-    client: ElisAPIClient = None,
-    org_path: Path = None,
+    client: ElisAPIClient = None, org_path: Path = None, validate_only: bool = False
 ):
-    if not org_path:
-        org_path = Path("./")
-    mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
-    previous_mapping = deepcopy(mapping)
-
-    target_organization = mapping["organization"]["target_object"]
-    if not target_organization:
-        raise click.ClickException(
-            "No target for organization. If you want to migrate inside the same organization, just target its own ID."
-        )
-
-    if not client:
-        if settings.IS_PROJECT_IN_SAME_ORG:
-            client = ElisAPIClient(
-                base_url=settings.SOURCE_API_URL,
-                token=settings.SOURCE_TOKEN,
-                username=settings.SOURCE_USERNAME,
-                password=settings.SOURCE_PASSWORD,
-            )
-        else:
-            client = ElisAPIClient(
-                base_url=settings.TARGET_API_URL,
-                token=settings.TARGET_TOKEN,
-                username=settings.TARGET_USERNAME,
-                password=settings.TARGET_PASSWORD,
-            )
-
-    source_id_target_pairs = {}
-    sources_by_source_id_map = {}
-
-    await validate_override_migrated_objects_attributes(
-        org_path / settings.SOURCE_DIRNAME, mapping
-    )
-
     try:
+        if not org_path:
+            org_path = Path("./")
+        mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
+        previous_mapping = deepcopy(mapping)
+
+        target_organization = mapping["organization"]["target_object"]
+        if not target_organization:
+            raise click.ClickException(
+                "No target for organization. If you want to migrate inside the same organization, just target its own ID."
+            )
+
+        if not client:
+            if settings.IS_PROJECT_IN_SAME_ORG:
+                client = ElisAPIClient(
+                    base_url=settings.SOURCE_API_URL,
+                    token=settings.SOURCE_TOKEN,
+                    username=settings.SOURCE_USERNAME,
+                    password=settings.SOURCE_PASSWORD,
+                )
+            else:
+                client = ElisAPIClient(
+                    base_url=settings.TARGET_API_URL,
+                    token=settings.TARGET_TOKEN,
+                    username=settings.TARGET_USERNAME,
+                    password=settings.TARGET_PASSWORD,
+                )
+
+        source_id_target_pairs = {}
+        sources_by_source_id_map = {}
+
+        if not (
+            await validate_override_migrated_objects_attributes(
+                org_path / settings.SOURCE_DIRNAME, mapping
+            )
+        ):
+            return
+
+        if validate_only:
+            return
+
         with Progress() as progress:
             task = progress.add_task("Releasing organization...", total=1)
 
@@ -136,34 +149,35 @@ async def migrate_project(
 
         # Update the mapping with right hand sides (targets) created during migration
         await write_mapping(org_path / settings.MAPPING_FILENAME, mapping)
+
+        _, previous_targets = extract_sources_targets(previous_mapping)
+        lookup_table = extract_flat_lookup_table(mapping)
+        current_target_ids = set(filter(lambda x: x, lookup_table.values()))
+
+        previous_target_ids = []
+        for objects in previous_targets.values():
+            if isinstance(objects, list):
+                previous_target_ids.extend(objects)
+        previous_target_ids = set(previous_target_ids)
+
+        new_target_ids = current_target_ids.difference(previous_target_ids)
+
+        if len(new_target_ids):
+            print(Panel(f"These target objects were created: {new_target_ids}"))
+
+        await override_migrated_objects_attributes(
+            mapping=mapping,
+            client=client,
+            sources_by_source_id_map=sources_by_source_id_map,
+            source_id_target_pairs=source_id_target_pairs,
+            lookup_table=lookup_table,
+        )
+
+        print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
+
     except Exception as e:
-        print(f"Unexpected error while migrating objects: {e}")
-
-    _, previous_targets = extract_sources_targets(previous_mapping)
-    lookup_table = extract_flat_lookup_table(mapping)
-    current_target_ids = set(lookup_table.values())
-
-    previous_target_ids = []
-    for objects in previous_targets.values():
-        if isinstance(objects, list):
-            previous_target_ids.extend(objects)
-    previous_target_ids = set(previous_target_ids)
-
-    new_target_ids = current_target_ids.difference(previous_target_ids)
-
-    if len(new_target_ids):
-        click.echo("These target objects were created:")
-        click.echo(new_target_ids)
-
-    await override_migrated_objects_attributes(
-        mapping=mapping,
-        client=client,
-        sources_by_source_id_map=sources_by_source_id_map,
-        source_id_target_pairs=source_id_target_pairs,
-        lookup_table=lookup_table,
-    )
-
-    print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
+        logging.exception(e)
+        print(Panel(f"Unexpected error while migrating objects: {e}"))
 
     await download_project(client=client, org_path=org_path)
 
@@ -219,38 +233,42 @@ async def migrate_schemas(
 
             progress.update(task, advance=1)
         except Exception as e:
-            print(f"Error while migrationg schema: {e}")
+            print(Panel(f"Error while migrating schema: {e}"))
 
     await asyncio.gather(
         *[migrate_schema(schema_path=schema_path) for schema_path in schema_paths]
     )
 
 
-async def validate_override_migrated_objects_attributes(base_path: Path, mapping: dict):
-    print(Panel("Validating attribute_override..."))
-    source_paths = await find_all_object_paths(base_path)
-    source_objects = [await read_json(path) for path in source_paths]
-    for mapping_object in traverse_mapping(mapping):
-        if mapping_object.get("attribute_override", None) and not mapping_object.get(
-            "ignore", None
-        ):
-            source_object = None
-            for source_candidate in source_objects:
-                if source_candidate["id"] == mapping_object["id"]:
-                    source_object = source_candidate
-                    break
+async def validate_override_migrated_objects_attributes(
+    base_path: Path, mapping: dict
+) -> bool:
+    try:
+        print(Panel("Validating attribute_override..."))
+        source_paths = await find_all_object_paths(base_path)
+        source_objects = [await read_json(path) for path in source_paths]
+        for mapping_object in traverse_mapping(mapping):
+            if mapping_object.get(
+                "attribute_override", None
+            ) and not mapping_object.get("ignore", None):
+                source_object = None
+                for source_candidate in source_objects:
+                    if source_candidate["id"] == mapping_object["id"]:
+                        source_object = source_candidate
+                        break
 
-            override_attributes_v2(
-                lookup_table=extract_flat_lookup_table(mapping),
-                submapping=mapping_object,
-                object=source_object,
-                is_dryrun=True,
-            )
-    print(
-        Panel(
-            f"Attribute override dry run found no errors, proceeding with {settings.MIGRATE_COMMAND_NAME}."
-        )
-    )
+                override_attributes_v2(
+                    lookup_table=extract_flat_lookup_table(mapping),
+                    submapping=mapping_object,
+                    object=source_object,
+                    is_dryrun=True,
+                )
+
+        print(Panel("Attribute override dry-run found no errors."))
+        return True
+    except Exception as e:
+        print(Panel(f"Attribute override dry-run failed: {e}"))
+        return False
 
 
 async def override_migrated_objects_attributes(

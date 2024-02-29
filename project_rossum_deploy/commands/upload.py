@@ -47,80 +47,85 @@ async def upload_project_wrapper(destination):
 
 
 async def upload_project(destination: str, client: ElisAPIClient = None):
-    org_path = Path("./")
+    try:
+        org_path = Path("./")
 
-    if not client:
-        match destination:
-            case settings.SOURCE_DIRNAME:
-                client = ElisAPIClient(
-                    base_url=settings.SOURCE_API_URL,
-                    token=settings.SOURCE_TOKEN,
-                    username=settings.SOURCE_USERNAME,
-                    password=settings.SOURCE_PASSWORD,
-                )
-            case settings.TARGET_DIRNAME:
-                client = ElisAPIClient(
-                    base_url=settings.TARGET_API_URL,
-                    token=settings.TARGET_TOKEN,
-                    username=settings.TARGET_USERNAME,
-                    password=settings.TARGET_PASSWORD,
-                )
-            case _:
-                raise click.ClickException(
-                    f'Unrecognized destination "{destination}" to use {settings.UPLOAD_COMMAND_NAME}.'
-                )
+        if not client:
+            match destination:
+                case settings.SOURCE_DIRNAME:
+                    client = ElisAPIClient(
+                        base_url=settings.SOURCE_API_URL,
+                        token=settings.SOURCE_TOKEN,
+                        username=settings.SOURCE_USERNAME,
+                        password=settings.SOURCE_PASSWORD,
+                    )
+                case settings.TARGET_DIRNAME:
+                    client = ElisAPIClient(
+                        base_url=settings.TARGET_API_URL,
+                        token=settings.TARGET_TOKEN,
+                        username=settings.TARGET_USERNAME,
+                        password=settings.TARGET_PASSWORD,
+                    )
+                case _:
+                    raise click.ClickException(
+                        f'Unrecognized destination "{destination}" to use {settings.UPLOAD_COMMAND_NAME}.'
+                    )
 
-    # The -s flag is there to show a simplified list of changes
-    # The -u flag is there to show each individual file (and not a subdir)
-    # The change in git config is because of potential 'unusual' (non-ASCII) characters in paths
-    subprocess.run(['git' ,'config' ,'core.quotePath', 'false'])
-    git_destination_diff = subprocess.run(
-        ["git", "status", destination, "-s", "-u"],
-        capture_output=True,
-        text=True,
-    )
-    subprocess.run(['git' ,'config' ,'core.quotePath', 'true'])
-    # print(git_destination_diff.stdout.split('\n'))
-    changes_raw = git_destination_diff.stdout.split("\n")
-    changes = []
-    for change in changes_raw:
-        change = change.strip()
-        if not change:
-            continue
-        op, path = tuple(change.split(" ", maxsplit=1))
-        path = Path(path.strip().strip('"'))
-        path
-        changes.append((op, path))
-
-    if changes:
-        changes = await merge_hook_changes(changes, org_path)
-        changes = await evaluate_delete_dependencies(changes, org_path)
-        changes = await evaluate_create_dependencies(changes, org_path, client)
-
-    for change in track(changes, description="Pushing changes to Rossum..."):
-        op, path = change
-        match op:
-            case GIT_CHARACTERS.CREATED:
-                await create_object(org_path / path, client)
-            case GIT_CHARACTERS.CREATED_STAGED:
-                await create_object(org_path / path, client)
-            case GIT_CHARACTERS.DELETED:
-                await delete_object(org_path / path, client)
-            case GIT_CHARACTERS.UPDATED:
-                await update_object(client=client, path=org_path / path)
-            case _:
-                raise click.ClickException(f'Unrecognized operator "{op}".')
-
-    print(
-        Panel(
-            f"Finished {settings.UPLOAD_COMMAND_NAME}. Please commit the changes before running this command again."
+        # The -s flag is there to show a simplified list of changes
+        # The -u flag is there to show each individual file (and not a subdir)
+        # The change in git config is because of potential 'unusual' (non-ASCII) characters in paths
+        subprocess.run(["git", "config", "core.quotePath", "false"])
+        git_destination_diff = subprocess.run(
+            ["git", "status", destination, "-s", "-u"],
+            capture_output=True,
+            text=True,
         )
-    )
-    print(
-        Panel(
-            f"Running {settings.DOWNLOAD_COMMAND_NAME} for {destination} because of potential changes to names and mapping."
+        subprocess.run(["git", "config", "core.quotePath", "true"])
+        # print(git_destination_diff.stdout.split('\n'))
+        changes_raw = git_destination_diff.stdout.split("\n")
+        changes = []
+        for change in changes_raw:
+            change = change.strip()
+            if not change:
+                continue
+            op, path = tuple(change.split(" ", maxsplit=1))
+            path = Path(path.strip().strip('"'))
+            path
+            changes.append((op, path))
+
+        if changes:
+            changes = await merge_hook_changes(changes, org_path)
+            changes = await evaluate_delete_dependencies(changes, org_path)
+            changes = await evaluate_create_dependencies(changes, org_path, client)
+
+        for change in track(changes, description="Pushing changes to Rossum..."):
+            op, path = change
+            match op:
+                case GIT_CHARACTERS.CREATED:
+                    await create_object(org_path / path, client)
+                case GIT_CHARACTERS.CREATED_STAGED:
+                    await create_object(org_path / path, client)
+                case GIT_CHARACTERS.DELETED:
+                    await delete_object(org_path / path, client)
+                case GIT_CHARACTERS.UPDATED:
+                    await update_object(client=client, path=org_path / path)
+                case _:
+                    raise click.ClickException(f'Unrecognized operator "{op}".')
+
+        print(
+            Panel(
+                f"Finished {settings.UPLOAD_COMMAND_NAME}. Please commit the changes before running this command again."
+            )
         )
-    )
+        print(
+            Panel(
+                f"Running {settings.DOWNLOAD_COMMAND_NAME} for {destination} because of potential changes to names and mapping."
+            )
+        )
+
+    except Exception as e:
+        logging.exception(e)
+        print(Panel(f"Error during project {settings.UPLOAD_COMMAND_NAME}: {e}"))
 
     # Repulling is done to update mapping and (potentially) different filenames.
     await download_project(client=client, org_path=org_path)

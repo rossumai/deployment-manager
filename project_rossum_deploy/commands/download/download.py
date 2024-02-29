@@ -1,5 +1,6 @@
 import asyncio
 import functools
+import logging
 from anyio import Path
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
@@ -46,65 +47,69 @@ async def download_project_wrapper():
 
 
 async def download_project(client: ElisAPIClient = None, org_path: Path = None):
-    if settings.IS_PROJECT_IN_SAME_ORG:
-        return await download_organization_combined(client, org_path)
+    try:
+        if settings.IS_PROJECT_IN_SAME_ORG:
+            return await download_organization_combined(client, org_path)
 
-    if not org_path:
-        org_path = Path("./")
+        if not org_path:
+            org_path = Path("./")
 
-    if len([path async for path in org_path.iterdir()]):
-        if not Confirm.ask(
-            f'Project "{(await (org_path).absolute()).name}" already has configuration files in it, do you want to replace it with the new configuration (both source and target)?',
-        ):
-            return
-        await delete_current_configuration(org_path)
+        if len([path async for path in org_path.iterdir()]):
+            if not Confirm.ask(
+                f'Project "{(await (org_path).absolute()).name}" already has configuration files in it, do you want to replace it with the new configuration (both source and target)?',
+            ):
+                return
+            await delete_current_configuration(org_path)
 
-    mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
-    if not mapping:
-        mapping = create_empty_mapping()
+        mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
+        if not mapping:
+            mapping = create_empty_mapping()
 
-    source_client = ElisAPIClient(
-        base_url=settings.SOURCE_API_URL,
-        token=settings.SOURCE_TOKEN,
-        username=settings.SOURCE_USERNAME,
-        password=settings.SOURCE_PASSWORD,
-    )
-    (
-        source_organization,
-        source_workspaces,
-        source_schemas,
-        source_hooks,
-    ) = await download_organization_single(
-        client=source_client,
-        org_path=org_path,
-        destination=settings.SOURCE_DIRNAME,
-    )
+        source_client = ElisAPIClient(
+            base_url=settings.SOURCE_API_URL,
+            token=settings.SOURCE_TOKEN,
+            username=settings.SOURCE_USERNAME,
+            password=settings.SOURCE_PASSWORD,
+        )
+        (
+            source_organization,
+            source_workspaces,
+            source_schemas,
+            source_hooks,
+        ) = await download_organization_single(
+            client=source_client,
+            org_path=org_path,
+            destination=settings.SOURCE_DIRNAME,
+        )
 
-    target_client = ElisAPIClient(
-        base_url=settings.TARGET_API_URL,
-        token=settings.TARGET_TOKEN,
-        username=settings.TARGET_USERNAME,
-        password=settings.TARGET_PASSWORD,
-    )
-    (
-        _,
-        target_workspaces,
-        target_schemas,
-        target_hooks,
-    ) = await download_organization_single(
-        client=target_client,
-        org_path=org_path,
-        destination=settings.TARGET_DIRNAME,
-    )
+        target_client = ElisAPIClient(
+            base_url=settings.TARGET_API_URL,
+            token=settings.TARGET_TOKEN,
+            username=settings.TARGET_USERNAME,
+            password=settings.TARGET_PASSWORD,
+        )
+        (
+            _,
+            target_workspaces,
+            target_schemas,
+            target_hooks,
+        ) = await download_organization_single(
+            client=target_client,
+            org_path=org_path,
+            destination=settings.TARGET_DIRNAME,
+        )
 
-    await create_update_mapping(
-        org_path=org_path,
-        organization=source_organization,
-        workspaces_for_mapping=[*source_workspaces, *target_workspaces],
-        schemas_for_mapping=[*source_schemas, *target_schemas],
-        hooks_for_mapping=[*source_hooks, *target_hooks],
-        old_mapping=mapping,
-    )
+        await create_update_mapping(
+            org_path=org_path,
+            organization=source_organization,
+            workspaces_for_mapping=[*source_workspaces, *target_workspaces],
+            schemas_for_mapping=[*source_schemas, *target_schemas],
+            hooks_for_mapping=[*source_hooks, *target_hooks],
+            old_mapping=mapping,
+        )
+    except Exception as e:
+        logging.exception(e)
+        print(Panel(f"Error during project {settings.DOWNLOAD_COMMAND_NAME}: {e}"))
 
 
 async def download_organization_single(
@@ -181,20 +186,22 @@ async def download_workspaces(
     )
 
     for workspace in full_workspaces:
+        destination_local = (
+            destination
+            if destination
+            else await determine_object_destination(
+                object=workspace,
+                object_type="workspace",
+                org_path=org_path,
+                mapping=mapping,
+                sources=sources,
+                targets=targets,
+            )
+        )
+
         workspace_config_path = (
             org_path
-            / (
-                destination
-                if destination
-                else await determine_object_destination(
-                    object=workspace,
-                    object_type="workspace",
-                    org_path=org_path,
-                    mapping=mapping,
-                    sources=sources,
-                    targets=targets,
-                )
-            )
+            / destination_local
             / "workspaces"
             / templatize_name_id(workspace.name, workspace.id)
             / "workspace.json"
@@ -205,7 +212,7 @@ async def download_workspaces(
         workspace.queues = await download_queues_for_workspace(
             client, workspace_config_path.parent, workspace.id
         )
-        workspaces.append((destination, workspace))
+        workspaces.append((destination_local, workspace))
         progress.update(task, advance=1)
 
     return workspaces
@@ -270,25 +277,26 @@ async def download_schemas(
     )
 
     for schema in full_schemas:
+        destination_local = (
+            destination
+            if destination
+            else await determine_object_destination(
+                object=schema,
+                object_type="schema",
+                org_path=org_path,
+                mapping=mapping,
+                sources=sources,
+                targets=targets,
+            )
+        )
         schema_config_path = (
             org_path
-            / (
-                destination
-                if destination
-                else await determine_object_destination(
-                    object=schema,
-                    object_type="schema",
-                    org_path=org_path,
-                    mapping=mapping,
-                    sources=sources,
-                    targets=targets,
-                )
-            )
+            / destination_local
             / "schemas"
             / f"{templatize_name_id(schema.name, schema.id)}.json"
         )
         await write_json(schema_config_path, schema, "schema")
-        schemas.append((destination, schema))
+        schemas.append((destination_local, schema))
 
     return schemas
 
@@ -320,26 +328,27 @@ async def download_hooks(
     )
 
     for hook in full_hooks:
+        destination_local = (
+            destination
+            if destination
+            else await determine_object_destination(
+                object=hook,
+                object_type="hook",
+                org_path=org_path,
+                mapping=mapping,
+                sources=sources,
+                targets=targets,
+            )
+        )
         hook_config_path = (
             org_path
-            / (
-                destination
-                if destination
-                else await determine_object_destination(
-                    object=hook,
-                    object_type="hook",
-                    org_path=org_path,
-                    mapping=mapping,
-                    sources=sources,
-                    targets=targets,
-                )
-            )
+            / destination_local
             / "hooks"
             / f"{templatize_name_id(hook.name, hook.id)}.json"
         )
 
         await write_json(hook_config_path, hook, "hook")
-        hooks.append((destination, hook))
+        hooks.append((destination_local, hook))
 
         if hook.extension_source != "rossum_store":
             hook_code = hook.config.get("code")
@@ -356,78 +365,83 @@ async def download_hooks(
 async def download_organization_combined(
     client: ElisAPIClient = None, org_path: Path = None
 ):
-    if not client:
-        client = ElisAPIClient(
-            base_url=settings.SOURCE_API_URL,
-            token=settings.SOURCE_TOKEN,
-            username=settings.SOURCE_USERNAME,
-            password=settings.SOURCE_PASSWORD,
+    try:
+        if not client:
+            client = ElisAPIClient(
+                base_url=settings.SOURCE_API_URL,
+                token=settings.SOURCE_TOKEN,
+                username=settings.SOURCE_USERNAME,
+                password=settings.SOURCE_PASSWORD,
+            )
+
+        organizations = [org async for org in client.list_all_organizations()]
+        if not len(organizations):
+            raise click.ClickException("No organization found.")
+        organization = await client.retrieve_organization(organizations[0].id)
+
+        if not org_path:
+            org_path = Path("./")
+
+        org_config_path = org_path / settings.SOURCE_DIRNAME / "organization.json"
+        if await org_config_path.exists():
+            if not Confirm.ask(
+                f'Project "{(await org_path.absolute()).name}" already has configuration files in it, do you want to replace it with the new configuration?',
+            ):
+                return
+            await delete_current_configuration(org_path)
+
+        await write_json(org_config_path, organization, "organization")
+
+        mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
+        if not mapping:
+            mapping = create_empty_mapping()
+        previous_sources, previous_targets = extract_sources_targets(mapping)
+
+        with Progress() as progress:
+            (
+                workspaces_for_mapping,
+                schemas_for_mapping,
+                hooks_for_mapping,
+            ) = await asyncio.gather(
+                *[
+                    download_workspaces(
+                        client=client,
+                        org_path=org_path,
+                        mapping=mapping,
+                        sources=previous_sources,
+                        targets=previous_targets,
+                        progress=progress,
+                    ),
+                    download_schemas(
+                        client=client,
+                        org_path=org_path,
+                        mapping=mapping,
+                        sources=previous_sources,
+                        targets=previous_targets,
+                        progress=progress,
+                    ),
+                    download_hooks(
+                        client=client,
+                        org_path=org_path,
+                        mapping=mapping,
+                        sources=previous_sources,
+                        targets=previous_targets,
+                        progress=progress,
+                    ),
+                ]
+            )
+
+        await create_update_mapping(
+            org_path=org_path,
+            organization=organization,
+            workspaces_for_mapping=workspaces_for_mapping,
+            schemas_for_mapping=schemas_for_mapping,
+            hooks_for_mapping=hooks_for_mapping,
+            old_mapping=mapping,
         )
 
-    organizations = [org async for org in client.list_all_organizations()]
-    if not len(organizations):
-        raise click.ClickException("No organization found.")
-    organization = await client.retrieve_organization(organizations[0].id)
+        print(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME}."))
 
-    if not org_path:
-        org_path = Path("./")
-
-    org_config_path = org_path / settings.SOURCE_DIRNAME / "organization.json"
-    if await org_config_path.exists():
-        if not Confirm.ask(
-            f'Project "{(await org_path.absolute()).name}" already has configuration files in it, do you want to replace it with the new configuration?',
-        ):
-            return
-        await delete_current_configuration(org_path)
-
-    await write_json(org_config_path, organization, "organization")
-
-    mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
-    if not mapping:
-        mapping = create_empty_mapping()
-    previous_sources, previous_targets = extract_sources_targets(mapping)
-
-    with Progress() as progress:
-        (
-            workspaces_for_mapping,
-            schemas_for_mapping,
-            hooks_for_mapping,
-        ) = await asyncio.gather(
-            *[
-                download_workspaces(
-                    client=client,
-                    org_path=org_path,
-                    mapping=mapping,
-                    sources=previous_sources,
-                    targets=previous_targets,
-                    progress=progress,
-                ),
-                download_schemas(
-                    client=client,
-                    org_path=org_path,
-                    mapping=mapping,
-                    sources=previous_sources,
-                    targets=previous_targets,
-                    progress=progress,
-                ),
-                download_hooks(
-                    client=client,
-                    org_path=org_path,
-                    mapping=mapping,
-                    sources=previous_sources,
-                    targets=previous_targets,
-                    progress=progress,
-                ),
-            ]
-        )
-
-    await create_update_mapping(
-        org_path=org_path,
-        organization=organization,
-        workspaces_for_mapping=workspaces_for_mapping,
-        schemas_for_mapping=schemas_for_mapping,
-        hooks_for_mapping=hooks_for_mapping,
-        old_mapping=mapping,
-    )
-
-    print(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME}."))
+    except Exception as e:
+        logging.exception(e)
+        print(Panel(f"Error during project {settings.DOWNLOAD_COMMAND_NAME}: {e}"))
