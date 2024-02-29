@@ -30,13 +30,10 @@ from project_rossum_deploy.commands.upload import upload_project_wrapper
 
 # TODO: Pull ignores some keys (e.g., count for queues) which get updated all the time
 
-# TODO: array of targets in mapping (incl. attribute_override for each)
 # Preserve a single ID
 # ? You specify 2 targets and they download into separate folders. If you redownload, you would need to check target order in mapping to know where to put it? ([2] -> target_3/)
-# ? 
+# ?
 
-# TODO: Push
-# TODO: workspaces can only be deleted after they have no queues
 # TODO: queues should have the delete_after: 0 query param set so that their schema can be deleted immediately
 
 # TODO: Migrate
@@ -45,6 +42,7 @@ from project_rossum_deploy.commands.upload import upload_project_wrapper
 # TODO: change mapping.yaml to mapping.json or allow both
 
 # TODO: remove countdown from progress bars
+
 
 @click.group()
 @click.version_option()
