@@ -1,4 +1,3 @@
-import json
 import logging
 from anyio import Path
 import subprocess
@@ -8,23 +7,20 @@ from rich.progress import track
 
 import click
 from rossum_api import ElisAPIClient
-from rossum_api.api_client import Resource
 from project_rossum_deploy.commands.download.download import (
     download_project,
 )
 
+from project_rossum_deploy.commands.upload.operations import create_object, delete_object, update_object
 from project_rossum_deploy.utils.consts import (
     GIT_CHARACTERS,
     settings,
 )
 from project_rossum_deploy.utils.functions import (
     coro,
-    detemplatize_name_id,
-    read_json,
     merge_hook_changes,
     evaluate_delete_dependencies,
     evaluate_create_dependencies,
-    write_json,
 )
 
 
@@ -40,13 +36,21 @@ Only source files are taken into account by default.
     default=settings.SOURCE_DIRNAME,
     type=click.Choice([settings.SOURCE_DIRNAME, settings.TARGET_DIRNAME]),
 )
+@click.option(
+    "--all",
+    default=False,
+    is_flag=True,
+    help="Uploads all local files in the selected destination (source/target) and not just files that were locally modified.",
+)
 @coro
-async def upload_project_wrapper(destination):
+async def upload_project_wrapper(destination, all):
     # To be able to run the command progammatically without the CLI decorators
-    await upload_project(destination)
+    await upload_project(destination=destination, upload_all=all)
 
 
-async def upload_project(destination: str, client: ElisAPIClient = None):
+async def upload_project(
+    destination: str, client: ElisAPIClient = None, upload_all=False
+):
     try:
         org_path = Path("./")
 
@@ -131,73 +135,3 @@ async def upload_project(destination: str, client: ElisAPIClient = None):
     await download_project(client=client, org_path=org_path)
 
 
-async def update_object(client: ElisAPIClient, path: Path = None, object: dict = None):
-    try:
-        if not object:
-            object = await read_json(path)
-
-        id, url = object.get("id", None), object.get("url", None)
-        if not id:
-            raise Exception("Missing object ID")
-        if not url:
-            raise Exception("Missing object URL")
-
-        resource = determine_object_type_from_url(url)
-        result = await client._http_client.update(resource, id, object)
-
-        print(f'Successfully updated {resource} with ID "{id}".')
-        return result
-    except Exception as e:
-        if path:
-            logging.error(f'Error while updating object with path "{path}": {e}')
-        else:
-            id = object.get("id", None)
-            descriptor = id if id else json.dump(object)
-            logging.error(f"Error while updating object {descriptor}: {e}")
-
-
-async def create_object(path: Path, client: ElisAPIClient):
-    try:
-        object = await read_json(path)
-        object["id"] = None
-        resource = determine_object_type_from_path(path)
-        created_object = await client._http_client.create(resource, object)
-        await write_json(path, created_object)
-        print(f'Successfully create {resource} with ID "{created_object["id"]}".')
-    except Exception as e:
-        logging.error(f'Error while creating object with path "{path}": {e}')
-
-
-async def delete_object(path: Path, client: ElisAPIClient):
-    try:
-        _, id = detemplatize_name_id(path)
-        resource = determine_object_type_from_path(path)
-        await client._http_client.delete(resource, id)
-        print(f'Successfully deleted {resource} with ID "{id}".')
-    except Exception as e:
-        logging.error(f'Error while deleting object with path "{path}": {e}')
-
-
-def determine_object_type_from_path(path: Path) -> Resource:
-    split_path = str(path).split("/")
-    type = split_path[-2] if len(split_path) > 1 else path.stem + "s"
-    allowed_types = set(resource.value for resource in Resource)
-    if type in allowed_types:
-        return Resource(type)
-    else:
-        type = split_path[-3] if len(split_path) > 1 else path.stem + "s"
-        allowed_types = set(resource.value for resource in Resource)
-        if type in allowed_types:
-            return Resource(type)
-        else:
-            raise Exception(f'Unknown resource "{type}".')
-
-
-def determine_object_type_from_url(url: str) -> Resource:
-    split_path = url.split("/")
-    type = split_path[-2]
-    allowed_types = set(resource.value for resource in Resource)
-    if type in allowed_types:
-        return Resource(type)
-    else:
-        raise Exception(f'Unknown resource "{type}".')

@@ -14,7 +14,7 @@ from project_rossum_deploy.commands.download.download import (
     download_organization_combined,
 )
 from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
-from project_rossum_deploy.commands.upload import upload_project
+from project_rossum_deploy.commands.upload.upload import upload_project
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     read_json,

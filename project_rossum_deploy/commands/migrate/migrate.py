@@ -19,7 +19,7 @@ from project_rossum_deploy.commands.migrate.helpers import (
 )
 from project_rossum_deploy.commands.migrate.hooks import migrate_hooks
 from project_rossum_deploy.commands.migrate.workspaces import migrate_workspaces
-from project_rossum_deploy.commands.upload import update_object
+from project_rossum_deploy.commands.upload.upload import update_object
 from project_rossum_deploy.common.attribute_override import override_attributes_v2
 from project_rossum_deploy.common.upload import (
     upload_organization,

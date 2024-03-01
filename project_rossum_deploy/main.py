@@ -5,7 +5,7 @@ from project_rossum_deploy.commands.download.download import (
 )
 from project_rossum_deploy.commands.initialize import init_project
 from project_rossum_deploy.commands.migrate.migrate import migrate_project_wrapper
-from project_rossum_deploy.commands.upload import upload_project_wrapper
+from project_rossum_deploy.commands.upload.upload import upload_project_wrapper
 
 # TODO: selective pull
 # When pushing changes, repull only the last_modified_date from the API, not everything
