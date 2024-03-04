@@ -6,7 +6,7 @@ from project_rossum_deploy.utils.consts import (
 )
 from project_rossum_deploy.utils.functions import (
     flatten,
-    convert_source_to_target_value,
+    convert_source_to_target_values,
 )
 
 
@@ -17,7 +17,7 @@ def override_attributes_v2(
     is_dryrun: bool = False,
 ) -> dict:
     if is_dryrun:
-        lookup_table = {k: "dummy" for k in lookup_table}
+        lookup_table = {k: ["dummy"] for k in lookup_table}
 
     def override_attribute_v2(
         key_query: str,
@@ -57,11 +57,11 @@ def override_attributes_v2(
                 elif isinstance(value_to_override, list):
                     new_values = []
                     for source_value in value_to_override:
-                        target_value = convert_source_to_target_value(
+                        target_values = convert_source_to_target_values(
                             source_value, lookup_table
                         )
-                        if target_value is not None:
-                            new_values.append(target_value)
+                        if len(target_values):
+                            new_values.extend(target_values)
 
                     if not len(new_values):
                         raise Exception(
@@ -69,14 +69,14 @@ def override_attributes_v2(
                         )
                     override_parent[key] = new_values
                 else:
-                    target_value = convert_source_to_target_value(
+                    target_values = convert_source_to_target_values(
                         value_to_override, lookup_table
                     )
-                    if target_value is None:
+                    if not len(target_values):
                         raise Exception(
-                            f'Found no target value for source key "{key_query}" and value "{value_to_override}".'
+                            f'Found no target values for source key "{key_query}" and value "{value_to_override}".'
                         )
-                    override_parent[key] = target_value
+                    override_parent[key] = target_values
             # Value is not using any reference -> just replace
             else:
                 override_parent[key] = new_value

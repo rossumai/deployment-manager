@@ -153,7 +153,7 @@ async def test_migrate_works_with_attribute_override(
         source_queue_ids = jmespath.search(QUEUE_IDS_OVERRIDE_PATH, source_hook)
 
         assert jmespath.search(QUEUE_IDS_OVERRIDE_PATH, migrated_hook)[0] == list(
-            map(lambda source_queue_id: lookup_table[source_queue_id], source_queue_ids[0])
+            map(lambda source_queue_id: lookup_table[source_queue_id][0], source_queue_ids[0])
         )
     finally:
         # Cleanup

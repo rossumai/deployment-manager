@@ -118,7 +118,7 @@ async def ensure_source_objects_have_target_counter_part(mapping: dict, tmp_path
     source_target_pairs = extract_source_target_pairs(mapping)
     for object_type, pairs in source_target_pairs.items():
         for target in pairs.values():
-            assert target
+            assert len(target)
         if object_type == "queues" or object_type == "inboxes":
             continue
 
@@ -129,7 +129,8 @@ async def ensure_source_objects_have_target_counter_part(mapping: dict, tmp_path
             targets_with_json.append(detemplatize_name_id(path.stem)[1])
 
         for target in pairs.values():
-            assert target in targets_with_json
+            for target_id in target:
+                assert target_id in targets_with_json
 
 
 async def ensure_hooks_have_same_dependency_graph(mapping: dict, tmp_path: Path):
@@ -141,12 +142,12 @@ async def ensure_hooks_have_same_dependency_graph(mapping: dict, tmp_path: Path)
             continue
         source_hook = await read_json(source_hook_path)
 
-        target_hook_id = source_target_pairs["hooks"][source_hook["id"]]
+        target_hook_ids = source_target_pairs["hooks"][source_hook["id"]]
         target_hook_path = (
             tmp_path
             / settings.TARGET_DIRNAME
             / "hooks"
-            / f'{templatize_name_id(source_hook["name"], target_hook_id)}.json'
+            / f'{templatize_name_id(source_hook["name"], target_hook_ids[0])}.json'
         )
         target_hook = await read_json(target_hook_path)
 

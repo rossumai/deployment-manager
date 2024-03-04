@@ -31,6 +31,7 @@ from project_rossum_deploy.utils.functions import (
     extract_flat_lookup_table,
     extract_sources_targets,
     find_all_object_paths,
+    flatten,
     read_json,
 )
 
@@ -150,7 +151,9 @@ async def migrate_project(
 
         _, previous_targets = extract_sources_targets(previous_mapping)
         lookup_table = extract_flat_lookup_table(mapping)
-        current_target_ids = set(filter(lambda x: x, lookup_table.values()))
+        current_target_ids = set(
+            flatten(filter(lambda x: len(x) > 0, lookup_table.values()))
+        )
 
         previous_target_ids = []
         for objects in previous_targets.values():

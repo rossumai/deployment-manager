@@ -40,21 +40,25 @@ def templatize_name_id(name: str, id: int):
 # ID_BRACKET_RE = re.compile(r"(\[\d+\])$")
 
 
-def convert_source_to_target_value(source_value, lookup_table: dict):
-    """Finds a counterpart id in the lookup table file and replace it based on the type of the original value"""
+def convert_source_to_target_values(source_value, lookup_table: dict) -> list:
+    """Finds a counterpart id in the lookup table file and replace it based on the type of the original value.
+    There can be multiple target values for a single source value.
+    """
+    result = []
     type, source_id = convert_reference_to_int_id(source_value)
-    target_id = lookup_table.get(source_id, None)
-    if target_id is not None:
-        match type:
-            case "str":
-                return str(target_id)
-            case "url":
-                parts = source_value.split("/")[:-1]
-                parts.append(str(target_id))
-                return "".join(parts)
-            case "int":
-                return target_id
-    return None
+    target_ids = lookup_table.get(source_id, None)
+    if len(target_ids):
+        for target_id in target_ids:
+            match type:
+                case "str":
+                    result.append(str(target_id))
+                case "url":
+                    parts = source_value.split("/")[:-1]
+                    parts.append(str(target_id))
+                    result.append("".join(parts))
+                case "int":
+                    result.append(target_id)
+    return result
 
 
 def convert_reference_to_int_id(value):
@@ -426,7 +430,7 @@ def extract_sources_targets(
     return sources, targets
 
 
-def extract_source_target_pairs(mapping: dict) -> dict:
+def extract_source_target_pairs(mapping: dict) -> dict[str, dict[int, list]]:
     pairs = {
         "workspaces": {},
         "queues": {},
@@ -436,22 +440,34 @@ def extract_source_target_pairs(mapping: dict) -> dict:
     }
 
     for ws in mapping["organization"]["workspaces"]:
-        pairs["workspaces"][ws["id"]] = ws.get("target_object", None)
+        pairs["workspaces"][ws["id"]] = extract_target_ids(ws)
 
         for q in ws["queues"]:
-            pairs["queues"][q["id"]] = q.get("target_object", None)
+            pairs["queues"][q["id"]] = extract_target_ids(q)
 
-            inbox = q.get("inbox", {})
+            inbox = q.get("inbox", None)
             if inbox and (inbox_id := inbox.get("id", None)):
-                pairs["inboxes"][inbox_id] = q["inbox"].get("target_object", None)
+                pairs["inboxes"][inbox_id] = extract_target_ids(inbox)
 
     for schema in mapping["organization"]["schemas"]:
-        pairs["schemas"][schema["id"]] = schema.get("target_object", None)
+        pairs["schemas"][schema["id"]] = extract_target_ids(schema)
 
     for hook in mapping["organization"]["hooks"]:
-        pairs["hooks"][hook["id"]] = hook.get("target_object", None)
+        pairs["hooks"][hook["id"]] = extract_target_ids(hook)
 
     return pairs
+
+
+def extract_target_ids(submapping: dict) -> list[int]:
+    target_ids = []
+    if default_target_id := submapping.get("target_object", None):
+        target_ids.append(default_target_id)
+
+    for target_object in submapping.get("targets", []):
+        if target_id := target_object.get("target_id", None):
+            target_ids.append(target_id)
+
+    return target_ids
 
 
 def extract_flat_lookup_table(mapping: dict) -> dict:
