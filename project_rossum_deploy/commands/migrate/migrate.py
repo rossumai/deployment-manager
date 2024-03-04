@@ -4,8 +4,6 @@ from anyio import Path
 from rich import print
 from rich.panel import Panel
 from rich.progress import Progress
-
-
 import click
 from rossum_api import ElisAPIClient
 from project_rossum_deploy.commands.download.download import (
@@ -65,10 +63,15 @@ async def migrate_project(
         mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
         previous_mapping = deepcopy(mapping)
 
-        target_organization = mapping["organization"]["target_object"]
+        target_organization = mapping["organization"].get("target_object", None)
         if not target_organization:
             raise click.ClickException(
                 "No target for organization. If you want to migrate inside the same organization, just target its own ID."
+            )
+        multi_org_targets = mapping["organization"].get("targets", None)
+        if multi_org_targets:
+            raise click.ClickException(
+                "Multiple targets for the same organization are not supported. If you want to migrate the organization multiple times, create separate GIT branches and specify a different target_object attribute."
             )
 
         if not client:
