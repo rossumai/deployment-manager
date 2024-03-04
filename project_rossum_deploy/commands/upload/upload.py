@@ -11,13 +11,18 @@ from project_rossum_deploy.commands.download.download import (
     download_project,
 )
 
-from project_rossum_deploy.commands.upload.operations import create_object, delete_object, update_object
+from project_rossum_deploy.commands.upload.operations import (
+    create_object,
+    delete_object,
+    update_object,
+)
 from project_rossum_deploy.utils.consts import (
     GIT_CHARACTERS,
     settings,
 )
 from project_rossum_deploy.utils.functions import (
     coro,
+    find_all_object_paths,
     merge_hook_changes,
     evaluate_delete_dependencies,
     evaluate_create_dependencies,
@@ -102,6 +107,9 @@ async def upload_project(
             changes = await evaluate_delete_dependencies(changes, org_path)
             changes = await evaluate_create_dependencies(changes, org_path, client)
 
+        if upload_all:
+            await include_unmodified_files(Path(org_path) / destination, changes)
+
         for change in track(changes, description="Pushing changes to Rossum..."):
             op, path = change
             match op:
@@ -112,7 +120,10 @@ async def upload_project(
                 case GIT_CHARACTERS.DELETED:
                     await delete_object(org_path / path, client)
                 case GIT_CHARACTERS.UPDATED:
-                    await update_object(client=client, path=org_path / path)
+                    result = await update_object(client=client, path=org_path / path)
+                    if not result and upload_all:
+                        print(f'Recreating object with path "{path}".')
+                        await create_object(org_path / path, client)
                 case _:
                     raise click.ClickException(f'Unrecognized operator "{op}".')
 
@@ -135,3 +146,12 @@ async def upload_project(
     await download_project(client=client, org_path=org_path)
 
 
+async def include_unmodified_files(
+    destination_path: Path, changes: list[tuple[str, Path]]
+):
+    all_files = await find_all_object_paths(destination_path)
+
+    changes_paths = set(map(lambda x: x[1], changes))
+    for file_path in all_files:
+        if file_path not in changes_paths:
+            changes.append((GIT_CHARACTERS.UPDATED.value, file_path))

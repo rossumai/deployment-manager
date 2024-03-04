@@ -169,7 +169,7 @@ If `mapping.yaml` file does not exist, file is created and populated with all pu
 
 If `mapping.yaml` is already existing, missing records for new objects are created and records for no longer existing objects are removed. If there are new objects found in the organization, an attempt is made to determine whether they belong to `source` or `target` (by analyzing existing `mapping.yaml` file and finding nearest parent object [workspace/organization]). If this cannot be determined, user is prompted to classify the new object(s).
 ```
-push
+push # or 'push source'
 ```
 Pushes all eligible (see `mapping.yaml` definition) objects into the `source` organization in Rossum platform. 
 
@@ -177,6 +177,8 @@ Pushes all eligible (see `mapping.yaml` definition) objects into the `source` or
 push target
 ```
 Pushes all eligible objects from local `target` to remote `target`.
+
+The push command also accepts `--all` parameter that will take everything in `source`/`target` and update the corresponding objects in Rossum. If these objects cannot be found, they are recreated.
 
 ```
 release

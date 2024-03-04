@@ -72,7 +72,7 @@ def flatten(x):
     return result
 
 
-async def find_all_object_paths(base_directory: Path):
+async def find_all_object_paths(base_directory: Path) -> list[Path]:
     return [file async for file in base_directory.glob("**/*.json")]
 
 
