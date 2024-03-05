@@ -115,11 +115,11 @@ async def migrate_project(
                 k: organization[k] for k in settings.ORGANIZATION_FIELDS
             }
 
-            source_id_target_pairs[
-                mapping["organization"]["id"]
-            ] = await upload_organization(
-                client, organization_fields, target_organization
-            )
+            source_id_target_pairs[mapping["organization"]["id"]] = [
+                await upload_organization(
+                    client, organization_fields, target_organization
+                )
+            ]
             progress.update(task, advance=1)
 
             source_path = org_path / settings.SOURCE_DIRNAME
@@ -184,7 +184,9 @@ async def migrate_project(
         display_error(f"Unexpected error while migrating objects: {e}", e)
 
 
-def find_created_target_ids(previous_mapping: dict, source_id_target_pairs: dict):
+def filter_created_target_ids(
+    previous_mapping: dict, source_id_target_pairs: dict[int, list]
+):
     _, previous_targets = extract_sources_targets(previous_mapping)
     previous_target_ids = []
     for objects in previous_targets.values():
@@ -193,8 +195,9 @@ def find_created_target_ids(previous_mapping: dict, source_id_target_pairs: dict
     previous_target_ids = set(previous_target_ids)
 
     all_target_ids = set()
-    for object in source_id_target_pairs.values():
-        all_target_ids.add(object["id"])
+    for objects in source_id_target_pairs.values():
+        for object_id in map(lambda o: o["id"], objects):
+            all_target_ids.add(object_id)
 
     return all_target_ids.difference(previous_target_ids)
 
@@ -234,7 +237,7 @@ async def override_migrated_objects_attributes(
     mapping: dict,
     client: ElisAPIClient,
     sources_by_source_id_map: dict,
-    source_id_target_pairs: dict,
+    source_id_target_pairs: dict[int, list],
     lookup_table: dict,
 ):
     print(Panel("Running attribute_override..."))
@@ -246,16 +249,16 @@ async def override_migrated_objects_attributes(
             source_object_subset = get_attributes_from_object(
                 source_object, mapping_object["attribute_override"]
             )
-            target_object = source_id_target_pairs[mapping_object["id"]]
+            target_objects = source_id_target_pairs[mapping_object["id"]]
+            for target_object in target_objects:
+                source_object_subset["id"] = target_object["id"]
+                source_object_subset["url"] = target_object["url"]
 
-            source_object_subset["id"] = target_object["id"]
-            source_object_subset["url"] = target_object["url"]
-
-            override_attributes_v2(
-                lookup_table=lookup_table,
-                submapping=mapping_object,
-                object=source_object_subset,
-            )
+                override_attributes_v2(
+                    lookup_table=lookup_table,
+                    submapping=mapping_object,
+                    object=source_object_subset,
+                )
 
             await update_object(path=None, client=client, object=source_object_subset)
 

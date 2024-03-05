@@ -1,4 +1,5 @@
 import asyncio
+import functools
 from rich.progress import Progress
 from anyio import Path
 import click
@@ -10,7 +11,8 @@ from rich.prompt import Prompt
 from project_rossum_deploy.commands.migrate.helpers import (
     find_mapping_of_object,
     get_token_owner,
-    is_first_time_migration,
+    migrate_object_to_default_target,
+    migrate_object_to_multiple_targets,
 )
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.common.upload import upload_hook
@@ -27,7 +29,7 @@ async def migrate_hooks(
     source_path: Path,
     client: ElisAPIClient,
     mapping: dict,
-    source_id_target_pairs: dict,
+    source_id_target_pairs: dict[int, list],
     sources_by_source_id_map: dict,
     progress: Progress,
 ):
@@ -70,24 +72,20 @@ async def migrate_hooks(
 
             await update_hook_code(hook_path, hook)
 
-            migrated_hook = None
-            if is_first_time_migration(hook_mapping):
-                migrated_hook = await create_hook_based_on_template(hook, client)
-
-                if not migrated_hook:
-                    migrated_hook = await create_hook_without_template(
-                        hook=hook,
-                        hook_mapping=hook_mapping,
-                        client=client,
-                        progress=progress,
-                    )
-            else:
-                migrated_hook = await upload_hook(
-                    client, hook, hook_mapping["target_object"]
+            partial_upload_hook = functools.partial(
+                upload_hook, client, hook, hook_mapping
+            )
+            source_id_target_pairs[id] = []
+            if "target_object" in hook_mapping:
+                result = await migrate_object_to_default_target(
+                    submapping=hook_mapping, upload_function=partial_upload_hook
                 )
+                source_id_target_pairs[id].append(result)
 
-            hook_mapping["target_object"] = migrated_hook["id"]
-            source_id_target_pairs[id] = migrated_hook
+            results = await migrate_object_to_multiple_targets(
+                submapping=hook_mapping, upload_function=partial_upload_hook
+            )
+            source_id_target_pairs[id].extend(results)
 
             progress.update(task, advance=1)
         except Exception as e:
@@ -218,7 +216,7 @@ async def create_hook_without_template(
 
 
 async def migrate_hook_dependency_graph(
-    client: ElisAPIClient, source_path: Path, source_id_target_pairs: dict
+    client: ElisAPIClient, source_path: Path, source_id_target_pairs: dict[int, list]
 ):
     async for hook_path in (source_path / "hooks").iterdir():
         if hook_path.suffix != ".json":

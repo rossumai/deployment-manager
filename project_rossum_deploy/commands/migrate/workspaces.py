@@ -1,4 +1,5 @@
 import asyncio
+import functools
 from anyio import Path
 from rich.progress import Progress
 
@@ -6,6 +7,8 @@ from rossum_api import ElisAPIClient
 
 from project_rossum_deploy.commands.migrate.helpers import (
     find_mapping_of_object,
+    migrate_object_to_default_target,
+    migrate_object_to_multiple_targets,
     replace_dependency_url,
 )
 from project_rossum_deploy.common.upload import (
@@ -26,7 +29,7 @@ async def migrate_workspaces(
     source_path: Path,
     client: ElisAPIClient,
     mapping: dict,
-    source_id_target_pairs: dict,
+    source_id_target_pairs: dict[int, list],
     sources_by_source_id_map: dict,
     progress: Progress,
 ):
@@ -55,12 +58,21 @@ async def migrate_workspaces(
                 progress.update(task, advance=1)
                 return
 
-            result = await upload_workspace(
-                client, workspace, workspace_mapping["target_object"]
+            partial_upload_workspace = functools.partial(
+                upload_workspace, client, workspace
             )
+            source_id_target_pairs[id] = []
+            if "target_object" in workspace_mapping:
+                result = await migrate_object_to_default_target(
+                    submapping=workspace_mapping,
+                    upload_function=partial_upload_workspace,
+                )
+                source_id_target_pairs[id].append(result)
 
-            workspace_mapping["target_object"] = result["id"]
-            source_id_target_pairs[id] = result
+            results = await migrate_object_to_multiple_targets(
+                submapping=workspace_mapping, upload_function=partial_upload_workspace
+            )
+            source_id_target_pairs[id].extend(results)
 
             await migrate_queues_and_inboxes(
                 ws_path=ws_path,
@@ -88,7 +100,7 @@ async def migrate_queues_and_inboxes(
     workspace_mapping: dict,
     mapping: dict,
     sources_by_source_id_map: dict,
-    source_id_target_pairs: dict,
+    source_id_target_pairs: dict[int, list],
 ):
     if not (await (ws_path / "queues").exists()):
         return
@@ -114,12 +126,18 @@ async def migrate_queues_and_inboxes(
             if queue_mapping.get("ignore", None):
                 return
 
-            queue_result = await upload_queue(
-                client, queue, queue_mapping["target_object"]
-            )
+            partial_upload_queue = functools.partial(upload_queue, client, queue)
+            source_id_target_pairs[id] = []
+            if "target_object" in queue_mapping:
+                result = await migrate_object_to_default_target(
+                    submapping=queue_mapping, upload_function=partial_upload_queue
+                )
+                source_id_target_pairs[id].append(result)
 
-            queue_mapping["target_object"] = queue_result["id"]
-            source_id_target_pairs[id] = queue_result
+            results = await migrate_object_to_multiple_targets(
+                submapping=queue_mapping, upload_function=partial_upload_queue
+            )
+            source_id_target_pairs[id].extend(results)
 
             inbox_config_path = queue_path / "inbox.json"
             try:
@@ -134,11 +152,19 @@ async def migrate_queues_and_inboxes(
 
             inbox_mapping = queue_mapping["inbox"]
             # Inbox cannot be ignored because a queue depends on it
-            inbox_result = await upload_inbox(
-                client, inbox, inbox_mapping["target_object"]
+            partial_upload_inbox = functools.partial(upload_inbox, client, inbox)
+            source_id_target_pairs[id] = []
+            if "target_object" in inbox_mapping:
+                result = await migrate_object_to_default_target(
+                    submapping=inbox_mapping, upload_function=partial_upload_inbox
+                )
+                source_id_target_pairs[id].append(result)
+
+            results = await migrate_object_to_multiple_targets(
+                submapping=inbox_mapping, upload_function=partial_upload_inbox
             )
-            inbox_mapping["target_object"] = inbox_result["id"]
-            source_id_target_pairs[inbox["id"]] = inbox_result
+            source_id_target_pairs[id].extend(results)
+
         except Exception as e:
             display_error(
                 f"Error while migrating queue with path '{queue_path}': {e}", e
