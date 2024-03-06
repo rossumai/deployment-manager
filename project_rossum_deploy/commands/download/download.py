@@ -393,7 +393,9 @@ async def download_organization_combined(
         organizations = [org async for org in client.list_all_organizations()]
         if not len(organizations):
             raise click.ClickException("No organization found.")
-        organization = await client.retrieve_organization(organizations[0].id)
+        organization = await client._http_client.fetch_one(
+            Resource.Organization, organizations[0].id
+        )
 
         if not org_path:
             org_path = Path("./")
