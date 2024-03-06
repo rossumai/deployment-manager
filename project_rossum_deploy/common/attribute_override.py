@@ -29,6 +29,11 @@ def override_attributes_v2(
         search = perform_search(parent, object)
 
         for override_parent in search:
+
+            # The attribute (key) might not be on all parent objects (e.g., configurations[*].queue_ids)
+            if key not in override_parent:
+                continue
+
             value_to_override = override_parent[key]
 
             # Referencing the value in source -> replace the '$' placeholder
@@ -99,15 +104,15 @@ def parse_parent_and_key(key_query: str):
 def perform_search(parent: str, object: dict):
     # The query targets a key of the top-most object, no need to search
     if not parent:
-        search = [object]
-    else:
-        search = jmespath.search(parent, object)
-        if isinstance(search, list):
-            search = flatten(search)
-        else:
-            search = [search]
+        return [object]
 
-        if not len(search):
-            raise Exception(f'Query "{parent}" returned no result.')
+    search = jmespath.search(parent, object)
+    if isinstance(search, list):
+        search = flatten(search)
+    else:
+        search = [search]
+
+    if not len(search):
+        raise Exception(f'Query "{parent}" returned no result.')
 
     return search
