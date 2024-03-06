@@ -1,10 +1,9 @@
 from rossum_api import ElisAPIClient
-from rossum_api.models import Schema, Hook, Workspace, Queue, Inbox, Organization
 from rossum_api.api_client import Resource
 
 
 async def upload_organization(
-    client: ElisAPIClient, organization: Organization, target: int
+    client: ElisAPIClient, organization: dict, target: int
 ):
     try:
         if not target:
@@ -17,7 +16,7 @@ async def upload_organization(
         print(f"Error while uploading organization: {e}")
 
 
-async def upload_workspace(client: ElisAPIClient, workspace: Workspace, target: int):
+async def upload_workspace(client: ElisAPIClient, workspace: dict, target: int):
     if target:
         return await client._http_client.update(
             Resource.Workspace, id_=target, data=workspace
@@ -26,21 +25,21 @@ async def upload_workspace(client: ElisAPIClient, workspace: Workspace, target: 
         return await client._http_client.create(Resource.Workspace, workspace)
 
 
-async def upload_queue(client: ElisAPIClient, queue: Queue, target: int):
+async def upload_queue(client: ElisAPIClient, queue: dict, target: int):
     if target:
         return await client._http_client.update(Resource.Queue, id_=target, data=queue)
     else:
         return await client._http_client.create(Resource.Queue, queue)
 
 
-async def upload_inbox(client: ElisAPIClient, inbox: Inbox, target: int):
+async def upload_inbox(client: ElisAPIClient, inbox: dict, target: int):
     if target:
         return await client._http_client.update(Resource.Inbox, id_=target, data=inbox)
     else:
         return await client._http_client.create(Resource.Inbox, inbox)
 
 
-async def upload_schema(client: ElisAPIClient, schema: Schema, target: int):
+async def upload_schema(client: ElisAPIClient, schema: dict, target: int):
     if target:
         return await client._http_client.update(
             Resource.Schema, id_=target, data=schema
@@ -49,7 +48,7 @@ async def upload_schema(client: ElisAPIClient, schema: Schema, target: int):
         return await client._http_client.create(Resource.Schema, schema)
 
 
-async def upload_hook(client: ElisAPIClient, hook: Hook, target: int):
+async def upload_hook(client: ElisAPIClient, hook: dict, target: int):
     if target:
         return await client._http_client.update(Resource.Hook, id_=target, data=hook)
     else:

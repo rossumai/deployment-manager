@@ -118,7 +118,9 @@ async def download_organization_single(
     organizations = [org async for org in client.list_all_organizations()]
     if not len(organizations):
         raise click.ClickException("No organization found.")
-    organization = await client.retrieve_organization(organizations[0].id)
+    organization = await client._http_client.fetch_one(
+        Resource.Organization, organizations[0].id
+    )
 
     org_config_path = org_path / destination / "organization.json"
     await write_json(org_config_path, organization, "organization")
@@ -176,10 +178,15 @@ async def download_workspaces(
     )
 
     # Refetch in case the paginated fields don't include everything
+    # Use raw dicts and not dataclasses in case of fields not defined in the Rossum API lib
     full_workspaces = await asyncio.gather(
         *[
             retrieve_with_progress(
-                functools.partial(client.retrieve_workspace, ws.id), progress, task
+                functools.partial(
+                    client._http_client.fetch_one, Resource.Workspace, ws.id
+                ),
+                progress,
+                task,
             )
             for ws in paginated_workspaces
         ]
@@ -203,14 +210,14 @@ async def download_workspaces(
             org_path
             / destination_local
             / "workspaces"
-            / templatize_name_id(workspace.name, workspace.id)
+            / templatize_name_id(workspace["name"], workspace["id"])
             / "workspace.json"
         )
 
         await write_json(workspace_config_path, workspace, "workspace")
 
-        workspace.queues = await download_queues_for_workspace(
-            client, workspace_config_path.parent, workspace.id
+        workspace["queues"] = await download_queues_for_workspace(
+            client, workspace_config_path.parent, workspace["id"]
         )
         workspaces.append((destination_local, workspace))
         progress.update(task, advance=1)
@@ -225,19 +232,20 @@ async def download_queues_for_workspace(
 
     paginated_queues = [q async for q in client.list_all_queues(workspace=workspace_id)]
     # Refetch in case the paginated fields don't include everything
+    # Use raw dicts and not dataclasses in case of fields not defined in the Rossum API lib
     full_queues = await asyncio.gather(
-        *[client.retrieve_queue(q.id) for q in paginated_queues]
+        *[client._http_client.fetch_one(Resource.Queue, q.id) for q in paginated_queues]
     )
 
     for queue in full_queues:
         queue_path = (
-            parent_dir / "queues" / f"{templatize_name_id(queue.name, queue.id)}"
+            parent_dir / "queues" / f"{templatize_name_id(queue['name'], queue['id'])}"
         )
         await write_json(queue_path / "queue.json", queue, "queue")
 
-        inbox_id = extract_id_from_url(queue.inbox)
+        inbox_id = extract_id_from_url(queue["inbox"])
         if inbox_id:
-            queue.inbox = await download_inbox(client, queue_path, inbox_id)
+            queue["inbox"] = await download_inbox(client, queue_path, inbox_id)
         queues.append(queue)
 
     return queues
@@ -245,7 +253,6 @@ async def download_queues_for_workspace(
 
 async def download_inbox(client: ElisAPIClient, parent_dir: Path, inbox_id: int):
     inbox = await client._http_client.fetch_one(Resource.Inbox, inbox_id)
-    inbox = client._deserializer(Resource.Inbox, inbox)
     await write_json(parent_dir / "inbox.json", inbox, "inbox")
     return inbox
 
@@ -267,10 +274,15 @@ async def download_schemas(
     )
 
     # Refetch because schema fields are not fully listed
+    # Use raw dicts and not dataclasses in case of fields not defined in the Rossum API lib
     full_schemas = await asyncio.gather(
         *[
             retrieve_with_progress(
-                functools.partial(client.retrieve_schema, schema.id), progress, task
+                functools.partial(
+                    client._http_client.fetch_one, Resource.Schema, schema.id
+                ),
+                progress,
+                task,
             )
             for schema in paginated_schemas
         ]
@@ -293,7 +305,7 @@ async def download_schemas(
             org_path
             / destination_local
             / "schemas"
-            / f"{templatize_name_id(schema.name, schema.id)}.json"
+            / f"{templatize_name_id(schema['name'], schema['id'])}.json"
         )
         await write_json(schema_config_path, schema, "schema")
         schemas.append((destination_local, schema))
@@ -318,10 +330,15 @@ async def download_hooks(
     )
 
     # Refetch in case the paginated fields don't include everything
+    # Use raw dicts and not dataclasses in case of fields not defined in the Rossum API lib
     full_hooks = await asyncio.gather(
         *[
             retrieve_with_progress(
-                functools.partial(client.retrieve_hook, hook.id), progress, task
+                functools.partial(
+                    client._http_client.fetch_one, Resource.Hook, hook.id
+                ),
+                progress,
+                task,
             )
             for hook in paginated_hooks
         ]
@@ -344,16 +361,15 @@ async def download_hooks(
             org_path
             / destination_local
             / "hooks"
-            / f"{templatize_name_id(hook.name, hook.id)}.json"
+            / f"{templatize_name_id(hook['name'], hook['id'])}.json"
         )
 
         await write_json(hook_config_path, hook, "hook")
         hooks.append((destination_local, hook))
 
-        if hook.extension_source != "rossum_store":
-            hook_code = hook.config.get("code")
-            if hook_code:
-                hook_runtime = hook.config.get("runtime")
+        if hook["extension_source"] != "rossum_store":
+            if hook_code := hook.get("config", {}).get("code", None):
+                hook_runtime = hook["config"].get("runtime")
                 extension = ".py" if "python" in hook_runtime else ".js"
                 hook_code_path = hook_config_path.with_suffix(extension)
                 await write_str(hook_code_path, hook_code)

@@ -1,5 +1,4 @@
 from anyio import Path
-from rossum_api.models import Organization, Workspace, Hook, Schema, Queue, Inbox
 
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
@@ -31,16 +30,16 @@ async def write_mapping(mapping_path: Path, mapping: dict):
 
 async def create_update_mapping(
     org_path: Path,
-    organization: Organization,
-    workspaces_for_mapping: list[Workspace],
-    hooks_for_mapping: list[Hook],
-    schemas_for_mapping: list[Schema],
+    organization: dict,
+    workspaces_for_mapping: list[dict],
+    hooks_for_mapping: list[dict],
+    schemas_for_mapping: list[dict],
     old_mapping: dict,
 ):
     mapping = create_empty_mapping()
 
-    mapping["organization"]["id"] = organization.id
-    mapping["organization"]["name"] = organization.name
+    mapping["organization"]["id"] = organization["id"]
+    mapping["organization"]["name"] = organization["name"]
 
     # Ids of both source and target objects
     # Used to check that a target object was not deleted
@@ -48,19 +47,19 @@ async def create_update_mapping(
     new_ids = []
 
     for destination, workspace in workspaces_for_mapping:
-        new_ids.append(workspace.id)
+        new_ids.append(workspace["id"])
         ws_mapping = {
             **get_attributes_for_mapping(workspace),
             "queues": [],
         }
-        for q in workspace.queues:
-            new_ids.append(q.id)
-            if q.inbox:
-                new_ids.append(q.inbox.id)
+        for q in workspace["queues"]:
+            new_ids.append(q["id"])
+            if (inbox := q.get("inbox", None)) and (inbox_id := inbox.get("id", None)):
+                new_ids.append(inbox_id)
 
             queue_mapping = {
                 **get_attributes_for_mapping(q),
-                "inbox": get_attributes_for_mapping(q.inbox) if q.inbox else None,
+                "inbox": get_attributes_for_mapping(inbox) if inbox else None,
             }
             ws_mapping["queues"].append(queue_mapping)
 
@@ -71,13 +70,13 @@ async def create_update_mapping(
         mapping["organization"]["workspaces"].append(ws_mapping)
 
     for destination, hook in hooks_for_mapping:
-        new_ids.append(hook.id)
+        new_ids.append(hook["id"])
         if destination == settings.TARGET_DIRNAME:
             continue
         mapping["organization"]["hooks"].append(get_attributes_for_mapping(hook))
 
     for destination, schema in schemas_for_mapping:
-        new_ids.append(schema.id)
+        new_ids.append(schema["id"])
         if destination == settings.TARGET_DIRNAME:
             continue
         mapping["organization"]["schemas"].append(get_attributes_for_mapping(schema))
@@ -90,9 +89,9 @@ async def create_update_mapping(
 
 
 def get_attributes_for_mapping(
-    object: Organization | Workspace | Queue | Hook | Schema | Inbox,
+    object: dict,
 ):
-    return {"id": object.id, "name": object.name, "target_object": None}
+    return {"id": object["id"], "name": object["name"], "target_object": None}
 
 
 def index_mappings_by_object_id(sub_mapping: list[dict]):

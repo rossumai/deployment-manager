@@ -251,7 +251,7 @@ async def write_json(path: Path, object: dict, type: str = None):
         json.dump(object, wf, indent=2)
 
 
-async def read_json(path: Path):
+async def read_json(path: Path) -> dict:
     return json.loads(await path.read_text())
 
 
