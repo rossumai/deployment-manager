@@ -73,12 +73,9 @@ try:
                             "Target token is invalid or expired."
                         )
                 # Can't fool us that easily
-                if self.SOURCE_API_BASE == self.TARGET_API_BASE and (
-                    (
-                        self.SOURCE_USERNAME == self.TARGET_USERNAME
-                        and self.SOURCE_PASSWORD == self.TARGET_PASSWORD
-                    )
-                    or self.SOURCE_TOKEN == self.TARGET_TOKEN
+                if (
+                    self.SOURCE_API_BASE == self.TARGET_API_BASE
+                    and self.SOURCE_TOKEN == self.TARGET_TOKEN
                 ):
                     self.IS_PROJECT_IN_SAME_ORG = True
             else:
