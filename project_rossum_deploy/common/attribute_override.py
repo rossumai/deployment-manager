@@ -1,5 +1,4 @@
 import jmespath
-from rossum_api.models import Organization, Workspace, Hook, Schema, Queue, Inbox
 
 from project_rossum_deploy.utils.consts import (
     ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD,
@@ -14,9 +13,9 @@ from project_rossum_deploy.utils.functions import (
 def override_attributes_v2(
     lookup_table: dict,
     submapping: dict,
-    object: Organization | Workspace | Hook | Schema | Queue | Inbox,
+    object: dict,
     is_dryrun: bool = False,
-) -> Organization | Workspace | Hook | Schema | Queue | Inbox:
+) -> dict:
     if is_dryrun:
         lookup_table = {k: "dummy" for k in lookup_table}
 
