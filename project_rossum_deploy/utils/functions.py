@@ -370,7 +370,8 @@ def extract_source_target_pairs(mapping: dict) -> dict:
         for q in ws["queues"]:
             pairs["queues"][q["id"]] = q.get("target_object", None)
 
-            if inbox_id := q.get("inbox", {}).get("id", None):
+            inbox = q.get("inbox", {})
+            if inbox and (inbox_id := inbox.get("id", None)):
                 pairs["inboxes"][inbox_id] = q["inbox"].get("target_object", None)
 
     for schema in mapping["organization"]["schemas"]:

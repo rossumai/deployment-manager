@@ -9,7 +9,7 @@ def is_org_targetting_itself(mapping: dict):
 
 
 def is_first_time_migration(submapping: dict):
-    return not submapping["target_object"]
+    return not submapping.get("target_object", None)
 
 
 def replace_dependency_url(object: dict, dependency: str, source_id_target_pairs: dict):

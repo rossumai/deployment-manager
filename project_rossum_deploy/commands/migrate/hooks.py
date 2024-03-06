@@ -73,7 +73,10 @@ async def migrate_hooks(
 
                 if not migrated_hook:
                     migrated_hook = await create_hook_without_template(
-                        hook=hook, hook_mapping=hook_mapping, client=client
+                        hook=hook,
+                        hook_mapping=hook_mapping,
+                        client=client,
+                        progress=progress,
                     )
             else:
                 migrated_hook = await upload_hook(
@@ -85,7 +88,7 @@ async def migrate_hooks(
 
             progress.update(task, advance=1)
         except Exception as e:
-            print(Panel(f"Error while migrating hook: {e}"))
+            print(Panel(f"Error while migrating hook with path '{hook_path}': {e}"))
 
     await asyncio.gather(
         *[migrate_hook(hook_path=hook_path) for hook_path in hook_paths]
@@ -146,12 +149,13 @@ async def create_hook_based_on_template(hook: dict, client: ElisAPIClient):
         # We try to find the corresponding template by comparing names
         # If no match is found, this hook will be processed as if the hook_template was not there at all
         template_id = extract_id_from_url(hook["hook_template"])
-        source_hook_template = await source_client._http_client.fetch_one(
-            "hook_templates", template_id
+        source_hook_template = await source_client.request_json(
+            "GET", f"hook_templates/{template_id}"
         )
 
         target_hook_templates = [
-            item async for item in await client._http_client.fetch_all("hook_templates")
+            item
+            async for item in client._http_client.fetch_all_by_url("hook_templates")
         ]
         target_hook_template_match = None
         for target_template in target_hook_templates:
@@ -163,23 +167,34 @@ async def create_hook_based_on_template(hook: dict, client: ElisAPIClient):
             return None
 
         hook["hook_template"] = target_hook_template_match["url"]
-        return await client._http_client.request_json(
-            "POST", url="hooks/create", json=hook
+
+        initial_fields = ["name", "hook_template", "token_owner", "events"]
+        create_payload = {
+            **{k: hook[k] for k in initial_fields},
+            "queues": [],
+        }
+        created_hook = await client._http_client.request_json(
+            "POST", url="hooks/create", json=create_payload
         )
+        return await upload_hook(client, hook, created_hook["id"])
 
 
 async def create_hook_without_template(
-    hook: dict, hook_mapping: dict, client: ElisAPIClient
+    hook: dict, hook_mapping: dict, client: ElisAPIClient, progress: Progress
 ):
     # Use the dummy URL only for newly-created private hooks
     # And only if attribute override does not specify the url
     if (
-        hook["type"] != "function"
+        hook.get("type", None) != "function"
         and hook.get("config", {}).get("private", None)
         and hook_mapping.get("attribute_override", {}).get("config", {}).get("path", "")
         != "url"
     ):
-        hook["config"]["url"] = settings.PRIVATE_HOOK_DUMMY_URL
+        with PauseProgress(progress):
+            private_hook_url = Prompt.ask(
+                f"Please provide hook url (target base_url is '{client._http_client.base_url}') for '{hook['name']}'"
+            )
+            hook["config"]["url"] = private_hook_url
 
     return await upload_hook(client, hook, hook_mapping["target_object"])
 
