@@ -133,6 +133,8 @@ async def create_hook_based_on_template(hook: dict, client: ElisAPIClient):
         return None
 
     if settings.IS_PROJECT_IN_SAME_ORG:
+        # Some of the properties (e.g., url) are not in the json, but are required by the API
+        hook.pop('config', None)
         return await client._http_client.request_json(
             "POST", url="hooks/create", json=hook
         )
