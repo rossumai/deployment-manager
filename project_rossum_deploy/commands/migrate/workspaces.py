@@ -1,5 +1,7 @@
 import asyncio
+from copy import deepcopy
 import functools
+import logging
 from anyio import Path
 from rich.progress import Progress
 
@@ -7,7 +9,6 @@ from rossum_api import ElisAPIClient
 
 from project_rossum_deploy.commands.migrate.helpers import (
     find_mapping_of_object,
-    migrate_object_to_default_target,
     migrate_object_to_multiple_targets,
     replace_dependency_url,
 )
@@ -16,7 +17,7 @@ from project_rossum_deploy.common.upload import (
     upload_queue,
     upload_workspace,
 )
-from project_rossum_deploy.utils.consts import settings
+from project_rossum_deploy.utils.consts import PrdVersionException, settings
 
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
@@ -47,8 +48,8 @@ async def migrate_workspaces(
             sources_by_source_id_map[id] = workspace
 
             workspace["queues"] = []
-            workspace["organization"] = (
-                f"{settings.TARGET_API_URL}/organizations/{mapping['organization']['target_object']}"
+            replace_dependency_url(
+                workspace, 0, 1, "organization", source_id_target_pairs
             )
 
             workspace_mapping = find_mapping_of_object(
@@ -63,11 +64,9 @@ async def migrate_workspaces(
             )
             source_id_target_pairs[id] = []
             if "target_object" in workspace_mapping:
-                result = await migrate_object_to_default_target(
-                    submapping=workspace_mapping,
-                    upload_function=partial_upload_workspace,
+                raise PrdVersionException(
+                    f'Detected "target_object" for workspace with ID "{id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping.'
                 )
-                source_id_target_pairs[id].append(result)
 
             results = await migrate_object_to_multiple_targets(
                 submapping=workspace_mapping, upload_function=partial_upload_workspace
@@ -84,6 +83,8 @@ async def migrate_workspaces(
             )
 
             progress.update(task, advance=1)
+        except PrdVersionException as e:
+            raise e
         except Exception as e:
             display_error(
                 f"Error while migrating workspace with path '{ws_path}': {e}", e
@@ -115,27 +116,27 @@ async def migrate_queues_and_inboxes(
             queue = await read_json(queue_config_path)
             sources_by_source_id_map[id] = queue
 
-            replace_dependency_url(queue, "workspace", source_id_target_pairs)
-            replace_dependency_url(queue, "schema", source_id_target_pairs)
-            # Both should be updated, otherwise Elis API uses 'webhooks' in case of a mismatch even though it is deprecated
-            replace_dependency_url(queue, "hooks", source_id_target_pairs)
-            replace_dependency_url(queue, "webhooks", source_id_target_pairs)
-            queue.pop("inbox", None)
-
             queue_mapping = find_mapping_of_object(workspace_mapping["queues"], id)
             if queue_mapping.get("ignore", None):
                 return
 
-            partial_upload_queue = functools.partial(upload_queue, client, queue)
+            partial_upload_queue_function = functools.partial(
+                prepare_queue_upload,
+                queue=queue,
+                client=client,
+                source_id_target_pairs=source_id_target_pairs,
+            )
+
             source_id_target_pairs[id] = []
             if "target_object" in queue_mapping:
-                result = await migrate_object_to_default_target(
-                    submapping=queue_mapping, upload_function=partial_upload_queue
+                raise PrdVersionException(
+                    f'Detected "target_object" for queue with ID "{id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping.'
                 )
-                source_id_target_pairs[id].append(result)
 
             results = await migrate_object_to_multiple_targets(
-                submapping=queue_mapping, upload_function=partial_upload_queue
+                submapping=queue_mapping,
+                upload_function=partial_upload_queue_function,
+                pass_index_args=True,
             )
             source_id_target_pairs[id].extend(results)
 
@@ -144,32 +145,110 @@ async def migrate_queues_and_inboxes(
                 inbox = await read_json(inbox_config_path)
             except FileNotFoundError:
                 return
-            sources_by_source_id_map[inbox["id"]] = inbox
 
-            replace_dependency_url(inbox, "queues", source_id_target_pairs)
             # Should either create a new one or it is already present
             inbox.pop("email", None)
 
+            inbox_id = inbox["id"]
+            sources_by_source_id_map[inbox["id"]] = inbox
             inbox_mapping = queue_mapping["inbox"]
+
             # Inbox cannot be ignored because a queue depends on it
-            partial_upload_inbox = functools.partial(upload_inbox, client, inbox)
-            source_id_target_pairs[id] = []
+
+            partial_upload_inbox_function = functools.partial(
+                prepare_inbox_upload,
+                inbox=inbox,
+                client=client,
+                source_id_target_pairs=source_id_target_pairs,
+            )
+            source_id_target_pairs[inbox_id] = []
             if "target_object" in inbox_mapping:
-                result = await migrate_object_to_default_target(
-                    submapping=inbox_mapping, upload_function=partial_upload_inbox
+                raise PrdVersionException(
+                    f'Detected "target_object" for inbox with ID "{inbox_id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping.'
                 )
-                source_id_target_pairs[id].append(result)
 
             results = await migrate_object_to_multiple_targets(
-                submapping=inbox_mapping, upload_function=partial_upload_inbox
+                submapping=inbox_mapping,
+                upload_function=partial_upload_inbox_function,
+                pass_index_args=True,
             )
-            source_id_target_pairs[id].extend(results)
+            source_id_target_pairs[inbox_id].extend(results)
 
+        except PrdVersionException as e:
+            raise e
         except Exception as e:
             display_error(
                 f"Error while migrating queue with path '{queue_path}': {e}", e
             )
+            logging.exception(e)
 
     await asyncio.gather(
         *[migrate_queue_and_inbox(queue_path=queue_path) for queue_path in queue_paths]
     )
+
+
+async def prepare_queue_upload(
+    queue: dict,
+    client: ElisAPIClient,
+    target_index: int,
+    target_objects_count: int,
+    source_id_target_pairs: dict[int, list],
+    target_id: int,
+):
+    queue = deepcopy(queue)
+
+    replace_dependency_url(
+        object=queue,
+        object_index=target_index,
+        target_objects_count=target_objects_count,
+        dependency="workspace",
+        source_id_target_pairs=source_id_target_pairs,
+    )
+    replace_dependency_url(
+        object=queue,
+        object_index=target_index,
+        target_objects_count=target_objects_count,
+        dependency="schema",
+        source_id_target_pairs=source_id_target_pairs,
+    )
+    # Both should be updated, otherwise Elis API uses 'webhooks' in case of a mismatch even though it is deprecated
+    replace_dependency_url(
+        object=queue,
+        object_index=target_index,
+        target_objects_count=target_objects_count,
+        dependency="hooks",
+        source_id_target_pairs=source_id_target_pairs,
+    )
+    replace_dependency_url(
+        object=queue,
+        object_index=target_index,
+        target_objects_count=target_objects_count,
+        dependency="webhooks",
+        source_id_target_pairs=source_id_target_pairs,
+    )
+    queue.pop("inbox", None)
+
+    return await upload_queue(client=client, queue=queue, target_id=target_id)
+
+
+async def prepare_inbox_upload(
+    inbox: dict,
+    client: ElisAPIClient,
+    target_index: int,
+    target_objects_count: int,
+    source_id_target_pairs: dict[int, list],
+    target_id: int,
+):
+    inbox = deepcopy(inbox)
+
+    replace_dependency_url(
+        object=inbox,
+        dependency="queues",
+        object_index=target_index,
+        target_objects_count=target_objects_count,
+        source_id_target_pairs=source_id_target_pairs,
+    )
+    # Should either create a new one or it is already present
+    del inbox["email"]
+
+    return await upload_inbox(client=client, inbox=inbox, target_id=target_id)

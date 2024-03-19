@@ -12,8 +12,8 @@ from project_rossum_deploy.utils.functions import (
 
 def override_attributes_v2(
     lookup_table: dict,
-    submapping: dict,
     object: dict,
+    submapping: dict,
     is_dryrun: bool = False,
 ) -> dict:
     if is_dryrun:

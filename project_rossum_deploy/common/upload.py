@@ -21,48 +21,52 @@ async def upload_organization(client: ElisAPIClient, organization: dict, target:
         display_error(f"Error while uploading organization: {e}", e)
 
 
-async def upload_workspace(client: ElisAPIClient, workspace: dict, target: int):
-    if target:
+async def upload_workspace(client: ElisAPIClient, workspace: dict, target_id: int):
+    if target_id:
         return await client._http_client.update(
-            Resource.Workspace, id_=target, data=workspace
+            Resource.Workspace, id_=target_id, data=workspace
         )
     else:
         return await client._http_client.create(Resource.Workspace, workspace)
 
 
-async def upload_queue(client: ElisAPIClient, queue: dict, target: int):
-    if target:
-        return await client._http_client.update(Resource.Queue, id_=target, data=queue)
+async def upload_queue(client: ElisAPIClient, queue: dict, target_id: int):
+    if target_id:
+        return await client._http_client.update(Resource.Queue, id_=target_id, data=queue)
     else:
         return await client._http_client.create(Resource.Queue, queue)
 
 
-async def upload_inbox(client: ElisAPIClient, inbox: dict, target: int):
-    if target:
-        return await client._http_client.update(Resource.Inbox, id_=target, data=inbox)
+async def upload_inbox(client: ElisAPIClient, inbox: dict, target_id: int):
+    if target_id:
+        return await client._http_client.update(Resource.Inbox, id_=target_id, data=inbox)
     else:
         return await client._http_client.create(Resource.Inbox, inbox)
 
 
-async def upload_schema(client: ElisAPIClient, schema: dict, target: int):
-    if target:
+async def upload_schema(client: ElisAPIClient, schema: dict, target_id: int):
+    if target_id:
         return await client._http_client.update(
-            Resource.Schema, id_=target, data=schema
+            Resource.Schema, id_=target_id, data=schema
         )
     else:
         return await client._http_client.create(Resource.Schema, schema)
 
 
 async def upload_hook(
-    client: ElisAPIClient, hook: dict, hook_mapping: dict, target: int
+    client: ElisAPIClient,
+    hook: dict,
+    hook_mapping: dict,
+    target_id: int,
+    progress: Progress,
 ):
-    if target:
-        return await client._http_client.update(Resource.Hook, id_=target, data=hook)
+    if target_id:
+        return await client._http_client.update(Resource.Hook, id_=target_id, data=hook)
     else:
         created_hook = await create_hook_based_on_template(hook=hook, client=client)
         if not created_hook:
             created_hook = await create_hook_without_template(
-                hook=hook, client=client, hook_mapping=hook_mapping
+                hook=hook, client=client, hook_mapping=hook_mapping, progress=progress
             )
         return created_hook
 
@@ -72,6 +76,8 @@ async def create_hook_based_on_template(hook: dict, client: ElisAPIClient):
         return None
 
     if settings.IS_PROJECT_IN_SAME_ORG:
+        # Some of the properties (e.g., url) are not in the json, but are required by the API
+        hook.pop('config', None)
         return await client._http_client.request_json(
             "POST", url="hooks/create", json=hook
         )
@@ -135,6 +141,10 @@ async def create_hook_without_template(
             private_hook_url = Prompt.ask(
                 f"Please provide hook url (target base_url is '{client._http_client.base_url}') for '{hook['name']}'"
             )
-            hook["config"]["url"] = private_hook_url
+            hook["config"]["url"] = (
+                private_hook_url
+                if private_hook_url
+                else settings.PRIVATE_HOOK_DUMMY_URL
+            )
 
     return await client._http_client.create(Resource.Hook, hook)

@@ -4,6 +4,7 @@ import logging
 from functools import wraps
 import dataclasses
 import json
+from math import inf
 import os
 import re
 from typing import Any
@@ -308,7 +309,7 @@ def get_mapping_key_index(key: str):
     try:
         return settings.MAPPING_KEYS_ORDER.index(key)
     except Exception:
-        return -1
+        return inf
 
 
 async def write_json(path: Path, object: dict, type: str = None):
@@ -343,6 +344,23 @@ def read_yaml(path: Path):
         return yaml.safe_load(rf)
 
 
+def sort_mapping(mapping: dict):
+    if isinstance(mapping, list):
+        result = []
+        for el in mapping:
+            result.append(sort_mapping(el))
+        return result
+    elif isinstance(mapping, dict):
+        result = {}
+        for k, v in sorted(
+            mapping.items(), key=lambda item: get_mapping_key_index(item[0])
+        ):
+            result[k] = sort_mapping(v)
+        return result
+    else:
+        return mapping
+
+
 def adjust_keys(object: Any, uppercase_fields: list = [], lower: bool = True):
     if isinstance(object, dict):
         lowercased = {}
@@ -374,7 +392,7 @@ def create_empty_mapping():
         "organization": {
             "id": "",
             "name": "",
-            "target_object": None,
+            "targets": [],
             "workspaces": [],
             "hooks": [],
             "schemas": [],
@@ -398,34 +416,29 @@ def extract_sources_targets(
     sources = copy.deepcopy(targets)
 
     if include_organization:
-        targets["organization"] = mapping["organization"]["target_object"]
+        targets["organization"] = extract_target_ids(mapping["organization"])
         sources["organization"] = mapping["organization"]["id"]
 
     for ws in mapping["organization"]["workspaces"]:
         sources["workspaces"].append(ws["id"])
-        if ws["target_object"]:
-            targets["workspaces"].append(ws["target_object"])
+        targets["workspaces"].extend(extract_target_ids(ws))
 
         for q in ws["queues"]:
             sources["queues"].append(q["id"])
-            if q["target_object"]:
-                targets["queues"].append(q["target_object"])
+            targets["queues"].extend(extract_target_ids(q))
 
             inbox = q.get("inbox", {})
             if inbox and (inbox_id := inbox.get("id", None)):
                 sources["inboxes"].append(inbox_id)
-                if inbox_target_id := q["inbox"]["target_object"]:
-                    targets["inboxes"].append(inbox_target_id)
+                targets["inboxes"].extend(extract_target_ids(inbox))
 
     for schema in mapping["organization"]["schemas"]:
         sources["schemas"].append(schema["id"])
-        if schema["target_object"]:
-            targets["schemas"].append(schema["target_object"])
+        targets["schemas"].extend(extract_target_ids(schema))
 
     for hook in mapping["organization"]["hooks"]:
         sources["hooks"].append(hook["id"])
-        if hook["target_object"]:
-            targets["hooks"].append(hook["target_object"])
+        targets["hooks"].extend(extract_target_ids(hook))
 
     return sources, targets
 
@@ -460,9 +473,6 @@ def extract_source_target_pairs(mapping: dict) -> dict[str, dict[int, list]]:
 
 def extract_target_ids(submapping: dict) -> list[int]:
     target_ids = []
-    if default_target_id := submapping.get("target_object", None):
-        target_ids.append(default_target_id)
-
     for target_object in submapping.get("targets", []):
         if target_id := target_object.get("target_id", None):
             target_ids.append(target_id)

@@ -90,7 +90,7 @@ try:
 
         MAPPING_FILENAME: str = "mapping.yaml"
         CREDENTIALS_FILENAME: str = "credentials.json"
-        MAPPING_KEYS_ORDER: list = ["id", "name", "target_object"]
+        MAPPING_KEYS_ORDER: list = ["id", "name", "ignore", "targets"]
 
         TARGET_API_BASE: str = ""
         TARGET_TOKEN: str = "dummy_token"
@@ -110,7 +110,9 @@ try:
             "schemas",
             "hooks",
         ]
+        MAPPING_TRAVERSE_IGNORE_FIELDS: list[str] = ["targets"]
 
+        MIGRATE_MAPPING_COMMAND_NAME: str = "migrate-mapping"
         INITIALIZE_COMMAND_NAME: str = "init"
         DOWNLOAD_COMMAND_NAME: str = "pull"
         UPLOAD_COMMAND_NAME: str = "push"
@@ -139,3 +141,7 @@ try:
 except Exception as e:
     logging.exception(f"Error while initializing PRD settings: {e}")
     sys.exit(1)
+
+
+class PrdVersionException(Exception):
+    ...

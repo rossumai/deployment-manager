@@ -20,6 +20,7 @@ from project_rossum_deploy.commands.download.mapping import (
 )
 
 from project_rossum_deploy.common.git import get_changed_file_paths
+from project_rossum_deploy.commands.migrate_mapping import migrate_mapping
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     coro,
@@ -105,7 +106,8 @@ async def download_organizations(
     download_all: bool = False,
 ):
     try:
-        mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
+        mapping_path = org_path / settings.MAPPING_FILENAME
+        mapping = await read_mapping(mapping_path)
         if not mapping:
             mapping = create_empty_mapping()
 
@@ -146,6 +148,10 @@ async def download_organizations(
             changed_files=changed_files,
             download_all=download_all,
         )
+
+        # Make the previous mapping conform in structure
+        await migrate_mapping("mapping.yaml")
+        mapping = await read_mapping(mapping_path)
 
         await create_update_mapping(
             org_path=org_path,
@@ -491,7 +497,8 @@ async def download_organization_combined_source_target(
                 password=settings.SOURCE_PASSWORD,
             )
 
-        mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
+        mapping_path = org_path / settings.MAPPING_FILENAME
+        mapping = await read_mapping(mapping_path)
         if not mapping:
             mapping = create_empty_mapping()
         previous_sources, previous_targets = extract_sources_targets(mapping)
@@ -511,6 +518,10 @@ async def download_organization_combined_source_target(
             changed_files=changed_files,
             download_all=download_all,
         )
+
+        # Make the previous mapping conform in structure
+        await migrate_mapping("mapping.yaml")
+        mapping = await read_mapping(mapping_path)
 
         await create_update_mapping(
             org_path=org_path,

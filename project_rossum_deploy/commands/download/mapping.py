@@ -4,7 +4,7 @@ from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     adjust_keys,
     create_empty_mapping,
-    get_mapping_key_index,
+    sort_mapping,
     read_yaml,
     write_yaml,
 )
@@ -22,9 +22,8 @@ async def write_mapping(mapping_path: Path, mapping: dict):
     mapping = adjust_keys(mapping, settings.MAPPING_UPPERCASE_FIELDS, lower=False)
 
     # Python dictionaries are sorted
-    mapping = dict(
-        sorted(mapping.items(), key=lambda item: get_mapping_key_index(item[0]))
-    )
+    mapping = sort_mapping(mapping)
+
     await write_yaml(mapping_path, mapping)
 
 
@@ -91,7 +90,11 @@ async def create_update_mapping(
 def get_attributes_for_mapping(
     object: dict,
 ):
-    return {"id": object["id"], "name": object["name"], "target_object": None}
+    return {
+        "id": object["id"],
+        "name": object["name"],
+        "targets": [],
+    }
 
 
 def index_mappings_by_object_id(sub_mapping: list[dict]):
@@ -109,13 +112,28 @@ def enrich_mapping_with_previous_properties(
             new_sub_mapping[k] = v
 
 
+def enrich_mapping_with_previous_targets(
+    new_sub_mapping: dict, old_sub_mapping: dict, new_ids: list
+):
+    old_targets = old_sub_mapping.get("targets", [])
+    new_targets = []
+    for old_target in old_targets:
+        old_target_id = old_target.get("target_id", None)
+        if old_target_id is None or old_target_id in new_ids:
+            new_targets.append(old_target)
+
+    new_sub_mapping["targets"] = new_targets
+
+
 def enrich_mappings_with_existing_attributes(
     old_mapping: dict, new_mapping: dict, new_ids: list[int]
 ):
     """Use targets from the previous mapping, but only if the target objects were not deleted in Rossum"""
-    new_mapping["organization"]["target_object"] = old_mapping["organization"][
-        "target_object"
-    ]
+
+    old_org_targets = old_mapping["organization"].get("targets", [])
+    if not old_org_targets:
+        old_org_targets = [{"target_id": None}]
+    new_mapping["organization"]["targets"] = old_org_targets
 
     old_schema_mappings = index_mappings_by_object_id(
         old_mapping["organization"]["schemas"]
@@ -124,8 +142,11 @@ def enrich_mappings_with_existing_attributes(
         old_schema_mapping = old_schema_mappings.get(new_schema_mapping["id"], {})
         enrich_mapping_with_previous_properties(new_schema_mapping, old_schema_mapping)
 
-        target = old_schema_mapping.get("target_object", None)
-        new_schema_mapping["target_object"] = target if target in new_ids else None
+        enrich_mapping_with_previous_targets(
+            new_sub_mapping=new_schema_mapping,
+            old_sub_mapping=old_schema_mapping,
+            new_ids=new_ids,
+        )
 
     old_hook_mappings = index_mappings_by_object_id(
         old_mapping["organization"]["hooks"]
@@ -134,8 +155,11 @@ def enrich_mappings_with_existing_attributes(
         old_hook_mapping = old_hook_mappings.get(new_hook_mapping["id"], {})
         enrich_mapping_with_previous_properties(new_hook_mapping, old_hook_mapping)
 
-        target = old_hook_mapping.get("target_object", None)
-        new_hook_mapping["target_object"] = target if target in new_ids else None
+        enrich_mapping_with_previous_targets(
+            new_sub_mapping=new_hook_mapping,
+            old_sub_mapping=old_hook_mapping,
+            new_ids=new_ids,
+        )
 
     old_workspace_mappings = index_mappings_by_object_id(
         old_mapping["organization"]["workspaces"]
@@ -148,8 +172,11 @@ def enrich_mappings_with_existing_attributes(
             new_workspace_mapping, old_workspace_mapping
         )
 
-        target = old_workspace_mapping.get("target_object", None)
-        new_workspace_mapping["target_object"] = target if target in new_ids else None
+        enrich_mapping_with_previous_targets(
+            new_sub_mapping=new_workspace_mapping,
+            old_sub_mapping=old_workspace_mapping,
+            new_ids=new_ids,
+        )
 
         old_queue_mappings = index_mappings_by_object_id(
             old_workspace_mapping.get("queues", [])
@@ -160,8 +187,11 @@ def enrich_mappings_with_existing_attributes(
                 new_queue_mapping, old_queue_mapping
             )
 
-            target = old_queue_mapping.get("target_object", None)
-            new_queue_mapping["target_object"] = target if target in new_ids else None
+            enrich_mapping_with_previous_targets(
+                new_sub_mapping=new_queue_mapping,
+                old_sub_mapping=old_queue_mapping,
+                new_ids=new_ids,
+            )
 
             if new_queue_mapping.get("inbox", None) and (
                 old_inbox_mapping := old_queue_mapping.get("inbox", {})
@@ -170,7 +200,8 @@ def enrich_mappings_with_existing_attributes(
                     new_queue_mapping["inbox"], old_inbox_mapping
                 )
 
-                target = old_inbox_mapping.get("target_object", None)
-                new_queue_mapping["inbox"]["target_object"] = (
-                    target if target in new_ids else None
+                enrich_mapping_with_previous_targets(
+                    new_sub_mapping=new_queue_mapping["inbox"],
+                    old_sub_mapping=old_inbox_mapping,
+                    new_ids=new_ids,
                 )

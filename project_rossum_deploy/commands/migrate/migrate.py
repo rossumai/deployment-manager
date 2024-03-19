@@ -22,7 +22,7 @@ from project_rossum_deploy.common.upload import (
     upload_organization,
 )
 
-from project_rossum_deploy.utils.consts import settings
+from project_rossum_deploy.utils.consts import PrdVersionException, settings
 from project_rossum_deploy.utils.functions import (
     coro,
     display_error,
@@ -63,15 +63,19 @@ async def migrate_project(
         mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
         previous_mapping = deepcopy(mapping)
 
-        target_organization = mapping["organization"].get("target_object", None)
-        if not target_organization:
+        target_organizations = mapping["organization"].get("targets", [])
+        target_organization_id = (
+            target_organizations[0].get("target_id", None)
+            if len(target_organizations)
+            else None
+        )
+        if not target_organization_id:
             raise click.ClickException(
-                "No target for organization. If you want to migrate inside the same organization, just target its own ID."
+                "No target for organization. If you want to migrate inside the same organization, just add a target with the same ID."
             )
-        multi_org_targets = mapping["organization"].get("targets", None)
-        if multi_org_targets:
+        elif len(target_organizations) > 1:
             raise click.ClickException(
-                "Multiple targets for the same organization are not supported. If you want to migrate the organization multiple times, create separate GIT branches and specify a different target_object attribute."
+                "Multiple targets for the same organization are not supported. If you want to migrate the organization multiple times, create separate GIT branches and specify a different target_id."
             )
 
         if not client:
@@ -117,7 +121,7 @@ async def migrate_project(
 
             source_id_target_pairs[mapping["organization"]["id"]] = [
                 await upload_organization(
-                    client, organization_fields, target_organization
+                    client, organization_fields, target_organization_id
                 )
             ]
             progress.update(task, advance=1)
@@ -160,7 +164,7 @@ async def migrate_project(
 
         previous_target_ids = []
         for objects in previous_targets.values():
-            if isinstance(objects, list):
+            if len(objects):
                 previous_target_ids.extend(objects)
         previous_target_ids = set(previous_target_ids)
 
@@ -180,6 +184,9 @@ async def migrate_project(
         print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
 
         await download_project(client=client, org_path=org_path)
+    except PrdVersionException as e:
+        print(Panel(f"Unexpected error while migrating objects: {e}"))
+        return
     except Exception as e:
         display_error(f"Unexpected error while migrating objects: {e}", e)
 
@@ -241,33 +248,51 @@ async def override_migrated_objects_attributes(
     lookup_table: dict,
 ):
     print(Panel("Running attribute_override..."))
-    for mapping_object in traverse_mapping(mapping):
-        if mapping_object.get("attribute_override", None) and not mapping_object.get(
-            "ignore", None
-        ):
-            source_object = sources_by_source_id_map[mapping_object["id"]]
-            source_object_subset = get_attributes_from_object(
-                source_object, mapping_object["attribute_override"]
-            )
-            target_objects = source_id_target_pairs[mapping_object["id"]]
-            for target_object in target_objects:
-                source_object_subset["id"] = target_object["id"]
-                source_object_subset["url"] = target_object["url"]
+    for mapping_object in traverse_mapping(mapping["organization"]):
+        if mapping_object.get("ignore", None):
+            continue
 
-                override_attributes_v2(
-                    lookup_table=lookup_table,
-                    submapping=mapping_object,
-                    object=source_object_subset,
-                )
+        source_object = sources_by_source_id_map.get(mapping_object["id"], None)
+        target_objects = source_id_target_pairs.get(mapping_object["id"], [])
+        targets_in_mapping = mapping_object.get("targets", [])
+
+        if not source_object or not len(target_objects):
+            continue
+
+        for target_object in target_objects:
+            attribute_overrides = find_attribute_override_for_target(
+                targets_in_mapping, target_object["id"]
+            )
+
+            source_object_subset = get_attributes_from_object(
+                source_object, attribute_overrides
+            )
+
+            source_object_subset["id"] = target_object["id"]
+            source_object_subset["url"] = target_object["url"]
+
+            override_attributes_v2(
+                lookup_table=lookup_table,
+                submapping=mapping_object,
+                attribute_overrides=attribute_overrides,
+                object=source_object_subset,
+            )
 
             await update_object(path=None, client=client, object=source_object_subset)
 
 
-def get_attributes_from_object(object: dict, attribute_override_spec: dict):
+def find_attribute_override_for_target(targets_in_mapping: dict, target_id: int):
+    for target in targets_in_mapping:
+        if target.get("target_id", None) == target_id:
+            return target.get("attribute_override", {})
+    return {}
+
+
+def get_attributes_from_object(object: dict, attribute_overrides: dict):
     ROOT_KEY_REGEX = re.compile(r"^(\w+)")
     object_subset = {}
-    for query_key in attribute_override_spec:
+    for query_key in attribute_overrides:
         regex_search = ROOT_KEY_REGEX.findall(query_key)
         if len(regex_search) and (root_key := regex_search[0]) not in object_subset:
-            object_subset[root_key] = object[root_key]
+            object_subset[root_key] = deepcopy(object[root_key])
     return object_subset
