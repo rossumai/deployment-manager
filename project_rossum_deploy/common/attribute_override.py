@@ -28,7 +28,6 @@ def override_attributes_v2(
         search = perform_search(parent, object)
 
         for override_parent in search:
-
             # The attribute (key) might not be on all parent objects (e.g., configurations[*].queue_ids)
             if key not in override_parent:
                 continue
@@ -82,6 +81,11 @@ def override_attributes_v2(
             else:
                 override_parent[key] = new_value
 
+    if not object:
+        raise Exception(
+            f'Cannot perform attribute_override on None object (name: {submapping.get('name', '')} | id: {submapping.get('id', '')}).'
+        )
+
     attribute_overrides = submapping.get("attribute_override", {})
     for key, value in attribute_overrides.items():
         override_attribute_v2(
@@ -111,7 +115,7 @@ def perform_search(parent: str, object: dict):
     else:
         search = [search]
 
-    if not len(search):
+    if not len(search) or not search[0]:
         raise Exception(f'Query "{parent}" returned no result.')
 
     return search
