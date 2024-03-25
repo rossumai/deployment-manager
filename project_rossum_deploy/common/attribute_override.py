@@ -83,7 +83,7 @@ def override_attributes_v2(
 
     if not object:
         raise Exception(
-            f'Cannot perform attribute_override on None object (name: {submapping.get('name', '')} | id: {submapping.get('id', '')}).'
+            f'Cannot perform attribute_override on None object (name: {submapping.get("name", "")} | id: {submapping.get("id", "")}).'
         )
 
     attribute_overrides = submapping.get("attribute_override", {})
