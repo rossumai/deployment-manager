@@ -23,6 +23,7 @@ from project_rossum_deploy.utils.consts import (
 from project_rossum_deploy.utils.functions import (
     coro,
     find_all_object_paths,
+    merge_formula_changes,
     merge_hook_changes,
     evaluate_delete_dependencies,
     evaluate_create_dependencies,
@@ -105,6 +106,7 @@ async def upload_project(
         if changes:
             changes = await merge_hook_changes(changes, org_path)
             #changes = await evaluate_delete_dependencies(changes, org_path)
+            changes = await merge_formula_changes(changes)
             changes = await evaluate_create_dependencies(changes, org_path, client)
 
         if upload_all:

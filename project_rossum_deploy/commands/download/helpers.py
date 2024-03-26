@@ -1,12 +1,14 @@
 import os
+from typing import Any
 from anyio import Path
 import shutil
 from rich.prompt import Confirm
+import re
 
 from project_rossum_deploy.commands.migrate.helpers import is_org_targetting_itself
 
-from project_rossum_deploy.utils.consts import settings
-from project_rossum_deploy.utils.functions import templatize_name_id
+from project_rossum_deploy.utils.consts import FORMULA_FOOTER, FORMULA_HEADER, settings
+from project_rossum_deploy.utils.functions import templatize_name_id, write_str
 
 
 async def delete_current_configuration(org_path: Path):
@@ -63,3 +65,48 @@ async def find_object_in_project(object: dict, base_path: Path):
         await (base_path / file_name).exists()
         or await (base_path / (file_name + ".json")).exists()
     )
+
+
+def find_formula_fields_in_schema(node: Any) -> list[tuple[str, str]]:
+    formula_fields = []
+
+    def add_fields(node: dict):
+        if node["category"] == "datapoint" and (formula := node.get("formula", None)):
+            return [(node["id"], formula)]
+        elif "children" in node:
+            return find_formula_fields_in_schema(node["children"])
+        return []
+
+    if isinstance(node, list):
+        for subnode in node:
+            formula_fields.extend(add_fields(subnode))
+    elif isinstance(node, dict):
+        formula_fields.extend(add_fields(node))
+
+    return formula_fields
+
+
+async def create_formula_file(path: Path, code: str):
+    header_fields_regex = re.compile(r"\bfields\.\w+\b")
+    header_mock_fields = []
+
+    fields_matches = re.findall(header_fields_regex, code)
+    for match in fields_matches:
+        header_mock_fields.append(match + ' = ""')
+
+    line_item_fields_regex = re.compile(r"\brow\.\w+\b")
+    line_item_mock_fields = []
+
+    fields_matches = re.findall(line_item_fields_regex, code)
+    for match in fields_matches:
+        line_item_mock_fields.append(match + ' = ""')
+
+    code = (
+        FORMULA_HEADER.format(
+            header_mock_fields="\n".join(header_mock_fields),
+            line_item_mock_fields="\n".join(line_item_mock_fields),
+        )
+        + code
+        + FORMULA_FOOTER
+    )
+    await write_str(path, code)

@@ -14,7 +14,11 @@ from rossum_api import ElisAPIClient
 
 import yaml
 
-from project_rossum_deploy.utils.consts import GIT_CHARACTERS, Settings
+from project_rossum_deploy.utils.consts import (
+    FORMULA_SEPARATOR,
+    GIT_CHARACTERS,
+    settings,
+)
 
 
 def coro(f):
@@ -128,8 +132,11 @@ async def cascade_delete_ops(path, change, changes_updated, org_path):
 async def evaluate_create_dependencies(changes, org_path, client: ElisAPIClient):
     changes_updated = []
     for change in changes:
+        path: Path
         op, path = change
-        if op == GIT_CHARACTERS.CREATED or op == GIT_CHARACTERS.CREATED_STAGED:
+        if (
+            op == GIT_CHARACTERS.CREATED or op == GIT_CHARACTERS.CREATED_STAGED
+        ) and path.suffix == ".json":
             object_path = org_path / path
             object = await read_json(object_path)
             id = object.get("id", None)
@@ -173,11 +180,12 @@ async def merge_hook_changes(changes, org_path):
     merged_changes = []
     for change in changes:
         op, path = change
+        path = str(path)
         if (
             op == GIT_CHARACTERS.UPDATED
             or op == GIT_CHARACTERS.CREATED
             or op == GIT_CHARACTERS.CREATED_STAGED
-        ) and (str(path).endswith("py") or str(path).endswith("js")):
+        ) and (path.endswith("py") and "hooks" in path):
             with open(path, "r") as file:
                 code_str = file.read()
                 object_path = org_path / (
@@ -193,6 +201,67 @@ async def merge_hook_changes(changes, org_path):
         elif not is_change_existing(change, merged_changes):
             merged_changes.append(change)
     return merged_changes
+
+
+async def merge_formula_changes(changes):
+    merged_changes = []
+    for change in changes:
+        op: str
+        path: Path
+        op, path = change
+        str_path = str(path)
+
+        if (
+            (
+                op == GIT_CHARACTERS.UPDATED
+                or op == GIT_CHARACTERS.CREATED
+                or op == GIT_CHARACTERS.CREATED_STAGED
+            )
+            and (path.suffix == ".py")
+            and "schemas" in str_path
+        ):
+            formula_code = await read_formula_file(path)
+            formula_name = path.stem
+
+            schema_file_name = str(path.parent.stem).removeprefix(
+                settings.FORMULA_DIR_PREFIX
+            )
+            schema_path = path.parent.parent / f"{schema_file_name}.json"
+            schema = await read_json(schema_path)
+
+            schema_id = find_schema_id(schema["content"], formula_name)
+            schema_id["formula"] = formula_code
+
+            await write_json(schema_path, schema)
+            new_change = ("M", schema_path)
+            if not is_change_existing(new_change, merged_changes):
+                merged_changes.append(new_change)
+        elif not is_change_existing(change, merged_changes):
+            merged_changes.append(change)
+    return merged_changes
+
+
+async def read_formula_file(path: Path):
+    whole_file = await path.read_text()
+    file_parts = whole_file.split(FORMULA_SEPARATOR)
+    if len(file_parts) != 3:
+        raise Exception(f'Invalid format of a formula field file ("{path}").')
+    return file_parts[1]
+
+
+def find_schema_id(schema: Any, schema_id: str):
+    if isinstance(schema, list):
+        for subschema in schema:
+            result = find_schema_id(subschema, schema_id)
+            if result:
+                return result
+    elif isinstance(schema, dict) and "children" in schema:
+        for subschema in schema["children"]:
+            result = find_schema_id(subschema, schema_id)
+            if result:
+                return result
+    elif schema.get("id", None) == schema_id:
+        return schema
 
 
 def detemplatize_name_id(path: Path | str) -> tuple[str, int]:
@@ -231,7 +300,7 @@ async def write_str(path: Path, code: str):
 
 def get_mapping_key_index(key: str):
     try:
-        return Settings.MAPPING_KEYS_ORDER.index(key)
+        return settings.MAPPING_KEYS_ORDER.index(key)
     except Exception:
         return -1
 
@@ -242,7 +311,7 @@ async def write_json(path: Path, object: dict, type: str = None):
     if path.parent:
         await path.parent.mkdir(parents=True, exist_ok=True)
     if type:
-        ignored_keys = Settings.IGNORED_KEYS.get(type)
+        ignored_keys = settings.IGNORED_KEYS.get(type)
         if ignored_keys:
             for key in ignored_keys:
                 if key in object:

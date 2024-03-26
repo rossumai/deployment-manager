@@ -11,8 +11,10 @@ from rich.progress import Progress
 
 import click
 from project_rossum_deploy.commands.download.helpers import (
+    create_formula_file,
     determine_object_destination,
     delete_current_configuration,
+    find_formula_fields_in_schema,
 )
 from project_rossum_deploy.commands.download.mapping import (
     create_empty_mapping,
@@ -309,6 +311,17 @@ async def download_schemas(
         )
         await write_json(schema_config_path, schema, "schema")
         schemas.append((destination_local, schema))
+
+        formula_fields = find_formula_fields_in_schema(schema["content"])
+        if formula_fields:
+            formula_directory_path = (
+                schema_config_path.parent
+                / f"{settings.FORMULA_DIR_PREFIX}{templatize_name_id(schema['name'], schema['id'])}"
+            )
+            for field_id, code in formula_fields:
+                await create_formula_file(
+                    formula_directory_path / f"{field_id}.py", code
+                )
 
     return schemas
 
