@@ -67,6 +67,8 @@ async def migrate_hooks(
                 progress.update(task, advance=1)
                 return
 
+            await update_hook_code(hook_path, hook)
+
             migrated_hook = None
             if is_first_time_migration(hook_mapping):
                 migrated_hook = await create_hook_based_on_template(hook, client)
@@ -128,13 +130,26 @@ async def migrate_hooks(
         )
 
 
+async def update_hook_code(hook_path: Path, hook: dict):
+    """Checks if there is not newer code in the associated file and uses that for release.
+    The original hook file is not modified.
+    """
+    if hook.get("extension_source", "") != "rossum_store" and (
+        hook.get("config", {}).get("code", None)
+    ):
+        suffix = ".py" if "python" in hook["config"].get("runtime") else ".js"
+        code_path = hook_path.with_suffix(suffix)
+        new_code = await code_path.read_text()
+        hook["config"]["code"] = new_code
+
+
 async def create_hook_based_on_template(hook: dict, client: ElisAPIClient):
     if not hook.get("hook_template", None):
         return None
 
     if settings.IS_PROJECT_IN_SAME_ORG:
         # Some of the properties (e.g., url) are not in the json, but are required by the API
-        hook.pop('config', None)
+        hook.pop("config", None)
         return await client._http_client.request_json(
             "POST", url="hooks/create", json=hook
         )
