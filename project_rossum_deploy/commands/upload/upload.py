@@ -104,7 +104,7 @@ async def upload_project(
 
         if changes:
             changes = await merge_hook_changes(changes, org_path)
-            changes = await evaluate_delete_dependencies(changes, org_path)
+            #changes = await evaluate_delete_dependencies(changes, org_path)
             changes = await evaluate_create_dependencies(changes, org_path, client)
 
         if upload_all:
@@ -117,8 +117,8 @@ async def upload_project(
                     await create_object(org_path / path, client)
                 case GIT_CHARACTERS.CREATED_STAGED:
                     await create_object(org_path / path, client)
-                case GIT_CHARACTERS.DELETED:
-                    await delete_object(org_path / path, client)
+                #case GIT_CHARACTERS.DELETED:
+                #    await delete_object(org_path / path, client)
                 case GIT_CHARACTERS.UPDATED:
                     result = await update_object(client=client, path=org_path / path)
                     if not result and upload_all:
