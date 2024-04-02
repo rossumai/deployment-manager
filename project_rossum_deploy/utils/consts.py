@@ -31,13 +31,9 @@ FORMULA_HEADER = """from project_rossum_deploy.utils.formula_builtins import (
 )
 import unittest.mock
 
-fields = unittest.mock.Mock()
+field = unittest.mock.Mock()
 # Add dummy values to test:
 {header_mock_fields}
-
-row = unittest.mock.Mock()
-# Add dummy values to test:
-{line_item_mock_fields}
 
 ### PRD-only, do not remove this line ##################################
 

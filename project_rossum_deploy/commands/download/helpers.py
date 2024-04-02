@@ -87,24 +87,16 @@ def find_formula_fields_in_schema(node: Any) -> list[tuple[str, str]]:
 
 
 async def create_formula_file(path: Path, code: str):
-    header_fields_regex = re.compile(r"\bfields\.\w+\b")
-    header_mock_fields = []
+    header_fields_regex = re.compile(r"\bfield\.\w+\b")
+    header_mock_fields = set()
 
     fields_matches = re.findall(header_fields_regex, code)
     for match in fields_matches:
-        header_mock_fields.append(match + ' = ""')
-
-    line_item_fields_regex = re.compile(r"\brow\.\w+\b")
-    line_item_mock_fields = []
-
-    fields_matches = re.findall(line_item_fields_regex, code)
-    for match in fields_matches:
-        line_item_mock_fields.append(match + ' = ""')
+        header_mock_fields.add(match + ' = ""')
 
     code = (
         FORMULA_HEADER.format(
-            header_mock_fields="\n".join(header_mock_fields),
-            line_item_mock_fields="\n".join(line_item_mock_fields),
+            header_mock_fields="\n".join(sorted(list(header_mock_fields))),
         )
         + code
         + FORMULA_FOOTER

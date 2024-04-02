@@ -256,11 +256,16 @@ def find_schema_id(schema: Any, schema_id: str):
             if result:
                 return result
     elif isinstance(schema, dict) and "children" in schema:
-        for subschema in schema["children"]:
-            result = find_schema_id(subschema, schema_id)
+        if isinstance(schema["children"], dict):
+            result = find_schema_id(schema["children"], schema_id)
             if result:
                 return result
-    elif schema.get("id", None) == schema_id:
+        elif isinstance(schema["children"], list):
+            for subschema in schema["children"]:
+                result = find_schema_id(subschema, schema_id)
+                if result:
+                    return result
+    elif isinstance(schema, dict) and schema.get("id", None) == schema_id:
         return schema
 
 
