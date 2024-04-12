@@ -3,11 +3,10 @@ from typing import Any
 from anyio import Path
 import shutil
 from rich.prompt import Confirm
-import re
 
 from project_rossum_deploy.commands.migrate.helpers import is_org_targetting_itself
 
-from project_rossum_deploy.utils.consts import FORMULA_FOOTER, FORMULA_HEADER, settings
+from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import templatize_name_id, write_str
 
 
@@ -87,18 +86,4 @@ def find_formula_fields_in_schema(node: Any) -> list[tuple[str, str]]:
 
 
 async def create_formula_file(path: Path, code: str):
-    header_fields_regex = re.compile(r"\bfield\.\w+\b")
-    header_mock_fields = set()
-
-    fields_matches = re.findall(header_fields_regex, code)
-    for match in fields_matches:
-        header_mock_fields.add(match + ' = ""')
-
-    code = (
-        FORMULA_HEADER.format(
-            header_mock_fields="\n".join(sorted(list(header_mock_fields))),
-        )
-        + code
-        + FORMULA_FOOTER
-    )
     await write_str(path, code)

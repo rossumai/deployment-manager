@@ -13,7 +13,6 @@ from project_rossum_deploy.commands.download.download import (
 
 from project_rossum_deploy.commands.upload.operations import (
     create_object,
-    delete_object,
     update_object,
 )
 from project_rossum_deploy.utils.consts import (
@@ -25,7 +24,6 @@ from project_rossum_deploy.utils.functions import (
     find_all_object_paths,
     merge_formula_changes,
     merge_hook_changes,
-    evaluate_delete_dependencies,
     evaluate_create_dependencies,
 )
 
@@ -105,7 +103,7 @@ async def upload_project(
 
         if changes:
             changes = await merge_hook_changes(changes, org_path)
-            #changes = await evaluate_delete_dependencies(changes, org_path)
+            # changes = await evaluate_delete_dependencies(changes, org_path)
             changes = await merge_formula_changes(changes)
             changes = await evaluate_create_dependencies(changes, org_path, client)
 
@@ -119,7 +117,7 @@ async def upload_project(
                     await create_object(org_path / path, client)
                 case GIT_CHARACTERS.CREATED_STAGED:
                     await create_object(org_path / path, client)
-                #case GIT_CHARACTERS.DELETED:
+                # case GIT_CHARACTERS.DELETED:
                 #    await delete_object(org_path / path, client)
                 case GIT_CHARACTERS.UPDATED:
                     result = await update_object(client=client, path=org_path / path)

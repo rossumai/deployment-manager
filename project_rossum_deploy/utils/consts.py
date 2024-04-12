@@ -18,37 +18,6 @@ API_SUFFIX_RE = re.compile(r"/api/v\d+$")
 ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD = "$prd_ref"
 ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD = "$source_value"
 
-FORMULA_SEPARATOR = "### PRD-only, do not remove this line ##################################"
-
-FORMULA_HEADER = """from project_rossum_deploy.utils.formula_builtins import (
-    D,  # noqa: F401
-    date,  # noqa: F401
-    fallback,  # noqa: F401
-    is_set,  # noqa: F401
-    timedelta,  # noqa: F401
-    re,  # noqa: F401
-    substitute,  # noqa: F401
-)
-import unittest.mock
-
-field = unittest.mock.Mock()
-# Add dummy values to test:
-{header_mock_fields}
-
-### PRD-only, do not remove this line ##################################
-
-
-"""
-
-FORMULA_FOOTER = """
-
-
-### PRD-only, do not remove this line ##################################
-
-# Add the variable to be returned:
-if __name__ == '__main__':
-    print()
-"""
 
 try:
 

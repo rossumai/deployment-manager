@@ -15,7 +15,6 @@ from rossum_api import ElisAPIClient
 import yaml
 
 from project_rossum_deploy.utils.consts import (
-    FORMULA_SEPARATOR,
     GIT_CHARACTERS,
     settings,
 )
@@ -242,11 +241,7 @@ async def merge_formula_changes(changes):
 
 
 async def read_formula_file(path: Path):
-    whole_file = await path.read_text()
-    file_parts = whole_file.split(FORMULA_SEPARATOR)
-    if len(file_parts) != 3:
-        raise Exception(f'Invalid format of a formula field file ("{path}").')
-    return file_parts[1]
+    return await path.read_text()
 
 
 def find_schema_id(schema: Any, schema_id: str):
