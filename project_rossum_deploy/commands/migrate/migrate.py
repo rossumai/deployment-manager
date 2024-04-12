@@ -1,11 +1,10 @@
 from copy import deepcopy
-import logging
 import re
 from anyio import Path
 from rich import print
 from rich.panel import Panel
 from rich.progress import Progress
-import asyncio
+
 
 import click
 from rossum_api import ElisAPIClient
@@ -14,22 +13,20 @@ from project_rossum_deploy.commands.download.download import (
 )
 from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.migrate.helpers import (
-    find_mapping_of_object,
     traverse_mapping,
 )
 from project_rossum_deploy.commands.migrate.hooks import migrate_hooks
+from project_rossum_deploy.commands.migrate.schemas import migrate_schemas
 from project_rossum_deploy.commands.migrate.workspaces import migrate_workspaces
 from project_rossum_deploy.commands.upload.upload import update_object
 from project_rossum_deploy.common.attribute_override import override_attributes_v2
 from project_rossum_deploy.common.upload import (
     upload_organization,
-    upload_schema,
 )
 
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     coro,
-    detemplatize_name_id,
     extract_flat_lookup_table,
     extract_sources_targets,
     find_all_object_paths,
@@ -176,7 +173,6 @@ async def migrate_project(
         print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
 
     except Exception as e:
-        logging.exception(e)
         print(Panel(f"Unexpected error while migrating objects: {e}"))
 
     await download_project(client=client, org_path=org_path)
@@ -195,49 +191,6 @@ def find_created_target_ids(previous_mapping: dict, source_id_target_pairs: dict
         all_target_ids.add(object["id"])
 
     return all_target_ids.difference(previous_target_ids)
-
-
-async def migrate_schemas(
-    source_path: Path,
-    client: ElisAPIClient,
-    mapping: dict,
-    source_id_target_pairs: dict,
-    sources_by_source_id_map: dict,
-    progress: Progress,
-):
-    schema_paths = [
-        schema_path async for schema_path in (source_path / "schemas").iterdir()
-    ]
-    task = progress.add_task("Releasing schemas...", total=len(schema_paths))
-
-    async def migrate_schema(schema_path: Path):
-        try:
-            _, id = detemplatize_name_id(schema_path.stem)
-            schema = await read_json(schema_path)
-            sources_by_source_id_map[id] = schema
-
-            schema["queues"] = []
-
-            schema_mapping = find_mapping_of_object(
-                mapping["organization"]["schemas"], id
-            )
-            if schema_mapping.get("ignore", None):
-                progress.update(task, advance=1)
-                return
-
-            result = await upload_schema(
-                client, schema, schema_mapping["target_object"]
-            )
-            schema_mapping["target_object"] = result["id"]
-            source_id_target_pairs[id] = result
-
-            progress.update(task, advance=1)
-        except Exception as e:
-            print(Panel(f"Error while migrating schema: {e}"))
-
-    await asyncio.gather(
-        *[migrate_schema(schema_path=schema_path) for schema_path in schema_paths]
-    )
 
 
 async def validate_override_migrated_objects_attributes(

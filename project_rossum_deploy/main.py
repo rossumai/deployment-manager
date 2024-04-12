@@ -26,10 +26,6 @@ from project_rossum_deploy.commands.upload.upload import upload_project_wrapper
 
 # TODO: preserve comments in yaml
 
-# TODO: Push --force param (will push everything even if you have no changes)
-
-# TODO: Pull ignores some keys (e.g., count for queues) which get updated all the time
-
 # Preserve a single ID
 # ? You specify 2 targets and they download into separate folders. If you redownload, you would need to check target order in mapping to know where to put it? ([2] -> target_3/)
 # ?
