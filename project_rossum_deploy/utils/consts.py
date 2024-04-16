@@ -116,7 +116,7 @@ try:
         UPLOAD_COMMAND_NAME: str = "push"
         MIGRATE_COMMAND_NAME: str = "release"
 
-        IGNORED_KEYS: dict = {"queue": ["counts"]}
+        IGNORED_KEYS: dict = {"queue": ["counts", "users"], "hook": ["status"]}
 
         FORMULA_DIR_PREFIX: str = "formulas:"
 
