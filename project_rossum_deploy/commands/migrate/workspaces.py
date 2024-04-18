@@ -117,8 +117,12 @@ async def migrate_queues_and_inboxes(
             queue_mapping["target_object"] = queue_result["id"]
             source_id_target_pairs[id] = queue_result
 
+
             inbox_config_path = queue_path / "inbox.json"
-            inbox = await read_json(inbox_config_path)
+            try:
+                inbox = await read_json(inbox_config_path)
+            except FileNotFoundError:
+                return
             sources_by_source_id_map[inbox["id"]] = inbox
 
             replace_dependency_url(inbox, "queues", source_id_target_pairs)

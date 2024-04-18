@@ -3,6 +3,7 @@ import logging
 
 from anyio import Path
 from rossum_api import ElisAPIClient
+from rossum_api.api_client import Resource
 
 from project_rossum_deploy.commands.upload.helpers import determine_object_type_from_path, determine_object_type_from_url
 from project_rossum_deploy.utils.functions import detemplatize_name_id, read_json, write_json
@@ -20,6 +21,10 @@ async def update_object(client: ElisAPIClient, path: Path = None, object: dict =
             raise Exception("Missing object URL")
 
         resource = determine_object_type_from_url(url)
+        # Inboxes are ready-only in Elis API, but we don't ignore them when pulling to distinguish queues with and without inboxes
+        if resource == Resource.Queue:
+            del object['inbox']
+
         result = await client._http_client.update(resource, id, object)
 
         print(f'Successfully updated {resource} with ID "{id}".')
