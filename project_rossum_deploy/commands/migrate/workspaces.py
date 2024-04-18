@@ -104,7 +104,7 @@ async def migrate_queues_and_inboxes(
             # Both should be updated, otherwise Elis API uses 'webhooks' in case of a mismatch even though it is deprecated
             replace_dependency_url(queue, "hooks", source_id_target_pairs)
             replace_dependency_url(queue, "webhooks", source_id_target_pairs)
-            del queue["inbox"]
+            queue.pop('inbox', None)
 
             queue_mapping = find_mapping_of_object(workspace_mapping["queues"], id)
             if queue_mapping.get("ignore", None):
@@ -127,7 +127,7 @@ async def migrate_queues_and_inboxes(
 
             replace_dependency_url(inbox, "queues", source_id_target_pairs)
             # Should either create a new one or it is already present
-            del inbox["email"]
+            inbox.pop('email', None)
 
             inbox_mapping = queue_mapping["inbox"]
             # Inbox cannot be ignored because a queue depends on it

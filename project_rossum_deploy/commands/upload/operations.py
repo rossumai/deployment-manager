@@ -23,7 +23,7 @@ async def update_object(client: ElisAPIClient, path: Path = None, object: dict =
         resource = determine_object_type_from_url(url)
         # Inboxes are ready-only in Elis API, but we don't ignore them when pulling to distinguish queues with and without inboxes
         if resource == Resource.Queue:
-            del object['inbox']
+            object.pop('inbox', None)
 
         result = await client._http_client.update(resource, id, object)
 
