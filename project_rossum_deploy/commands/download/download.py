@@ -42,27 +42,43 @@ Creates a local organization directory structure with the configs of these objec
 In case the directory already exists, it first deletes its contents and then downloads them anew.
                """,
 )
+@click.option(
+    "--cm",
+    default="",
+    help="Commits the pulled changes automatically with the specified commit message.",
+)
 @coro
-async def download_project_wrapper():
-    # To be able to run the command progammatically without the CLI decorators
-    await download_project()
+# To be able to run the command progammatically without the CLI decorators
+async def download_project_wrapper(cm: str = ""):
+    await download_project(commit_message=cm)
 
 
-async def download_project(client: ElisAPIClient = None, org_path: Path = None):
+async def download_project(
+    client: ElisAPIClient = None, org_path: Path = None, commit_message: str = ""
+):
+    if not org_path:
+        org_path = Path("./")
+
+    if (
+        await (org_path / settings.SOURCE_DIRNAME).exists()
+        or await (org_path / settings.TARGET_DIRNAME).exists()
+    ):
+        if not Confirm.ask(
+            f'Project "{(await org_path.absolute()).name}" already has configuration files in it, do you want to replace it with the new configuration?',
+        ):
+            return
+        await delete_current_configuration(org_path)
+
+    if settings.IS_PROJECT_IN_SAME_ORG:
+        await download_organization_combined_source_target(
+            client=client, org_path=org_path, commit_message=commit_message
+        )
+    else:
+        await download_organizations(org_path=org_path, commit_message=commit_message)
+
+
+async def download_organizations(org_path: Path = None, commit_message: str = ""):
     try:
-        if settings.IS_PROJECT_IN_SAME_ORG:
-            return await download_organization_combined(client, org_path)
-
-        if not org_path:
-            org_path = Path("./")
-
-        if len([path async for path in org_path.iterdir()]):
-            if not Confirm.ask(
-                f'Project "{(await (org_path).absolute()).name}" already has configuration files in it, do you want to replace it with the new configuration (both source and target)?',
-            ):
-                return
-            await delete_current_configuration(org_path)
-
         mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
         if not mapping:
             mapping = create_empty_mapping()
@@ -109,12 +125,17 @@ async def download_project(client: ElisAPIClient = None, org_path: Path = None):
             hooks_for_mapping=[*source_hooks, *target_hooks],
             old_mapping=mapping,
         )
+
     except Exception as e:
         display_error(f"Error during project {settings.DOWNLOAD_COMMAND_NAME}: {e}", e)
 
 
 async def download_organization_single(
-    client: ElisAPIClient, org_path: Path, destination: str
+    client: ElisAPIClient,
+    org_path: Path,
+    destination: str = "",
+    previous_sources: dict = {},
+    previous_targets: dict = {},
 ):
     organizations = [org async for org in client.list_all_organizations()]
     if not len(organizations):
@@ -137,24 +158,33 @@ async def download_organization_single(
                     client=client,
                     org_path=org_path,
                     destination=destination,
+                    sources=previous_sources,
+                    targets=previous_targets,
                     progress=progress,
                 ),
                 download_schemas(
                     client=client,
                     org_path=org_path,
                     destination=destination,
+                    sources=previous_sources,
+                    targets=previous_targets,
                     progress=progress,
                 ),
                 download_hooks(
                     client=client,
                     org_path=org_path,
                     destination=destination,
+                    sources=previous_sources,
+                    targets=previous_targets,
                     progress=progress,
                 ),
             ]
         )
 
-    print(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME} for {destination}."))
+    if destination:
+        print(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME} for {destination}."))
+    else:
+        print(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME}."))
     return organization, workspaces_for_mapping, schemas_for_mapping, hooks_for_mapping
 
 
@@ -389,9 +419,8 @@ async def download_hooks(
     return hooks
 
 
-# TODO: might be obsolete even for interorg
-async def download_organization_combined(
-    client: ElisAPIClient = None, org_path: Path = None
+async def download_organization_combined_source_target(
+    client: ElisAPIClient = None, org_path: Path = None, commit_message: str = ""
 ):
     try:
         if not client:
@@ -402,64 +431,23 @@ async def download_organization_combined(
                 password=settings.SOURCE_PASSWORD,
             )
 
-        organizations = [org async for org in client.list_all_organizations()]
-        if not len(organizations):
-            raise click.ClickException("No organization found.")
-        organization = await client._http_client.fetch_one(
-            Resource.Organization, organizations[0].id
-        )
-
-        if not org_path:
-            org_path = Path("./")
-
-        org_config_path = org_path / settings.SOURCE_DIRNAME / "organization.json"
-        if await org_config_path.exists():
-            if not Confirm.ask(
-                f'Project "{(await org_path.absolute()).name}" already has configuration files in it, do you want to replace it with the new configuration?',
-            ):
-                return
-            await delete_current_configuration(org_path)
-
-        await write_json(org_config_path, organization, "organization")
-
         mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
         if not mapping:
             mapping = create_empty_mapping()
         previous_sources, previous_targets = extract_sources_targets(mapping)
 
-        with Progress() as progress:
-            (
-                workspaces_for_mapping,
-                schemas_for_mapping,
-                hooks_for_mapping,
-            ) = await asyncio.gather(
-                *[
-                    download_workspaces(
-                        client=client,
-                        org_path=org_path,
-                        mapping=mapping,
-                        sources=previous_sources,
-                        targets=previous_targets,
-                        progress=progress,
-                    ),
-                    download_schemas(
-                        client=client,
-                        org_path=org_path,
-                        mapping=mapping,
-                        sources=previous_sources,
-                        targets=previous_targets,
-                        progress=progress,
-                    ),
-                    download_hooks(
-                        client=client,
-                        org_path=org_path,
-                        mapping=mapping,
-                        sources=previous_sources,
-                        targets=previous_targets,
-                        progress=progress,
-                    ),
-                ]
-            )
+        (
+            organization,
+            workspaces_for_mapping,
+            schemas_for_mapping,
+            hooks_for_mapping,
+        ) = await download_organization_single(
+            client=client,
+            org_path=org_path,
+            destination=settings.SOURCE_DIRNAME,
+            previous_sources=previous_sources,
+            previous_targets=previous_targets,
+        )
 
         await create_update_mapping(
             org_path=org_path,
@@ -469,8 +457,6 @@ async def download_organization_combined(
             hooks_for_mapping=hooks_for_mapping,
             old_mapping=mapping,
         )
-
-        print(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME}."))
 
     except Exception as e:
         display_error(f"Error during project {settings.DOWNLOAD_COMMAND_NAME}: {e}", e)
