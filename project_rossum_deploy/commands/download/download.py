@@ -1,5 +1,6 @@
 import asyncio
 import functools
+import subprocess
 from anyio import Path
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
@@ -43,18 +44,27 @@ In case the directory already exists, it first deletes its contents and then dow
                """,
 )
 @click.option(
-    "--cm",
-    default="",
-    help="Commits the pulled changes automatically with the specified commit message.",
+    "-c",
+    default=False,
+    is_flag=True,
+    help="Commits the pulled changes automatically.",
+)
+@click.option(
+    "-m",
+    default="Sync changes",
+    help="Commit message for pulling.",
 )
 @coro
 # To be able to run the command progammatically without the CLI decorators
-async def download_project_wrapper(cm: str = ""):
-    await download_project(commit_message=cm)
+async def download_project_wrapper(c: bool = False, m: str = ""):
+    await download_project(commit_message=m, commit=c)
 
 
 async def download_project(
-    client: ElisAPIClient = None, org_path: Path = None, commit_message: str = ""
+    client: ElisAPIClient = None,
+    org_path: Path = None,
+    commit: bool = False,
+    commit_message: str = "",
 ):
     if not org_path:
         org_path = Path("./")
@@ -71,13 +81,20 @@ async def download_project(
 
     if settings.IS_PROJECT_IN_SAME_ORG:
         await download_organization_combined_source_target(
-            client=client, org_path=org_path, commit_message=commit_message
+            client=client,
+            org_path=org_path,
+            commit=commit,
+            commit_message=commit_message,
         )
     else:
-        await download_organizations(org_path=org_path, commit_message=commit_message)
+        await download_organizations(
+            org_path=org_path, commit=commit, commit_message=commit_message
+        )
 
 
-async def download_organizations(org_path: Path = None, commit_message: str = ""):
+async def download_organizations(
+    org_path: Path = None, commit: bool = False, commit_message: str = ""
+):
     try:
         mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
         if not mapping:
@@ -126,6 +143,10 @@ async def download_organizations(org_path: Path = None, commit_message: str = ""
             old_mapping=mapping,
         )
 
+        if commit:
+            subprocess.run(["git", "add", "."])
+            subprocess.run(["git", "commit", "-m", commit_message])
+
     except Exception as e:
         display_error(f"Error during project {settings.DOWNLOAD_COMMAND_NAME}: {e}", e)
 
@@ -136,6 +157,7 @@ async def download_organization_single(
     destination: str = "",
     previous_sources: dict = {},
     previous_targets: dict = {},
+    org_config_path: str = "",
 ):
     organizations = [org async for org in client.list_all_organizations()]
     if not len(organizations):
@@ -144,7 +166,8 @@ async def download_organization_single(
         Resource.Organization, organizations[0].id
     )
 
-    org_config_path = org_path / destination / "organization.json"
+    if not org_config_path:
+        org_config_path = org_path / destination / "organization.json"
     await write_json(org_config_path, organization, "organization")
 
     with Progress() as progress:
@@ -420,7 +443,10 @@ async def download_hooks(
 
 
 async def download_organization_combined_source_target(
-    client: ElisAPIClient = None, org_path: Path = None, commit_message: str = ""
+    client: ElisAPIClient = None,
+    org_path: Path = None,
+    commit: bool = False,
+    commit_message: str = "",
 ):
     try:
         if not client:
@@ -435,6 +461,7 @@ async def download_organization_combined_source_target(
         if not mapping:
             mapping = create_empty_mapping()
         previous_sources, previous_targets = extract_sources_targets(mapping)
+        org_config_path = org_path / settings.SOURCE_DIRNAME / "organization.json"
 
         (
             organization,
@@ -444,9 +471,9 @@ async def download_organization_combined_source_target(
         ) = await download_organization_single(
             client=client,
             org_path=org_path,
-            destination=settings.SOURCE_DIRNAME,
             previous_sources=previous_sources,
             previous_targets=previous_targets,
+            org_config_path=org_config_path,
         )
 
         await create_update_mapping(
@@ -457,6 +484,10 @@ async def download_organization_combined_source_target(
             hooks_for_mapping=hooks_for_mapping,
             old_mapping=mapping,
         )
+
+        if commit:
+            subprocess.run(["git", "add", "."])
+            subprocess.run(["git", "commit", "-m", commit_message])
 
     except Exception as e:
         display_error(f"Error during project {settings.DOWNLOAD_COMMAND_NAME}: {e}", e)
