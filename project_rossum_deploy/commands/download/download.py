@@ -1,6 +1,5 @@
 import asyncio
 import functools
-import logging
 from anyio import Path
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
@@ -25,6 +24,7 @@ from project_rossum_deploy.commands.download.mapping import (
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     coro,
+    display_error,
     extract_id_from_url,
     extract_sources_targets,
     retrieve_with_progress,
@@ -110,8 +110,7 @@ async def download_project(client: ElisAPIClient = None, org_path: Path = None):
             old_mapping=mapping,
         )
     except Exception as e:
-        logging.exception(e)
-        print(Panel(f"Error during project {settings.DOWNLOAD_COMMAND_NAME}: {e}"))
+        display_error(f"Error during project {settings.DOWNLOAD_COMMAND_NAME}: {e}", e)
 
 
 async def download_organization_single(
@@ -474,5 +473,4 @@ async def download_organization_combined(
         print(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME}."))
 
     except Exception as e:
-        logging.exception(e)
-        print(Panel(f"Error during project {settings.DOWNLOAD_COMMAND_NAME}: {e}"))
+        display_error(f"Error during project {settings.DOWNLOAD_COMMAND_NAME}: {e}", e)

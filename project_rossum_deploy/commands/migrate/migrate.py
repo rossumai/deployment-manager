@@ -27,6 +27,7 @@ from project_rossum_deploy.common.upload import (
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     coro,
+    display_error,
     extract_flat_lookup_table,
     extract_sources_targets,
     find_all_object_paths,
@@ -174,7 +175,7 @@ async def migrate_project(
 
         await download_project(client=client, org_path=org_path)
     except Exception as e:
-        print(Panel(f"Unexpected error while migrating objects: {e}"))
+        display_error(f"Unexpected error while migrating objects: {e}", e)
 
 
 def find_created_target_ids(previous_mapping: dict, source_id_target_pairs: dict):
@@ -219,7 +220,7 @@ async def validate_override_migrated_objects_attributes(
         print(Panel("Attribute override dry-run found no errors."))
         return True
     except Exception as e:
-        print(Panel(f"Attribute override dry-run failed: {e}"))
+        display_error(f"Attribute override dry-run failed: {e}", e)
         return False
 
 

@@ -1,8 +1,6 @@
 import asyncio
 from anyio import Path
 from rich.progress import Progress
-from rich import print
-from rich.panel import Panel
 
 from rossum_api import ElisAPIClient
 
@@ -17,7 +15,11 @@ from project_rossum_deploy.common.upload import (
 )
 from project_rossum_deploy.utils.consts import settings
 
-from project_rossum_deploy.utils.functions import detemplatize_name_id, read_json
+from project_rossum_deploy.utils.functions import (
+    detemplatize_name_id,
+    display_error,
+    read_json,
+)
 
 
 async def migrate_workspaces(
@@ -42,9 +44,9 @@ async def migrate_workspaces(
             sources_by_source_id_map[id] = workspace
 
             workspace["queues"] = []
-            workspace[
-                "organization"
-            ] = f"{settings.TARGET_API_URL}/organizations/{mapping['organization']['target_object']}"
+            workspace["organization"] = (
+                f"{settings.TARGET_API_URL}/organizations/{mapping['organization']['target_object']}"
+            )
 
             workspace_mapping = find_mapping_of_object(
                 mapping["organization"]["workspaces"], id
@@ -71,7 +73,9 @@ async def migrate_workspaces(
 
             progress.update(task, advance=1)
         except Exception as e:
-            print(Panel(f"Error while migrating workspace with path '{ws_path}': {e}"))
+            display_error(
+                f"Error while migrating workspace with path '{ws_path}': {e}", e
+            )
 
     await asyncio.gather(
         *[migrate_workspace(ws_path=ws_path) for ws_path in workspace_paths]
@@ -104,7 +108,7 @@ async def migrate_queues_and_inboxes(
             # Both should be updated, otherwise Elis API uses 'webhooks' in case of a mismatch even though it is deprecated
             replace_dependency_url(queue, "hooks", source_id_target_pairs)
             replace_dependency_url(queue, "webhooks", source_id_target_pairs)
-            queue.pop('inbox', None)
+            queue.pop("inbox", None)
 
             queue_mapping = find_mapping_of_object(workspace_mapping["queues"], id)
             if queue_mapping.get("ignore", None):
@@ -117,7 +121,6 @@ async def migrate_queues_and_inboxes(
             queue_mapping["target_object"] = queue_result["id"]
             source_id_target_pairs[id] = queue_result
 
-
             inbox_config_path = queue_path / "inbox.json"
             try:
                 inbox = await read_json(inbox_config_path)
@@ -127,7 +130,7 @@ async def migrate_queues_and_inboxes(
 
             replace_dependency_url(inbox, "queues", source_id_target_pairs)
             # Should either create a new one or it is already present
-            inbox.pop('email', None)
+            inbox.pop("email", None)
 
             inbox_mapping = queue_mapping["inbox"]
             # Inbox cannot be ignored because a queue depends on it
@@ -137,7 +140,9 @@ async def migrate_queues_and_inboxes(
             inbox_mapping["target_object"] = inbox_result["id"]
             source_id_target_pairs[inbox["id"]] = inbox_result
         except Exception as e:
-            print(Panel(f"Error while migrating queue with path '{queue_path}': {e}"))
+            display_error(
+                f"Error while migrating queue with path '{queue_path}': {e}", e
+            )
 
     await asyncio.gather(
         *[migrate_queue_and_inbox(queue_path=queue_path) for queue_path in queue_paths]

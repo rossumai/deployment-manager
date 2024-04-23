@@ -17,6 +17,7 @@ from project_rossum_deploy.common.upload import upload_hook
 from project_rossum_deploy.utils.functions import (
     PauseProgress,
     detemplatize_name_id,
+    display_error,
     extract_id_from_url,
     read_json,
 )
@@ -90,7 +91,7 @@ async def migrate_hooks(
 
             progress.update(task, advance=1)
         except Exception as e:
-            print(Panel(f"Error while migrating hook with path '{hook_path}': {e}"))
+            display_error(f"Error while migrating hook with path '{hook_path}': {e}", e)
 
     await asyncio.gather(
         *[migrate_hook(hook_path=hook_path) for hook_path in hook_paths]
@@ -247,8 +248,7 @@ async def migrate_hook_dependency_graph(
 
                 await upload_hook(client, {"run_after": run_after}, new_hook["id"])
         except Exception as e:
-            print(
-                Panel(
-                    f"Error while migrating dependency graph for hook '{source_path}': {e}"
-                )
+            display_error(
+                f"Error while migrating dependency graph for hook '{source_path}': {e}",
+                e,
             )

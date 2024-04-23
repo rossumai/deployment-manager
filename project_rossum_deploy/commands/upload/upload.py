@@ -1,4 +1,3 @@
-import logging
 from anyio import Path
 import subprocess
 from rich import print
@@ -21,6 +20,7 @@ from project_rossum_deploy.utils.consts import (
 )
 from project_rossum_deploy.utils.functions import (
     coro,
+    display_error,
     find_all_object_paths,
     merge_formula_changes,
     merge_hook_changes,
@@ -141,8 +141,7 @@ async def upload_project(
         await download_project(client=client, org_path=org_path)
 
     except Exception as e:
-        logging.exception(e)
-        print(Panel(f"Error during project {settings.UPLOAD_COMMAND_NAME}: {e}"))
+        display_error(f"Error during project {settings.UPLOAD_COMMAND_NAME}: {e}", e)
 
 
 async def include_unmodified_files(
