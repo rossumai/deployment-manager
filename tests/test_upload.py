@@ -11,7 +11,7 @@ from rossum_api.api_client import Resource
 
 
 from project_rossum_deploy.commands.download.download import (
-    download_organization_combined,
+    download_organization_combined_source_target,
 )
 from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.upload.upload import upload_project
@@ -29,7 +29,7 @@ from tests.utils.consts import REFERENCE_PROJECT_PATH, UPDATED_NAME
 
 
 async def setup_project(client: ElisAPIClient, tmp_path):
-    await download_organization_combined(client=client, org_path=tmp_path)
+    await download_organization_combined_source_target(client=client, org_path=tmp_path)
 
     # Commit to a git repo so that the following update can be diffed
     current_path = Path(__file__).parent.parent
@@ -211,7 +211,7 @@ async def source_and_target_schema(client: ElisAPIClient, tmp_path, monkeypatch)
         {"name": "target_schema", "content": []}
     )
 
-    await download_organization_combined(client, org_path=tmp_path)
+    await download_organization_combined_source_target(client, org_path=tmp_path)
 
     mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
     mapping["organization"]["schemas"][0]["target_object"] = target_schema.id

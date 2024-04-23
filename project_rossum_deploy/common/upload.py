@@ -1,10 +1,10 @@
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
+from project_rossum_deploy.utils.functions import display_error
 
-async def upload_organization(
-    client: ElisAPIClient, organization: dict, target: int
-):
+
+async def upload_organization(client: ElisAPIClient, organization: dict, target: int):
     try:
         if not target:
             return
@@ -13,7 +13,7 @@ async def upload_organization(
             Resource.Organization, id_=target, data=organization
         )
     except Exception as e:
-        print(f"Error while uploading organization: {e}")
+        display_error(f"Error while uploading organization: {e}", e)
 
 
 async def upload_workspace(client: ElisAPIClient, workspace: dict, target: int):

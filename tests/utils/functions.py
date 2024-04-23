@@ -54,7 +54,7 @@ async def delete_migrated_objects(ids_to_retain: list[dict], client: ElisAPIClie
             ]
         )
     except Exception as e:
-        logging.error(f"Error while deleting hooks: {e}")
+        logging.exception(f"Error while deleting hooks: {e}")
 
     try:
         await asyncio.gather(
@@ -64,7 +64,7 @@ async def delete_migrated_objects(ids_to_retain: list[dict], client: ElisAPIClie
             ]
         )
     except Exception as e:
-        logging.error(f"Error while deleting inboxes: {e}")
+        logging.exception(f"Error while deleting inboxes: {e}")
 
     try:
         await asyncio.gather(
@@ -76,7 +76,7 @@ async def delete_migrated_objects(ids_to_retain: list[dict], client: ElisAPIClie
             ]
         )
     except Exception as e:
-        logging.error(f"Error while deleting queues: {e}")
+        logging.exception(f"Error while deleting queues: {e}")
 
     try:
         await asyncio.gather(
@@ -86,11 +86,11 @@ async def delete_migrated_objects(ids_to_retain: list[dict], client: ElisAPIClie
             ]
         )
     except Exception as e:
-        logging.error(f"Error while deleting workspaces: {e}")
+        logging.exception(f"Error while deleting workspaces: {e}")
 
     try:
         await asyncio.gather(
             *[client.delete_schema(schema_id) for schema_id in to_delete["schemas"]]
         )
     except Exception as e:
-        logging.error(f"Error while deleting schemas: {e}")
+        logging.exception(f"Error while deleting schemas: {e}")

@@ -1,12 +1,19 @@
 import json
-import logging
 
 from anyio import Path
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
-from project_rossum_deploy.commands.upload.helpers import determine_object_type_from_path, determine_object_type_from_url
-from project_rossum_deploy.utils.functions import detemplatize_name_id, read_json, write_json
+from project_rossum_deploy.commands.upload.helpers import (
+    determine_object_type_from_path,
+    determine_object_type_from_url,
+)
+from project_rossum_deploy.utils.functions import (
+    detemplatize_name_id,
+    display_error,
+    read_json,
+    write_json,
+)
 
 
 async def update_object(client: ElisAPIClient, path: Path = None, object: dict = None):
@@ -23,7 +30,7 @@ async def update_object(client: ElisAPIClient, path: Path = None, object: dict =
         resource = determine_object_type_from_url(url)
         # Inboxes are ready-only in Elis API, but we don't ignore them when pulling to distinguish queues with and without inboxes
         if resource == Resource.Queue:
-            object.pop('inbox', None)
+            object.pop("inbox", None)
 
         result = await client._http_client.update(resource, id, object)
 
@@ -31,11 +38,11 @@ async def update_object(client: ElisAPIClient, path: Path = None, object: dict =
         return result
     except Exception as e:
         if path:
-            logging.error(f'Error while updating object with path "{path}": {e}')
+            display_error(f'Error while updating object with path "{path}": {e}', e)
         else:
             id = object.get("id", None)
             descriptor = id if id else json.dump(object)
-            logging.error(f"Error while updating object {descriptor}: {e}")
+            display_error(f"Error while updating object {descriptor}: {e}", e)
 
 
 async def create_object(path: Path, client: ElisAPIClient):
@@ -47,7 +54,7 @@ async def create_object(path: Path, client: ElisAPIClient):
         await write_json(path, created_object)
         print(f'Successfully create {resource} with ID "{created_object["id"]}".')
     except Exception as e:
-        logging.error(f'Error while creating object with path "{path}": {e}')
+        display_error(f'Error while creating object with path "{path}": {e}', e)
 
 
 async def delete_object(path: Path, client: ElisAPIClient):
@@ -57,4 +64,4 @@ async def delete_object(path: Path, client: ElisAPIClient):
         await client._http_client.delete(resource, id)
         print(f'Successfully deleted {resource} with ID "{id}".')
     except Exception as e:
-        logging.error(f'Error while deleting object with path "{path}": {e}')
+        display_error(f'Error while deleting object with path "{path}": {e}', e)

@@ -137,5 +137,5 @@ try:
     settings = Settings()
 
 except Exception as e:
-    logging.error(f"Error while initializing PRD settings: {e}")
+    logging.exception(f"Error while initializing PRD settings: {e}")
     sys.exit(1)

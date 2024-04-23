@@ -2,14 +2,13 @@ from anyio import Path
 import asyncio
 
 from rossum_api import ElisAPIClient
-from rich import print
 from rich.progress import Progress
-from rich.panel import Panel
 
 from project_rossum_deploy.commands.migrate.helpers import find_mapping_of_object
 from project_rossum_deploy.common.upload import upload_schema
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
+    display_error,
     find_schema_id,
     read_formula_file,
     read_json,
@@ -56,7 +55,7 @@ async def migrate_schemas(
 
             progress.update(task, advance=1)
         except Exception as e:
-            print(Panel(f"Error while migrating schema: {e}"))
+            display_error(f"Error while migrating schema: {e}", e)
 
     await asyncio.gather(
         *[

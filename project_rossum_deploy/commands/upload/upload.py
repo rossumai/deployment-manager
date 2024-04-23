@@ -1,4 +1,3 @@
-import logging
 from anyio import Path
 import subprocess
 from rich import print
@@ -8,7 +7,7 @@ from rich.progress import track
 import click
 from rossum_api import ElisAPIClient
 from project_rossum_deploy.commands.download.download import (
-    download_project,
+    download_organizations,
 )
 
 from project_rossum_deploy.commands.upload.operations import (
@@ -21,6 +20,7 @@ from project_rossum_deploy.utils.consts import (
 )
 from project_rossum_deploy.utils.functions import (
     coro,
+    display_error,
     find_all_object_paths,
     merge_formula_changes,
     merge_hook_changes,
@@ -137,13 +137,11 @@ async def upload_project(
                 f"Running {settings.DOWNLOAD_COMMAND_NAME} for {destination} because of potential changes to names and mapping."
             )
         )
+        # Repulling is done to update mapping and (potentially) different filenames.
+        await download_organizations(client=client, org_path=org_path)
 
     except Exception as e:
-        logging.exception(e)
-        print(Panel(f"Error during project {settings.UPLOAD_COMMAND_NAME}: {e}"))
-
-    # Repulling is done to update mapping and (potentially) different filenames.
-    await download_project(client=client, org_path=org_path)
+        display_error(f"Error during project {settings.UPLOAD_COMMAND_NAME}: {e}", e)
 
 
 async def include_unmodified_files(

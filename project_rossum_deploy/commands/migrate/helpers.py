@@ -4,10 +4,6 @@ from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import extract_id_from_url
 
 
-def is_org_targetting_itself(mapping: dict):
-    return mapping["organization"]["target_object"] == mapping["organization"]["id"]
-
-
 def is_first_time_migration(submapping: dict):
     return not submapping.get("target_object", None)
 

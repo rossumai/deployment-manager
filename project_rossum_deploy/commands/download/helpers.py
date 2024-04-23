@@ -4,8 +4,6 @@ from anyio import Path
 import shutil
 from rich.prompt import Confirm
 
-from project_rossum_deploy.commands.migrate.helpers import is_org_targetting_itself
-
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import templatize_name_id, write_str
 
@@ -42,7 +40,7 @@ async def determine_object_destination(
     # Cross-org migration means that there is no target dir in this project
     # Both organizations = projects only have the source dir
     elif (
-        not is_org_targetting_itself(mapping)
+        not settings.IS_PROJECT_IN_SAME_ORG
         or object["id"] in sources[object_type + "s"]
     ):
         destination = settings.SOURCE_DIRNAME
