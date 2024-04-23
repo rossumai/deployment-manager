@@ -172,10 +172,9 @@ async def migrate_project(
 
         print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
 
+        await download_project(client=client, org_path=org_path)
     except Exception as e:
         print(Panel(f"Unexpected error while migrating objects: {e}"))
-
-    await download_project(client=client, org_path=org_path)
 
 
 def find_created_target_ids(previous_mapping: dict, source_id_target_pairs: dict):

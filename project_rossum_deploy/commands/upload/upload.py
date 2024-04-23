@@ -137,13 +137,12 @@ async def upload_project(
                 f"Running {settings.DOWNLOAD_COMMAND_NAME} for {destination} because of potential changes to names and mapping."
             )
         )
+        # Repulling is done to update mapping and (potentially) different filenames.
+        await download_project(client=client, org_path=org_path)
 
     except Exception as e:
         logging.exception(e)
         print(Panel(f"Error during project {settings.UPLOAD_COMMAND_NAME}: {e}"))
-
-    # Repulling is done to update mapping and (potentially) different filenames.
-    await download_project(client=client, org_path=org_path)
 
 
 async def include_unmodified_files(
