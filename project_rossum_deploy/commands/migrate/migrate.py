@@ -9,7 +9,7 @@ from rich.progress import Progress
 import click
 from rossum_api import ElisAPIClient
 from project_rossum_deploy.commands.download.download import (
-    download_organizations,
+    download_project,
 )
 from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.migrate.helpers import (
@@ -173,7 +173,7 @@ async def migrate_project(
 
         print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
 
-        await download_organizations(client=client, org_path=org_path)
+        await download_project(client=client, org_path=org_path)
     except Exception as e:
         display_error(f"Unexpected error while migrating objects: {e}", e)
 
