@@ -520,7 +520,7 @@ async def download_organization_combined_source_target(
         )
 
         # Make the previous mapping conform in structure
-        await migrate_mapping("mapping.yaml")
+        await migrate_mapping("mapping.yaml", print_result=False)
         mapping = await read_mapping(mapping_path)
 
         await create_update_mapping(

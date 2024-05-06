@@ -22,14 +22,14 @@ async def migrate_mapping_wrapper(mapping: str):
     await migrate_mapping(mapping_file=mapping)
 
 
-async def migrate_mapping(mapping_file: str = ""):
+async def migrate_mapping(mapping_file: str = "", print_result: bool = True):
     mapping_path = Path("./") / mapping_file
     if not await mapping_path.exists():
         raise click.ClickException(f"Mapping '{mapping_path}' not found.")
 
     mapping = await read_mapping(mapping_path)
 
-    for mapping_object in traverse_mapping(mapping['organization']):
+    for mapping_object in traverse_mapping(mapping["organization"]):
         target_object = mapping_object.get("target_object", None)
         attribute_override = mapping_object.get("attribute_override", None)
 
@@ -49,4 +49,5 @@ async def migrate_mapping(mapping_file: str = ""):
 
     await write_mapping(mapping_path=mapping_path, mapping=mapping)
 
-    print(Panel(f'Successfully updated/migrated "{mapping_path}".'))
+    if print_result:
+        print(Panel(f'Successfully updated/migrated "{mapping_path}".'))
