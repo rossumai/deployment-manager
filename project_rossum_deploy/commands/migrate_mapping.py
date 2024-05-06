@@ -49,4 +49,4 @@ async def migrate_mapping(mapping_file: str = ""):
 
     await write_mapping(mapping_path=mapping_path, mapping=mapping)
 
-    print(Panel(f'Successfully migrated "{mapping_path}".'))
+    print(Panel(f'Successfully updated/migrated "{mapping_path}".'))

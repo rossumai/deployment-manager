@@ -146,9 +146,6 @@ async def migrate_queues_and_inboxes(
             except FileNotFoundError:
                 return
 
-            # Should either create a new one or it is already present
-            inbox.pop("email", None)
-
             inbox_id = inbox["id"]
             sources_by_source_id_map[inbox["id"]] = inbox
             inbox_mapping = queue_mapping["inbox"]
@@ -249,6 +246,6 @@ async def prepare_inbox_upload(
         source_id_target_pairs=source_id_target_pairs,
     )
     # Should either create a new one or it is already present
-    del inbox["email"]
+    inbox.pop("email", None)
 
     return await upload_inbox(client=client, inbox=inbox, target_id=target_id)

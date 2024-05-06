@@ -1,7 +1,6 @@
 import asyncio
 import functools
 from anyio import Path
-import asyncio
 
 from rossum_api import ElisAPIClient
 from rich.progress import Progress
@@ -20,7 +19,6 @@ from project_rossum_deploy.utils.functions import (
     read_json,
     templatize_name_id,
 )
-from project_rossum_deploy.utils.consts import settings
 
 
 async def migrate_schemas(

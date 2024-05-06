@@ -69,7 +69,7 @@ async def migrate_project(
             raise PrdVersionException(
                 f'Detected "target_object" for organization. Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping format.'
             )
-        
+
         target_organization_id = (
             target_organizations[0].get("target_id", None)
             if len(target_organizations)
@@ -223,19 +223,23 @@ async def validate_override_migrated_objects_attributes(
         source_paths = await find_all_object_paths(base_path)
         source_objects = [await read_json(path) for path in source_paths]
         for mapping_object in traverse_mapping(mapping):
-            if mapping_object.get(
-                "attribute_override", None
-            ) and not mapping_object.get("ignore", None):
-                source_object = None
-                for source_candidate in source_objects:
-                    if source_candidate["id"] == mapping_object["id"]:
-                        source_object = source_candidate
-                        break
+            if mapping_object.get("ignore", None) or not (
+                targets := mapping_object.get("targets", [])
+            ):
+                continue
 
+            source_object = None
+            for source_candidate in source_objects:
+                if source_candidate["id"] == mapping_object["id"]:
+                    source_object = source_candidate
+                    break
+
+            for target in targets:
+                source_copy = deepcopy(source_object)
                 override_attributes_v2(
                     lookup_table=extract_flat_lookup_table(mapping),
-                    submapping=mapping_object,
-                    object=source_object,
+                    target_submapping=target,
+                    object=source_copy,
                     is_dryrun=True,
                 )
 
@@ -279,8 +283,10 @@ async def override_migrated_objects_attributes(
 
             override_attributes_v2(
                 lookup_table=lookup_table,
-                submapping=mapping_object,
-                attribute_overrides=attribute_overrides,
+                target_submapping={
+                    "target_id": target_object["id"],
+                    "attribute_override": attribute_overrides,
+                },
                 object=source_object_subset,
             )
 

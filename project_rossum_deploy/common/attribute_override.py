@@ -13,7 +13,7 @@ from project_rossum_deploy.utils.functions import (
 def override_attributes_v2(
     lookup_table: dict,
     object: dict,
-    submapping: dict,
+    target_submapping: dict,
     is_dryrun: bool = False,
 ) -> dict:
     if is_dryrun:
@@ -83,10 +83,10 @@ def override_attributes_v2(
 
     if not object:
         raise Exception(
-            f'Cannot perform attribute_override on None object (name: {submapping.get("name", "")} | id: {submapping.get("id", "")}).'
+            f'Cannot perform attribute_override on None object (target name: {target_submapping.get("name", "")} | target id: {target_submapping.get("id", "")}).'
         )
 
-    attribute_overrides = submapping.get("attribute_override", {})
+    attribute_overrides = target_submapping.get("attribute_override", {})
     for key, value in attribute_overrides.items():
         override_attribute_v2(
             key_query=key,
