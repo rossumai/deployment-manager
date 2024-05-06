@@ -65,7 +65,7 @@ async def migrate_workspaces(
             source_id_target_pairs[id] = []
             if "target_object" in workspace_mapping:
                 raise PrdVersionException(
-                    f'Detected "target_object" for workspace with ID "{id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping.'
+                    f'Detected "target_object" for workspace with ID "{id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping format.'
                 )
 
             results = await migrate_object_to_multiple_targets(
@@ -130,7 +130,7 @@ async def migrate_queues_and_inboxes(
             source_id_target_pairs[id] = []
             if "target_object" in queue_mapping:
                 raise PrdVersionException(
-                    f'Detected "target_object" for queue with ID "{id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping.'
+                    f'Detected "target_object" for queue with ID "{id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping format.'
                 )
 
             results = await migrate_object_to_multiple_targets(
@@ -164,7 +164,7 @@ async def migrate_queues_and_inboxes(
             source_id_target_pairs[inbox_id] = []
             if "target_object" in inbox_mapping:
                 raise PrdVersionException(
-                    f'Detected "target_object" for inbox with ID "{inbox_id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping.'
+                    f'Detected "target_object" for inbox with ID "{inbox_id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping format.'
                 )
 
             results = await migrate_object_to_multiple_targets(

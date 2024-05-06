@@ -81,7 +81,7 @@ async def migrate_hooks(
             source_id_target_pairs[id] = []
             if "target_object" in hook_mapping:
                 raise PrdVersionException(
-                    f'Detected "target_object" for hook with ID "{id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping.'
+                    f'Detected "target_object" for hook with ID "{id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping format.'
                 )
 
             results = await migrate_object_to_multiple_targets(

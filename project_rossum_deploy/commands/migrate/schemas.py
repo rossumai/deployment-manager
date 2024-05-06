@@ -57,7 +57,7 @@ async def migrate_schemas(
             source_id_target_pairs[id] = []
             if "target_object" in schema_mapping:
                 raise PrdVersionException(
-                    f'Detected "target_object" for schema with ID "{id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping.'
+                    f'Detected "target_object" for schema with ID "{id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping format.'
                 )
             #     result = await migrate_object_to_default_target(
             #         submapping=schema_mapping, upload_function=partial_upload_schema

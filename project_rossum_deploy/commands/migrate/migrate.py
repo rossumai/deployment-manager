@@ -64,6 +64,12 @@ async def migrate_project(
         previous_mapping = deepcopy(mapping)
 
         target_organizations = mapping["organization"].get("targets", [])
+
+        if "target_object" in mapping["organization"]:
+            raise PrdVersionException(
+                f'Detected "target_object" for organization. Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping format.'
+            )
+        
         target_organization_id = (
             target_organizations[0].get("target_id", None)
             if len(target_organizations)
