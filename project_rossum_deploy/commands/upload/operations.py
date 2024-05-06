@@ -8,6 +8,7 @@ from project_rossum_deploy.commands.upload.helpers import (
     determine_object_type_from_path,
     determine_object_type_from_url,
 )
+from project_rossum_deploy.utils.consts import GIT_CHARACTERS
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
     display_error,
@@ -16,7 +17,9 @@ from project_rossum_deploy.utils.functions import (
 )
 
 
-async def update_object(client: ElisAPIClient, path: Path = None, object: dict = None):
+async def update_object(
+    client: ElisAPIClient, path: Path = None, object: dict = None, errors: list = []
+):
     try:
         if not object:
             object = await read_json(path)
@@ -43,9 +46,10 @@ async def update_object(client: ElisAPIClient, path: Path = None, object: dict =
             id = object.get("id", None)
             descriptor = id if id else json.dump(object)
             display_error(f"Error while updating object {descriptor}: {e}", e)
+        errors.append({"op": GIT_CHARACTERS.UPDATED, "path": path})
 
 
-async def create_object(path: Path, client: ElisAPIClient):
+async def create_object(path: Path, client: ElisAPIClient, errors: list):
     try:
         object = await read_json(path)
         object["id"] = None
@@ -55,9 +59,10 @@ async def create_object(path: Path, client: ElisAPIClient):
         print(f'Successfully create {resource} with ID "{created_object["id"]}".')
     except Exception as e:
         display_error(f'Error while creating object with path "{path}": {e}', e)
+        errors.append({"op": GIT_CHARACTERS.CREATED, "path": path})
 
 
-async def delete_object(path: Path, client: ElisAPIClient):
+async def delete_object(path: Path, client: ElisAPIClient, errors: list):
     try:
         _, id = detemplatize_name_id(path)
         resource = determine_object_type_from_path(path)
@@ -65,3 +70,4 @@ async def delete_object(path: Path, client: ElisAPIClient):
         print(f'Successfully deleted {resource} with ID "{id}".')
     except Exception as e:
         display_error(f'Error while deleting object with path "{path}": {e}', e)
+        errors.append({"op": GIT_CHARACTERS.DELETED, "path": path})

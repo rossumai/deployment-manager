@@ -110,33 +110,40 @@ async def upload_project(
         if upload_all:
             await include_unmodified_files(Path(org_path) / destination, changes)
 
+        errors = []
         for change in track(changes, description="Pushing changes to Rossum..."):
             op, path = change
             match op:
                 case GIT_CHARACTERS.CREATED:
-                    await create_object(org_path / path, client)
+                    await create_object(org_path / path, client, errors)
                 case GIT_CHARACTERS.CREATED_STAGED:
-                    await create_object(org_path / path, client)
+                    await create_object(org_path / path, client, errors)
                 # case GIT_CHARACTERS.DELETED:
-                #    await delete_object(org_path / path, client)
+                #    await delete_object(org_path / path, client, errors)
                 case GIT_CHARACTERS.UPDATED:
-                    result = await update_object(client=client, path=org_path / path)
+                    result = await update_object(
+                        client=client, path=org_path / path, errors=errors
+                    )
                     if not result and upload_all:
                         print(f'Recreating object with path "{path}".')
                         await create_object(org_path / path, client)
                 case _:
+                    errors.append({"op": op, "path": path})
                     raise click.ClickException(f'Unrecognized operator "{op}".')
 
-        print(
-            Panel(
-                f"Finished {settings.UPLOAD_COMMAND_NAME}. Please commit the changes before running this command again."
+        if len(errors):
+            errors_listed = "\n".join(list(map(lambda x: str(x["path"]), errors)))
+            display_error(
+                f"Errors happened during {settings.UPLOAD_COMMAND_NAME} for the following paths. Do not run {settings.DOWNLOAD_COMMAND_NAME} or you might lose changes in these files:\n{errors_listed}",
             )
-        )
-        print(
-            Panel(
-                f"Running {settings.DOWNLOAD_COMMAND_NAME} for {destination} because of potential changes to names and mapping."
+            return
+        else:
+            print(
+                Panel(
+                    f"Finished {settings.UPLOAD_COMMAND_NAME}. Please commit the changes before running this command again."
+                )
             )
-        )
+
         # Repulling is done to update mapping and (potentially) different filenames.
         await download_project(client=client, org_path=org_path)
 

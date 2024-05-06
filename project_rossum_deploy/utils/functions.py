@@ -462,10 +462,11 @@ def extract_flat_lookup_table(mapping: dict) -> dict:
     return table
 
 
-def display_error(error_msg: str, exception: Exception):
+def display_error(error_msg: str, exception: Exception = None):
     console = Console()
-    logging.exception(exception)
-    console.print(Panel(error_msg), style='bold red')
+    if exception:
+        logging.exception(exception)
+    console.print(Panel(error_msg), style="bold red")
 
 
 # https://stackoverflow.com/questions/73464511/rich-prompt-confirm-not-working-in-rich-progress-context-python
