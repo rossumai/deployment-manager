@@ -1,5 +1,4 @@
 import asyncio
-import functools
 import subprocess
 from anyio import Path
 from rossum_api import ElisAPIClient
@@ -28,7 +27,7 @@ from project_rossum_deploy.utils.functions import (
     display_error,
     extract_id_from_url,
     extract_sources_targets,
-    retrieve_with_progress,
+    make_request_with_progress,
     templatize_name_id,
     write_json,
     write_str,
@@ -235,10 +234,8 @@ async def download_workspaces(
     # Use raw dicts and not dataclasses in case of fields not defined in the Rossum API lib
     full_workspaces = await asyncio.gather(
         *[
-            retrieve_with_progress(
-                functools.partial(
-                    client._http_client.fetch_one, Resource.Workspace, ws.id
-                ),
+            make_request_with_progress(
+                client._http_client.fetch_one(Resource.Workspace, ws.id),
                 progress,
                 task,
             )
@@ -331,10 +328,8 @@ async def download_schemas(
     # Use raw dicts and not dataclasses in case of fields not defined in the Rossum API lib
     full_schemas = await asyncio.gather(
         *[
-            retrieve_with_progress(
-                functools.partial(
-                    client._http_client.fetch_one, Resource.Schema, schema.id
-                ),
+            make_request_with_progress(
+                client._http_client.fetch_one(Resource.Schema, schema.id),
                 progress,
                 task,
             )
@@ -398,10 +393,8 @@ async def download_hooks(
     # Use raw dicts and not dataclasses in case of fields not defined in the Rossum API lib
     full_hooks = await asyncio.gather(
         *[
-            retrieve_with_progress(
-                functools.partial(
-                    client._http_client.fetch_one, Resource.Hook, hook.id
-                ),
+            make_request_with_progress(
+                client._http_client.fetch_one(Resource.Hook, hook.id),
                 progress,
                 task,
             )

@@ -359,8 +359,8 @@ def adjust_keys(object: Any, uppercase_fields: list = [], lower: bool = True):
         return object
 
 
-async def retrieve_with_progress(retrieve, progress, task):
-    result = await retrieve()
+async def make_request_with_progress(coro, progress, task):
+    result = await coro
     progress.update(task, advance=1)
     return result
 
@@ -487,3 +487,13 @@ class PauseProgress:
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self._progress.start()
+
+
+async def gather_with_concurrency(n, *coros):
+    semaphore = asyncio.Semaphore(n)
+
+    async def sem_coro(coro):
+        async with semaphore:
+            return await coro
+
+    return await asyncio.gather(*(sem_coro(c) for c in coros))

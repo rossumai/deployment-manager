@@ -2,7 +2,7 @@ from anyio import Path
 import subprocess
 from rich import print
 from rich.panel import Panel
-from rich.progress import track
+from rich.progress import Progress
 
 import click
 from rossum_api import ElisAPIClient
@@ -22,6 +22,8 @@ from project_rossum_deploy.utils.functions import (
     coro,
     display_error,
     find_all_object_paths,
+    gather_with_concurrency,
+    make_request_with_progress,
     merge_formula_changes,
     merge_hook_changes,
     evaluate_create_dependencies,
@@ -110,26 +112,43 @@ async def upload_project(
         if upload_all:
             await include_unmodified_files(Path(org_path) / destination, changes)
 
+        requests = []
         errors = []
-        for change in track(changes, description="Pushing changes to Rossum..."):
+
+        for change in changes:
             op, path = change
             match op:
                 case GIT_CHARACTERS.CREATED:
-                    await create_object(org_path / path, client, errors)
+                    requests.append(create_object(org_path / path, client, errors))
                 case GIT_CHARACTERS.CREATED_STAGED:
-                    await create_object(org_path / path, client, errors)
+                    requests.append(create_object(org_path / path, client, errors))
                 # case GIT_CHARACTERS.DELETED:
-                #    await delete_object(org_path / path, client, errors)
+                #    requests.append(delete_object(org_path / path, client, errors))
                 case GIT_CHARACTERS.UPDATED:
-                    result = await update_object(
-                        client=client, path=org_path / path, errors=errors
-                    )
-                    if not result and upload_all:
-                        print(f'Recreating object with path "{path}".')
-                        await create_object(org_path / path, client)
+                    if upload_all:
+                        requests.append(
+                            update_create_object(
+                                client=client, path=org_path / path, errors=errors
+                            )
+                        )
+                    else:
+                        requests.append(
+                            update_object(
+                                client=client, path=org_path / path, errors=errors
+                            )
+                        )
                 case _:
+                    display_error(f'Unrecognized operation "{op}" for "{path}".')
                     errors.append({"op": op, "path": path})
-                    raise click.ClickException(f'Unrecognized operator "{op}".')
+
+        with Progress() as progress:
+            task = progress.add_task(
+                "Pushing changes to Rossum...", total=len(requests)
+            )
+            await gather_with_concurrency(
+                5,
+                *map(lambda r: make_request_with_progress(r, progress, task), requests),
+            )
 
         if len(errors):
             errors_listed = "\n".join(list(map(lambda x: str(x["path"]), errors)))
@@ -149,6 +168,14 @@ async def upload_project(
 
     except Exception as e:
         display_error(f"Error during project {settings.UPLOAD_COMMAND_NAME}: {e}", e)
+
+
+async def update_create_object(client, path, errors):
+    result = await update_object(client=client, path=path, errors=errors)
+
+    if not result:
+        print(f'Recreating object with path "{path}".')
+        await create_object(path=path, client=client, errors=errors)
 
 
 async def include_unmodified_files(
