@@ -4,10 +4,13 @@ from anyio import Path
 
 from rossum_api import ElisAPIClient
 from rich.progress import Progress
+from rich.panel import Panel
+from rich import print
 
 from project_rossum_deploy.commands.migrate.helpers import (
     find_mapping_of_object,
     migrate_object_to_multiple_targets,
+    simulate_migrate_object,
 )
 from project_rossum_deploy.utils.consts import settings, PrdVersionException
 from project_rossum_deploy.common.upload import upload_schema
@@ -28,6 +31,7 @@ async def migrate_schemas(
     source_id_target_pairs: dict[int, list],
     sources_by_source_id_map: dict,
     progress: Progress,
+    plan_only: bool = False,
 ):
     schema_paths = [
         schema_path async for schema_path in (source_path / "schemas").iterdir()
@@ -51,7 +55,13 @@ async def migrate_schemas(
 
             await update_formula_fields_code(schema_path, schema)
 
-            partial_upload_schema = functools.partial(upload_schema, client, schema)
+            if plan_only:
+                partial_upload_schema = functools.partial(
+                    simulate_migrate_object,
+                    source_object=schema,
+                )
+            else:
+                partial_upload_schema = functools.partial(upload_schema, client, schema)
             source_id_target_pairs[id] = []
             if "target_object" in schema_mapping:
                 raise PrdVersionException(
@@ -72,6 +82,9 @@ async def migrate_schemas(
             raise e
         except Exception as e:
             display_error(f"Error while migrating schema: {e}", e)
+
+    if plan_only:
+        print(Panel("Simulating workspaces"))
 
     await asyncio.gather(
         *[

@@ -121,3 +121,23 @@ async def migrate_object_to_multiple_targets(
             submapping.get("targets", [])[index]["target_id"] = result.get("id", None)
 
     return list(filter(lambda x: x, results))
+
+
+# Extra args are there to accomodate all upload function signatures
+async def simulate_migrate_object(
+    source_object: dict,
+    target_id: int,
+    target_index: int = 0,
+    target_objects_count: int = 0,
+    source_id_target_pairs: dict[int, list] = None,
+):
+    if target_id:
+        print(
+            f'Simulated update of target "{target_id}" from source "{source_object.get('id', None)} {source_object.get('name', '')}".'
+        )
+    else:
+        print(
+            f'Simualted creation of target from source "{source_object.get('id', None)} {source_object.get('name', '')}".'
+        )
+
+    return {}

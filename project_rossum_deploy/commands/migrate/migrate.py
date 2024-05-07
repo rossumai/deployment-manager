@@ -43,19 +43,19 @@ The specifics of what objects to migrate and where to migrate them are specified
                """,
 )
 @click.option(
-    "--validate-only",
-    "-v",
-    help=f"Checks the defined attribute_override without the actual {settings.MIGRATE_COMMAND_NAME}.",
+    "--plan-only",
+    "-p",
+    help=f"Prints/simulates operations that would be done in the actual {settings.MIGRATE_COMMAND_NAME}.",
     default=False,
     is_flag=True,
 )
 @coro
-async def migrate_project_wrapper(validate_only: bool):
-    await migrate_project(validate_only=validate_only)
+async def migrate_project_wrapper(plan_only: bool):
+    await migrate_project(plan_only=plan_only)
 
 
 async def migrate_project(
-    client: ElisAPIClient = None, org_path: Path = None, validate_only: bool = False
+    client: ElisAPIClient = None, org_path: Path = None, plan_only: bool = False
 ):
     try:
         if not org_path:
@@ -110,9 +110,6 @@ async def migrate_project(
         ):
             return
 
-        if validate_only:
-            return
-
         with Progress() as progress:
             task = progress.add_task("Releasing organization...", total=1)
 
@@ -141,6 +138,7 @@ async def migrate_project(
                 source_id_target_pairs=source_id_target_pairs,
                 sources_by_source_id_map=sources_by_source_id_map,
                 progress=progress,
+                plan_only=plan_only,
             )
             await migrate_hooks(
                 source_path=source_path,
@@ -149,6 +147,7 @@ async def migrate_project(
                 source_id_target_pairs=source_id_target_pairs,
                 sources_by_source_id_map=sources_by_source_id_map,
                 progress=progress,
+                plan_only=plan_only,
             )
             await migrate_workspaces(
                 source_path=source_path,
@@ -157,7 +156,11 @@ async def migrate_project(
                 source_id_target_pairs=source_id_target_pairs,
                 sources_by_source_id_map=sources_by_source_id_map,
                 progress=progress,
+                plan_only=plan_only,
             )
+
+        if plan_only:
+            return
 
         # Update the mapping with right hand sides (targets) created during migration
         await write_mapping(org_path / settings.MAPPING_FILENAME, mapping)

@@ -12,6 +12,7 @@ from project_rossum_deploy.commands.migrate.helpers import (
     find_mapping_of_object,
     get_token_owner,
     migrate_object_to_multiple_targets,
+    simulate_migrate_object,
 )
 from project_rossum_deploy.utils.consts import PrdVersionException, settings
 from project_rossum_deploy.common.upload import upload_hook
@@ -31,6 +32,7 @@ async def migrate_hooks(
     source_id_target_pairs: dict[int, list],
     sources_by_source_id_map: dict,
     progress: Progress,
+    plan_only: bool = False,
 ):
     hook_paths = [hook_path async for hook_path in (source_path / "hooks").iterdir()]
     task = progress.add_task("Releasing hooks...", total=len(hook_paths))
@@ -71,13 +73,19 @@ async def migrate_hooks(
 
             await update_hook_code(hook_path, hook)
 
-            partial_upload_hook = functools.partial(
-                upload_hook,
-                client=client,
-                hook=hook,
-                hook_mapping=hook_mapping,
-                progress=progress,
-            )
+            if plan_only:
+                partial_upload_hook = functools.partial(
+                    simulate_migrate_object,
+                    source_object=hook,
+                )
+            else:
+                partial_upload_hook = functools.partial(
+                    upload_hook,
+                    client=client,
+                    hook=hook,
+                    hook_mapping=hook_mapping,
+                    progress=progress,
+                )
             source_id_target_pairs[id] = []
             if "target_object" in hook_mapping:
                 raise PrdVersionException(
@@ -95,9 +103,15 @@ async def migrate_hooks(
         except Exception as e:
             display_error(f"Error while migrating hook with path '{hook_path}': {e}", e)
 
+    if plan_only:
+        print(Panel("Simulating hooks"))
+
     await asyncio.gather(
         *[migrate_hook(hook_path=hook_path) for hook_path in hook_paths]
     )
+
+    if plan_only:
+        return
 
     await migrate_hook_dependency_graph(client, source_path, source_id_target_pairs)
 

@@ -3,7 +3,9 @@ from copy import deepcopy
 import functools
 import logging
 from anyio import Path
+from rich import print
 from rich.progress import Progress
+from rich.panel import Panel
 
 from rossum_api import ElisAPIClient
 
@@ -11,6 +13,7 @@ from project_rossum_deploy.commands.migrate.helpers import (
     find_mapping_of_object,
     migrate_object_to_multiple_targets,
     replace_dependency_url,
+    simulate_migrate_object,
 )
 from project_rossum_deploy.common.upload import (
     upload_inbox,
@@ -33,6 +36,7 @@ async def migrate_workspaces(
     source_id_target_pairs: dict[int, list],
     sources_by_source_id_map: dict,
     progress: Progress,
+    plan_only: bool = False,
 ):
     workspace_paths = [
         workspace_path
@@ -59,9 +63,15 @@ async def migrate_workspaces(
                 progress.update(task, advance=1)
                 return
 
-            partial_upload_workspace = functools.partial(
-                upload_workspace, client, workspace
-            )
+            if plan_only:
+                partial_upload_workspace = functools.partial(
+                    simulate_migrate_object,
+                    source_object=workspace,
+                )
+            else:
+                partial_upload_workspace = functools.partial(
+                    upload_workspace, client, workspace
+                )
             source_id_target_pairs[id] = []
             if "target_object" in workspace_mapping:
                 raise PrdVersionException(
@@ -80,6 +90,7 @@ async def migrate_workspaces(
                 mapping=mapping,
                 sources_by_source_id_map=sources_by_source_id_map,
                 source_id_target_pairs=source_id_target_pairs,
+                plan_only=plan_only,
             )
 
             progress.update(task, advance=1)
@@ -89,6 +100,9 @@ async def migrate_workspaces(
             display_error(
                 f"Error while migrating workspace with path '{ws_path}': {e}", e
             )
+
+    if plan_only:
+        print(Panel("Simulating workspaces"))
 
     await asyncio.gather(
         *[migrate_workspace(ws_path=ws_path) for ws_path in workspace_paths]
@@ -102,6 +116,7 @@ async def migrate_queues_and_inboxes(
     mapping: dict,
     sources_by_source_id_map: dict,
     source_id_target_pairs: dict[int, list],
+    plan_only: bool = False,
 ):
     if not (await (ws_path / "queues").exists()):
         return
@@ -120,12 +135,18 @@ async def migrate_queues_and_inboxes(
             if queue_mapping.get("ignore", None):
                 return
 
-            partial_upload_queue_function = functools.partial(
-                prepare_queue_upload,
-                queue=queue,
-                client=client,
-                source_id_target_pairs=source_id_target_pairs,
-            )
+            if plan_only:
+                partial_upload_queue_function = functools.partial(
+                    simulate_migrate_object,
+                    source_object=queue,
+                )
+            else:
+                partial_upload_queue_function = functools.partial(
+                    prepare_queue_upload,
+                    queue=queue,
+                    client=client,
+                    source_id_target_pairs=source_id_target_pairs,
+                )
 
             source_id_target_pairs[id] = []
             if "target_object" in queue_mapping:
@@ -152,12 +173,18 @@ async def migrate_queues_and_inboxes(
 
             # Inbox cannot be ignored because a queue depends on it
 
-            partial_upload_inbox_function = functools.partial(
-                prepare_inbox_upload,
-                inbox=inbox,
-                client=client,
-                source_id_target_pairs=source_id_target_pairs,
-            )
+            if plan_only:
+                partial_upload_inbox_function = functools.partial(
+                    simulate_migrate_object,
+                    source_object=inbox,
+                )
+            else:
+                partial_upload_inbox_function = functools.partial(
+                    prepare_inbox_upload,
+                    inbox=inbox,
+                    client=client,
+                    source_id_target_pairs=source_id_target_pairs,
+                )
             source_id_target_pairs[inbox_id] = []
             if "target_object" in inbox_mapping:
                 raise PrdVersionException(
