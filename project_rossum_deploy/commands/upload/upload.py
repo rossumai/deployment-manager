@@ -6,9 +6,6 @@ from rich.progress import Progress
 
 import click
 from rossum_api import ElisAPIClient
-from project_rossum_deploy.commands.download.download import (
-    download_project,
-)
 
 from project_rossum_deploy.commands.upload.operations import (
     create_object,
@@ -162,9 +159,6 @@ async def upload_project(
                     f"Finished {settings.UPLOAD_COMMAND_NAME}. Please commit the changes before running this command again."
                 )
             )
-
-        # Repulling is done to update mapping and (potentially) different filenames.
-        await download_project(client=client, org_path=org_path)
 
     except Exception as e:
         display_error(f"Error during project {settings.UPLOAD_COMMAND_NAME}: {e}", e)

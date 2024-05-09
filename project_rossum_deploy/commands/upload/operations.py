@@ -1,4 +1,5 @@
 import json
+import os
 
 from anyio import Path
 from rossum_api import ElisAPIClient
@@ -13,6 +14,7 @@ from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
     display_error,
     read_json,
+    templatize_name_id,
     write_json,
 )
 
@@ -37,6 +39,11 @@ async def update_object(
 
         result = await client._http_client.update(resource, id, object)
 
+        # Delete and resave object in case the name changed
+        os.remove(path)
+        path = path.with_stem(templatize_name_id(result["name"], result["id"]))
+        await write_json(path, result)
+
         print(f'Successfully updated {resource} with ID "{id}".')
         return result
     except Exception as e:
@@ -55,8 +62,11 @@ async def create_object(path: Path, client: ElisAPIClient, errors: list):
         object["id"] = None
         resource = determine_object_type_from_path(path)
         created_object = await client._http_client.create(resource, object)
+
+        os.remove(path)
+        path = path.with_stem(templatize_name_id(created_object["name"], created_object["id"]))
         await write_json(path, created_object)
-        print(f'Successfully create {resource} with ID "{created_object["id"]}".')
+        print(f'Successfully created {resource} with ID "{created_object["id"]}".')
     except Exception as e:
         display_error(f'Error while creating object with path "{path}": {e}', e)
         errors.append({"op": GIT_CHARACTERS.CREATED, "path": path})
@@ -67,6 +77,8 @@ async def delete_object(path: Path, client: ElisAPIClient, errors: list):
         _, id = detemplatize_name_id(path)
         resource = determine_object_type_from_path(path)
         await client._http_client.delete(resource, id)
+
+        os.remove(path)
         print(f'Successfully deleted {resource} with ID "{id}".')
     except Exception as e:
         display_error(f'Error while deleting object with path "{path}": {e}', e)
