@@ -6,6 +6,7 @@ from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
 from project_rossum_deploy.commands.upload.helpers import (
+    check_modified_timestamp,
     determine_object_type_from_path,
     determine_object_type_from_url,
 )
@@ -33,6 +34,12 @@ async def update_object(
             raise Exception("Missing object URL")
 
         resource = determine_object_type_from_url(url)
+
+        if not await check_modified_timestamp(
+            client, resource, id, object["modified_at"]
+        ):
+            return
+
         # Inboxes are ready-only in Elis API, but we don't ignore them when pulling to distinguish queues with and without inboxes
         if resource == Resource.Queue:
             object.pop("inbox", None)
@@ -61,10 +68,18 @@ async def create_object(path: Path, client: ElisAPIClient, errors: list):
         object = await read_json(path)
         object["id"] = None
         resource = determine_object_type_from_path(path)
+
+        if not await check_modified_timestamp(
+            client, resource, id, object["modified_at"]
+        ):
+            return
+
         created_object = await client._http_client.create(resource, object)
 
         os.remove(path)
-        path = path.with_stem(templatize_name_id(created_object["name"], created_object["id"]))
+        path = path.with_stem(
+            templatize_name_id(created_object["name"], created_object["id"])
+        )
         await write_json(path, created_object)
         print(f'Successfully created {resource} with ID "{created_object["id"]}".')
     except Exception as e:
@@ -76,6 +91,13 @@ async def delete_object(path: Path, client: ElisAPIClient, errors: list):
     try:
         _, id = detemplatize_name_id(path)
         resource = determine_object_type_from_path(path)
+
+        object = await read_json(path)
+        if not await check_modified_timestamp(
+            client, resource, id, object["modified_at"]
+        ):
+            return
+
         await client._http_client.delete(resource, id)
 
         os.remove(path)
