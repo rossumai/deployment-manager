@@ -5,7 +5,28 @@ import shutil
 from rich.prompt import Confirm
 
 from project_rossum_deploy.utils.consts import settings
-from project_rossum_deploy.utils.functions import templatize_name_id, write_str
+from project_rossum_deploy.utils.functions import (
+    read_json,
+    templatize_name_id,
+    write_str,
+)
+
+
+async def should_write_object(path: Path, remote_object: Any, changed_files: list):
+    if await path.exists():
+        local_file = await read_json(path)
+
+        if (local_timestamp := local_file.get("modified_at", "")) != (
+            remote_timestamp := remote_object.get("modified_at", "")
+        ):
+            if path in changed_files:
+                return Confirm.ask(
+                    f'File "{path}" has local unversioned changes (local: {local_timestamp} | remote: {remote_timestamp}). Should the remote version overwrite the local one?',
+                )
+            return True
+
+    else:
+        return True
 
 
 async def delete_current_configuration(org_path: Path):

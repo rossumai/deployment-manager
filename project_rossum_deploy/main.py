@@ -8,7 +8,6 @@ from project_rossum_deploy.commands.migrate.migrate import migrate_project_wrapp
 from project_rossum_deploy.commands.upload.upload import upload_project_wrapper
 
 # TODO: selective pull
-# When pushing changes, repull only the last_modified_date from the API, not everything
 # When pulling, local and remote LMD must be equal, otherwise raise a warning/prompt
 # If they are equal, nothing gets overriden
 # Detect files that were not remotely found and delete them
