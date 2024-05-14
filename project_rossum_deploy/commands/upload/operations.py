@@ -47,9 +47,10 @@ async def update_object(
         result = await client._http_client.update(resource, id, object)
 
         # Delete and resave object in case the name changed
-        os.remove(path)
-        path = path.with_stem(templatize_name_id(result["name"], result["id"]))
-        await write_json(path, result)
+        if path:
+            os.remove(path)
+            path = path.with_stem(templatize_name_id(result["name"], result["id"]))
+            await write_json(path, result)
 
         print(f'Successfully updated {resource} with ID "{id}".')
         return result
