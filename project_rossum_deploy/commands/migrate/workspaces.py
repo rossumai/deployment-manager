@@ -8,6 +8,7 @@ from rich.progress import Progress
 from rich.panel import Panel
 
 from rossum_api import ElisAPIClient
+from rossum_api.api_client import Resource
 
 from project_rossum_deploy.commands.migrate.helpers import (
     find_mapping_of_object,
@@ -220,35 +221,44 @@ async def prepare_queue_upload(
     target_id: int,
 ):
     queue = deepcopy(queue)
+    target_object = (
+        await client._http_client.fetch_one(Resource.Queue, target_id)
+        if target_id
+        else None
+    )
 
     replace_dependency_url(
         object=queue,
-        object_index=target_index,
+        target_index=target_index,
         target_objects_count=target_objects_count,
         dependency="workspace",
         source_id_target_pairs=source_id_target_pairs,
+        target_object=target_object,
     )
     replace_dependency_url(
         object=queue,
-        object_index=target_index,
+        target_index=target_index,
         target_objects_count=target_objects_count,
         dependency="schema",
         source_id_target_pairs=source_id_target_pairs,
+        target_object=target_object,
     )
     # Both should be updated, otherwise Elis API uses 'webhooks' in case of a mismatch even though it is deprecated
     replace_dependency_url(
         object=queue,
-        object_index=target_index,
+        target_index=target_index,
         target_objects_count=target_objects_count,
         dependency="hooks",
         source_id_target_pairs=source_id_target_pairs,
+        target_object=target_object,
     )
     replace_dependency_url(
         object=queue,
-        object_index=target_index,
+        target_index=target_index,
         target_objects_count=target_objects_count,
         dependency="webhooks",
         source_id_target_pairs=source_id_target_pairs,
+        target_object=target_object,
     )
     queue.pop("inbox", None)
 
@@ -268,7 +278,7 @@ async def prepare_inbox_upload(
     replace_dependency_url(
         object=inbox,
         dependency="queues",
-        object_index=target_index,
+        target_index=target_index,
         target_objects_count=target_objects_count,
         source_id_target_pairs=source_id_target_pairs,
     )

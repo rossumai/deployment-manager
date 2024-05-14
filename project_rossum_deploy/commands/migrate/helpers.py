@@ -12,10 +12,11 @@ def is_first_time_migration(submapping: dict):
 
 def replace_dependency_url(
     object: dict,
-    object_index: int,
+    target_index: int,
     target_objects_count: int,
     dependency: str,
     source_id_target_pairs: dict[int, list],
+    target_object: dict = None,
 ):
     if isinstance(object[dependency], list):
         new_urls = []
@@ -29,7 +30,7 @@ def replace_dependency_url(
             elif len(target_dependency_objects) == target_objects_count:
                 new_url = source_dependency_url.replace(
                     str(source_id),
-                    str(target_dependency_objects[object_index]["id"]),
+                    str(target_dependency_objects[target_index]["id"]),
                 )
                 new_urls.append(new_url)
             # All objects will have the same dependency
@@ -38,6 +39,26 @@ def replace_dependency_url(
                     str(source_id), str(target_dependency_objects[0]["id"])
                 )
                 new_urls.append(new_url)
+
+        # Target queues can have 'dangling' hooks that exist only on target, these should not be overwritten.
+        if target_object:
+            for target_dependency_url in target_object[dependency]:
+                # Target ID was found in the new list as well
+                if target_dependency_url in new_urls:
+                    continue
+
+                target_has_source = False
+                # Check if this target has a source. If not, it is a dangling target and we need to add it back.
+                target_id = extract_id_from_url(target_dependency_url)
+                for _, targets in source_id_target_pairs.items():
+                    for target in targets:
+                        if target.get("id", "") == target_id:
+                            target_has_source = True
+                            break
+
+                if not target_has_source:
+                    new_urls.append(target_dependency_url)
+
         object[dependency] = new_urls
     else:
         source_dependency_url = object[dependency]
@@ -52,7 +73,7 @@ def replace_dependency_url(
         if len(target_dependency_objects) == target_objects_count:
             new_url = source_dependency_url.replace(
                 str(source_id),
-                str(target_dependency_objects[object_index]["id"]),
+                str(target_dependency_objects[target_index]["id"]),
             )
         # All objects will have the same dependency
         else:
