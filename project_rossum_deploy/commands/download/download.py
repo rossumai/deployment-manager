@@ -8,9 +8,12 @@ from rich.panel import Panel
 
 import click
 from project_rossum_deploy.commands.download.helpers import (
+    create_custom_hook_code_path,
+    create_formula_directory_path,
     create_formula_file,
     determine_object_destination,
     find_formula_fields_in_schema,
+    remove_local_nonexistent_objects,
     should_write_object,
 )
 from project_rossum_deploy.commands.download.mapping import (
@@ -79,88 +82,20 @@ async def download_project(
     changed_files = get_changed_file_paths(settings.SOURCE_DIRNAME)
     changed_files = list(map(lambda x: x[1], changed_files))
 
-    if settings.IS_PROJECT_IN_SAME_ORG:
-        await download_organization_combined_source_target(
-            client=client,
-            org_path=org_path,
-            commit=commit,
-            commit_message=commit_message,
-            changed_files=changed_files,
-            download_all=download_all,
-        )
-    else:
-        await download_organizations(
-            org_path=org_path,
-            commit=commit,
-            commit_message=commit_message,
-            changed_files=changed_files,
-            download_all=download_all,
-        )
-
-
-async def download_organizations(
-    org_path: Path = None,
-    commit: bool = False,
-    commit_message: str = "",
-    changed_files: list = [],
-    download_all: bool = False,
-):
     try:
-        mapping_path = org_path / settings.MAPPING_FILENAME
-        mapping = await read_mapping(mapping_path)
-        if not mapping:
-            mapping = create_empty_mapping()
-
-        source_client = ElisAPIClient(
-            base_url=settings.SOURCE_API_URL,
-            token=settings.SOURCE_TOKEN,
-            username=settings.SOURCE_USERNAME,
-            password=settings.SOURCE_PASSWORD,
-        )
-        (
-            source_organization,
-            source_workspaces,
-            source_schemas,
-            source_hooks,
-        ) = await download_organization_single(
-            client=source_client,
-            org_path=org_path,
-            destination=settings.SOURCE_DIRNAME,
-            changed_files=changed_files,
-            download_all=download_all,
-        )
-
-        target_client = ElisAPIClient(
-            base_url=settings.TARGET_API_URL,
-            token=settings.TARGET_TOKEN,
-            username=settings.TARGET_USERNAME,
-            password=settings.TARGET_PASSWORD,
-        )
-        (
-            _,
-            target_workspaces,
-            target_schemas,
-            target_hooks,
-        ) = await download_organization_single(
-            client=target_client,
-            org_path=org_path,
-            destination=settings.TARGET_DIRNAME,
-            changed_files=changed_files,
-            download_all=download_all,
-        )
-
-        # Make the previous mapping conform in structure
-        await migrate_mapping("mapping.yaml")
-        mapping = await read_mapping(mapping_path)
-
-        await create_update_mapping(
-            org_path=org_path,
-            organization=source_organization,
-            workspaces_for_mapping=[*source_workspaces, *target_workspaces],
-            schemas_for_mapping=[*source_schemas, *target_schemas],
-            hooks_for_mapping=[*source_hooks, *target_hooks],
-            old_mapping=mapping,
-        )
+        if settings.IS_PROJECT_IN_SAME_ORG:
+            await download_organization_combined_source_target(
+                client=client,
+                org_path=org_path,
+                changed_files=changed_files,
+                download_all=download_all,
+            )
+        else:
+            await download_organizations(
+                org_path=org_path,
+                changed_files=changed_files,
+                download_all=download_all,
+            )
 
         if commit:
             subprocess.run(["git", "add", "."])
@@ -168,6 +103,65 @@ async def download_organizations(
 
     except Exception as e:
         display_error(f"Error during project {settings.DOWNLOAD_COMMAND_NAME}: {e}", e)
+
+
+async def download_organizations(
+    org_path: Path = None,
+    changed_files: list = [],
+    download_all: bool = False,
+):
+    # Make the previous mapping conform in structure
+    await migrate_mapping("mapping.yaml", print_result=False)
+    mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
+    if not mapping:
+        mapping = create_empty_mapping()
+
+    source_client = ElisAPIClient(
+        base_url=settings.SOURCE_API_URL,
+        token=settings.SOURCE_TOKEN,
+        username=settings.SOURCE_USERNAME,
+        password=settings.SOURCE_PASSWORD,
+    )
+    (
+        source_organization,
+        source_workspaces,
+        source_schemas,
+        source_hooks,
+    ) = await download_organization_single(
+        client=source_client,
+        org_path=org_path,
+        destination=settings.SOURCE_DIRNAME,
+        changed_files=changed_files,
+        download_all=download_all,
+    )
+
+    target_client = ElisAPIClient(
+        base_url=settings.TARGET_API_URL,
+        token=settings.TARGET_TOKEN,
+        username=settings.TARGET_USERNAME,
+        password=settings.TARGET_PASSWORD,
+    )
+    (
+        _,
+        target_workspaces,
+        target_schemas,
+        target_hooks,
+    ) = await download_organization_single(
+        client=target_client,
+        org_path=org_path,
+        destination=settings.TARGET_DIRNAME,
+        changed_files=changed_files,
+        download_all=download_all,
+    )
+
+    await create_update_mapping(
+        org_path=org_path,
+        organization=source_organization,
+        workspaces_for_mapping=[*source_workspaces, *target_workspaces],
+        schemas_for_mapping=[*source_schemas, *target_schemas],
+        hooks_for_mapping=[*source_hooks, *target_hooks],
+        old_mapping=mapping,
+    )
 
 
 async def download_organization_single(
@@ -237,6 +231,10 @@ async def download_organization_single(
         print(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME} for {destination}."))
     else:
         print(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME}."))
+
+    # Within the organization scope since they might have different URLs and credentials
+    await remove_local_nonexistent_objects(client, org_path / destination)
+
     return organization, workspaces_for_mapping, schemas_for_mapping, hooks_for_mapping
 
 
@@ -409,9 +407,8 @@ async def download_schemas(
 
         formula_fields = find_formula_fields_in_schema(schema["content"])
         if formula_fields:
-            formula_directory_path = (
-                schema_config_path.parent
-                / f"{settings.FORMULA_DIR_PREFIX}{templatize_name_id(schema['name'], schema['id'])}"
+            formula_directory_path = create_formula_directory_path(
+                schema_config_path, schema
             )
             for field_id, code in formula_fields:
                 await create_formula_file(
@@ -470,12 +467,11 @@ async def download_hooks(
             await write_json(hook_config_path, hook, "hook")
         hooks.append((destination_local, hook))
 
-        if hook["extension_source"] != "rossum_store":
-            if hook_code := hook.get("config", {}).get("code", None):
-                hook_runtime = hook["config"].get("runtime")
-                extension = ".py" if "python" in hook_runtime else ".js"
-                hook_code_path = hook_config_path.with_suffix(extension)
-                await write_str(hook_code_path, hook_code)
+        custom_hook_code_path = create_custom_hook_code_path(hook_config_path, hook)
+        if custom_hook_code_path:
+            await write_str(
+                custom_hook_code_path, hook.get("config", {}).get("code", None)
+            )
 
     return hooks
 
@@ -483,58 +479,45 @@ async def download_hooks(
 async def download_organization_combined_source_target(
     client: ElisAPIClient = None,
     org_path: Path = None,
-    commit: bool = False,
-    commit_message: str = "",
     changed_files: list = [],
     download_all: bool = False,
 ):
-    try:
-        if not client:
-            client = ElisAPIClient(
-                base_url=settings.SOURCE_API_URL,
-                token=settings.SOURCE_TOKEN,
-                username=settings.SOURCE_USERNAME,
-                password=settings.SOURCE_PASSWORD,
-            )
-
-        mapping_path = org_path / settings.MAPPING_FILENAME
-        mapping = await read_mapping(mapping_path)
-        if not mapping:
-            mapping = create_empty_mapping()
-        previous_sources, previous_targets = extract_sources_targets(mapping)
-        org_config_path = org_path / settings.SOURCE_DIRNAME / "organization.json"
-
-        (
-            organization,
-            workspaces_for_mapping,
-            schemas_for_mapping,
-            hooks_for_mapping,
-        ) = await download_organization_single(
-            client=client,
-            org_path=org_path,
-            previous_sources=previous_sources,
-            previous_targets=previous_targets,
-            org_config_path=org_config_path,
-            changed_files=changed_files,
-            download_all=download_all,
+    if not client:
+        client = ElisAPIClient(
+            base_url=settings.SOURCE_API_URL,
+            token=settings.SOURCE_TOKEN,
+            username=settings.SOURCE_USERNAME,
+            password=settings.SOURCE_PASSWORD,
         )
 
-        # Make the previous mapping conform in structure
-        await migrate_mapping("mapping.yaml", print_result=False)
-        mapping = await read_mapping(mapping_path)
+    # Make the previous mapping conform in structure
+    await migrate_mapping("mapping.yaml", print_result=False)
+    mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
+    if not mapping:
+        mapping = create_empty_mapping()
+    previous_sources, previous_targets = extract_sources_targets(mapping)
+    org_config_path = org_path / settings.SOURCE_DIRNAME / "organization.json"
 
-        await create_update_mapping(
-            org_path=org_path,
-            organization=organization,
-            workspaces_for_mapping=workspaces_for_mapping,
-            schemas_for_mapping=schemas_for_mapping,
-            hooks_for_mapping=hooks_for_mapping,
-            old_mapping=mapping,
-        )
+    (
+        organization,
+        workspaces_for_mapping,
+        schemas_for_mapping,
+        hooks_for_mapping,
+    ) = await download_organization_single(
+        client=client,
+        org_path=org_path,
+        previous_sources=previous_sources,
+        previous_targets=previous_targets,
+        org_config_path=org_config_path,
+        changed_files=changed_files,
+        download_all=download_all,
+    )
 
-        if commit:
-            subprocess.run(["git", "add", "."])
-            subprocess.run(["git", "commit", "-m", commit_message])
-
-    except Exception as e:
-        display_error(f"Error during project {settings.DOWNLOAD_COMMAND_NAME}: {e}", e)
+    await create_update_mapping(
+        org_path=org_path,
+        organization=organization,
+        workspaces_for_mapping=workspaces_for_mapping,
+        schemas_for_mapping=schemas_for_mapping,
+        hooks_for_mapping=hooks_for_mapping,
+        old_mapping=mapping,
+    )
