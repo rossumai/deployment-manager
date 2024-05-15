@@ -14,7 +14,6 @@ from project_rossum_deploy.commands.upload.helpers import (
 )
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
-    display_error,
     find_all_object_paths,
     read_json,
     templatize_name_id,
@@ -39,22 +38,33 @@ async def should_write_object(path: Path, remote_object: Any, changed_files: lis
         return True
 
 
-def del_dirs(src_dir):
-    for dirpath, _, _ in os.walk(src_dir, topdown=False):  # Listing the files
-        if dirpath == src_dir:
-            break
-        try:
-            os.rmdir(dirpath)
-        except OSError as e:
-            if e.errno != 66:
-                display_error("Error while deleting empty directories", e)
+def delete_empty_folders(root: Path):
+    deleted = set()
+
+    for current_dir, subdirs, files in os.walk(root, topdown=False):
+        still_has_subdirs = False
+        for subdir in subdirs:
+            if os.path.join(current_dir, subdir) not in deleted:
+                still_has_subdirs = True
+                break
+
+        if not any(files) and not still_has_subdirs:
+            os.rmdir(current_dir)
+            deleted.add(current_dir)
+
+    return deleted
 
 
 async def remove_local_nonexistent_objects(client: ElisAPIClient, base_path: Path):
     """
     Checks that the local object still exists in Rossum and removes its local file if not.
     """
-    paths = await find_all_object_paths(base_path)
+    source_path = base_path / settings.SOURCE_DIRNAME
+    target_path = base_path / settings.TARGET_DIRNAME
+    paths = [
+        *(await find_all_object_paths(source_path)),
+        *(await find_all_object_paths(target_path)),
+    ]
 
     async def remove_local_nonexistent_object(path: Path):
         object = await read_json(path)
@@ -83,7 +93,8 @@ async def remove_local_nonexistent_objects(client: ElisAPIClient, base_path: Pat
 
     await asyncio.gather(*[remove_local_nonexistent_object(path) for path in paths])
 
-    del_dirs(base_path)
+    delete_empty_folders(source_path)
+    delete_empty_folders(target_path)
 
 
 async def determine_object_destination(

@@ -7,7 +7,7 @@ import click
 from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.migrate.helpers import traverse_mapping
 from project_rossum_deploy.utils.consts import settings
-from project_rossum_deploy.utils.functions import coro
+from project_rossum_deploy.utils.functions import coro, create_empty_mapping
 
 
 @click.command(
@@ -25,9 +25,9 @@ async def migrate_mapping_wrapper(mapping: str):
 async def migrate_mapping(mapping_file: str = "", print_result: bool = True):
     mapping_path = Path("./") / mapping_file
     if not await mapping_path.exists():
-        raise click.ClickException(f"Mapping '{mapping_path}' not found.")
-
-    mapping = await read_mapping(mapping_path)
+        mapping = create_empty_mapping()
+    else:
+        mapping = await read_mapping(mapping_path)
 
     for mapping_object in traverse_mapping(mapping["organization"]):
         target_object = mapping_object.get("target_object", None)
