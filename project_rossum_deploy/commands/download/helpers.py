@@ -21,6 +21,9 @@ from project_rossum_deploy.utils.functions import (
 )
 
 
+class InactiveQueueException(Exception): ...
+
+
 async def should_write_object(path: Path, remote_object: Any, changed_files: list):
     if await path.exists():
         local_file = await read_json(path)
@@ -59,19 +62,17 @@ async def remove_local_nonexistent_objects(client: ElisAPIClient, base_path: Pat
     """
     Checks that the local object still exists in Rossum and removes its local file if not.
     """
-    source_path = base_path / settings.SOURCE_DIRNAME
-    target_path = base_path / settings.TARGET_DIRNAME
-    paths = [
-        *(await find_all_object_paths(source_path)),
-        *(await find_all_object_paths(target_path)),
-    ]
+
+    paths = await find_all_object_paths(base_path)
 
     async def remove_local_nonexistent_object(path: Path):
         object = await read_json(path)
         try:
             if url := object.get("url", ""):
-                await client._http_client.request_json(method="GET", url=url)
-        except APIClientError as e:
+                result = await client._http_client.request_json(method="GET", url=url)
+                if result.get("status", "") == "deletion_requested":
+                    raise InactiveQueueException
+        except (APIClientError, InactiveQueueException) as e:
             if e.status_code == 404:
                 print(
                     Panel(
@@ -93,8 +94,7 @@ async def remove_local_nonexistent_objects(client: ElisAPIClient, base_path: Pat
 
     await asyncio.gather(*[remove_local_nonexistent_object(path) for path in paths])
 
-    delete_empty_folders(source_path)
-    delete_empty_folders(target_path)
+    delete_empty_folders(base_path)
 
 
 async def determine_object_destination(

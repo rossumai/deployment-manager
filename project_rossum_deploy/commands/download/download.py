@@ -134,6 +134,9 @@ async def download_organizations(
         changed_files=changed_files,
         download_all=download_all,
     )
+    await remove_local_nonexistent_objects(
+        source_client, org_path / settings.SOURCE_DIRNAME
+    )
 
     target_client = ElisAPIClient(
         base_url=settings.TARGET_API_URL,
@@ -152,6 +155,9 @@ async def download_organizations(
         destination=settings.TARGET_DIRNAME,
         changed_files=changed_files,
         download_all=download_all,
+    )
+    await remove_local_nonexistent_objects(
+        target_client, org_path / settings.TARGET_DIRNAME
     )
 
     await create_update_mapping(
@@ -231,9 +237,6 @@ async def download_organization_single(
         print(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME} for {destination}."))
     else:
         print(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME}."))
-
-    # Within the organization scope since they might have different URLs and credentials
-    await remove_local_nonexistent_objects(client, org_path / destination)
 
     return organization, workspaces_for_mapping, schemas_for_mapping, hooks_for_mapping
 
@@ -512,6 +515,8 @@ async def download_organization_combined_source_target(
         changed_files=changed_files,
         download_all=download_all,
     )
+    await remove_local_nonexistent_objects(client, org_path / settings.SOURCE_DIRNAME)
+    await remove_local_nonexistent_objects(client, org_path / settings.TARGET_DIRNAME)
 
     await create_update_mapping(
         org_path=org_path,
