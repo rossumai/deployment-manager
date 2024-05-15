@@ -1,4 +1,8 @@
+import json
+import re
 import jmespath
+from rich import print
+from rich.panel import Panel
 
 from project_rossum_deploy.utils.consts import (
     ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD,
@@ -119,3 +123,46 @@ def perform_search(parent: str, object: dict):
         raise Exception(f'Query "{parent}" returned no result.')
 
     return search
+
+
+async def replace_ids_in_settings(
+    object_id: int,
+    object_settings: dict,
+    lookup_table: dict,
+    object_index: int,
+    num_targets: int,
+):
+    stringified_dict = json.dumps(object_settings)
+    for source_id, target_ids in lookup_table.items():
+        source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
+        if not re.search(source_id_regex, stringified_dict):
+            continue
+
+        if len(target_ids) != 1 and num_targets != len(target_ids):
+            print(
+                Panel(
+                    f"Could not override source '{source_id}' in settings of '{object_id}'. There are multiple target IDs. Please do the attribute_override explicitly.",
+                    style="yellow",
+                ),
+            )
+            continue
+
+        # Using lambdas for sub() because of quotes inside strings
+        # N:N objects -> objects are referenced in pairs
+        elif num_targets == len(target_ids):
+            stringified_dict = re.sub(
+                source_id_regex,
+                lambda m: str(target_ids[object_index])
+                if m[0] == str(source_id)
+                else m[0],
+                stringified_dict,
+            )
+        # N:1 objects -> everything should be mapped to the first target ID
+        else:
+            stringified_dict = re.sub(
+                source_id_regex,
+                lambda m: str(target_ids[0]) if m[0] == str(source_id) else m[0],
+                stringified_dict,
+            )
+
+    return json.loads(stringified_dict)

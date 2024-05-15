@@ -17,7 +17,10 @@ from project_rossum_deploy.commands.migrate.hooks import migrate_hooks
 from project_rossum_deploy.commands.migrate.schemas import migrate_schemas
 from project_rossum_deploy.commands.migrate.workspaces import migrate_workspaces
 from project_rossum_deploy.commands.upload.helpers import determine_object_type_from_url
-from project_rossum_deploy.common.attribute_override import override_attributes_v2
+from project_rossum_deploy.common.attribute_override import (
+    override_attributes_v2,
+    replace_ids_in_settings,
+)
 from project_rossum_deploy.common.upload import (
     upload_organization,
 )
@@ -272,11 +275,26 @@ async def override_migrated_objects_attributes(
         if not source_object or not len(target_objects):
             continue
 
-        for target_object in target_objects:
+        for target_index, target_object in enumerate(target_objects):
+            resource = determine_object_type_from_url(target_object["url"])
+
+            # Implicit override for settings
+            if "settings" in target_object:
+                target_settings = await replace_ids_in_settings(
+                    target_object["id"],
+                    target_object["settings"],
+                    lookup_table,
+                    target_index,
+                    num_targets=len(target_objects),
+                )
+                await client._http_client.update(
+                    resource, target_object["id"], {"settings": target_settings}
+                )
+
+            # Explicit override for settings and anything else
             attribute_overrides = find_attribute_override_for_target(
                 targets_in_mapping, target_object["id"]
             )
-
             source_object_subset = get_attributes_from_object(
                 source_object, attribute_overrides
             )
@@ -293,7 +311,6 @@ async def override_migrated_objects_attributes(
                 object=source_object_subset,
             )
 
-            resource = determine_object_type_from_url(target_object["url"])
             await client._http_client.update(
                 resource, target_object["id"], source_object_subset
             )
