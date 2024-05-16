@@ -22,7 +22,7 @@ def replace_dependency_url(
         new_urls = []
         for source_dependency_url in object[dependency]:
             source_id = extract_id_from_url(source_dependency_url)
-            target_dependency_objects = source_id_target_pairs.get(source_id, None)
+            target_dependency_objects = source_id_target_pairs.get(source_id, [])
             # The object was ignored during release, no target equivalents exist
             if not len(target_dependency_objects):
                 continue
