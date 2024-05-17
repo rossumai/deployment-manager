@@ -40,6 +40,7 @@ In case the directory already exists, it first deletes its contents and then dow
                """,
 )
 @click.option(
+    "--commit",
     "-c",
     default=False,
     is_flag=True,
@@ -47,19 +48,21 @@ In case the directory already exists, it first deletes its contents and then dow
 )
 @click.option(
     "--all",
+    "-a",
     default=False,
     is_flag=True,
     help="Downloads all remote files and overwrites the local ones.",
 )
 @click.option(
+    "--message",
     "-m",
     default="Sync changes",
     help="Commit message for pulling.",
 )
 @coro
 # To be able to run the command progammatically without the CLI decorators
-async def download_project_wrapper(c: bool = False, m: str = "", all: bool = False):
-    await download_project(commit_message=m, commit=c, download_all=all)
+async def download_project_wrapper(commit: bool = False, message: str = "", all: bool = False):
+    await download_project(commit_message=message, commit=commit, download_all=all)
 
 
 async def download_project(
