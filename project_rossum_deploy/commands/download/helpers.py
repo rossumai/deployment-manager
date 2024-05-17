@@ -9,7 +9,11 @@ from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
 from rich.panel import Panel
 
-from project_rossum_deploy.common.write import create_custom_hook_code_path, create_formula_directory_path, determine_object_type_from_path
+from project_rossum_deploy.common.determine_path import determine_object_type_from_url
+from project_rossum_deploy.common.write import (
+    create_custom_hook_code_path,
+    create_formula_directory_path,
+)
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
@@ -24,6 +28,10 @@ class InactiveQueueException(Exception):
 
 
 class DifferentNameException(Exception):
+    status_code = 404
+
+
+class DifferentPathException(Exception):
     status_code = 404
 
 
@@ -63,17 +71,66 @@ def delete_empty_folders(root: Path):
 
 async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
     object = await read_json(path)
+    url = object.get("url", "")
+    object_type = determine_object_type_from_url(url)
+
     try:
-        if url := object.get("url", ""):
-            result = await client._http_client.request_json(method="GET", url=url)
-            if result.get("status", "") == "deletion_requested":
-                raise InactiveQueueException
+        # ID not found because it was deleted from Rossum
+        result = await client._http_client.request_json(method="GET", url=url)
 
-            name, _ = detemplatize_name_id(path)
-            if result.get("name", "") != name:
-                raise DifferentNameException
+        # Special queue edge case (they are deleted after some period)
+        if result.get("status", "") == "deletion_requested":
+            raise InactiveQueueException
 
-    except (APIClientError, InactiveQueueException, DifferentNameException) as e:
+        # Name might have changed
+        name, _ = detemplatize_name_id(path)
+        if result.get("name", "") != name:
+            raise DifferentNameException
+
+        # Workspace name might have changed, remove queue and inbox files inside
+        if object_type == Resource.Queue:
+            ws = await client._http_client.request_json(
+                method="GET", url=result["workspace"]
+            )
+            ws_path_part = templatize_name_id(ws["name"], ws["id"])
+            queue_path_path = templatize_name_id(result["name"], result["id"])
+            path_parts = str(path).split("/")
+            latest_path = (
+                Path(*path_parts[:-4])
+                / ws_path_part
+                / "queues"
+                / queue_path_path
+                / "queue.json"
+            )
+            if latest_path != path:
+                raise DifferentPathException
+
+        elif object_type == Resource.Inbox:
+            queue = await client._http_client.request_json(
+                method="GET", url=result["queues"][0]
+            )
+            ws = await client._http_client.request_json(
+                method="GET", url=queue["workspace"]
+            )
+            ws_path_part = templatize_name_id(ws["name"], ws["id"])
+            queue_path_path = templatize_name_id(queue["name"], queue["id"])
+            path_parts = str(path).split("/")
+            latest_path = (
+                Path(*path_parts[:-4])
+                / ws_path_part
+                / "queues"
+                / queue_path_path
+                / "inbox.json"
+            )
+            if latest_path != path:
+                raise DifferentPathException
+
+    except (
+        APIClientError,
+        InactiveQueueException,
+        DifferentNameException,
+        DifferentPathException,
+    ) as e:
         if e.status_code == 404:
             print(
                 Panel(
@@ -83,7 +140,6 @@ async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
             )
             os.remove(path)
 
-            object_type = determine_object_type_from_path(path)
             if object_type == Resource.Schema:
                 formula_directory_path = create_formula_directory_path(path, object)
                 if await formula_directory_path.exists():
@@ -150,5 +206,3 @@ async def find_object_in_project(object: dict, base_path: Path):
         await (base_path / file_name).exists()
         or await (base_path / (file_name + ".json")).exists()
     )
-
-

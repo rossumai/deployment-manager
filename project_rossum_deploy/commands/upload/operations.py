@@ -43,11 +43,11 @@ async def update_object(
         resource = determine_object_type_from_url(url)
 
         local_remote_timestamp_synced = await check_modified_timestamp(
-            client, resource, id, object["modified_at"]
+            client, resource, id, object
         )
         if not force and not local_remote_timestamp_synced:
             display_error(create_mismatch_warning(resource, id))
-            return
+            return "timestamp"
 
         # Inboxes are ready-only in Elis API, but we don't ignore them when pulling to distinguish queues with and without inboxes
         if resource == Resource.Queue:
@@ -55,10 +55,11 @@ async def update_object(
 
         result = await client._http_client.update(resource, id, object)
 
-        await remove_local_nonexistent_object(path, client)
+        # if resource != Resource.Organization:
+        #     await remove_local_nonexistent_object(path, client)
 
-        path = path.with_stem(templatize_name_id(result["name"], result["id"]))
-        await create_local_object(path, result)
+        # path = path.with_stem(templatize_name_id(result["name"], result["id"]))
+        # await create_local_object(path, result)
 
         print(f'Successfully updated {resource} with ID "{id}".')
         return result
@@ -81,7 +82,7 @@ async def create_object(
         resource = determine_object_type_from_path(path)
 
         local_remote_timestamp_synced = await check_modified_timestamp(
-            client, resource, id, object["modified_at"]
+            client, resource, id, object
         )
         if not force and not local_remote_timestamp_synced:
             display_error(create_mismatch_warning(resource, id))
@@ -89,8 +90,8 @@ async def create_object(
 
         result = await client._http_client.create(resource, object)
 
-        path = path.with_stem(templatize_name_id(result["name"], result["id"]))
-        await create_local_object(path, result)
+        # path = path.with_stem(templatize_name_id(result["name"], result["id"]))
+        # await create_local_object(path, result)
 
         print(f'Successfully created {resource} with ID "{result["id"]}".')
         return result
@@ -108,7 +109,7 @@ async def delete_object(
 
         object = await read_json(path)
         local_remote_timestamp_synced = await check_modified_timestamp(
-            client, resource, id, object["modified_at"]
+            client, resource, id, object
         )
         if not force and not local_remote_timestamp_synced:
             display_error(create_mismatch_warning(resource, id))
@@ -116,7 +117,7 @@ async def delete_object(
 
         await client._http_client.delete(resource, id)
 
-        await remove_local_nonexistent_object(path, client)
+        # await remove_local_nonexistent_object(path, client)
 
         print(f'Successfully deleted {resource} with ID "{id}".')
     except Exception as e:

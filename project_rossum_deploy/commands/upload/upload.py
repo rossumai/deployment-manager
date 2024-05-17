@@ -6,6 +6,7 @@ from rich.progress import Progress
 import click
 from rossum_api import ElisAPIClient
 
+from project_rossum_deploy.commands.download.download import download_project
 from project_rossum_deploy.commands.upload.operations import (
     create_object,
     update_object,
@@ -100,6 +101,10 @@ async def upload_project(
         requests = []
         errors = []
 
+        if not changes:
+            print(Panel(f"No changes to {settings.UPLOAD_COMMAND_NAME}."))
+            return
+
         for change in changes:
             op, path = change
             match op:
@@ -162,6 +167,7 @@ async def upload_project(
             )
             return
         else:
+            await download_project()
             print(
                 Panel(
                     f"Finished {settings.UPLOAD_COMMAND_NAME}. Please commit the changes before running this command again."
