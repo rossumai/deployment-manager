@@ -69,7 +69,6 @@ async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
             if result.get("status", "") == "deletion_requested":
                 raise InactiveQueueException
 
-            print(path)
             name, _ = detemplatize_name_id(path)
             if result.get("name", "") != name:
                 raise DifferentNameException
