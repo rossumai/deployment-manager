@@ -10,9 +10,7 @@ import click
 from project_rossum_deploy.commands.download.helpers import (
     create_custom_hook_code_path,
     create_formula_directory_path,
-    create_formula_file,
     determine_object_destination,
-    find_formula_fields_in_schema,
     remove_local_nonexistent_objects,
     should_write_object,
 )
@@ -24,6 +22,10 @@ from project_rossum_deploy.commands.download.mapping import (
 
 from project_rossum_deploy.common.git import get_changed_file_paths
 from project_rossum_deploy.commands.migrate_mapping import migrate_mapping
+from project_rossum_deploy.common.write import (
+    create_formula_file,
+    find_formula_fields_in_schema,
+)
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     coro,
@@ -77,8 +79,6 @@ async def download_project(
     if not org_path:
         org_path = Path("./")
 
-    # TODO: check the paths have the same format for comparing
-    # TODO: should files be put for mapping update even if overwrite did not happen?
     changed_files = get_changed_file_paths(settings.SOURCE_DIRNAME)
     changed_files = list(map(lambda x: x[1], changed_files))
 
@@ -195,7 +195,7 @@ async def download_organization_single(
     if download_all or await should_write_object(
         org_config_path, organization, changed_files
     ):
-        await write_json(org_config_path, organization, "organization")
+        await write_json(org_config_path, organization, Resource.Organization)
 
     (
         workspaces_for_mapping,
@@ -291,7 +291,7 @@ async def download_workspaces(
         if download_all or await should_write_object(
             workspace_config_path, workspace, changed_files
         ):
-            await write_json(workspace_config_path, workspace, "workspace")
+            await write_json(workspace_config_path, workspace, Resource.Workspace)
 
         workspace["queues"] = await download_queues_for_workspace(
             client=client,
@@ -405,7 +405,7 @@ async def download_schemas(
         if download_all or await should_write_object(
             schema_config_path, schema, changed_files
         ):
-            await write_json(schema_config_path, schema, "schema")
+            await write_json(schema_config_path, schema, Resource.Schema)
         schemas.append((destination_local, schema))
 
         formula_fields = find_formula_fields_in_schema(schema["content"])
@@ -467,7 +467,8 @@ async def download_hooks(
         if download_all or await should_write_object(
             hook_config_path, hook, changed_files
         ):
-            await write_json(hook_config_path, hook, "hook")
+            # TODO: use write local object
+            await write_json(hook_config_path, hook, Resource.Hook)
         hooks.append((destination_local, hook))
 
         custom_hook_code_path = create_custom_hook_code_path(hook_config_path, hook)

@@ -9,12 +9,13 @@ import os
 import re
 from typing import Any
 from anyio import Path
+
 from click import progressbar
 from rich.prompt import Confirm
 from rich.console import Console
 from rich.panel import Panel
 from rossum_api import ElisAPIClient
-
+from rossum_api.api_client import Resource
 import yaml
 
 from project_rossum_deploy.utils.consts import (
@@ -276,7 +277,7 @@ def detemplatize_name_id(path: Path | str) -> tuple[str, int]:
         parts = path.split("_")
         return "_".join(parts[:-1]), int(parts[-1].removeprefix("[").removesuffix("]"))
 
-    if str(path.stem) in ["queue", "workspace"]:
+    if str(path.stem) in ["queue", "workspace", "inbox"]:
         parts = path.parent.stem.split("_")
         return "_".join(parts[:-1]), int(parts[-1].removeprefix("[").removesuffix("]"))
     elif str(path.parent.stem) in ("hooks, schemas"):
@@ -312,7 +313,7 @@ def get_mapping_key_index(key: str):
         return inf
 
 
-async def write_json(path: Path, object: dict, type: str = None):
+async def write_json(path: Path, object: dict, type: Resource = None):
     if dataclasses.is_dataclass(object):
         object = dataclasses.asdict(object)
     if path.parent:

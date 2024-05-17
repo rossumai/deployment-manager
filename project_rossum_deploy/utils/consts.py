@@ -8,6 +8,9 @@ import sys
 import click
 import httpx
 
+from rossum_api.api_client import Resource
+
+
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.ERROR)
 
@@ -17,7 +20,6 @@ API_SUFFIX_RE = re.compile(r"/api/v\d+$")
 
 ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD = "$prd_ref"
 ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD = "$source_value"
-
 
 try:
 
@@ -118,7 +120,10 @@ try:
         UPLOAD_COMMAND_NAME: str = "push"
         MIGRATE_COMMAND_NAME: str = "release"
 
-        IGNORED_KEYS: dict = {"queue": ["counts", "users", "workflows"], "hook": ["status"]}
+        IGNORED_KEYS: dict = {
+            Resource.Queue: ["counts", "users", "workflows"],
+            Resource.Hook: ["status"],
+        }
 
         FORMULA_DIR_PREFIX: str = "formulas:"
 
@@ -143,5 +148,8 @@ except Exception as e:
     sys.exit(1)
 
 
-class PrdVersionException(Exception):
-    ...
+class PrdVersionException(Exception): ...
+
+
+def create_mismatch_warning(resource, id):
+    return f'WARNING: Could not {settings.UPLOAD_COMMAND_NAME} {resource} with ID "{id}". Rossum has a version with a different timestamp.\n This means that the object was updated without PRD. Please stash your changes for these objects and run {settings.DOWNLOAD_COMMAND_NAME} first or use the --force option.'

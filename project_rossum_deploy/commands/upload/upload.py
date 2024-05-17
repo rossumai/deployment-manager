@@ -95,7 +95,7 @@ async def upload_project(
             changes = await evaluate_create_dependencies(changes, org_path, client)
 
         if upload_all:
-            await include_unmodified_files(Path(org_path) / destination, changes)
+            await include_unmodified_files(org_path / destination, changes)
 
         requests = []
         errors = []

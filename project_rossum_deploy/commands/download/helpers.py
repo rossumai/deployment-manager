@@ -9,19 +9,22 @@ from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
 from rich.panel import Panel
 
-from project_rossum_deploy.commands.upload.helpers import (
-    determine_object_type_from_path,
-)
+from project_rossum_deploy.common.write import create_custom_hook_code_path, create_formula_directory_path, determine_object_type_from_path
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
+    detemplatize_name_id,
     find_all_object_paths,
     read_json,
     templatize_name_id,
-    write_str,
 )
 
 
-class InactiveQueueException(Exception): ...
+class InactiveQueueException(Exception):
+    status_code = 404
+
+
+class DifferentNameException(Exception):
+    status_code = 404
 
 
 async def should_write_object(path: Path, remote_object: Any, changed_files: list):
@@ -58,41 +61,55 @@ def delete_empty_folders(root: Path):
     return deleted
 
 
+async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
+    object = await read_json(path)
+    try:
+        if url := object.get("url", ""):
+            result = await client._http_client.request_json(method="GET", url=url)
+            if result.get("status", "") == "deletion_requested":
+                raise InactiveQueueException
+
+            print(path)
+            name, _ = detemplatize_name_id(path)
+            if result.get("name", "") != name:
+                raise DifferentNameException
+
+    except (APIClientError, InactiveQueueException, DifferentNameException) as e:
+        if e.status_code == 404:
+            print(
+                Panel(
+                    f"Deleting local object that no longer exists in Rossum: {path}",
+                    style="yellow",
+                )
+            )
+            os.remove(path)
+
+            object_type = determine_object_type_from_path(path)
+            if object_type == Resource.Schema:
+                formula_directory_path = create_formula_directory_path(path, object)
+                if await formula_directory_path.exists():
+                    shutil.rmtree(formula_directory_path)
+            elif object_type == Resource.Hook:
+                custom_hook_code_path = create_custom_hook_code_path(path, object)
+                if custom_hook_code_path:
+                    os.remove(custom_hook_code_path)
+
+
 async def remove_local_nonexistent_objects(client: ElisAPIClient, base_path: Path):
     """
     Checks that the local object still exists in Rossum and removes its local file if not.
     """
 
     paths = await find_all_object_paths(base_path)
+    # the file might not be there for target
+    try:
+        paths.remove(Path(base_path / "organization.json"))
+    except Exception:
+        ...
 
-    async def remove_local_nonexistent_object(path: Path):
-        object = await read_json(path)
-        try:
-            if url := object.get("url", ""):
-                result = await client._http_client.request_json(method="GET", url=url)
-                if result.get("status", "") == "deletion_requested":
-                    raise InactiveQueueException
-        except (APIClientError, InactiveQueueException) as e:
-            if e.status_code == 404:
-                print(
-                    Panel(
-                        f"Deleting local object that no longer exists in Rossum: {path}",
-                        style="yellow",
-                    )
-                )
-                os.remove(path)
-
-                object_type = determine_object_type_from_path(path)
-                if object_type == Resource.Schema:
-                    formula_directory_path = create_formula_directory_path(path, object)
-                    if await formula_directory_path.exists():
-                        shutil.rmtree(formula_directory_path)
-                elif object_type == Resource.Hook:
-                    custom_hook_code_path = create_custom_hook_code_path(path, object)
-                    if custom_hook_code_path:
-                        os.remove(custom_hook_code_path)
-
-    await asyncio.gather(*[remove_local_nonexistent_object(path) for path in paths])
+    await asyncio.gather(
+        *[remove_local_nonexistent_object(path, client) for path in paths]
+    )
 
     delete_empty_folders(base_path)
 
@@ -136,41 +153,3 @@ async def find_object_in_project(object: dict, base_path: Path):
     )
 
 
-def find_formula_fields_in_schema(node: Any) -> list[tuple[str, str]]:
-    formula_fields = []
-
-    def add_fields(node: dict):
-        if node["category"] == "datapoint" and (formula := node.get("formula", None)):
-            return [(node["id"], formula)]
-        elif "children" in node:
-            return find_formula_fields_in_schema(node["children"])
-        return []
-
-    if isinstance(node, list):
-        for subnode in node:
-            formula_fields.extend(add_fields(subnode))
-    elif isinstance(node, dict):
-        formula_fields.extend(add_fields(node))
-
-    return formula_fields
-
-
-def create_custom_hook_code_path(hook_path: Path, hook: object):
-    if hook["extension_source"] != "rossum_store" and hook.get("config", {}).get(
-        "code", None
-    ):
-        hook_runtime = hook["config"].get("runtime")
-        extension = ".py" if "python" in hook_runtime else ".js"
-        return hook_path.with_suffix(extension)
-    return None
-
-
-def create_formula_directory_path(schema_path: Path, schema: dict):
-    return (
-        schema_path.parent
-        / f"{settings.FORMULA_DIR_PREFIX}{templatize_name_id(schema['name'], schema['id'])}"
-    )
-
-
-async def create_formula_file(path: Path, code: str):
-    await write_str(path, code)
