@@ -41,18 +41,26 @@ Only source files are taken into account by default.
 )
 @click.option(
     "--all",
+    "-a",
     default=False,
     is_flag=True,
     help="Uploads all local files in the selected destination (source/target) and not just files that were locally modified.",
 )
+@click.option(
+    "--force",
+    "-f",
+    default=False,
+    is_flag=True,
+    help="Ignores newer remote timestamps = overwrites remote with local version of objects.",
+)
 @coro
-async def upload_project_wrapper(destination, all):
+async def upload_project_wrapper(destination, all, force):
     # To be able to run the command progammatically without the CLI decorators
-    await upload_project(destination=destination, upload_all=all)
+    await upload_project(destination=destination, upload_all=all, force=force)
 
 
 async def upload_project(
-    destination: str, client: ElisAPIClient = None, upload_all=False
+    destination: str, client: ElisAPIClient = None, upload_all=False, force=False
 ):
     try:
         org_path = Path("./")
@@ -96,22 +104,42 @@ async def upload_project(
             op, path = change
             match op:
                 case GIT_CHARACTERS.CREATED:
-                    requests.append(create_object(org_path / path, client, errors))
+                    requests.append(
+                        create_object(
+                            path=org_path / path,
+                            client=client,
+                            errors=errors,
+                            force=force,
+                        )
+                    )
                 case GIT_CHARACTERS.CREATED_STAGED:
-                    requests.append(create_object(org_path / path, client, errors))
+                    requests.append(
+                        create_object(
+                            path=org_path / path,
+                            client=client,
+                            errors=errors,
+                            force=force,
+                        )
+                    )
                 # case GIT_CHARACTERS.DELETED:
                 #    requests.append(delete_object(org_path / path, client, errors))
                 case GIT_CHARACTERS.UPDATED:
                     if upload_all:
                         requests.append(
                             update_create_object(
-                                client=client, path=org_path / path, errors=errors
+                                client=client,
+                                path=org_path / path,
+                                errors=errors,
+                                force=force,
                             )
                         )
                     else:
                         requests.append(
                             update_object(
-                                client=client, path=org_path / path, errors=errors
+                                client=client,
+                                path=org_path / path,
+                                errors=errors,
+                                force=force,
                             )
                         )
                 case _:
@@ -144,12 +172,12 @@ async def upload_project(
         display_error(f"Error during project {settings.UPLOAD_COMMAND_NAME}: {e}", e)
 
 
-async def update_create_object(client, path, errors):
-    result = await update_object(client=client, path=path, errors=errors)
+async def update_create_object(client, path, errors, force):
+    result = await update_object(client=client, path=path, errors=errors, force=force)
 
     if not result:
         print(f'Recreating object with path "{path}".')
-        await create_object(path=path, client=client, errors=errors)
+        await create_object(path=path, client=client, errors=errors, force=force)
 
 
 async def include_unmodified_files(

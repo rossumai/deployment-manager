@@ -21,7 +21,11 @@ from project_rossum_deploy.utils.functions import (
 
 
 async def update_object(
-    client: ElisAPIClient, path: Path = None, object: dict = None, errors: list = []
+    client: ElisAPIClient,
+    path: Path = None,
+    object: dict = None,
+    errors: list = None,
+    force=False,
 ):
     try:
         if not object:
@@ -35,9 +39,10 @@ async def update_object(
 
         resource = determine_object_type_from_url(url)
 
-        if not await check_modified_timestamp(
+        local_remote_timestamp_synced = await check_modified_timestamp(
             client, resource, id, object["modified_at"]
-        ):
+        )
+        if not force and not local_remote_timestamp_synced:
             return
 
         # Inboxes are ready-only in Elis API, but we don't ignore them when pulling to distinguish queues with and without inboxes
@@ -65,15 +70,18 @@ async def update_object(
         errors.append({"op": GIT_CHARACTERS.UPDATED, "path": path})
 
 
-async def create_object(path: Path, client: ElisAPIClient, errors: list):
+async def create_object(
+    path: Path, client: ElisAPIClient, errors: list = None, force=False
+):
     try:
         object = await read_json(path)
         object["id"] = None
         resource = determine_object_type_from_path(path)
 
-        if not await check_modified_timestamp(
+        local_remote_timestamp_synced = await check_modified_timestamp(
             client, resource, id, object["modified_at"]
-        ):
+        )
+        if not force and not local_remote_timestamp_synced:
             return
 
         created_object = await client._http_client.create(resource, object)
@@ -89,15 +97,18 @@ async def create_object(path: Path, client: ElisAPIClient, errors: list):
         errors.append({"op": GIT_CHARACTERS.CREATED, "path": path})
 
 
-async def delete_object(path: Path, client: ElisAPIClient, errors: list):
+async def delete_object(
+    path: Path, client: ElisAPIClient, errors: list = None, force=False
+):
     try:
         _, id = detemplatize_name_id(path)
         resource = determine_object_type_from_path(path)
 
         object = await read_json(path)
-        if not await check_modified_timestamp(
+        local_remote_timestamp_synced = await check_modified_timestamp(
             client, resource, id, object["modified_at"]
-        ):
+        )
+        if not force and not local_remote_timestamp_synced:
             return
 
         await client._http_client.delete(resource, id)
