@@ -102,7 +102,7 @@ async def download_queues_for_workspace(
         if download_all or await should_write_object(
             queue_path / "queue.json", queue, changed_files
         ):
-            await write_json(queue_path / "queue.json", queue, "queue")
+            await write_json(queue_path / "queue.json", queue, Resource.Queue)
 
         inbox_id = extract_id_from_url(queue["inbox"])
         if inbox_id:
@@ -128,6 +128,6 @@ async def download_inbox(
     inbox = await client._http_client.fetch_one(Resource.Inbox, inbox_id)
     inbox_path = parent_dir / "inbox.json"
     if download_all or await should_write_object(inbox_path, inbox, changed_files):
-        await write_json(inbox_path, inbox, "inbox")
+        await write_json(inbox_path, inbox, Resource.Inbox)
 
     return inbox

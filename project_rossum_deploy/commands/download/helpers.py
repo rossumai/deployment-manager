@@ -84,7 +84,8 @@ async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
 
         # Name might have changed
         name, _ = detemplatize_name_id(path)
-        if result.get("name", "") != name:
+        # Inboxes are in the queue folder so they are an edge case (names might not the same for the queue and its inbox)
+        if result.get("name", "") != name and object_type != Resource.Inbox:
             raise DifferentNameException
 
         # Workspace name might have changed, remove queue and inbox files inside

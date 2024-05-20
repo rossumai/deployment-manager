@@ -228,7 +228,7 @@ async def migrate_hook_dependency_graph(
                 new_run_after = []
                 for predecessor_url in old_hook["run_after"]:
                     predecessor_id = extract_id_from_url(predecessor_url)
-                    target_objects = source_id_target_pairs.get(predecessor_id, None)
+                    target_objects = source_id_target_pairs.get(predecessor_id, [])
                     # The hook was ignored, it has no targets equivalent
                     if not len(target_objects):
                         continue

@@ -143,6 +143,9 @@ try:
 
     settings = Settings()
 
+    if not settings.IS_PROJECT_IN_SAME_ORG:
+        settings.IGNORED_KEYS[Resource.Queue].extend(['dedicated_engine', 'engine', 'generic_engine'])
+
 except Exception as e:
     logging.exception(f"Error while initializing PRD settings: {e}")
     sys.exit(1)
