@@ -54,14 +54,27 @@ Only source files are taken into account by default.
     is_flag=True,
     help="Ignores newer remote timestamps = overwrites remote with local version of objects.",
 )
+@click.option(
+    "--indexed-only",
+    "-io",
+    default=False,
+    is_flag=True,
+    help="Pushes only files added to git index (using `git add <path>`).",
+)
 @coro
-async def upload_project_wrapper(destination, all, force):
+async def upload_project_wrapper(destination, all, force, indexed_only):
     # To be able to run the command progammatically without the CLI decorators
-    await upload_project(destination=destination, upload_all=all, force=force)
+    await upload_project(
+        destination=destination, upload_all=all, force=force, indexed_only=indexed_only
+    )
 
 
 async def upload_project(
-    destination: str, client: ElisAPIClient = None, upload_all=False, force=False
+    destination: str,
+    client: ElisAPIClient = None,
+    upload_all=False,
+    force=False,
+    indexed_only=False,
 ):
     try:
         org_path = Path("./")
@@ -87,7 +100,7 @@ async def upload_project(
                         f'Unrecognized destination "{destination}" to use {settings.UPLOAD_COMMAND_NAME}.'
                     )
 
-        changes = get_changed_file_paths(destination)
+        changes = get_changed_file_paths(destination, indexed_only=indexed_only)
 
         if changes:
             changes = await merge_hook_changes(changes, org_path)
@@ -128,7 +141,7 @@ async def upload_project(
                     )
                 # case GIT_CHARACTERS.DELETED:
                 #    requests.append(delete_object(org_path / path, client, errors))
-                case GIT_CHARACTERS.UPDATED:
+                case GIT_CHARACTERS.UPDATED | GIT_CHARACTERS.PARTIALLY_UPADTED:
                     if upload_all:
                         requests.append(
                             update_create_object(

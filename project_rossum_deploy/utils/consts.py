@@ -138,6 +138,7 @@ try:
     class GIT_CHARACTERS(StrEnum):
         DELETED = "D"
         UPDATED = "M"
+        PARTIALLY_UPADTED = "MM"
         CREATED = "??"
         CREATED_STAGED = "A"
 
