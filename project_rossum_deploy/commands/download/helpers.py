@@ -83,14 +83,14 @@ async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
             raise InactiveQueueException
 
         # Name might have changed
-        name, _ = detemplatize_name_id(path)
+        previous_name, _ = detemplatize_name_id(path)
         # Use the same process to create the name (e.g., missing forbidden chars like '/')
         path_from_remote = templatize_name_id(
             result.get("name", ""), result.get("id", "")
         )
         cleaned_name, _ = detemplatize_name_id(path_from_remote)
         # Inboxes are in the queue folder so they are an edge case (names might not the same for the queue and its inbox)
-        if cleaned_name != name and object_type != Resource.Inbox:
+        if cleaned_name != previous_name and object_type != Resource.Inbox:
             raise DifferentNameException
 
         # Workspace name might have changed, remove queue and inbox files inside
@@ -146,12 +146,17 @@ async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
             )
             os.remove(path)
 
+            previous_name, previous_id = detemplatize_name_id(path)
             if object_type == Resource.Schema:
-                formula_directory_path = create_formula_directory_path(path, object)
+                formula_directory_path = create_formula_directory_path(
+                    path, previous_name, previous_id
+                )
                 if await formula_directory_path.exists():
                     shutil.rmtree(formula_directory_path)
             elif object_type == Resource.Hook:
-                custom_hook_code_path = create_custom_hook_code_path(path, object)
+                custom_hook_code_path = create_custom_hook_code_path(
+                    path, previous_name, previous_id
+                )
                 if custom_hook_code_path:
                     os.remove(custom_hook_code_path)
 

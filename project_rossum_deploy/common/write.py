@@ -59,10 +59,10 @@ def create_custom_hook_code_path(hook_path: Path, hook: object):
     return None
 
 
-def create_formula_directory_path(schema_path: Path, schema: dict):
+def create_formula_directory_path(schema_path: Path, schema_name: str, schema_id: int):
     return (
         schema_path.parent
-        / f"{settings.FORMULA_DIR_PREFIX}{templatize_name_id(schema['name'], schema['id'])}"
+        / f"{settings.FORMULA_DIR_PREFIX}{templatize_name_id(schema_name, schema_id)}"
     )
 
 
