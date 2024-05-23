@@ -9,10 +9,13 @@ from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
 from rich.panel import Panel
 
-from project_rossum_deploy.common.determine_path import determine_object_type_from_url
+from project_rossum_deploy.common.determine_path import (
+    determine_object_type_from_url,
+)
 from project_rossum_deploy.common.write import (
     create_custom_hook_code_path,
     create_formula_directory_path,
+    find_formula_fields_in_schema,
 )
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
@@ -69,6 +72,26 @@ def delete_empty_folders(root: Path):
     return deleted
 
 
+async def check_schema_formula_fields_existence(remote_object: dict, path: Path):
+    formula_fields = find_formula_fields_in_schema(remote_object["content"])
+    formula_field_ids = [f[0] for f in formula_fields]
+    formula_directory_path = create_formula_directory_path(
+        path, remote_object.get("name", ""), remote_object.get("id", "")
+    )
+    if not await formula_directory_path.exists():
+        return
+
+    async for formula_path in formula_directory_path.iterdir():
+        if formula_path.stem not in formula_field_ids:
+            print(
+                Panel(
+                    f"Deleting local formula field code file that no longer exists in Rossum: {path}",
+                    style="yellow",
+                )
+            )
+            os.remove(formula_path)
+
+
 async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
     object = await read_json(path)
     url = object.get("url", "")
@@ -76,17 +99,17 @@ async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
 
     try:
         # ID not found because it was deleted from Rossum
-        result = await client._http_client.request_json(method="GET", url=url)
+        remote_object = await client._http_client.request_json(method="GET", url=url)
 
         # Special queue edge case (they are deleted after some period)
-        if result.get("status", "") == "deletion_requested":
+        if remote_object.get("status", "") == "deletion_requested":
             raise InactiveQueueException
 
         # Name might have changed
         previous_name, _ = detemplatize_name_id(path)
         # Use the same process to create the name (e.g., missing forbidden chars like '/')
         path_from_remote = templatize_name_id(
-            result.get("name", ""), result.get("id", "")
+            remote_object.get("name", ""), remote_object.get("id", "")
         )
         cleaned_name, _ = detemplatize_name_id(path_from_remote)
         # Inboxes are in the queue folder so they are an edge case (names might not the same for the queue and its inbox)
@@ -95,41 +118,11 @@ async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
 
         # Workspace name might have changed, remove queue and inbox files inside
         if object_type == Resource.Queue:
-            ws = await client._http_client.request_json(
-                method="GET", url=result["workspace"]
-            )
-            ws_path_part = templatize_name_id(ws["name"], ws["id"])
-            queue_path_path = templatize_name_id(result["name"], result["id"])
-            path_parts = str(path).split("/")
-            latest_path = (
-                Path(*path_parts[:-4])
-                / ws_path_part
-                / "queues"
-                / queue_path_path
-                / "queue.json"
-            )
-            if latest_path != path:
-                raise DifferentPathException
-
+            await check_queue_existence(client, remote_object, path)
         elif object_type == Resource.Inbox:
-            queue = await client._http_client.request_json(
-                method="GET", url=result["queues"][0]
-            )
-            ws = await client._http_client.request_json(
-                method="GET", url=queue["workspace"]
-            )
-            ws_path_part = templatize_name_id(ws["name"], ws["id"])
-            queue_path_path = templatize_name_id(queue["name"], queue["id"])
-            path_parts = str(path).split("/")
-            latest_path = (
-                Path(*path_parts[:-4])
-                / ws_path_part
-                / "queues"
-                / queue_path_path
-                / "inbox.json"
-            )
-            if latest_path != path:
-                raise DifferentPathException
+            await check_inbox_existence(client, remote_object, path)
+        elif object_type == Resource.Schema:
+            await check_schema_formula_fields_existence(remote_object, path)
 
     except (
         APIClientError,
@@ -161,20 +154,58 @@ async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
                     os.remove(custom_hook_code_path)
 
 
+async def check_queue_existence(client: ElisAPIClient, remote_object: dict, path: Path):
+    ws = await client._http_client.request_json(
+        method="GET", url=remote_object["workspace"]
+    )
+    ws_path_part = templatize_name_id(ws["name"], ws["id"])
+    queue_path_path = templatize_name_id(remote_object["name"], remote_object["id"])
+    path_parts = str(path).split("/")
+    latest_path = (
+        Path(*path_parts[:-4])
+        / ws_path_part
+        / "queues"
+        / queue_path_path
+        / "queue.json"
+    )
+    if latest_path != path:
+        raise DifferentPathException
+
+
+async def check_inbox_existence(client: ElisAPIClient, remote_object: dict, path: Path):
+    queue = await client._http_client.request_json(
+        method="GET", url=remote_object["queues"][0]
+    )
+    ws = await client._http_client.request_json(method="GET", url=queue["workspace"])
+    ws_path_part = templatize_name_id(ws["name"], ws["id"])
+    queue_path_path = templatize_name_id(queue["name"], queue["id"])
+    path_parts = str(path).split("/")
+    latest_path = (
+        Path(*path_parts[:-4])
+        / ws_path_part
+        / "queues"
+        / queue_path_path
+        / "inbox.json"
+    )
+    if latest_path != path:
+        raise DifferentPathException
+
+
 async def remove_local_nonexistent_objects(client: ElisAPIClient, base_path: Path):
     """
     Checks that the local object still exists in Rossum and removes its local file if not.
     """
 
-    paths = await find_all_object_paths(base_path)
-    # the file might not be there for target
+    object_paths = await find_all_object_paths(base_path)
+    # Ignore the org file, it should never be deleted
     try:
-        paths.remove(Path(base_path / "organization.json"))
+        object_paths.remove(Path(base_path / "organization.json"))
+    # The file might not be there for target
     except Exception:
         ...
 
     await asyncio.gather(
-        *[remove_local_nonexistent_object(path, client) for path in paths]
+        *[remove_local_nonexistent_object(path, client) for path in object_paths]
     )
 
     delete_empty_folders(base_path)
