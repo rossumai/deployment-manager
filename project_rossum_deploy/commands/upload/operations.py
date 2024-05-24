@@ -11,11 +11,10 @@ from project_rossum_deploy.common.determine_path import determine_object_type_fr
 from project_rossum_deploy.common.write import (
     determine_object_type_from_path,
 )
-from project_rossum_deploy.utils.consts import create_mismatch_warning
+from project_rossum_deploy.utils.consts import create_mismatch_warning, display_error
 from project_rossum_deploy.utils.consts import GIT_CHARACTERS
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
-    display_error,
     read_json,
     write_json,
 )

@@ -25,10 +25,9 @@ from project_rossum_deploy.commands.migrate.upload import (
     upload_organization,
 )
 
-from project_rossum_deploy.utils.consts import PrdVersionException, settings
+from project_rossum_deploy.utils.consts import PrdVersionException, display_error, settings
 from project_rossum_deploy.utils.functions import (
     coro,
-    display_error,
     extract_flat_lookup_table,
     extract_sources_targets,
     find_all_object_paths,

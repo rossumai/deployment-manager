@@ -15,11 +15,11 @@ from project_rossum_deploy.commands.upload.operations import (
 from project_rossum_deploy.common.git import get_changed_file_paths
 from project_rossum_deploy.utils.consts import (
     GIT_CHARACTERS,
+    display_error,
     settings,
 )
 from project_rossum_deploy.utils.functions import (
     coro,
-    display_error,
     find_all_object_paths,
     gather_with_concurrency,
     make_request_with_progress,

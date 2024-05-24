@@ -21,11 +21,10 @@ from project_rossum_deploy.commands.migrate.upload import (
     upload_queue,
     upload_workspace,
 )
-from project_rossum_deploy.utils.consts import PrdVersionException, settings
+from project_rossum_deploy.utils.consts import PrdVersionException, display_error, settings
 
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
-    display_error,
     read_json,
 )
 

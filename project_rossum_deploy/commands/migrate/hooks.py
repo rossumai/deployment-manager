@@ -14,12 +14,11 @@ from project_rossum_deploy.commands.migrate.helpers import (
     migrate_object_to_multiple_targets,
     simulate_migrate_object,
 )
-from project_rossum_deploy.utils.consts import PrdVersionException, settings
+from project_rossum_deploy.utils.consts import PrdVersionException, display_error, settings
 from project_rossum_deploy.commands.migrate.upload import upload_hook
 from project_rossum_deploy.utils.functions import (
     PauseProgress,
     detemplatize_name_id,
-    display_error,
     extract_id_from_url,
     read_json,
 )

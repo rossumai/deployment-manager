@@ -8,6 +8,9 @@ import sys
 import click
 import httpx
 
+from rich.prompt import Prompt
+from rich.console import Console
+from rich.panel import Panel
 from rossum_api.api_client import Resource
 
 
@@ -20,6 +23,14 @@ API_SUFFIX_RE = re.compile(r"/api/v\d+$")
 
 ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD = "$prd_ref"
 ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD = "$source_value"
+
+
+def display_error(error_msg: str, exception: Exception = None):
+    console = Console()
+    if exception:
+        logging.exception(exception)
+    console.print(Panel(error_msg), style="bold red")
+
 
 try:
 
@@ -39,10 +50,9 @@ try:
 
             cred_path = Path("./") / self.CREDENTIALS_FILENAME
             if not cred_path.exists():
-                click.echo(
+                raise click.ClickException(
                     f"WARNING: {self.CREDENTIALS_FILENAME} not found in the current directory."
                 )
-                return
 
             credentials = json.loads(cred_path.read_text())
 
@@ -50,9 +60,18 @@ try:
             self.SOURCE_USERNAME = credentials["source"].get("username", None)
             self.SOURCE_PASSWORD = credentials["source"].get("password", None)
             self.SOURCE_TOKEN = credentials["source"].get("token", None)
-            if self.SOURCE_TOKEN:
-                token_valid = validate_token(self.SOURCE_API_BASE, self.SOURCE_TOKEN)
-                if not token_valid:
+            if self.SOURCE_TOKEN and not (
+                validate_token(self.SOURCE_API_BASE, self.SOURCE_TOKEN)
+            ):
+                new_token = Prompt.ask(
+                    "Source token is invalid or expired. Provide a new one"
+                )
+                if validate_token(self.SOURCE_API_BASE, new_token):
+                    self.SOURCE_TOKEN = new_token
+                    credentials["source"]["token"] = new_token
+                    with open(cred_path, "w") as wf:
+                        json.dump(credentials, wf, indent=2)
+                else:
                     raise click.ClickException("Source token is invalid or expired.")
 
             if not credentials.get("use_same_org_as_target", False):
@@ -67,11 +86,18 @@ try:
                 self.TARGET_USERNAME = credentials["target"].get("username", None)
                 self.TARGET_PASSWORD = credentials["target"].get("password", None)
                 self.TARGET_TOKEN = credentials["target"].get("token", None)
-                if self.TARGET_TOKEN:
-                    token_valid = validate_token(
-                        self.TARGET_API_BASE, self.TARGET_TOKEN
+                if self.TARGET_TOKEN and not (
+                    validate_token(self.TARGET_API_BASE, self.TARGET_TOKEN)
+                ):
+                    new_token = Prompt.ask(
+                        "Target token is invalid or expired. Provide a new one"
                     )
-                    if not token_valid:
+                    if validate_token(self.TARGET_API_BASE, new_token):
+                        self.TARGET_TOKEN = new_token
+                        credentials["target"]["token"] = new_token
+                        with open(cred_path, "w") as wf:
+                            json.dump(credentials, wf, indent=2)
+                    else:
                         raise click.ClickException(
                             "Target token is invalid or expired."
                         )
@@ -145,10 +171,12 @@ try:
     settings = Settings()
 
     if not settings.IS_PROJECT_IN_SAME_ORG:
-        settings.IGNORED_KEYS[Resource.Queue].extend(['dedicated_engine', 'engine', 'generic_engine'])
+        settings.IGNORED_KEYS[Resource.Queue].extend(
+            ["dedicated_engine", "engine", "generic_engine"]
+        )
 
 except Exception as e:
-    logging.exception(f"Error while initializing PRD settings: {e}")
+    display_error(f"Error while initializing PRD settings: {str(e)}", e)
     sys.exit(1)
 
 

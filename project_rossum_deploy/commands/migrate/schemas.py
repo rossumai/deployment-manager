@@ -12,11 +12,10 @@ from project_rossum_deploy.commands.migrate.helpers import (
     migrate_object_to_multiple_targets,
     simulate_migrate_object,
 )
-from project_rossum_deploy.utils.consts import settings, PrdVersionException
+from project_rossum_deploy.utils.consts import display_error, settings, PrdVersionException
 from project_rossum_deploy.commands.migrate.upload import upload_schema
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
-    display_error,
     find_schema_id,
     read_formula_file,
     read_json,
