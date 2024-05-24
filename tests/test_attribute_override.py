@@ -8,7 +8,7 @@ from project_rossum_deploy.utils.consts import (
     ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD,
     settings,
 )
-from project_rossum_deploy.commands.download.mapping import read_mapping
+from project_rossum_deploy.common.mapping import read_mapping
 from project_rossum_deploy.utils.functions import read_json
 from tests.utils.consts import REFERENCE_PROJECT_PATH
 

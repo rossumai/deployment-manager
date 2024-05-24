@@ -521,3 +521,11 @@ async def gather_with_concurrency(n, *coros):
             return await coro
 
     return await asyncio.gather(*(sem_coro(c) for c in coros))
+
+
+async def find_object_in_project(object: dict, base_path: Path):
+    file_name = templatize_name_id(object["name"], object["id"])
+    return (
+        await (base_path / file_name).exists()
+        or await (base_path / (file_name + ".json")).exists()
+    )

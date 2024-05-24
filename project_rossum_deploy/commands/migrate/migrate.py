@@ -9,7 +9,7 @@ from rossum_api import ElisAPIClient
 from project_rossum_deploy.commands.download.download import (
     download_project,
 )
-from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
+from project_rossum_deploy.common.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.migrate.helpers import (
     traverse_mapping,
 )

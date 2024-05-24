@@ -3,7 +3,7 @@ import logging
 from anyio import Path
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
-from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
+from project_rossum_deploy.common.mapping import read_mapping, write_mapping
 from project_rossum_deploy.utils.consts import settings
 
 

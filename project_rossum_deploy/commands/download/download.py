@@ -12,7 +12,7 @@ from project_rossum_deploy.commands.download.helpers import (
     should_write_object,
 )
 from project_rossum_deploy.commands.download.hooks import download_hooks
-from project_rossum_deploy.commands.download.mapping import (
+from project_rossum_deploy.common.mapping import (
     create_empty_mapping,
     create_update_mapping,
     read_mapping,

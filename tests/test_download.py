@@ -6,7 +6,7 @@ from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
 from project_rossum_deploy.commands.download.download import download_organization_combined_source_target
-from project_rossum_deploy.commands.download.mapping import read_mapping, write_mapping
+from project_rossum_deploy.common.mapping import read_mapping, write_mapping
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import read_json, templatize_name_id
 from tests.utils.compare import ensure_downloaded_object, compare_projects
