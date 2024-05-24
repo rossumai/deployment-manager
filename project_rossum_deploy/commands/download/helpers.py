@@ -85,7 +85,7 @@ async def check_schema_formula_fields_existence(remote_object: dict, path: Path)
         if formula_path.stem not in formula_field_ids:
             print(
                 Panel(
-                    f"Deleting local formula field code file that no longer exists in Rossum: {path}",
+                    f"Deleting a local formula field code file that no longer exists in Rossum: {path}",
                     style="yellow",
                 )
             )
@@ -133,7 +133,7 @@ async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
         if e.status_code == 404:
             print(
                 Panel(
-                    f"Deleting local object that no longer exists in Rossum: {path}",
+                    f"Deleting a local object that no longer exists in Rossum: {path}",
                     style="yellow",
                 )
             )

@@ -13,7 +13,7 @@ from project_rossum_deploy.commands.migrate.helpers import (
     simulate_migrate_object,
 )
 from project_rossum_deploy.utils.consts import settings, PrdVersionException
-from project_rossum_deploy.common.upload import upload_schema
+from project_rossum_deploy.commands.migrate.upload import upload_schema
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
     display_error,
@@ -32,6 +32,9 @@ async def migrate_schemas(
     sources_by_source_id_map: dict,
     progress: Progress,
     plan_only: bool = False,
+    target_objects: list[dict] = [],
+    errors: dict = {},
+    force: bool = False,
 ):
     schema_paths = [
         schema_path async for schema_path in (source_path / "schemas").iterdir()
@@ -61,16 +64,19 @@ async def migrate_schemas(
                     source_object=schema,
                 )
             else:
-                partial_upload_schema = functools.partial(upload_schema, client, schema)
+                partial_upload_schema = functools.partial(
+                    upload_schema,
+                    client,
+                    schema,
+                    target_objects=target_objects,
+                    errors=errors,
+                    force=force,
+                )
             source_id_target_pairs[id] = []
             if "target_object" in schema_mapping:
                 raise PrdVersionException(
                     f'Detected "target_object" for schema with ID "{id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping format.'
                 )
-            #     result = await migrate_object_to_default_target(
-            #         submapping=schema_mapping, upload_function=partial_upload_schema
-            #     )
-            #     source_id_target_pairs[id].append(result)
 
             results = await migrate_object_to_multiple_targets(
                 submapping=schema_mapping, upload_function=partial_upload_schema

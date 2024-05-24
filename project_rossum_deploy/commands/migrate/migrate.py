@@ -21,7 +21,7 @@ from project_rossum_deploy.common.attribute_override import (
     replace_ids_in_settings,
 )
 from project_rossum_deploy.common.determine_path import determine_object_type_from_url
-from project_rossum_deploy.common.upload import (
+from project_rossum_deploy.commands.migrate.upload import (
     upload_organization,
 )
 
@@ -52,13 +52,23 @@ The specifics of what objects to migrate and where to migrate them are specified
     default=False,
     is_flag=True,
 )
+@click.option(
+    "--force",
+    "-f",
+    default=False,
+    is_flag=True,
+    help="Ignores newer remote timestamps = overwrites remote with local version of objects.",
+)
 @coro
-async def migrate_project_wrapper(plan_only: bool):
-    await migrate_project(plan_only=plan_only)
+async def migrate_project_wrapper(plan_only: bool, force: bool):
+    await migrate_project(plan_only=plan_only, force=force)
 
 
 async def migrate_project(
-    client: ElisAPIClient = None, org_path: Path = None, plan_only: bool = False
+    client: ElisAPIClient = None,
+    org_path: Path = None,
+    plan_only: bool = False,
+    force: bool = False,
 ):
     try:
         if not org_path:
@@ -105,6 +115,7 @@ async def migrate_project(
 
         source_id_target_pairs = {}
         sources_by_source_id_map = {}
+        errors_by_target_id = {}
 
         if not (
             await validate_override_migrated_objects_attributes(
@@ -125,9 +136,21 @@ async def migrate_project(
                 k: organization[k] for k in settings.ORGANIZATION_FIELDS
             }
 
+            target_paths = await find_all_object_paths(
+                org_path / settings.TARGET_DIRNAME
+            )
+            target_objects = [await read_json(path) for path in target_paths]
+
             source_id_target_pairs[mapping["organization"]["id"]] = [
                 await upload_organization(
-                    client, organization_fields, target_organization_id
+                    client,
+                    organization_fields,
+                    target_organization_id,
+                    target_objects=[organization]
+                    if settings.IS_PROJECT_IN_SAME_ORG
+                    else target_objects,
+                    errors=errors_by_target_id,
+                    force=force,
                 )
             ]
             progress.update(task, advance=1)
@@ -142,6 +165,9 @@ async def migrate_project(
                 sources_by_source_id_map=sources_by_source_id_map,
                 progress=progress,
                 plan_only=plan_only,
+                target_objects=target_objects,
+                errors=errors_by_target_id,
+                force=force,
             )
             await migrate_hooks(
                 source_path=source_path,
@@ -151,6 +177,9 @@ async def migrate_project(
                 sources_by_source_id_map=sources_by_source_id_map,
                 progress=progress,
                 plan_only=plan_only,
+                target_objects=target_objects,
+                errors=errors_by_target_id,
+                force=force,
             )
             await migrate_workspaces(
                 source_path=source_path,
@@ -160,6 +189,9 @@ async def migrate_project(
                 sources_by_source_id_map=sources_by_source_id_map,
                 progress=progress,
                 plan_only=plan_only,
+                target_objects=target_objects,
+                errors=errors_by_target_id,
+                force=force,
             )
 
         if plan_only:
@@ -191,11 +223,23 @@ async def migrate_project(
             sources_by_source_id_map=sources_by_source_id_map,
             source_id_target_pairs=source_id_target_pairs,
             lookup_table=lookup_table,
+            errors=errors_by_target_id,
         )
 
-        print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
-
-        await download_project(client=client, org_path=org_path)
+        if len(errors_by_target_id.keys()):
+            errors_listed = "\n".join(
+                [
+                    f"{err[1][0]} - {err[1][1]} ({err[0]})"
+                    for err in errors_by_target_id.items()
+                ]
+            )
+            display_error(
+                f"Changes made to target objects were not pulled to local because some target objects were not released, please do so manually.\n\nThe following target IDs were not released because of a newer version existed in Rossum. Please check these remote versions and retry:\n{errors_listed}",
+            )
+            return
+        else:
+            await download_project(client=client, org_path=org_path)
+            print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
     except PrdVersionException as e:
         print(Panel(f"Unexpected error while migrating objects: {e}"))
         return
@@ -262,6 +306,7 @@ async def override_migrated_objects_attributes(
     sources_by_source_id_map: dict,
     source_id_target_pairs: dict[int, list],
     lookup_table: dict,
+    errors: dict,
 ):
     print(Panel("Running attribute_override..."))
     for mapping_object in traverse_mapping(mapping["organization"]):
@@ -276,6 +321,9 @@ async def override_migrated_objects_attributes(
             continue
 
         for target_index, target_object in enumerate(target_objects):
+            if target_object["id"] in errors:
+                continue
+
             resource = determine_object_type_from_url(target_object["url"])
 
             # Implicit override for settings

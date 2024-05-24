@@ -5,22 +5,38 @@ from rich.prompt import Prompt
 
 from project_rossum_deploy.commands.migrate.helpers import (
     find_object_by_id,
-    should_upload_object,
 )
-from project_rossum_deploy.utils.consts import settings
-from project_rossum_deploy.utils.functions import PauseProgress, extract_id_from_url
+from project_rossum_deploy.commands.upload.helpers import check_modified_timestamp
+from project_rossum_deploy.utils.consts import (
+    create_mismatch_warning,
+    settings,
+)
+from project_rossum_deploy.utils.functions import (
+    PauseProgress,
+    display_error,
+    extract_id_from_url,
+)
 
 
 async def upload_organization(
-    client: ElisAPIClient, organization: dict, target_id: int, target_objects=[]
+    client: ElisAPIClient,
+    organization: dict,
+    target_id: int,
+    target_objects=[],
+    errors={},
+    force=False,
 ):
-    if not await should_upload_object(
-        client=client, target_id=target_id, target_objects=target_objects
-    ):
-        return find_object_by_id(target_id, target_objects)
-
     if not target_id:
         return
+
+    local_object = find_object_by_id(target_id, target_objects)
+    local_remote_timestamp_synced = await check_modified_timestamp(
+        client, Resource.Organization, target_id, local_object
+    )
+    if not force and not local_remote_timestamp_synced:
+        display_error(create_mismatch_warning(Resource.Organization, target_id))
+        errors[target_id] = (Resource.Organization, local_object.get("name", ""))
+        return local_object
 
     return await client._http_client.update(
         Resource.Organization, id_=target_id, data=organization
@@ -28,14 +44,23 @@ async def upload_organization(
 
 
 async def upload_workspace(
-    client: ElisAPIClient, workspace: dict, target_id: int, target_objects=[]
+    client: ElisAPIClient,
+    workspace: dict,
+    target_id: int,
+    target_objects=[],
+    errors={},
+    force=False,
 ):
-    if not await should_upload_object(
-        client=client, target_id=target_id, target_objects=target_objects
-    ):
-        return find_object_by_id(target_id, target_objects)
-
     if target_id:
+        local_object = find_object_by_id(target_id, target_objects)
+        local_remote_timestamp_synced = await check_modified_timestamp(
+            client, Resource.Workspace, target_id, local_object
+        )
+        if not force and not local_remote_timestamp_synced:
+            display_error(create_mismatch_warning(Resource.Workspace, target_id))
+            errors[target_id] = (Resource.Workspace, local_object.get("name", ""))
+            return local_object
+
         return await client._http_client.update(
             Resource.Workspace, id_=target_id, data=workspace
         )
@@ -44,14 +69,23 @@ async def upload_workspace(
 
 
 async def upload_queue(
-    client: ElisAPIClient, queue: dict, target_id: int, target_objects=[]
+    client: ElisAPIClient,
+    queue: dict,
+    target_id: int,
+    target_objects=[],
+    errors={},
+    force=False,
 ):
-    if not await should_upload_object(
-        client=client, target_id=target_id, target_objects=target_objects
-    ):
-        return find_object_by_id(target_id, target_objects)
-
     if target_id:
+        local_object = find_object_by_id(target_id, target_objects)
+        local_remote_timestamp_synced = await check_modified_timestamp(
+            client, Resource.Queue, target_id, local_object
+        )
+        if not force and not local_remote_timestamp_synced:
+            display_error(create_mismatch_warning(Resource.Queue, target_id))
+            errors[target_id] = (Resource.Queue, local_object.get("name", ""))
+            return local_object
+
         return await client._http_client.update(
             Resource.Queue, id_=target_id, data=queue
         )
@@ -60,14 +94,23 @@ async def upload_queue(
 
 
 async def upload_inbox(
-    client: ElisAPIClient, inbox: dict, target_id: int, target_objects=[]
+    client: ElisAPIClient,
+    inbox: dict,
+    target_id: int,
+    target_objects=[],
+    errors={},
+    force=False,
 ):
-    if not await should_upload_object(
-        client=client, target_id=target_id, target_objects=target_objects
-    ):
-        return find_object_by_id(target_id, target_objects)
-
     if target_id:
+        local_object = find_object_by_id(target_id, target_objects)
+        local_remote_timestamp_synced = await check_modified_timestamp(
+            client, Resource.Inbox, target_id, local_object
+        )
+        if not force and not local_remote_timestamp_synced:
+            display_error(create_mismatch_warning(Resource.Inbox, target_id))
+            errors[target_id] = (Resource.Inbox, local_object.get("name", ""))
+            return local_object
+
         return await client._http_client.update(
             Resource.Inbox, id_=target_id, data=inbox
         )
@@ -76,14 +119,23 @@ async def upload_inbox(
 
 
 async def upload_schema(
-    client: ElisAPIClient, schema: dict, target_id: int, target_objects=[]
+    client: ElisAPIClient,
+    schema: dict,
+    target_id: int,
+    target_objects=[],
+    errors={},
+    force=False,
 ):
-    if not await should_upload_object(
-        client=client, target_id=target_id, target_objects=target_objects
-    ):
-        return find_object_by_id(target_id, target_objects)
-
     if target_id:
+        local_object = find_object_by_id(target_id, target_objects)
+        local_remote_timestamp_synced = await check_modified_timestamp(
+            client, Resource.Schema, target_id, local_object
+        )
+        if not force and not local_remote_timestamp_synced:
+            display_error(create_mismatch_warning(Resource.Schema, target_id))
+            errors[target_id] = (Resource.Schema, local_object.get("name", ""))
+            return local_object
+
         return await client._http_client.update(
             Resource.Schema, id_=target_id, data=schema
         )
@@ -98,13 +150,19 @@ async def upload_hook(
     target_id: int,
     progress: Progress,
     target_objects=[],
+    errors={},
+    force=False,
 ):
-    if not await should_upload_object(
-        client=client, target_id=target_id, target_objects=target_objects
-    ):
-        return find_object_by_id(target_id, target_objects)
-
     if target_id:
+        local_object = find_object_by_id(target_id, target_objects)
+        local_remote_timestamp_synced = await check_modified_timestamp(
+            client, Resource.Hook, target_id, local_object
+        )
+        if not force and not local_remote_timestamp_synced:
+            display_error(create_mismatch_warning(Resource.Hook, target_id))
+            errors[target_id] = (Resource.Hook, local_object.get("name", ""))
+            return local_object
+
         return await client._http_client.update(Resource.Hook, id_=target_id, data=hook)
     else:
         created_hook = await create_hook_based_on_template(hook=hook, client=client)

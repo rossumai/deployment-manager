@@ -3,11 +3,41 @@ from typing import Callable
 from rossum_api import ElisAPIClient
 from project_rossum_deploy.utils.consts import settings
 
-from project_rossum_deploy.utils.functions import extract_id_from_url
+from project_rossum_deploy.utils.functions import (
+    extract_id_from_url,
+)
 
 
 def is_first_time_migration(submapping: dict):
     return not submapping.get("target_object", None)
+
+
+def find_object_by_id(id: int, objects: list):
+    object = {}
+    for candidate in objects:
+        if candidate["id"] == id:
+            object = candidate
+            break
+    return object
+
+
+async def should_upload_object(
+    client: ElisAPIClient, target_id: int, target_objects: list[dict]
+):
+    if target_id:
+        target_object = find_object_by_id(target_id, target_objects)
+        if not target_object:
+            return True
+
+        remote_object = await client._http_client.request_json(
+            method="get", url=target_object.get("url", "")
+        )
+
+        return remote_object.get("modified_at", "") == target_object.get(
+            "modified_at", ""
+        )
+    else:
+        return True
 
 
 def replace_dependency_url(
@@ -133,6 +163,7 @@ async def migrate_object_to_multiple_targets(
         if pass_index_args:
             extra_args["target_index"] = target_index
             extra_args["target_objects_count"] = len(targets)
+
         requests.append(upload_function(target_id=target_id, **extra_args))
 
     results = await asyncio.gather(*requests)

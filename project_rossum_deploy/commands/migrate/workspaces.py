@@ -16,7 +16,7 @@ from project_rossum_deploy.commands.migrate.helpers import (
     replace_dependency_url,
     simulate_migrate_object,
 )
-from project_rossum_deploy.common.upload import (
+from project_rossum_deploy.commands.migrate.upload import (
     upload_inbox,
     upload_queue,
     upload_workspace,
@@ -38,6 +38,9 @@ async def migrate_workspaces(
     sources_by_source_id_map: dict,
     progress: Progress,
     plan_only: bool = False,
+    target_objects: list[dict] = [],
+    errors: dict = {},
+    force: bool = False,
 ):
     workspace_paths = [
         workspace_path
@@ -71,7 +74,12 @@ async def migrate_workspaces(
                 )
             else:
                 partial_upload_workspace = functools.partial(
-                    upload_workspace, client, workspace
+                    upload_workspace,
+                    client,
+                    workspace,
+                    target_objects=target_objects,
+                    errors=errors,
+                    force=force,
                 )
             source_id_target_pairs[id] = []
             if "target_object" in workspace_mapping:
@@ -92,6 +100,9 @@ async def migrate_workspaces(
                 sources_by_source_id_map=sources_by_source_id_map,
                 source_id_target_pairs=source_id_target_pairs,
                 plan_only=plan_only,
+                target_objects=target_objects,
+                errors=errors,
+                force=force,
             )
 
             progress.update(task, advance=1)
@@ -118,6 +129,9 @@ async def migrate_queues_and_inboxes(
     sources_by_source_id_map: dict,
     source_id_target_pairs: dict[int, list],
     plan_only: bool = False,
+    target_objects: list[dict] = [],
+    errors: dict = {},
+    force: bool = False,
 ):
     if not (await (ws_path / "queues").exists()):
         return
@@ -147,6 +161,9 @@ async def migrate_queues_and_inboxes(
                     queue=queue,
                     client=client,
                     source_id_target_pairs=source_id_target_pairs,
+                    target_objects=target_objects,
+                    errors=errors,
+                    force=force,
                 )
 
             source_id_target_pairs[id] = []
@@ -185,6 +202,9 @@ async def migrate_queues_and_inboxes(
                     inbox=inbox,
                     client=client,
                     source_id_target_pairs=source_id_target_pairs,
+                    target_objects=target_objects,
+                    errors=errors,
+                    force=force,
                 )
             source_id_target_pairs[inbox_id] = []
             if "target_object" in inbox_mapping:
@@ -219,6 +239,9 @@ async def prepare_queue_upload(
     target_objects_count: int,
     source_id_target_pairs: dict[int, list],
     target_id: int,
+    target_objects: list[dict] = [],
+    errors: dict = {},
+    force: bool = False,
 ):
     queue = deepcopy(queue)
     target_object = (
@@ -262,7 +285,14 @@ async def prepare_queue_upload(
     )
     queue.pop("inbox", None)
 
-    return await upload_queue(client=client, queue=queue, target_id=target_id)
+    return await upload_queue(
+        client=client,
+        queue=queue,
+        target_id=target_id,
+        target_objects=target_objects,
+        errors=errors,
+        force=force,
+    )
 
 
 async def prepare_inbox_upload(
@@ -272,6 +302,9 @@ async def prepare_inbox_upload(
     target_objects_count: int,
     source_id_target_pairs: dict[int, list],
     target_id: int,
+    target_objects: list[dict] = [],
+    errors: dict = {},
+    force: bool = False,
 ):
     inbox = deepcopy(inbox)
 
@@ -285,4 +318,11 @@ async def prepare_inbox_upload(
     # Should either create a new one or it is already present
     inbox.pop("email", None)
 
-    return await upload_inbox(client=client, inbox=inbox, target_id=target_id)
+    return await upload_inbox(
+        client=client,
+        inbox=inbox,
+        target_id=target_id,
+        target_objects=target_objects,
+        errors=errors,
+        force=force,
+    )
