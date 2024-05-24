@@ -147,9 +147,8 @@ async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
                 if await formula_directory_path.exists():
                     shutil.rmtree(formula_directory_path)
             elif object_type == Resource.Hook:
-                custom_hook_code_path = create_custom_hook_code_path(
-                    path, previous_name, previous_id
-                )
+                object['name'] = previous_name
+                custom_hook_code_path = create_custom_hook_code_path(path, object)
                 if custom_hook_code_path:
                     os.remove(custom_hook_code_path)
 
