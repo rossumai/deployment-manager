@@ -62,8 +62,12 @@ async def download_hooks(
         if download_all or await should_write_object(
             hook_config_path, hook, changed_files
         ):
-            # TODO: use write local object
-            await write_json(hook_config_path, hook, Resource.Hook)
+            await write_json(
+                hook_config_path,
+                hook,
+                Resource.Hook,
+                log_message=f"Pulled {hook_config_path}",
+            )
         hooks.append((destination_local, hook))
 
         custom_hook_code_path = create_custom_hook_code_path(hook_config_path, hook)

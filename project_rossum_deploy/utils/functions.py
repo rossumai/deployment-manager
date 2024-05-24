@@ -12,6 +12,7 @@ from anyio import Path
 
 from click import progressbar
 from rich.prompt import Confirm
+from rich import print
 from rich.console import Console
 from rich.panel import Panel
 from rossum_api import ElisAPIClient
@@ -313,7 +314,9 @@ def get_mapping_key_index(key: str):
         return inf
 
 
-async def write_json(path: Path, object: dict, type: Resource = None):
+async def write_json(
+    path: Path, object: dict, type: Resource = None, log_message: str = ""
+):
     if dataclasses.is_dataclass(object):
         object = dataclasses.asdict(object)
     if path.parent:
@@ -326,6 +329,9 @@ async def write_json(path: Path, object: dict, type: Resource = None):
                     del object[key]
     with open(path, "w") as wf:
         json.dump(object, wf, indent=2)
+
+    if log_message:
+        print(log_message)
 
 
 async def read_json(path: Path) -> dict:

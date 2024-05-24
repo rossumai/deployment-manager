@@ -61,7 +61,9 @@ In case the directory already exists, it first deletes its contents and then dow
 )
 @coro
 # To be able to run the command progammatically without the CLI decorators
-async def download_project_wrapper(commit: bool = False, message: str = "", all: bool = False):
+async def download_project_wrapper(
+    commit: bool = False, message: str = "", all: bool = False
+):
     await download_project(commit_message=message, commit=commit, download_all=all)
 
 
@@ -176,7 +178,11 @@ async def download_organization_single(
     changed_files: list = [],
     download_all: bool = False,
 ):
-    print(Panel("Scanning for remote changes..."))
+    print(
+        Panel(
+            f"Scanning for remote changes{ f' in {destination}' if destination else ''}..."
+        )
+    )
 
     organizations = [org async for org in client.list_all_organizations()]
     if not len(organizations):
@@ -191,7 +197,12 @@ async def download_organization_single(
     if download_all or await should_write_object(
         org_config_path, organization, changed_files
     ):
-        await write_json(org_config_path, organization, Resource.Organization)
+        await write_json(
+            org_config_path,
+            organization,
+            Resource.Organization,
+            log_message=f"Pulled {org_config_path}.",
+        )
 
     (
         workspaces_for_mapping,

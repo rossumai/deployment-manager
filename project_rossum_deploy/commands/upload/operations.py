@@ -53,7 +53,9 @@ async def update_object(
         result = await client._http_client.update(resource, id, object)
 
         # Just to update the timestamp
-        await write_json(path, result, resource)
+        await write_json(
+            path, result, resource, log_message=f"Updating timestamp for {path}"
+        )
 
         print(f'Successfully updated {resource} with ID "{id}".')
         return result
@@ -85,7 +87,9 @@ async def create_object(
         result = await client._http_client.create(resource, object)
 
         # Just to update the timestamp
-        await write_json(path, result, resource)
+        await write_json(
+            path, result, resource, log_message=f"Updating timestamp for {path}"
+        )
 
         print(f'Successfully created {resource} with ID "{result["id"]}".')
         return result

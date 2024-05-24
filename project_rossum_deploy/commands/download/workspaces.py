@@ -65,7 +65,12 @@ async def download_workspaces(
         if download_all or await should_write_object(
             workspace_config_path, workspace, changed_files
         ):
-            await write_json(workspace_config_path, workspace, Resource.Workspace)
+            await write_json(
+                workspace_config_path,
+                workspace,
+                Resource.Workspace,
+                log_message=f"Pulled {workspace_config_path}",
+            )
 
         workspace["queues"] = await download_queues_for_workspace(
             client=client,
@@ -102,7 +107,12 @@ async def download_queues_for_workspace(
         if download_all or await should_write_object(
             queue_path / "queue.json", queue, changed_files
         ):
-            await write_json(queue_path / "queue.json", queue, Resource.Queue)
+            await write_json(
+                queue_path / "queue.json",
+                queue,
+                Resource.Queue,
+                log_message=f"Pulled {queue_path / "queue.json"}",
+            )
 
         inbox_id = extract_id_from_url(queue["inbox"])
         if inbox_id:
@@ -128,6 +138,11 @@ async def download_inbox(
     inbox = await client._http_client.fetch_one(Resource.Inbox, inbox_id)
     inbox_path = parent_dir / "inbox.json"
     if download_all or await should_write_object(inbox_path, inbox, changed_files):
-        await write_json(inbox_path, inbox, Resource.Inbox)
+        await write_json(
+            inbox_path,
+            inbox,
+            Resource.Inbox,
+            log_message=f"Pulled {inbox_path}",
+        )
 
     return inbox

@@ -65,7 +65,12 @@ async def download_schemas(
         if download_all or await should_write_object(
             schema_config_path, schema, changed_files
         ):
-            await write_json(schema_config_path, schema, Resource.Schema)
+            await write_json(
+                schema_config_path,
+                schema,
+                Resource.Schema,
+                log_message=f"Pulled {schema_config_path}",
+            )
         schemas.append((destination_local, schema))
 
         formula_fields = find_formula_fields_in_schema(schema["content"])
