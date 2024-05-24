@@ -43,6 +43,7 @@ async def update_object(
         )
         if not force and not local_remote_timestamp_synced:
             display_error(create_mismatch_warning(resource, id))
+            errors.append({"op": GIT_CHARACTERS.UPDATED, "path": path})
             return "timestamp"
 
         # Inboxes are ready-only in Elis API, but we don't ignore them when pulling to distinguish queues with and without inboxes
