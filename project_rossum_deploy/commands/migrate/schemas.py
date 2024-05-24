@@ -1,11 +1,19 @@
-from anyio import Path
 import asyncio
+import functools
+from anyio import Path
 
 from rossum_api import ElisAPIClient
 from rich.progress import Progress
+from rich.panel import Panel
+from rich import print
 
-from project_rossum_deploy.commands.migrate.helpers import find_mapping_of_object
-from project_rossum_deploy.common.upload import upload_schema
+from project_rossum_deploy.commands.migrate.helpers import (
+    find_mapping_of_object,
+    migrate_object_to_multiple_targets,
+    simulate_migrate_object,
+)
+from project_rossum_deploy.utils.consts import settings, PrdVersionException
+from project_rossum_deploy.commands.migrate.upload import upload_schema
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
     display_error,
@@ -14,16 +22,19 @@ from project_rossum_deploy.utils.functions import (
     read_json,
     templatize_name_id,
 )
-from project_rossum_deploy.utils.consts import settings
 
 
 async def migrate_schemas(
     source_path: Path,
     client: ElisAPIClient,
     mapping: dict,
-    source_id_target_pairs: dict,
+    source_id_target_pairs: dict[int, list],
     sources_by_source_id_map: dict,
     progress: Progress,
+    plan_only: bool = False,
+    target_objects: list[dict] = [],
+    errors: dict = {},
+    force: bool = False,
 ):
     schema_paths = [
         schema_path async for schema_path in (source_path / "schemas").iterdir()
@@ -47,15 +58,39 @@ async def migrate_schemas(
 
             await update_formula_fields_code(schema_path, schema)
 
-            result = await upload_schema(
-                client, schema, schema_mapping["target_object"]
+            if plan_only:
+                partial_upload_schema = functools.partial(
+                    simulate_migrate_object,
+                    source_object=schema,
+                )
+            else:
+                partial_upload_schema = functools.partial(
+                    upload_schema,
+                    client,
+                    schema,
+                    target_objects=target_objects,
+                    errors=errors,
+                    force=force,
+                )
+            source_id_target_pairs[id] = []
+            if "target_object" in schema_mapping:
+                raise PrdVersionException(
+                    f'Detected "target_object" for schema with ID "{id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping format.'
+                )
+
+            results = await migrate_object_to_multiple_targets(
+                submapping=schema_mapping, upload_function=partial_upload_schema
             )
-            schema_mapping["target_object"] = result["id"]
-            source_id_target_pairs[id] = result
+            source_id_target_pairs[id].extend(results)
 
             progress.update(task, advance=1)
+        except PrdVersionException as e:
+            raise e
         except Exception as e:
             display_error(f"Error while migrating schema: {e}", e)
+
+    if plan_only:
+        print(Panel("Simulating workspaces"))
 
     await asyncio.gather(
         *[

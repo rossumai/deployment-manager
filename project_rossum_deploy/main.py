@@ -5,6 +5,7 @@ from project_rossum_deploy.commands.download.download import (
 )
 from project_rossum_deploy.commands.initialize import init_project
 from project_rossum_deploy.commands.migrate.migrate import migrate_project_wrapper
+from project_rossum_deploy.commands.migrate_mapping import migrate_mapping_wrapper
 from project_rossum_deploy.commands.upload.upload import upload_project_wrapper
 
 # TODO: selective pull
@@ -15,10 +16,6 @@ from project_rossum_deploy.commands.upload.upload import upload_project_wrapper
 # TODO: selective push
 # First, check that all files have LMD equal to remote, otherwise, prompt
 # Second: upload individual files (and repull the new LMD)
-
-# TODO: multitarget in mapping
-# List of objects: id, attribute_override
-# Put attr_override under target objects
 
 # TODO: specify in mapping you want to target ALL queues etc. (not by ID)
 # TODO: specify in mapping you want to update only certain fields
@@ -47,5 +44,6 @@ def main():
 
 main.add_command(download_project_wrapper)
 main.add_command(init_project)
+main.add_command(migrate_mapping_wrapper)
 main.add_command(upload_project_wrapper)
 main.add_command(migrate_project_wrapper)

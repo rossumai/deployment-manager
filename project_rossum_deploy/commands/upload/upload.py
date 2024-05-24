@@ -6,6 +6,7 @@ from rich.progress import Progress
 import click
 from rossum_api import ElisAPIClient
 
+from project_rossum_deploy.commands.download.download import download_project
 from project_rossum_deploy.commands.upload.operations import (
     create_object,
     update_object,
@@ -41,18 +42,39 @@ Only source files are taken into account by default.
 )
 @click.option(
     "--all",
+    "-a",
     default=False,
     is_flag=True,
     help="Uploads all local files in the selected destination (source/target) and not just files that were locally modified.",
 )
+@click.option(
+    "--force",
+    "-f",
+    default=False,
+    is_flag=True,
+    help="Ignores newer remote timestamps = overwrites remote with local version of objects.",
+)
+@click.option(
+    "--indexed-only",
+    "-io",
+    default=False,
+    is_flag=True,
+    help="Pushes only files added to git index (using `git add <path>`).",
+)
 @coro
-async def upload_project_wrapper(destination, all):
+async def upload_project_wrapper(destination, all, force, indexed_only):
     # To be able to run the command progammatically without the CLI decorators
-    await upload_project(destination=destination, upload_all=all)
+    await upload_project(
+        destination=destination, upload_all=all, force=force, indexed_only=indexed_only
+    )
 
 
 async def upload_project(
-    destination: str, client: ElisAPIClient = None, upload_all=False
+    destination: str,
+    client: ElisAPIClient = None,
+    upload_all=False,
+    force=False,
+    indexed_only=False,
 ):
     try:
         org_path = Path("./")
@@ -78,29 +100,7 @@ async def upload_project(
                         f'Unrecognized destination "{destination}" to use {settings.UPLOAD_COMMAND_NAME}.'
                     )
 
-        # # The -s flag is there to show a simplified list of changes
-        # # The -u flag is there to show each individual file (and not a subdir)
-        # # The change in git config is because of potential 'unusual' (non-ASCII) characters in paths
-        # subprocess.run(["git", "config", "core.quotePath", "false"])
-        # git_destination_diff = subprocess.run(
-        #     ["git", "status", destination, "-s", "-u"],
-        #     capture_output=True,
-        #     text=True,
-        # )
-        # subprocess.run(["git", "config", "core.quotePath", "true"])
-        # # print(git_destination_diff.stdout.split('\n'))
-        # changes_raw = git_destination_diff.stdout.split("\n")
-        # changes = []
-        # for change in changes_raw:
-        #     change = change.strip()
-        #     if not change:
-        #         continue
-        #     op, path = tuple(change.split(" ", maxsplit=1))
-        #     path = Path(path.strip().strip('"'))
-        #     path
-        #     changes.append((op, path))
-
-        changes = get_changed_file_paths(destination)
+        changes = get_changed_file_paths(destination, indexed_only=indexed_only)
 
         if changes:
             changes = await merge_hook_changes(changes, org_path)
@@ -109,31 +109,55 @@ async def upload_project(
             changes = await evaluate_create_dependencies(changes, org_path, client)
 
         if upload_all:
-            await include_unmodified_files(Path(org_path) / destination, changes)
+            await include_unmodified_files(org_path / destination, changes)
 
         requests = []
         errors = []
+
+        if not changes:
+            print(Panel(f"No changes to {settings.UPLOAD_COMMAND_NAME}."))
+            return
 
         for change in changes:
             op, path = change
             match op:
                 case GIT_CHARACTERS.CREATED:
-                    requests.append(create_object(org_path / path, client, errors))
+                    requests.append(
+                        create_object(
+                            path=org_path / path,
+                            client=client,
+                            errors=errors,
+                            force=force,
+                        )
+                    )
                 case GIT_CHARACTERS.CREATED_STAGED:
-                    requests.append(create_object(org_path / path, client, errors))
+                    requests.append(
+                        create_object(
+                            path=org_path / path,
+                            client=client,
+                            errors=errors,
+                            force=force,
+                        )
+                    )
                 # case GIT_CHARACTERS.DELETED:
                 #    requests.append(delete_object(org_path / path, client, errors))
-                case GIT_CHARACTERS.UPDATED:
+                case GIT_CHARACTERS.UPDATED | GIT_CHARACTERS.PARTIALLY_UPADTED:
                     if upload_all:
                         requests.append(
                             update_create_object(
-                                client=client, path=org_path / path, errors=errors
+                                client=client,
+                                path=org_path / path,
+                                errors=errors,
+                                force=force,
                             )
                         )
                     else:
                         requests.append(
                             update_object(
-                                client=client, path=org_path / path, errors=errors
+                                client=client,
+                                path=org_path / path,
+                                errors=errors,
+                                force=force,
                             )
                         )
                 case _:
@@ -156,6 +180,7 @@ async def upload_project(
             )
             return
         else:
+            await download_project()
             print(
                 Panel(
                     f"Finished {settings.UPLOAD_COMMAND_NAME}. Please commit the changes before running this command again."
@@ -166,12 +191,12 @@ async def upload_project(
         display_error(f"Error during project {settings.UPLOAD_COMMAND_NAME}: {e}", e)
 
 
-async def update_create_object(client, path, errors):
-    result = await update_object(client=client, path=path, errors=errors)
+async def update_create_object(client, path, errors, force):
+    result = await update_object(client=client, path=path, errors=errors, force=force)
 
     if not result:
         print(f'Recreating object with path "{path}".')
-        await create_object(path=path, client=client, errors=errors)
+        await create_object(path=path, client=client, errors=errors, force=force)
 
 
 async def include_unmodified_files(

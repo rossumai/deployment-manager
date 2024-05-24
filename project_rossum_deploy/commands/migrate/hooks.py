@@ -1,8 +1,9 @@
 import asyncio
+import functools
 from rich.progress import Progress
 from anyio import Path
-import click
 from rossum_api import ElisAPIClient
+from rossum_api.api_client import Resource
 from rich import print
 from rich.panel import Panel
 from rich.prompt import Prompt
@@ -10,10 +11,11 @@ from rich.prompt import Prompt
 from project_rossum_deploy.commands.migrate.helpers import (
     find_mapping_of_object,
     get_token_owner,
-    is_first_time_migration,
+    migrate_object_to_multiple_targets,
+    simulate_migrate_object,
 )
-from project_rossum_deploy.utils.consts import settings
-from project_rossum_deploy.common.upload import upload_hook
+from project_rossum_deploy.utils.consts import PrdVersionException, settings
+from project_rossum_deploy.commands.migrate.upload import upload_hook
 from project_rossum_deploy.utils.functions import (
     PauseProgress,
     detemplatize_name_id,
@@ -27,9 +29,13 @@ async def migrate_hooks(
     source_path: Path,
     client: ElisAPIClient,
     mapping: dict,
-    source_id_target_pairs: dict,
+    source_id_target_pairs: dict[int, list],
     sources_by_source_id_map: dict,
     progress: Progress,
+    plan_only: bool = False,
+    target_objects: list[dict] = [],
+    errors: dict = {},
+    force: bool = False,
 ):
     hook_paths = [hook_path async for hook_path in (source_path / "hooks").iterdir()]
     task = progress.add_task("Releasing hooks...", total=len(hook_paths))
@@ -70,32 +76,48 @@ async def migrate_hooks(
 
             await update_hook_code(hook_path, hook)
 
-            migrated_hook = None
-            if is_first_time_migration(hook_mapping):
-                migrated_hook = await create_hook_based_on_template(hook, client)
-
-                if not migrated_hook:
-                    migrated_hook = await create_hook_without_template(
-                        hook=hook,
-                        hook_mapping=hook_mapping,
-                        client=client,
-                        progress=progress,
-                    )
+            if plan_only:
+                partial_upload_hook = functools.partial(
+                    simulate_migrate_object,
+                    source_object=hook,
+                )
             else:
-                migrated_hook = await upload_hook(
-                    client, hook, hook_mapping["target_object"]
+                partial_upload_hook = functools.partial(
+                    upload_hook,
+                    client=client,
+                    hook=hook,
+                    hook_mapping=hook_mapping,
+                    progress=progress,
+                    target_objects=target_objects,
+                    errors=errors,
+                    force=force,
+                )
+            source_id_target_pairs[id] = []
+            if "target_object" in hook_mapping:
+                raise PrdVersionException(
+                    f'Detected "target_object" for hook with ID "{id}". Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping format.'
                 )
 
-            hook_mapping["target_object"] = migrated_hook["id"]
-            source_id_target_pairs[id] = migrated_hook
+            results = await migrate_object_to_multiple_targets(
+                submapping=hook_mapping, upload_function=partial_upload_hook
+            )
+            source_id_target_pairs[id].extend(results)
 
             progress.update(task, advance=1)
+        except PrdVersionException as e:
+            raise e
         except Exception as e:
             display_error(f"Error while migrating hook with path '{hook_path}': {e}", e)
+
+    if plan_only:
+        print(Panel("Simulating hooks"))
 
     await asyncio.gather(
         *[migrate_hook(hook_path=hook_path) for hook_path in hook_paths]
     )
+
+    if plan_only:
+        return
 
     await migrate_hook_dependency_graph(client, source_path, source_id_target_pairs)
 
@@ -104,31 +126,6 @@ async def migrate_hooks(
             "Hooks were successfully migrated to target. Please add any necessary secrets manually."
         )
     )
-
-    private_dummy_url_hooks = list(
-        filter(
-            lambda x: x.get("config", {}).get("url", None)
-            == settings.PRIVATE_HOOK_DUMMY_URL,
-            source_id_target_pairs.values(),
-        )
-    )
-    if len(private_dummy_url_hooks):
-        print(
-            Panel(
-                "Private hooks detected. Please replace dummy URL in the following hooks using Django Admin:"
-            )
-        )
-
-        click.echo(
-            "\n".join(
-                list(
-                    map(
-                        lambda x: f'{x["name"]} ({x["id"]}): {x["url"]}',
-                        private_dummy_url_hooks,
-                    )
-                )
-            )
-        )
 
 
 async def update_hook_code(hook_path: Path, hook: dict):
@@ -218,7 +215,7 @@ async def create_hook_without_template(
 
 
 async def migrate_hook_dependency_graph(
-    client: ElisAPIClient, source_path: Path, source_id_target_pairs: dict
+    client: ElisAPIClient, source_path: Path, source_id_target_pairs: dict[int, list]
 ):
     async for hook_path in (source_path / "hooks").iterdir():
         if hook_path.suffix != ".json":
@@ -227,28 +224,52 @@ async def migrate_hook_dependency_graph(
         try:
             _, old_hook_id = detemplatize_name_id(hook_path.stem)
             old_hook = await read_json(hook_path)
-            new_hook = source_id_target_pairs.get(old_hook_id, None)
+            new_hooks = source_id_target_pairs.get(old_hook_id, None)
 
-            # The hook was ignored, it has no target equivalent anyway
-            if not new_hook:
+            # The hook was ignored, it has no targets equivalent
+            if not new_hooks or not len(new_hooks):
                 continue
 
-            run_after = []
-            for predecessor_url in old_hook["run_after"]:
-                predecessor_id = extract_id_from_url(predecessor_url)
-                # The hook was ignored, it has no target equivalent anyway
-                target_object = source_id_target_pairs.get(predecessor_id, None)
-                if not target_object:
-                    continue
+            for new_hook_index, new_hook in enumerate(new_hooks):
+                new_run_after = []
+                for predecessor_url in old_hook["run_after"]:
+                    predecessor_id = extract_id_from_url(predecessor_url)
+                    target_objects = source_id_target_pairs.get(predecessor_id, [])
+                    # The hook was ignored, it has no targets equivalent
+                    if not len(target_objects):
+                        continue
+                    # Assume each hook should have its own run_after
+                    elif len(new_hooks) == len(target_objects):
+                        new_url = predecessor_url.replace(
+                            str(predecessor_id),
+                            str(target_objects[new_hook_index]["id"]),
+                        )
+                        new_run_after.append(new_url)
+                    # All hooks will have the same single run_after
+                    elif len(target_objects) == 1:
+                        new_url = predecessor_url.replace(
+                            str(predecessor_id), str(target_objects[0]["id"])
+                        )
+                        new_run_after.append(new_url)
+                    else:
+                        new_url = predecessor_url.replace(
+                            str(predecessor_id), str(target_objects[0]["id"])
+                        )
+                        new_run_after.append(new_url)
+                        new_hook_ids = "".join(list(map(lambda x: x["id"], new_hooks)))
+                        print(
+                            Panel(
+                                f'Could not determine new predecessors for migrated hooks "{new_hook_ids}". The source predecessor ID is "{predecessor_id}". Assigning everything to target predecessor "{target_objects[0]["id"]}"'
+                            )
+                        )
+                        continue
 
-                new_url = predecessor_url.replace(
-                    str(predecessor_id), str(target_object["id"])
+                await client._http_client.update(
+                    Resource.Hook, id_=new_hook["id"], data={"run_after": new_run_after}
                 )
-                run_after.append(new_url)
-
-                await upload_hook(client, {"run_after": run_after}, new_hook["id"])
         except Exception as e:
             display_error(
                 f"Error while migrating dependency graph for hook '{source_path}': {e}",
                 e,
             )
+            raise e

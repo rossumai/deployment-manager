@@ -4,16 +4,18 @@ import logging
 from functools import wraps
 import dataclasses
 import json
+from math import inf
 import os
 import re
 from typing import Any
 from anyio import Path
+
 from click import progressbar
 from rich.prompt import Confirm
 from rich.console import Console
 from rich.panel import Panel
 from rossum_api import ElisAPIClient
-
+from rossum_api.api_client import Resource
 import yaml
 
 from project_rossum_deploy.utils.consts import (
@@ -40,21 +42,25 @@ def templatize_name_id(name: str, id: int):
 # ID_BRACKET_RE = re.compile(r"(\[\d+\])$")
 
 
-def convert_source_to_target_value(source_value, lookup_table: dict):
-    """Finds a counterpart id in the lookup table file and replace it based on the type of the original value"""
+def convert_source_to_target_values(source_value, lookup_table: dict) -> list:
+    """Finds a counterpart id in the lookup table file and replace it based on the type of the original value.
+    There can be multiple target values for a single source value.
+    """
+    result = []
     type, source_id = convert_reference_to_int_id(source_value)
-    target_id = lookup_table.get(source_id, None)
-    if target_id is not None:
-        match type:
-            case "str":
-                return str(target_id)
-            case "url":
-                parts = source_value.split("/")[:-1]
-                parts.append(str(target_id))
-                return "".join(parts)
-            case "int":
-                return target_id
-    return None
+    target_ids = lookup_table.get(source_id, None)
+    if len(target_ids):
+        for target_id in target_ids:
+            match type:
+                case "str":
+                    result.append(str(target_id))
+                case "url":
+                    parts = source_value.split("/")[:-1]
+                    parts.append(str(target_id))
+                    result.append("".join(parts))
+                case "int":
+                    result.append(target_id)
+    return result
 
 
 def convert_reference_to_int_id(value):
@@ -271,8 +277,8 @@ def detemplatize_name_id(path: Path | str) -> tuple[str, int]:
         parts = path.split("_")
         return "_".join(parts[:-1]), int(parts[-1].removeprefix("[").removesuffix("]"))
 
-    if str(path.stem) in ["queue", "workspace"]:
-        parts = path.parent.stem.split("_")
+    if str(path.stem) in ["queue", "workspace", "inbox"]:
+        parts = path.parent.name.split("_")
         return "_".join(parts[:-1]), int(parts[-1].removeprefix("[").removesuffix("]"))
     elif str(path.parent.stem) in ("hooks, schemas"):
         parts = path.stem.split("_")
@@ -304,10 +310,10 @@ def get_mapping_key_index(key: str):
     try:
         return settings.MAPPING_KEYS_ORDER.index(key)
     except Exception:
-        return -1
+        return inf
 
 
-async def write_json(path: Path, object: dict, type: str = None):
+async def write_json(path: Path, object: dict, type: Resource = None):
     if dataclasses.is_dataclass(object):
         object = dataclasses.asdict(object)
     if path.parent:
@@ -337,6 +343,23 @@ async def write_yaml(path: Path, object: dict):
 def read_yaml(path: Path):
     with open(path, "r") as rf:
         return yaml.safe_load(rf)
+
+
+def sort_mapping(mapping: dict):
+    if isinstance(mapping, list):
+        result = []
+        for el in mapping:
+            result.append(sort_mapping(el))
+        return result
+    elif isinstance(mapping, dict):
+        result = {}
+        for k, v in sorted(
+            mapping.items(), key=lambda item: get_mapping_key_index(item[0])
+        ):
+            result[k] = sort_mapping(v)
+        return result
+    else:
+        return mapping
 
 
 def adjust_keys(object: Any, uppercase_fields: list = [], lower: bool = True):
@@ -370,7 +393,7 @@ def create_empty_mapping():
         "organization": {
             "id": "",
             "name": "",
-            "target_object": None,
+            "targets": [],
             "workspaces": [],
             "hooks": [],
             "schemas": [],
@@ -394,39 +417,34 @@ def extract_sources_targets(
     sources = copy.deepcopy(targets)
 
     if include_organization:
-        targets["organization"] = mapping["organization"]["target_object"]
+        targets["organization"] = extract_target_ids(mapping["organization"])
         sources["organization"] = mapping["organization"]["id"]
 
     for ws in mapping["organization"]["workspaces"]:
         sources["workspaces"].append(ws["id"])
-        if ws["target_object"]:
-            targets["workspaces"].append(ws["target_object"])
+        targets["workspaces"].extend(extract_target_ids(ws))
 
         for q in ws["queues"]:
             sources["queues"].append(q["id"])
-            if q["target_object"]:
-                targets["queues"].append(q["target_object"])
+            targets["queues"].extend(extract_target_ids(q))
 
             inbox = q.get("inbox", {})
             if inbox and (inbox_id := inbox.get("id", None)):
                 sources["inboxes"].append(inbox_id)
-                if inbox_target_id := q["inbox"]["target_object"]:
-                    targets["inboxes"].append(inbox_target_id)
+                targets["inboxes"].extend(extract_target_ids(inbox))
 
     for schema in mapping["organization"]["schemas"]:
         sources["schemas"].append(schema["id"])
-        if schema["target_object"]:
-            targets["schemas"].append(schema["target_object"])
+        targets["schemas"].extend(extract_target_ids(schema))
 
     for hook in mapping["organization"]["hooks"]:
         sources["hooks"].append(hook["id"])
-        if hook["target_object"]:
-            targets["hooks"].append(hook["target_object"])
+        targets["hooks"].extend(extract_target_ids(hook))
 
     return sources, targets
 
 
-def extract_source_target_pairs(mapping: dict) -> dict:
+def extract_source_target_pairs(mapping: dict) -> dict[str, dict[int, list]]:
     pairs = {
         "workspaces": {},
         "queues": {},
@@ -436,22 +454,31 @@ def extract_source_target_pairs(mapping: dict) -> dict:
     }
 
     for ws in mapping["organization"]["workspaces"]:
-        pairs["workspaces"][ws["id"]] = ws.get("target_object", None)
+        pairs["workspaces"][ws["id"]] = extract_target_ids(ws)
 
         for q in ws["queues"]:
-            pairs["queues"][q["id"]] = q.get("target_object", None)
+            pairs["queues"][q["id"]] = extract_target_ids(q)
 
-            inbox = q.get("inbox", {})
+            inbox = q.get("inbox", None)
             if inbox and (inbox_id := inbox.get("id", None)):
-                pairs["inboxes"][inbox_id] = q["inbox"].get("target_object", None)
+                pairs["inboxes"][inbox_id] = extract_target_ids(inbox)
 
     for schema in mapping["organization"]["schemas"]:
-        pairs["schemas"][schema["id"]] = schema.get("target_object", None)
+        pairs["schemas"][schema["id"]] = extract_target_ids(schema)
 
     for hook in mapping["organization"]["hooks"]:
-        pairs["hooks"][hook["id"]] = hook.get("target_object", None)
+        pairs["hooks"][hook["id"]] = extract_target_ids(hook)
 
     return pairs
+
+
+def extract_target_ids(submapping: dict) -> list[int]:
+    target_ids = []
+    for target_object in submapping.get("targets", []):
+        if target_id := target_object.get("target_id", None):
+            target_ids.append(target_id)
+
+    return target_ids
 
 
 def extract_flat_lookup_table(mapping: dict) -> dict:
