@@ -56,7 +56,7 @@ In case the directory already exists, it first deletes its contents and then dow
 @click.option(
     "--message",
     "-m",
-    default="Sync changes",
+    default="Sync changes to local",
     help="Commit message for pulling.",
 )
 @coro

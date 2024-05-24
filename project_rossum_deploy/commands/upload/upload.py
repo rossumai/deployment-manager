@@ -1,3 +1,4 @@
+import subprocess
 from anyio import Path
 from rich import print
 from rich.panel import Panel
@@ -61,20 +62,42 @@ Only source files are taken into account by default.
     is_flag=True,
     help="Pushes only files added to git index (using `git add <path>`).",
 )
+@click.option(
+    "--commit",
+    "-c",
+    default=False,
+    is_flag=True,
+    help="Commits the pushed changes automatically.",
+)
+@click.option(
+    "--message",
+    "-m",
+    default="Pushed changes to remote",
+    help="Commit message for pulling.",
+)
 @coro
-async def upload_project_wrapper(destination, all, force, indexed_only):
+async def upload_project_wrapper(
+    destination, all, force, indexed_only, commit, message
+):
     # To be able to run the command progammatically without the CLI decorators
     await upload_project(
-        destination=destination, upload_all=all, force=force, indexed_only=indexed_only
+        destination=destination,
+        upload_all=all,
+        force=force,
+        indexed_only=indexed_only,
+        commit=commit,
+        commit_message=message,
     )
 
 
 async def upload_project(
     destination: str,
     client: ElisAPIClient = None,
-    upload_all=False,
-    force=False,
-    indexed_only=False,
+    upload_all: bool = False,
+    force: bool = False,
+    indexed_only: bool = False,
+    commit: bool = False,
+    commit_message: str = "",
 ):
     try:
         org_path = Path("./")
@@ -181,9 +204,12 @@ async def upload_project(
             return
         else:
             await download_project()
+            if commit:
+                subprocess.run(["git", "add", "."])
+                subprocess.run(["git", "commit", "-m", commit_message])
             print(
                 Panel(
-                    f"Finished {settings.UPLOAD_COMMAND_NAME}. Please commit the changes before running this command again."
+                    f"Finished {settings.UPLOAD_COMMAND_NAME}.{ ' Please commit the changes before running this command again.' if not commit else ''}"
                 )
             )
 
