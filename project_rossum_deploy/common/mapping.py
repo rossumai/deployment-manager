@@ -205,3 +205,10 @@ def enrich_mappings_with_existing_attributes(
                     old_sub_mapping=old_inbox_mapping,
                     new_ids=new_ids,
                 )
+
+
+def find_mapping_of_object(sub_mapping: list[dict], id: int):
+    for object in sub_mapping:
+        if object["id"] == id:
+            return object
+    return None

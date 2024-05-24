@@ -3,6 +3,9 @@ import re
 import jmespath
 from rich import print
 from rich.panel import Panel
+from copy import deepcopy
+from anyio import Path
+from rossum_api import ElisAPIClient
 
 from project_rossum_deploy.utils.consts import (
     ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD,
@@ -11,6 +14,16 @@ from project_rossum_deploy.utils.consts import (
 from project_rossum_deploy.utils.functions import (
     flatten,
     convert_source_to_target_values,
+    extract_flat_lookup_table,
+    find_all_object_paths,
+    read_json,
+)
+from project_rossum_deploy.commands.migrate.helpers import (
+    traverse_mapping,
+)
+from project_rossum_deploy.common.determine_path import determine_object_type_from_url
+from project_rossum_deploy.utils.consts import (
+    display_error,
 )
 
 
@@ -166,3 +179,119 @@ async def replace_ids_in_settings(
             )
 
     return json.loads(stringified_dict)
+
+
+async def validate_override_migrated_objects_attributes(
+    base_path: Path, mapping: dict
+) -> bool:
+    try:
+        print(Panel("Validating attribute_override..."))
+        source_paths = await find_all_object_paths(base_path)
+        source_objects = [await read_json(path) for path in source_paths]
+        for mapping_object in traverse_mapping(mapping):
+            if mapping_object.get("ignore", None) or not (
+                targets := mapping_object.get("targets", [])
+            ):
+                continue
+
+            source_object = None
+            for source_candidate in source_objects:
+                if source_candidate["id"] == mapping_object["id"]:
+                    source_object = source_candidate
+                    break
+
+            for target in targets:
+                source_copy = deepcopy(source_object)
+                override_attributes_v2(
+                    lookup_table=extract_flat_lookup_table(mapping),
+                    target_submapping=target,
+                    object=source_copy,
+                    is_dryrun=True,
+                )
+
+        print(Panel("Attribute override dry-run found no errors."))
+        return True
+    except Exception as e:
+        display_error(f"Attribute override dry-run failed: {e}", e)
+        return False
+
+
+async def override_migrated_objects_attributes(
+    mapping: dict,
+    client: ElisAPIClient,
+    sources_by_source_id_map: dict,
+    source_id_target_pairs: dict[int, list],
+    lookup_table: dict,
+    errors: dict,
+):
+    print(Panel("Running attribute_override..."))
+    for mapping_object in traverse_mapping(mapping["organization"]):
+        if mapping_object.get("ignore", None):
+            continue
+
+        source_object = sources_by_source_id_map.get(mapping_object["id"], None)
+        target_objects = source_id_target_pairs.get(mapping_object["id"], [])
+        targets_in_mapping = mapping_object.get("targets", [])
+
+        if not source_object or not len(target_objects):
+            continue
+
+        for target_index, target_object in enumerate(target_objects):
+            if target_object["id"] in errors:
+                continue
+
+            resource = determine_object_type_from_url(target_object["url"])
+
+            # Implicit override for settings
+            if "settings" in target_object:
+                target_settings = await replace_ids_in_settings(
+                    target_object["id"],
+                    target_object["settings"],
+                    lookup_table,
+                    target_index,
+                    num_targets=len(target_objects),
+                )
+                await client._http_client.update(
+                    resource, target_object["id"], {"settings": target_settings}
+                )
+
+            # Explicit override for settings and anything else
+            attribute_overrides = find_attribute_override_for_target(
+                targets_in_mapping, target_object["id"]
+            )
+            source_object_subset = get_attributes_from_object(
+                source_object, attribute_overrides
+            )
+
+            source_object_subset["id"] = target_object["id"]
+            source_object_subset["url"] = target_object["url"]
+
+            override_attributes_v2(
+                lookup_table=lookup_table,
+                target_submapping={
+                    "target_id": target_object["id"],
+                    "attribute_override": attribute_overrides,
+                },
+                object=source_object_subset,
+            )
+
+            await client._http_client.update(
+                resource, target_object["id"], source_object_subset
+            )
+
+
+def find_attribute_override_for_target(targets_in_mapping: dict, target_id: int):
+    for target in targets_in_mapping:
+        if target.get("target_id", None) == target_id:
+            return target.get("attribute_override", {})
+    return {}
+
+
+def get_attributes_from_object(object: dict, attribute_overrides: dict):
+    ROOT_KEY_REGEX = re.compile(r"^(\w+)")
+    object_subset = {}
+    for query_key in attribute_overrides:
+        regex_search = ROOT_KEY_REGEX.findall(query_key)
+        if len(regex_search) and (root_key := regex_search[0]) not in object_subset:
+            object_subset[root_key] = deepcopy(object[root_key])
+    return object_subset

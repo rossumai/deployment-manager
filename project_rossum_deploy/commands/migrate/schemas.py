@@ -8,12 +8,12 @@ from rich.panel import Panel
 from rich import print
 
 from project_rossum_deploy.commands.migrate.helpers import (
-    find_mapping_of_object,
     migrate_object_to_multiple_targets,
     simulate_migrate_object,
 )
+from project_rossum_deploy.common.mapping import find_mapping_of_object
 from project_rossum_deploy.utils.consts import display_error, settings, PrdVersionException
-from project_rossum_deploy.commands.migrate.upload import upload_schema
+from project_rossum_deploy.commands.migrate.upload_helpers import upload_schema
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
     find_schema_id,

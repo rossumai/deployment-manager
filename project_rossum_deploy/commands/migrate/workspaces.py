@@ -11,16 +11,16 @@ from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
 from project_rossum_deploy.commands.migrate.helpers import (
-    find_mapping_of_object,
     migrate_object_to_multiple_targets,
     replace_dependency_url,
     simulate_migrate_object,
 )
-from project_rossum_deploy.commands.migrate.upload import (
+from project_rossum_deploy.commands.migrate.upload_helpers import (
     upload_inbox,
     upload_queue,
     upload_workspace,
 )
+from project_rossum_deploy.common.mapping import find_mapping_of_object
 from project_rossum_deploy.utils.consts import PrdVersionException, display_error, settings
 
 from project_rossum_deploy.utils.functions import (
