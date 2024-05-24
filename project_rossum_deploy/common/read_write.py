@@ -1,14 +1,43 @@
+import dataclasses
+import json
 from typing import Any
 from anyio import Path
+from rich import print
 from rossum_api.api_client import Resource
+import yaml
 
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.common.determine_path import determine_object_type_from_path
 from project_rossum_deploy.utils.functions import (
     templatize_name_id,
-    write_json,
-    write_str,
 )
+
+
+async def write_json(
+    path: Path, object: dict, type: Resource = None, log_message: str = ""
+):
+    if dataclasses.is_dataclass(object):
+        object = dataclasses.asdict(object)
+    if path.parent:
+        await path.parent.mkdir(parents=True, exist_ok=True)
+    if type:
+        ignored_keys = settings.IGNORED_KEYS.get(type)
+        if ignored_keys:
+            for key in ignored_keys:
+                if key in object:
+                    del object[key]
+    with open(path, "w") as wf:
+        json.dump(object, wf, indent=2)
+
+    if log_message:
+        print(log_message)
+
+
+async def write_str(path: Path, code: str):
+    if path.parent:
+        await path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as wf:
+        wf.write(code)
 
 
 async def create_local_object(path: Path, object: dict):
@@ -68,3 +97,24 @@ def create_formula_directory_path(schema_path: Path, schema_name: str, schema_id
 
 async def create_formula_file(path: Path, code: str):
     await write_str(path, code)
+
+
+async def read_json(path: Path) -> dict:
+    return json.loads(await path.read_text())
+
+
+async def write_yaml(path: Path, object: dict):
+    if dataclasses.is_dataclass(object):
+        object = dataclasses.asdict(object)
+    await path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as wf:
+        yaml.dump(object, wf, sort_keys=False)
+
+
+def read_yaml(path: Path):
+    with open(path, "r") as rf:
+        return yaml.safe_load(rf)
+
+
+async def read_formula_file(path: Path):
+    return await path.read_text()

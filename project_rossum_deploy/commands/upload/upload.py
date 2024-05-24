@@ -8,6 +8,7 @@ import click
 from rossum_api import ElisAPIClient
 
 from project_rossum_deploy.commands.download.download import download_project
+from project_rossum_deploy.commands.upload.dependencies import evaluate_create_dependencies, merge_formula_changes, merge_hook_changes
 from project_rossum_deploy.commands.upload.operations import (
     create_object,
     update_object,
@@ -23,9 +24,6 @@ from project_rossum_deploy.utils.functions import (
     find_all_object_paths,
     gather_with_concurrency,
     make_request_with_progress,
-    merge_formula_changes,
-    merge_hook_changes,
-    evaluate_create_dependencies,
 )
 
 

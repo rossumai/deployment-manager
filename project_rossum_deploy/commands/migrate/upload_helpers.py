@@ -6,7 +6,7 @@ from rich.prompt import Prompt
 from project_rossum_deploy.commands.migrate.helpers import (
     find_object_by_id,
 )
-from project_rossum_deploy.commands.upload.helpers import check_modified_timestamp
+from project_rossum_deploy.common.modified_at import check_modified_timestamp
 from project_rossum_deploy.utils.consts import (
     settings,
 )

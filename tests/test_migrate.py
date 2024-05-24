@@ -9,20 +9,17 @@ from rossum_api import ElisAPIClient
 from project_rossum_deploy.commands.download.download import (
     download_organization_combined_source_target,
 )
-from project_rossum_deploy.common.mapping import read_mapping, write_mapping
+from project_rossum_deploy.common.mapping import extract_flat_lookup_table, extract_sources_targets, read_mapping, write_mapping
 from project_rossum_deploy.common.mapping import find_mapping_of_object
 from project_rossum_deploy.commands.migrate.migrate import migrate_project
+from project_rossum_deploy.common.read_write import read_json, write_json
 from project_rossum_deploy.utils.consts import (
     ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD,
     ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD,
     settings,
 )
 from project_rossum_deploy.utils.functions import (
-    extract_sources_targets,
-    extract_flat_lookup_table,
-    read_json,
     templatize_name_id,
-    write_json,
 )
 from tests.utils.compare import (
     ensure_hooks_have_same_dependency_graph,

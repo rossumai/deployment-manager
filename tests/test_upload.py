@@ -15,11 +15,10 @@ from project_rossum_deploy.commands.download.download import (
 )
 from project_rossum_deploy.common.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.upload.upload import upload_project
+from project_rossum_deploy.common.read_write import read_json, write_json
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
-    read_json,
     templatize_name_id,
-    write_json,
 )
 from tests.utils.compare import compare_mappings
 from tests.utils.consts import REFERENCE_PROJECT_PATH, UPDATED_NAME

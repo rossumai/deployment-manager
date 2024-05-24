@@ -5,13 +5,11 @@ from anyio import Path
 
 from rossum_api.models import Schema, Hook, Workspace, Queue, Inbox, Organization
 
-from project_rossum_deploy.common.mapping import read_mapping
+from project_rossum_deploy.common.mapping import extract_source_target_pairs, extract_sources_targets, read_mapping
+from project_rossum_deploy.common.read_write import read_json
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
     extract_id_from_url,
-    extract_source_target_pairs,
-    extract_sources_targets,
-    read_json,
     templatize_name_id,
 )
 from project_rossum_deploy.utils.consts import settings

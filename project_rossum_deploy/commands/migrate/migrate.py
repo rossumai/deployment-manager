@@ -12,7 +12,7 @@ from project_rossum_deploy.common.attribute_override import (
     override_migrated_objects_attributes,
     validate_override_migrated_objects_attributes,
 )
-from project_rossum_deploy.common.mapping import read_mapping, write_mapping
+from project_rossum_deploy.common.mapping import extract_flat_lookup_table, extract_sources_targets, read_mapping, write_mapping
 
 from project_rossum_deploy.commands.migrate.hooks import migrate_hooks
 from project_rossum_deploy.commands.migrate.schemas import migrate_schemas
@@ -22,6 +22,7 @@ from project_rossum_deploy.commands.migrate.upload_helpers import (
     upload_organization,
 )
 
+from project_rossum_deploy.common.read_write import read_json
 from project_rossum_deploy.utils.consts import (
     PrdVersionException,
     display_error,
@@ -29,11 +30,8 @@ from project_rossum_deploy.utils.consts import (
 )
 from project_rossum_deploy.utils.functions import (
     coro,
-    extract_flat_lookup_table,
-    extract_sources_targets,
     find_all_object_paths,
     flatten,
-    read_json,
 )
 
 

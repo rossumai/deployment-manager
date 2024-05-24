@@ -12,17 +12,17 @@ from rich.panel import Panel
 from project_rossum_deploy.common.determine_path import (
     determine_object_type_from_url,
 )
-from project_rossum_deploy.common.write import (
+from project_rossum_deploy.common.read_write import (
     create_custom_hook_code_path,
     create_formula_directory_path,
     find_formula_fields_in_schema,
+    read_json,
 )
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
     find_object_in_project,
     find_all_object_paths,
-    read_json,
     templatize_name_id,
 )
 

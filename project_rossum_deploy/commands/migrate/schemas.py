@@ -1,5 +1,6 @@
 import asyncio
 import functools
+from typing import Any
 from anyio import Path
 
 from rossum_api import ElisAPIClient
@@ -12,13 +13,11 @@ from project_rossum_deploy.commands.migrate.helpers import (
     simulate_migrate_object,
 )
 from project_rossum_deploy.common.mapping import find_mapping_of_object
+from project_rossum_deploy.common.read_write import read_formula_file, read_json
 from project_rossum_deploy.utils.consts import display_error, settings, PrdVersionException
 from project_rossum_deploy.commands.migrate.upload_helpers import upload_schema
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
-    find_schema_id,
-    read_formula_file,
-    read_json,
     templatize_name_id,
 )
 
@@ -98,6 +97,26 @@ async def migrate_schemas(
             if await schema_path.is_file()
         ]
     )
+
+
+def find_schema_id(schema: Any, schema_id: str):
+    if isinstance(schema, list):
+        for subschema in schema:
+            result = find_schema_id(subschema, schema_id)
+            if result:
+                return result
+    elif isinstance(schema, dict) and "children" in schema:
+        if isinstance(schema["children"], dict):
+            result = find_schema_id(schema["children"], schema_id)
+            if result:
+                return result
+        elif isinstance(schema["children"], list):
+            for subschema in schema["children"]:
+                result = find_schema_id(subschema, schema_id)
+                if result:
+                    return result
+    elif isinstance(schema, dict) and schema.get("id", None) == schema_id:
+        return schema
 
 
 async def update_formula_fields_code(schema_path: Path, schema: dict):

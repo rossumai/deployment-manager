@@ -14,13 +14,13 @@ from project_rossum_deploy.commands.migrate.helpers import (
     simulate_migrate_object,
 )
 from project_rossum_deploy.common.mapping import find_mapping_of_object
+from project_rossum_deploy.common.read_write import read_json
 from project_rossum_deploy.utils.consts import PrdVersionException, display_error, settings
 from project_rossum_deploy.commands.migrate.upload_helpers import upload_hook
 from project_rossum_deploy.utils.functions import (
     PauseProgress,
     detemplatize_name_id,
     extract_id_from_url,
-    read_json,
 )
 
 

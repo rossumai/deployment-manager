@@ -9,13 +9,13 @@ from project_rossum_deploy.commands.download.helpers import (
     should_write_object,
 )
 
-from project_rossum_deploy.common.write import (
+from project_rossum_deploy.common.read_write import (
     create_formula_file,
     find_formula_fields_in_schema,
+    write_json,
 )
 from project_rossum_deploy.utils.functions import (
     templatize_name_id,
-    write_json,
 )
 
 

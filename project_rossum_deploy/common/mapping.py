@@ -1,13 +1,30 @@
+import copy
+from math import inf
+from typing import Any
 from anyio import Path
 
+from project_rossum_deploy.common.read_write import read_yaml, write_yaml
 from project_rossum_deploy.utils.consts import settings
-from project_rossum_deploy.utils.functions import (
-    adjust_keys,
-    create_empty_mapping,
-    sort_mapping,
-    read_yaml,
-    write_yaml,
-)
+
+
+def adjust_keys(object: Any, uppercase_fields: list = [], lower: bool = True):
+    if isinstance(object, dict):
+        lowercased = {}
+        for k, v in object.items():
+            new_key = k
+            if lower and k.lower() in uppercase_fields:
+                new_key = k.lower()
+            elif not lower and k in uppercase_fields:
+                new_key = k.upper()
+            lowercased[new_key] = adjust_keys(v, uppercase_fields, lower)
+        return lowercased
+    elif isinstance(object, list):
+        lowercased = []
+        for v in object:
+            lowercased.append(adjust_keys(v, uppercase_fields, lower))
+        return lowercased
+    else:
+        return object
 
 
 async def read_mapping(mapping_path: Path):
@@ -18,6 +35,30 @@ async def read_mapping(mapping_path: Path):
     return None
 
 
+def get_mapping_key_index(key: str):
+    try:
+        return settings.MAPPING_KEYS_ORDER.index(key)
+    except Exception:
+        return inf
+
+
+def sort_mapping(mapping: dict):
+    if isinstance(mapping, list):
+        result = []
+        for el in mapping:
+            result.append(sort_mapping(el))
+        return result
+    elif isinstance(mapping, dict):
+        result = {}
+        for k, v in sorted(
+            mapping.items(), key=lambda item: get_mapping_key_index(item[0])
+        ):
+            result[k] = sort_mapping(v)
+        return result
+    else:
+        return mapping
+
+
 async def write_mapping(mapping_path: Path, mapping: dict):
     mapping = adjust_keys(mapping, settings.MAPPING_UPPERCASE_FIELDS, lower=False)
 
@@ -25,6 +66,19 @@ async def write_mapping(mapping_path: Path, mapping: dict):
     mapping = sort_mapping(mapping)
 
     await write_yaml(mapping_path, mapping)
+
+
+def create_empty_mapping():
+    return {
+        "organization": {
+            "id": "",
+            "name": "",
+            "targets": [],
+            "workspaces": [],
+            "hooks": [],
+            "schemas": [],
+        }
+    }
 
 
 async def create_update_mapping(
@@ -212,3 +266,91 @@ def find_mapping_of_object(sub_mapping: list[dict], id: int):
         if object["id"] == id:
             return object
     return None
+
+
+def extract_target_ids(submapping: dict) -> list[int]:
+    target_ids = []
+    for target_object in submapping.get("targets", []):
+        if target_id := target_object.get("target_id", None):
+            target_ids.append(target_id)
+
+    return target_ids
+
+
+def extract_sources_targets(
+    mapping: dict, include_organization=True
+) -> tuple[dict, dict]:
+    if not mapping:
+        mapping = create_empty_mapping()
+
+    targets = {
+        "workspaces": [],
+        "queues": [],
+        "inboxes": [],
+        "schemas": [],
+        "hooks": [],
+    }
+    sources = copy.deepcopy(targets)
+
+    if include_organization:
+        targets["organization"] = extract_target_ids(mapping["organization"])
+        sources["organization"] = mapping["organization"]["id"]
+
+    for ws in mapping["organization"]["workspaces"]:
+        sources["workspaces"].append(ws["id"])
+        targets["workspaces"].extend(extract_target_ids(ws))
+
+        for q in ws["queues"]:
+            sources["queues"].append(q["id"])
+            targets["queues"].extend(extract_target_ids(q))
+
+            inbox = q.get("inbox", {})
+            if inbox and (inbox_id := inbox.get("id", None)):
+                sources["inboxes"].append(inbox_id)
+                targets["inboxes"].extend(extract_target_ids(inbox))
+
+    for schema in mapping["organization"]["schemas"]:
+        sources["schemas"].append(schema["id"])
+        targets["schemas"].extend(extract_target_ids(schema))
+
+    for hook in mapping["organization"]["hooks"]:
+        sources["hooks"].append(hook["id"])
+        targets["hooks"].extend(extract_target_ids(hook))
+
+    return sources, targets
+
+
+def extract_source_target_pairs(mapping: dict) -> dict[str, dict[int, list]]:
+    pairs = {
+        "workspaces": {},
+        "queues": {},
+        "inboxes": {},
+        "schemas": {},
+        "hooks": {},
+    }
+
+    for ws in mapping["organization"]["workspaces"]:
+        pairs["workspaces"][ws["id"]] = extract_target_ids(ws)
+
+        for q in ws["queues"]:
+            pairs["queues"][q["id"]] = extract_target_ids(q)
+
+            inbox = q.get("inbox", None)
+            if inbox and (inbox_id := inbox.get("id", None)):
+                pairs["inboxes"][inbox_id] = extract_target_ids(inbox)
+
+    for schema in mapping["organization"]["schemas"]:
+        pairs["schemas"][schema["id"]] = extract_target_ids(schema)
+
+    for hook in mapping["organization"]["hooks"]:
+        pairs["hooks"][hook["id"]] = extract_target_ids(hook)
+
+    return pairs
+
+
+def extract_flat_lookup_table(mapping: dict) -> dict:
+    pairs_by_type = extract_source_target_pairs(mapping)
+    table = {}
+    for pairs in pairs_by_type.values():
+        table = {**table, **pairs}
+    return table

@@ -13,8 +13,8 @@ from project_rossum_deploy.commands.download.helpers import (
 )
 from project_rossum_deploy.commands.download.hooks import download_hooks
 from project_rossum_deploy.common.mapping import (
-    create_empty_mapping,
     create_update_mapping,
+    extract_sources_targets,
     read_mapping,
 )
 
@@ -22,11 +22,11 @@ from project_rossum_deploy.commands.download.schemas import download_schemas
 from project_rossum_deploy.commands.download.workspaces import download_workspaces
 from project_rossum_deploy.common.git import get_changed_file_paths
 from project_rossum_deploy.commands.migrate_mapping import migrate_mapping
+from project_rossum_deploy.common.mapping import create_empty_mapping
+from project_rossum_deploy.common.read_write import write_json
 from project_rossum_deploy.utils.consts import display_error, settings
 from project_rossum_deploy.utils.functions import (
     coro,
-    extract_sources_targets,
-    write_json,
 )
 
 

@@ -7,16 +7,15 @@ from copy import deepcopy
 from anyio import Path
 from rossum_api import ElisAPIClient
 
+from project_rossum_deploy.common.mapping import extract_flat_lookup_table
+from project_rossum_deploy.common.read_write import read_json
 from project_rossum_deploy.utils.consts import (
     ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD,
     ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD,
 )
 from project_rossum_deploy.utils.functions import (
     flatten,
-    convert_source_to_target_values,
-    extract_flat_lookup_table,
     find_all_object_paths,
-    read_json,
 )
 from project_rossum_deploy.commands.migrate.helpers import (
     traverse_mapping,
@@ -25,6 +24,37 @@ from project_rossum_deploy.common.determine_path import determine_object_type_fr
 from project_rossum_deploy.utils.consts import (
     display_error,
 )
+
+
+def convert_reference_to_int_id(value):
+    """Converts value into int if necessary and returns the original type - supports int, str and url (ie. https://elis.rossum.ai/api/v1/queues/156)"""
+    if isinstance(value, int):
+        return "int", value
+    elif isinstance(value, str) and "https" in value:
+        return "url", int(value.split("/")[-1])
+    elif isinstance(value, str):
+        return "str", int(value)
+
+
+def convert_source_to_target_values(source_value, lookup_table: dict) -> list:
+    """Finds a counterpart id in the lookup table file and replace it based on the type of the original value.
+    There can be multiple target values for a single source value.
+    """
+    result = []
+    type, source_id = convert_reference_to_int_id(source_value)
+    target_ids = lookup_table.get(source_id, None)
+    if len(target_ids):
+        for target_id in target_ids:
+            match type:
+                case "str":
+                    result.append(str(target_id))
+                case "url":
+                    parts = source_value.split("/")[:-1]
+                    parts.append(str(target_id))
+                    result.append("".join(parts))
+                case "int":
+                    result.append(target_id)
+    return result
 
 
 def override_attributes_v2(
