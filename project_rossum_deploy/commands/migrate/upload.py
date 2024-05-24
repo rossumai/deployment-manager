@@ -8,12 +8,10 @@ from project_rossum_deploy.commands.migrate.helpers import (
 )
 from project_rossum_deploy.commands.upload.helpers import check_modified_timestamp
 from project_rossum_deploy.utils.consts import (
-    create_mismatch_warning,
     settings,
 )
 from project_rossum_deploy.utils.functions import (
     PauseProgress,
-    display_error,
     extract_id_from_url,
 )
 
@@ -34,7 +32,6 @@ async def upload_organization(
         client, Resource.Organization, target_id, local_object
     )
     if not force and not local_remote_timestamp_synced:
-        display_error(create_mismatch_warning(Resource.Organization, target_id))
         errors[target_id] = (Resource.Organization, local_object.get("name", ""))
         return local_object
 
@@ -57,7 +54,6 @@ async def upload_workspace(
             client, Resource.Workspace, target_id, local_object
         )
         if not force and not local_remote_timestamp_synced:
-            display_error(create_mismatch_warning(Resource.Workspace, target_id))
             errors[target_id] = (Resource.Workspace, local_object.get("name", ""))
             return local_object
 
@@ -82,7 +78,6 @@ async def upload_queue(
             client, Resource.Queue, target_id, local_object
         )
         if not force and not local_remote_timestamp_synced:
-            display_error(create_mismatch_warning(Resource.Queue, target_id))
             errors[target_id] = (Resource.Queue, local_object.get("name", ""))
             return local_object
 
@@ -107,7 +102,6 @@ async def upload_inbox(
             client, Resource.Inbox, target_id, local_object
         )
         if not force and not local_remote_timestamp_synced:
-            display_error(create_mismatch_warning(Resource.Inbox, target_id))
             errors[target_id] = (Resource.Inbox, local_object.get("name", ""))
             return local_object
 
@@ -132,7 +126,6 @@ async def upload_schema(
             client, Resource.Schema, target_id, local_object
         )
         if not force and not local_remote_timestamp_synced:
-            display_error(create_mismatch_warning(Resource.Schema, target_id))
             errors[target_id] = (Resource.Schema, local_object.get("name", ""))
             return local_object
 
@@ -159,7 +152,6 @@ async def upload_hook(
             client, Resource.Hook, target_id, local_object
         )
         if not force and not local_remote_timestamp_synced:
-            display_error(create_mismatch_warning(Resource.Hook, target_id))
             errors[target_id] = (Resource.Hook, local_object.get("name", ""))
             return local_object
 

@@ -234,7 +234,7 @@ async def migrate_project(
                 ]
             )
             display_error(
-                f"Changes made to target objects were not pulled to local because some target objects were not released, please do so manually.\n\nThe following target IDs were not released because of a newer version existed in Rossum. Please check these remote versions and retry:\n{errors_listed}",
+                f"The following target IDs were not released because of a newer version existed in Rossum. Please check these remote versions and retry:\n{errors_listed}\n\nChanges made to target objects were not pulled to local because some target objects were not released, please do so manually.",
             )
             return
         else:
