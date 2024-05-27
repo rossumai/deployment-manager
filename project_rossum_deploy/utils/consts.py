@@ -50,10 +50,7 @@ try:
 
             cred_path = Path("./") / self.CREDENTIALS_FILENAME
             if not cred_path.exists():
-                raise click.ClickException(
-                    f"WARNING: {self.CREDENTIALS_FILENAME} not found in the current directory."
-                )
-
+                return
             credentials = json.loads(cred_path.read_text())
 
             self.SOURCE_API_BASE = credentials["source"]["api_base"]
