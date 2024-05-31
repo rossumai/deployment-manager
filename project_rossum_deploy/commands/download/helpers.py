@@ -39,6 +39,10 @@ class DifferentPathException(Exception):
     status_code = 404
 
 
+class MissingParentObjectException(Exception):
+    status_code = 404
+
+
 async def should_write_object(path: Path, remote_object: Any, changed_files: list):
     if await path.exists():
         local_file = await read_json(path)
@@ -130,34 +134,43 @@ async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
         InactiveQueueException,
         DifferentNameException,
         DifferentPathException,
+        MissingParentObjectException,
     ) as e:
-        if e.status_code == 404:
-            print(
-                Panel(
-                    f"Deleting a local object that no longer exists in Rossum: {path}",
-                    style="yellow",
-                )
-            )
-            os.remove(path)
+        if e.status_code != 404:
+            raise e
 
-            previous_name, previous_id = detemplatize_name_id(path)
-            if object_type == Resource.Schema:
-                formula_directory_path = create_formula_directory_path(
-                    path, previous_name, previous_id
-                )
-                if await formula_directory_path.exists():
-                    shutil.rmtree(formula_directory_path)
-            elif object_type == Resource.Hook:
-                object["name"] = previous_name
-                custom_hook_code_path = create_custom_hook_code_path(path, object)
-                if custom_hook_code_path:
-                    os.remove(custom_hook_code_path)
+        print(
+            Panel(
+                f"Deleting a local object that no longer exists in Rossum: {path}",
+                style="yellow",
+            )
+        )
+        os.remove(path)
+
+        previous_name, previous_id = detemplatize_name_id(path)
+        if object_type == Resource.Schema:
+            formula_directory_path = create_formula_directory_path(
+                path, previous_name, previous_id
+            )
+            if await formula_directory_path.exists():
+                shutil.rmtree(formula_directory_path)
+        elif object_type == Resource.Hook:
+            object["name"] = previous_name
+            custom_hook_code_path = create_custom_hook_code_path(path, object)
+            if custom_hook_code_path:
+                os.remove(custom_hook_code_path)
 
 
 async def check_queue_existence(client: ElisAPIClient, remote_object: dict, path: Path):
-    ws = await client._http_client.request_json(
-        method="GET", url=remote_object["workspace"]
-    )
+    try:
+        ws = await client._http_client.request_json(
+            method="GET", url=remote_object["workspace"]
+        )
+    except APIClientError as e:
+        if e.status_code != 404:
+            raise e
+
+        raise MissingParentObjectException
     ws_path_part = templatize_name_id(ws["name"], ws["id"])
     queue_path_path = templatize_name_id(remote_object["name"], remote_object["id"])
     path_parts = str(path).split("/")
@@ -173,10 +186,21 @@ async def check_queue_existence(client: ElisAPIClient, remote_object: dict, path
 
 
 async def check_inbox_existence(client: ElisAPIClient, remote_object: dict, path: Path):
-    queue = await client._http_client.request_json(
-        method="GET", url=remote_object["queues"][0]
-    )
-    ws = await client._http_client.request_json(method="GET", url=queue["workspace"])
+    try:
+        queue = await client._http_client.request_json(
+            method="GET", url=remote_object["queues"][0]
+        )
+        if not queue["workspace"]:
+            raise MissingParentObjectException
+        ws = await client._http_client.request_json(
+            method="GET", url=queue["workspace"]
+        )
+    except (APIClientError, MissingParentObjectException) as e:
+        if e.status_code != 404:
+            raise e
+
+        raise MissingParentObjectException
+
     ws_path_part = templatize_name_id(ws["name"], ws["id"])
     queue_path_path = templatize_name_id(queue["name"], queue["id"])
     path_parts = str(path).split("/")
