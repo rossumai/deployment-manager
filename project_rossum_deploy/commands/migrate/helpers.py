@@ -182,7 +182,7 @@ async def simulate_migrate_object(
         )
     else:
         print(
-            f'Simualted creation of target from source "{source_object.get('id', None)} {source_object.get('name', '')}".'
+            f'Simulated creation of target from source "{source_object.get('id', None)} {source_object.get('name', '')}".'
         )
 
     return {}

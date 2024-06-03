@@ -300,7 +300,7 @@ def extract_sources_targets(
         sources["workspaces"].append(ws["id"])
         targets["workspaces"].extend(extract_target_ids(ws))
 
-        for q in ws["queues"]:
+        for q in ws.get('queues', []):
             sources["queues"].append(q["id"])
             targets["queues"].extend(extract_target_ids(q))
 
@@ -332,7 +332,7 @@ def extract_source_target_pairs(mapping: dict) -> dict[str, dict[int, list]]:
     for ws in mapping["organization"]["workspaces"]:
         pairs["workspaces"][ws["id"]] = extract_target_ids(ws)
 
-        for q in ws["queues"]:
+        for q in ws.get("queues", []):
             pairs["queues"][q["id"]] = extract_target_ids(q)
 
             inbox = q.get("inbox", None)
