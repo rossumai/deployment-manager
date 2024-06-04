@@ -73,7 +73,7 @@ def create_empty_mapping():
         "organization": {
             "id": "",
             "name": "",
-            "targets": [],
+            "targets": [{"target_id": None}],
             "workspaces": [],
             "hooks": [],
             "schemas": [],
@@ -151,6 +151,10 @@ def get_attributes_for_mapping(
     }
 
 
+def get_default_targets():
+    return [{"target_id": None}]
+
+
 def index_mappings_by_object_id(sub_mapping: list[dict]):
     indexed = {sm["id"]: sm for sm in sub_mapping}
     return indexed
@@ -175,6 +179,9 @@ def enrich_mapping_with_previous_targets(
         old_target_id = old_target.get("target_id", None)
         if old_target_id is None or old_target_id in new_ids:
             new_targets.append(old_target)
+
+    if not len(new_targets):
+        new_targets = get_default_targets()
 
     new_sub_mapping["targets"] = new_targets
 
@@ -247,11 +254,10 @@ def enrich_mappings_with_existing_attributes(
                 new_ids=new_ids,
             )
 
-            if new_queue_mapping.get("inbox", None) and (
-                old_inbox_mapping := old_queue_mapping.get("inbox", {})
-            ):
+            if new_inbox_mapping := new_queue_mapping.get("inbox", None):
+                old_inbox_mapping = old_queue_mapping.get("inbox", {})
                 enrich_mapping_with_previous_properties(
-                    new_queue_mapping["inbox"], old_inbox_mapping
+                    new_inbox_mapping, old_inbox_mapping
                 )
 
                 enrich_mapping_with_previous_targets(
@@ -300,7 +306,7 @@ def extract_sources_targets(
         sources["workspaces"].append(ws["id"])
         targets["workspaces"].extend(extract_target_ids(ws))
 
-        for q in ws.get('queues', []):
+        for q in ws.get("queues", []):
             sources["queues"].append(q["id"])
             targets["queues"].extend(extract_target_ids(q))
 
