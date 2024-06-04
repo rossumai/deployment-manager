@@ -12,6 +12,7 @@ from rich.panel import Panel
 from project_rossum_deploy.common.determine_path import (
     determine_object_type_from_url,
 )
+from project_rossum_deploy.common.mapping import extract_flat_lookup_table
 from project_rossum_deploy.common.read_write import (
     create_custom_hook_code_path,
     create_formula_directory_path,
@@ -23,8 +24,13 @@ from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
     find_object_in_project,
     find_all_object_paths,
+    flatten,
     templatize_name_id,
 )
+
+
+class ObjectMovedBetweenSourceTargetException(Exception):
+    status_code = 404
 
 
 class InactiveQueueException(Exception):
@@ -97,12 +103,34 @@ async def check_schema_formula_fields_existence(remote_object: dict, path: Path)
             os.remove(formula_path)
 
 
-async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
+async def remove_local_nonexistent_object(
+    path: Path,
+    client: ElisAPIClient,
+    destination: str,
+    source_ids: list[int],
+    target_ids: list[int],
+):
     object = await read_json(path)
-    url = object.get("url", "")
+    url, id = object.get("url", ""), object.get("id", "")
     object_type = determine_object_type_from_url(url)
 
     try:
+        # Source object was put on a right hand side in mapping and became target
+        # The left hand side was deleted
+        # This object should not be in the source directory anymore
+        if (
+            destination == settings.SOURCE_DIRNAME
+            and id in target_ids
+            and id not in source_ids
+        ):
+            raise ObjectMovedBetweenSourceTargetException
+        # The mirror case - delete from target if it is not referenced as a right hand side in mapping
+        elif (
+            destination == settings.TARGET_DIRNAME
+            and id not in target_ids
+            and id in source_ids
+        ):
+            raise ObjectMovedBetweenSourceTargetException
         # ID not found because it was deleted from Rossum
         remote_object = await client._http_client.request_json(method="GET", url=url)
 
@@ -117,7 +145,7 @@ async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
             remote_object.get("name", ""), remote_object.get("id", "")
         )
         cleaned_name, _ = detemplatize_name_id(path_from_remote)
-        # Inboxes are in the queue folder so they are an edge case (names might not the same for the queue and its inbox)
+        # Inboxes are in the queue folder, but can have a different name than their queue
         if cleaned_name != previous_name and object_type != Resource.Inbox:
             raise DifferentNameException
 
@@ -135,13 +163,14 @@ async def remove_local_nonexistent_object(path: Path, client: ElisAPIClient):
         DifferentNameException,
         DifferentPathException,
         MissingParentObjectException,
+        ObjectMovedBetweenSourceTargetException,
     ) as e:
         if e.status_code != 404:
             raise e
 
         print(
             Panel(
-                f"Deleting a local object that no longer exists in Rossum: {path}",
+                f"Deleting a local object that no longer exists in Rossum or was moved between {settings.SOURCE_DIRNAME}/{settings.TARGET_DIRNAME}: {path}",
                 style="yellow",
             )
         )
@@ -215,21 +244,31 @@ async def check_inbox_existence(client: ElisAPIClient, remote_object: dict, path
         raise DifferentPathException
 
 
-async def remove_local_nonexistent_objects(client: ElisAPIClient, base_path: Path):
+async def remove_local_nonexistent_objects(
+    client: ElisAPIClient, base_path: Path, destination: str, mapping: dict
+):
     """
     Checks that the local object still exists in Rossum and removes its local file if not.
     """
 
-    object_paths = await find_all_object_paths(base_path)
+    object_paths = await find_all_object_paths(base_path / destination)
     # Ignore the org file, it should never be deleted
     try:
-        object_paths.remove(Path(base_path / "organization.json"))
+        object_paths.remove(Path(base_path / destination / "organization.json"))
     # The file might not be there for target
     except Exception:
         ...
 
+    lookup_table = extract_flat_lookup_table(mapping)
+    source_ids = list(lookup_table.keys())
+    target_ids = flatten(list(lookup_table.values()))
     await asyncio.gather(
-        *[remove_local_nonexistent_object(path, client) for path in object_paths]
+        *[
+            remove_local_nonexistent_object(
+                path, client, destination, source_ids, target_ids
+            )
+            for path in object_paths
+        ]
     )
 
     delete_empty_folders(base_path)
