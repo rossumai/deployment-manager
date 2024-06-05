@@ -59,9 +59,26 @@ The specifics of what objects to migrate and where to migrate them are specified
     is_flag=True,
     help="Ignores newer remote timestamps = overwrites remote with local version of objects.",
 )
+@click.option(
+    "--commit",
+    "-c",
+    default=False,
+    is_flag=True,
+    help="Commits the pushed changes automatically.",
+)
+@click.option(
+    "--message",
+    "-m",
+    default="Released changes to target organization",
+    help="Commit message for pulling.",
+)
 @coro
-async def migrate_project_wrapper(plan_only: bool, force: bool):
-    await migrate_project(plan_only=plan_only, force=force)
+async def migrate_project_wrapper(
+    plan_only: bool, force: bool, commit: bool, message: str
+):
+    await migrate_project(
+        plan_only=plan_only, force=force, commit=commit, commit_message=message
+    )
 
 
 async def migrate_project(
@@ -69,6 +86,8 @@ async def migrate_project(
     org_path: Path = None,
     plan_only: bool = False,
     force: bool = False,
+    commit: bool = False,
+    commit_message: str = "",
 ):
     try:
         if not org_path:
@@ -241,7 +260,12 @@ async def migrate_project(
             )
             return
         else:
-            await download_project(client=client, org_path=org_path)
+            await download_project(
+                client=client,
+                org_path=org_path,
+                commit=commit,
+                commit_message=commit_message,
+            )
             print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
     except PrdVersionException as e:
         print(Panel(f"Unexpected error while migrating objects: {e}"))
