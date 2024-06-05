@@ -19,3 +19,7 @@ main.add_command(init_project)
 main.add_command(migrate_mapping_wrapper)
 main.add_command(upload_project_wrapper)
 main.add_command(migrate_project_wrapper)
+
+# For debugging purposes
+if __name__ == "__main__":
+    main()
