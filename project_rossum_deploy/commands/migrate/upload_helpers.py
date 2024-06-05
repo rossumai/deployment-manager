@@ -1,6 +1,8 @@
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
+from rich import print
 from rich.progress import Progress
+from rich.panel import Panel
 from rich.prompt import Prompt
 
 from project_rossum_deploy.commands.migrate.helpers import (
@@ -19,24 +21,40 @@ from project_rossum_deploy.utils.functions import (
 async def upload_organization(
     client: ElisAPIClient,
     organization: dict,
-    target_id: int,
-    target_objects=[],
+    local_target_organization: dict = None,
     errors={},
     force=False,
 ):
-    if not target_id:
+    if not local_target_organization:
         return
 
-    local_object = find_object_by_id(target_id, target_objects)
+    target_organization_id = local_target_organization["id"]
     local_remote_timestamp_synced = await check_modified_timestamp(
-        client, Resource.Organization, target_id, local_object
+        client,
+        Resource.Organization,
+        target_organization_id,
+        local_target_organization,
     )
     if not force and not local_remote_timestamp_synced:
-        errors[target_id] = (Resource.Organization, local_object.get("name", ""))
-        return local_object
+        errors[target_organization_id] = (
+            Resource.Organization,
+            local_target_organization.get("name", ""),
+        )
+        return local_target_organization
+
+    if organization["id"] == target_organization_id:
+        print(
+            Panel(
+                f"Skipping organization {settings.MIGRATE_COMMAND_NAME} - they are the same."
+            )
+        )
+        return local_target_organization
+
+    # Use only a subset of org fields where it makes sense to migrate
+    organization_fields = {k: organization[k] for k in settings.ORGANIZATION_FIELDS}
 
     return await client._http_client.update(
-        Resource.Organization, id_=target_id, data=organization
+        Resource.Organization, id_=target_organization_id, data=organization_fields
     )
 
 
@@ -50,6 +68,11 @@ async def upload_workspace(
 ):
     if target_id:
         local_object = find_object_by_id(target_id, target_objects)
+        if not local_object:
+            raise Exception(
+                f'Not could not find target object with ID "{target_id}" locally. If it exists, please {settings.DOWNLOAD_COMMAND_NAME} it first.'
+            )
+
         local_remote_timestamp_synced = await check_modified_timestamp(
             client, Resource.Workspace, target_id, local_object
         )
@@ -74,6 +97,11 @@ async def upload_queue(
 ):
     if target_id:
         local_object = find_object_by_id(target_id, target_objects)
+        if not local_object:
+            raise Exception(
+                f'Not could not find target object with ID "{target_id}" locally. If it exists, please {settings.DOWNLOAD_COMMAND_NAME} it first.'
+            )
+
         local_remote_timestamp_synced = await check_modified_timestamp(
             client, Resource.Queue, target_id, local_object
         )
@@ -98,6 +126,11 @@ async def upload_inbox(
 ):
     if target_id:
         local_object = find_object_by_id(target_id, target_objects)
+        if not local_object:
+            raise Exception(
+                f'Not could not find target object with ID "{target_id}" locally. If it exists, please {settings.DOWNLOAD_COMMAND_NAME} it first.'
+            )
+
         local_remote_timestamp_synced = await check_modified_timestamp(
             client, Resource.Inbox, target_id, local_object
         )
@@ -122,6 +155,11 @@ async def upload_schema(
 ):
     if target_id:
         local_object = find_object_by_id(target_id, target_objects)
+        if not local_object:
+            raise Exception(
+                f'Not could not find target object with ID "{target_id}" locally. If it exists, please {settings.DOWNLOAD_COMMAND_NAME} it first.'
+            )
+
         local_remote_timestamp_synced = await check_modified_timestamp(
             client, Resource.Schema, target_id, local_object
         )
@@ -148,6 +186,11 @@ async def upload_hook(
 ):
     if target_id:
         local_object = find_object_by_id(target_id, target_objects)
+        if not local_object:
+            raise Exception(
+                f'Not could not find target object with ID "{target_id}" locally. If it exists, please {settings.DOWNLOAD_COMMAND_NAME} it first.'
+            )
+
         local_remote_timestamp_synced = await check_modified_timestamp(
             client, Resource.Hook, target_id, local_object
         )

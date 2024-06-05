@@ -7,6 +7,7 @@ from rossum_api import ElisAPIClient
 from rich.progress import Progress
 from rich.panel import Panel
 from rich import print
+from rossum_api.api_client import Resource
 
 from project_rossum_deploy.commands.migrate.helpers import (
     migrate_object_to_multiple_targets,
@@ -14,7 +15,11 @@ from project_rossum_deploy.commands.migrate.helpers import (
 )
 from project_rossum_deploy.common.mapping import find_mapping_of_object
 from project_rossum_deploy.common.read_write import read_formula_file, read_json
-from project_rossum_deploy.utils.consts import display_error, settings, PrdVersionException
+from project_rossum_deploy.utils.consts import (
+    display_error,
+    settings,
+    PrdVersionException,
+)
 from project_rossum_deploy.commands.migrate.upload_helpers import upload_schema
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
@@ -37,7 +42,7 @@ async def migrate_schemas(
     schema_paths = [
         schema_path async for schema_path in (source_path / "schemas").iterdir()
     ]
-    task = progress.add_task("Releasing schemas...", total=len(schema_paths))
+    task = progress.add_task("Releasing schemas.", total=len(schema_paths))
 
     async def migrate_schema(schema_path: Path):
         try:
@@ -59,7 +64,9 @@ async def migrate_schemas(
             if plan_only:
                 partial_upload_schema = functools.partial(
                     simulate_migrate_object,
+                    client=client,
                     source_object=schema,
+                    target_object_type=Resource.Schema,
                 )
             else:
                 partial_upload_schema = functools.partial(
@@ -77,7 +84,9 @@ async def migrate_schemas(
                 )
 
             results = await migrate_object_to_multiple_targets(
-                submapping=schema_mapping, upload_function=partial_upload_schema
+                submapping=schema_mapping,
+                upload_function=partial_upload_schema,
+                plan_only=plan_only,
             )
             source_id_target_pairs[id].extend(results)
 
@@ -88,7 +97,7 @@ async def migrate_schemas(
             display_error(f"Error while migrating schema: {e}", e)
 
     if plan_only:
-        print(Panel("Simulating workspaces"))
+        print(Panel("Simulating workspaces."))
 
     await asyncio.gather(
         *[

@@ -1,5 +1,7 @@
 import json
 import re
+import subprocess
+import tempfile
 import jmespath
 from rich import print
 from rich.panel import Panel
@@ -215,7 +217,7 @@ async def validate_override_migrated_objects_attributes(
     base_path: Path, mapping: dict
 ) -> bool:
     try:
-        print(Panel("Validating attribute_override..."))
+        print(Panel("Validating attribute_override."))
         source_paths = await find_all_object_paths(base_path)
         source_objects = [await read_json(path) for path in source_paths]
         for mapping_object in traverse_mapping(mapping):
@@ -253,8 +255,9 @@ async def override_migrated_objects_attributes(
     source_id_target_pairs: dict[int, list],
     lookup_table: dict,
     errors: dict,
+    plan_only: bool = False,
 ):
-    print(Panel("Running attribute_override..."))
+    print(Panel(f"Running attribute_override{' (simulated)' if plan_only else ''}."))
     for mapping_object in traverse_mapping(mapping["organization"]):
         if mapping_object.get("ignore", None):
             continue
@@ -281,14 +284,39 @@ async def override_migrated_objects_attributes(
                     target_index,
                     num_targets=len(target_objects),
                 )
-                await client._http_client.update(
-                    resource, target_object["id"], {"settings": target_settings}
-                )
-
+                if plan_only:
+                    with tempfile.NamedTemporaryFile() as tf1, tempfile.NamedTemporaryFile() as tf2:
+                        tf1.write(
+                            bytes(
+                                json.dumps(target_object["settings"], indent=2), "UTF-8"
+                            )
+                        )
+                        tf2.write(bytes(json.dumps(target_settings, indent=2), "UTF-8"))
+                        # Has to be manually seeked back to start
+                        tf1.seek(0)
+                        tf2.seek(0)
+                        diff = subprocess.run(
+                            ["diff", tf1.name, tf2.name],
+                            capture_output=True,
+                            text=True,
+                        )
+                        if diff.stdout:
+                            print(
+                                Panel(
+                                    f'Simulated implicit attribute override of source "{source_object['id']}" -> target "{target_object['id']}" replaced IDs:\n{diff.stdout}'
+                                )
+                            )
+                else:
+                    await client._http_client.update(
+                        resource, target_object["id"], {"settings": target_settings}
+                    )
             # Explicit override for settings and anything else
             attribute_overrides = find_attribute_override_for_target(
                 targets_in_mapping, target_object["id"]
             )
+            if not attribute_overrides:
+                continue
+
             source_object_subset = get_attributes_from_object(
                 source_object, attribute_overrides
             )
@@ -304,10 +332,19 @@ async def override_migrated_objects_attributes(
                 },
                 object=source_object_subset,
             )
-
-            await client._http_client.update(
-                resource, target_object["id"], source_object_subset
-            )
+            if plan_only:
+                # Clean up for display
+                del source_object_subset["id"]
+                del source_object_subset["url"]
+                print(
+                    Panel(
+                        f'Simulated explicit attribute override from source "{source_object['id']}" to target "{target_object['id']}":\n {json.dumps(source_object_subset, indent=2)}'
+                    )
+                )
+            else:
+                await client._http_client.update(
+                    resource, target_object["id"], source_object_subset
+                )
 
 
 def find_attribute_override_for_target(targets_in_mapping: dict, target_id: int):

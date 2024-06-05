@@ -15,7 +15,11 @@ from project_rossum_deploy.commands.migrate.helpers import (
 )
 from project_rossum_deploy.common.mapping import find_mapping_of_object
 from project_rossum_deploy.common.read_write import read_json
-from project_rossum_deploy.utils.consts import PrdVersionException, display_error, settings
+from project_rossum_deploy.utils.consts import (
+    PrdVersionException,
+    display_error,
+    settings,
+)
 from project_rossum_deploy.commands.migrate.upload_helpers import upload_hook
 from project_rossum_deploy.utils.functions import (
     PauseProgress,
@@ -37,7 +41,7 @@ async def migrate_hooks(
     force: bool = False,
 ):
     hook_paths = [hook_path async for hook_path in (source_path / "hooks").iterdir()]
-    task = progress.add_task("Releasing hooks...", total=len(hook_paths))
+    task = progress.add_task("Releasing hooks.", total=len(hook_paths))
 
     target_token_owner_id = ""
     if not settings.IS_PROJECT_IN_SAME_ORG:
@@ -78,7 +82,9 @@ async def migrate_hooks(
             if plan_only:
                 partial_upload_hook = functools.partial(
                     simulate_migrate_object,
+                    client=client,
                     source_object=hook,
+                    target_object_type=Resource.Hook,
                 )
             else:
                 partial_upload_hook = functools.partial(
@@ -98,7 +104,9 @@ async def migrate_hooks(
                 )
 
             results = await migrate_object_to_multiple_targets(
-                submapping=hook_mapping, upload_function=partial_upload_hook
+                submapping=hook_mapping,
+                upload_function=partial_upload_hook,
+                plan_only=plan_only,
             )
             source_id_target_pairs[id].extend(results)
 
@@ -109,7 +117,7 @@ async def migrate_hooks(
             display_error(f"Error while migrating hook with path '{hook_path}': {e}", e)
 
     if plan_only:
-        print(Panel("Simulating hooks"))
+        print(Panel("Simulating hooks."))
 
     await asyncio.gather(
         *[migrate_hook(hook_path=hook_path) for hook_path in hook_paths]

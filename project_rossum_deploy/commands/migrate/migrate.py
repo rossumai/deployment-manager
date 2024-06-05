@@ -8,19 +8,21 @@ from rossum_api import ElisAPIClient
 from project_rossum_deploy.commands.download.download import (
     download_project,
 )
+from project_rossum_deploy.commands.migrate.organization import migrate_organization
 from project_rossum_deploy.common.attribute_override import (
     override_migrated_objects_attributes,
     validate_override_migrated_objects_attributes,
 )
-from project_rossum_deploy.common.mapping import extract_flat_lookup_table, extract_sources_targets, read_mapping, write_mapping
+from project_rossum_deploy.common.mapping import (
+    extract_flat_lookup_table,
+    extract_sources_targets,
+    read_mapping,
+    write_mapping,
+)
 
 from project_rossum_deploy.commands.migrate.hooks import migrate_hooks
 from project_rossum_deploy.commands.migrate.schemas import migrate_schemas
 from project_rossum_deploy.commands.migrate.workspaces import migrate_workspaces
-
-from project_rossum_deploy.commands.migrate.upload_helpers import (
-    upload_organization,
-)
 
 from project_rossum_deploy.common.read_write import read_json
 from project_rossum_deploy.utils.consts import (
@@ -81,6 +83,7 @@ async def migrate_project(
                 f'Detected "target_object" for organization. Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping format.'
             )
 
+        source_organization_id = mapping["organization"].get("id", "")
         target_organization_id = (
             target_organizations[0].get("target_id", None)
             if len(target_organizations)
@@ -89,6 +92,20 @@ async def migrate_project(
         if not target_organization_id:
             raise click.ClickException(
                 "No target for organization. If you want to migrate inside the same organization, just add a target with the same ID."
+            )
+        elif (
+            settings.IS_PROJECT_IN_SAME_ORG
+            and target_organization_id != source_organization_id
+        ):
+            raise click.ClickException(
+                'Source and target organizations are different even though credentials.json has "use_same_org_as_target": true.'
+            )
+        elif (
+            not settings.IS_PROJECT_IN_SAME_ORG
+            and target_organization_id == source_organization_id
+        ):
+            raise click.ClickException(
+                'Source and target organizations are the same even though credentials.json has "use_same_org_as_target": false.'
             )
         elif len(target_organizations) > 1:
             raise click.ClickException(
@@ -122,38 +139,24 @@ async def migrate_project(
         ):
             return
 
+        source_path = org_path / settings.SOURCE_DIRNAME
+        target_paths = await find_all_object_paths(org_path / settings.TARGET_DIRNAME)
+        target_objects = [await read_json(path) for path in target_paths]
+
         with Progress() as progress:
-            task = progress.add_task("Releasing organization...", total=1)
-
-            organization = await read_json(
-                org_path / settings.SOURCE_DIRNAME / "organization.json"
+            await migrate_organization(
+                source_path=source_path,
+                client=client,
+                mapping=mapping,
+                source_id_target_pairs=source_id_target_pairs,
+                sources_by_source_id_map=sources_by_source_id_map,
+                target_organization_id=target_organization_id,
+                progress=progress,
+                plan_only=plan_only,
+                target_objects=target_objects,
+                errors=errors_by_target_id,
+                force=force,
             )
-            sources_by_source_id_map[organization["id"]] = organization
-            # Use only a subset of org fields where it makes sense to migrate
-            organization_fields = {
-                k: organization[k] for k in settings.ORGANIZATION_FIELDS
-            }
-
-            target_paths = await find_all_object_paths(
-                org_path / settings.TARGET_DIRNAME
-            )
-            target_objects = [await read_json(path) for path in target_paths]
-
-            source_id_target_pairs[mapping["organization"]["id"]] = [
-                await upload_organization(
-                    client,
-                    organization_fields,
-                    target_organization_id,
-                    target_objects=[organization]
-                    if settings.IS_PROJECT_IN_SAME_ORG
-                    else target_objects,
-                    errors=errors_by_target_id,
-                    force=force,
-                )
-            ]
-            progress.update(task, advance=1)
-
-            source_path = org_path / settings.SOURCE_DIRNAME
 
             await migrate_schemas(
                 source_path=source_path,
@@ -192,11 +195,9 @@ async def migrate_project(
                 force=force,
             )
 
-        if plan_only:
-            return
-
-        # Update the mapping with right hand sides (targets) created during migration
-        await write_mapping(org_path / settings.MAPPING_FILENAME, mapping)
+        if not plan_only:
+            # Update the mapping with right hand sides (targets) created during migration
+            await write_mapping(org_path / settings.MAPPING_FILENAME, mapping)
 
         _, previous_targets = extract_sources_targets(previous_mapping)
         lookup_table = extract_flat_lookup_table(mapping)
@@ -212,7 +213,7 @@ async def migrate_project(
 
         new_target_ids = current_target_ids.difference(previous_target_ids)
 
-        if len(new_target_ids):
+        if not plan_only and len(new_target_ids):
             print(Panel(f"These target objects were created: {new_target_ids}"))
 
         await override_migrated_objects_attributes(
@@ -222,7 +223,11 @@ async def migrate_project(
             source_id_target_pairs=source_id_target_pairs,
             lookup_table=lookup_table,
             errors=errors_by_target_id,
+            plan_only=plan_only,
         )
+
+        if plan_only:
+            return
 
         if len(errors_by_target_id.keys()):
             errors_listed = "\n".join(

@@ -22,7 +22,11 @@ from project_rossum_deploy.commands.migrate.upload_helpers import (
 )
 from project_rossum_deploy.common.mapping import find_mapping_of_object
 from project_rossum_deploy.common.read_write import read_json
-from project_rossum_deploy.utils.consts import PrdVersionException, display_error, settings
+from project_rossum_deploy.utils.consts import (
+    PrdVersionException,
+    display_error,
+    settings,
+)
 
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
@@ -45,7 +49,7 @@ async def migrate_workspaces(
         workspace_path
         async for workspace_path in (source_path / "workspaces").iterdir()
     ]
-    task = progress.add_task("Releasing workspaces...", total=len(workspace_paths))
+    task = progress.add_task("Releasing workspaces.", total=len(workspace_paths))
 
     async def migrate_workspace(ws_path: Path):
         try:
@@ -69,7 +73,9 @@ async def migrate_workspaces(
             if plan_only:
                 partial_upload_workspace = functools.partial(
                     simulate_migrate_object,
+                    client=client,
                     source_object=workspace,
+                    target_object_type=Resource.Workspace,
                 )
             else:
                 partial_upload_workspace = functools.partial(
@@ -87,7 +93,9 @@ async def migrate_workspaces(
                 )
 
             results = await migrate_object_to_multiple_targets(
-                submapping=workspace_mapping, upload_function=partial_upload_workspace
+                submapping=workspace_mapping,
+                upload_function=partial_upload_workspace,
+                plan_only=plan_only,
             )
             source_id_target_pairs[id].extend(results)
 
@@ -113,7 +121,7 @@ async def migrate_workspaces(
             )
 
     if plan_only:
-        print(Panel("Simulating workspaces"))
+        print(Panel("Simulating workspaces."))
 
     await asyncio.gather(
         *[migrate_workspace(ws_path=ws_path) for ws_path in workspace_paths]
@@ -152,7 +160,9 @@ async def migrate_queues_and_inboxes(
             if plan_only:
                 partial_upload_queue_function = functools.partial(
                     simulate_migrate_object,
+                    client=client,
                     source_object=queue,
+                    target_object_type=Resource.Queue,
                 )
             else:
                 partial_upload_queue_function = functools.partial(
@@ -175,6 +185,7 @@ async def migrate_queues_and_inboxes(
                 submapping=queue_mapping,
                 upload_function=partial_upload_queue_function,
                 pass_index_args=True,
+                plan_only=plan_only,
             )
             source_id_target_pairs[id].extend(results)
 
@@ -193,7 +204,9 @@ async def migrate_queues_and_inboxes(
             if plan_only:
                 partial_upload_inbox_function = functools.partial(
                     simulate_migrate_object,
+                    client=client,
                     source_object=inbox,
+                    target_object_type=Resource.Inbox,
                 )
             else:
                 partial_upload_inbox_function = functools.partial(
@@ -215,6 +228,7 @@ async def migrate_queues_and_inboxes(
                 submapping=inbox_mapping,
                 upload_function=partial_upload_inbox_function,
                 pass_index_args=True,
+                plan_only=plan_only,
             )
             source_id_target_pairs[inbox_id].extend(results)
 

@@ -187,7 +187,7 @@ async def upload_project(
 
         with Progress() as progress:
             task = progress.add_task(
-                "Pushing changes to Rossum...", total=len(requests)
+                "Pushing changes to Rossum.", total=len(requests)
             )
             await gather_with_concurrency(
                 5,

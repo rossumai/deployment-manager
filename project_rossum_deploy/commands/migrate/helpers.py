@@ -1,8 +1,10 @@
 import asyncio
+import copy
 from typing import Callable
 from rossum_api import ElisAPIClient
-from project_rossum_deploy.utils.consts import settings
+from rossum_api.api_client import Resource
 
+from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     extract_id_from_url,
 )
@@ -13,7 +15,7 @@ def is_first_time_migration(submapping: dict):
 
 
 def find_object_by_id(id: int, objects: list):
-    object = {}
+    object = None
     for candidate in objects:
         if candidate["id"] == id:
             object = candidate
@@ -21,6 +23,7 @@ def find_object_by_id(id: int, objects: list):
     return object
 
 
+# TODO: not used for release
 async def should_upload_object(
     client: ElisAPIClient, target_id: int, target_objects: list[dict]
 ):
@@ -146,14 +149,17 @@ async def migrate_object_to_default_target(
 
 
 async def migrate_object_to_multiple_targets(
-    submapping: dict, upload_function: Callable, pass_index_args: bool = False
+    submapping: dict,
+    upload_function: Callable,
+    pass_index_args: bool = False,
+    plan_only: bool = False,
 ):
     requests = []
     targets = submapping.get("targets", [])
     for target_index, target in enumerate(targets):
         target_id = target.get("target_id", None)
         extra_args = {}
-        if pass_index_args:
+        if pass_index_args or plan_only:
             extra_args["target_index"] = target_index
             extra_args["target_objects_count"] = len(targets)
 
@@ -170,19 +176,22 @@ async def migrate_object_to_multiple_targets(
 
 # Extra args are there to accomodate all upload function signatures
 async def simulate_migrate_object(
+    client: ElisAPIClient,
     source_object: dict,
+    target_object_type: Resource,
     target_id: int,
     target_index: int = 0,
-    target_objects_count: int = 0,
+    target_objects_count: int = None,
     source_id_target_pairs: dict[int, list] = None,
 ):
+    object_counter = f"({target_index +1}/{target_objects_count if target_objects_count is not None else 1})"
     if target_id:
         print(
-            f'Simulated update of target "{target_id}" from source "{source_object.get('id', None)} {source_object.get('name', '')}".'
+            f'UPDATE source {target_object_type} "{source_object.get('id', None)} {source_object.get('name', '')}" -> target "{target_id}" {object_counter}.'
         )
+        return await client._http_client.fetch_one(target_object_type, target_id)
     else:
         print(
-            f'Simulated creation of target from source "{source_object.get('id', None)} {source_object.get('name', '')}".'
+            f'CREATE source {target_object_type} "{source_object.get('id', None)} {source_object.get('name', '')}" -> target {object_counter}.'
         )
-
-    return {}
+        return copy.deepcopy(source_object)
