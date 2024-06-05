@@ -54,12 +54,19 @@ async def should_write_object(path: Path, remote_object: Any, changed_files: lis
     if await path.exists():
         local_file = await read_json(path)
 
-        object_type = determine_object_type_from_path(path) if 'organization' not in str(path) else ''
+        object_type = (
+            determine_object_type_from_path(path)
+            if "organization" not in str(path)
+            else ""
+        )
         # Queues are always pulled - their hooks/webhooks attribute might have changed.
         # This does not update the timestamp in the DB because this change is only done on hooks entities.
         if (local_timestamp := local_file.get("modified_at", "")) != (
             remote_timestamp := remote_object.get("modified_at", "")
-        ) or object_type == Resource.Queue:
+        ) or (
+            object_type == Resource.Queue
+            and local_file.get("hooks", []) != remote_object.get("hooks", [])
+        ):
             if path in changed_files:
                 return Confirm.ask(
                     f'File "{path}" has local unversioned changes (local: {local_timestamp} | remote: {remote_timestamp}). Should the remote version overwrite the local one?',
