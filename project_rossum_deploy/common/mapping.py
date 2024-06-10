@@ -191,6 +191,9 @@ def enrich_mappings_with_existing_attributes(
 ):
     """Use targets from the previous mapping, but only if the target objects were not deleted in Rossum"""
 
+    enrich_mapping_with_previous_properties(
+        new_mapping["organization"], old_mapping["organization"]
+    )
     old_org_targets = old_mapping["organization"].get("targets", [])
     if not old_org_targets:
         old_org_targets = [{"target_id": None}]

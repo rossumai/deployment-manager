@@ -115,7 +115,7 @@ try:
 
         MAPPING_FILENAME: str = "mapping.yaml"
         CREDENTIALS_FILENAME: str = "credentials.json"
-        MAPPING_KEYS_ORDER: list = ["id", "name", "ignore", "targets"]
+        MAPPING_KEYS_ORDER: list = ["comment", "id", "name", "ignore", "targets"]
 
         TARGET_API_BASE: str = ""
         TARGET_TOKEN: str = "dummy_token"
