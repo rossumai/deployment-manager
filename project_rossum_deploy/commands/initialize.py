@@ -18,20 +18,31 @@ Also initializes it as a git repository.
 The user is then expected to provide .env credentials and download Rossum objects.
                """,
 )
-@click.argument("name")
+@click.argument(
+    "name",
+    default=".",
+)
 def init_project(name):
-    if not os.path.exists(name):
-        os.mkdir(name)
-    else:
-        click.echo(f'Directory "{name}" already exists, skipping.')
+    if os.path.exists(name) and name != ".":
+        print(Panel(f'Directory "{name}" already exists, skipping.'))
         return
 
-    with open(name + "/.gitignore", "w") as wf:
-        wf.write("credentials.json")
+    credentials_path = name + "/credentials.json"
+    if os.path.exists(credentials_path):
+        print(Panel(f'"{credentials_path}" already exists, skipping.'))
+        return
+
+    if not os.path.exists(name) and name != ".":
+        os.mkdir(name)
+
+        os.chdir(name)
+        subprocess.run(["git", "init"])
+        os.chdir('..')
+
+    with open(name + "/.gitignore", "a") as wf:
+        wf.write("\ncredentials.json")
     example_credentials_path = Path(__file__).parent.parent / "dummy_credentials.json"
-    shutil.copyfile(example_credentials_path, name + "/credentials.json")
 
-    os.chdir(name)
-    subprocess.run(["git", "init"])
+    shutil.copyfile(example_credentials_path, credentials_path)
 
-    print(Panel(f'Initialized a new directory "{name}".'))
+    print(Panel(f'Initialized a new directory in "{name}" .'))
