@@ -56,29 +56,29 @@ ORGANIZATION: # organization category, always top level
       ignore: true # if true, object is not pushed to remote
       name: Magic Items
       targets
-        target_id: null
+        - target_id: null
   SCHEMAS:
     - id: 222
       name: Purchase orders schema
       targets
-        target_id: null
+        - target_id: null
   WORKSPACES:
     - QUEUES:
         - INBOX:
             id: 333
             name: Incoming Purchase Orders
             targets
-              target_id: null
+              - target_id: null
           id: 4444
           name: Incoming Purchase Orders
           targets
-            target_id: null
+            - target_id: null
       id: 321654
       name: Dev & test
       targets
-        target_id: null
-        attribute_override:
-          name: Prod
+        - target_id: null
+          attribute_override:
+            name: Prod
 ```
 And the source folder after pulling these objects:
 ```
@@ -123,33 +123,33 @@ ORGANIZATION: # organization category, always top level
   id: 123456 # id of the organization
   name: Production # name of the organization
   targets:
-    target_id: 123789 # id of the couterpart object in the target environment
+    - target_id: 123789 # id of the couterpart object in the target environment
   HOOKS: # hooks category
     - id: 111
       ignore: true # if true, object is not pushed to remote
       name: Magic Items
       targets:
-        target_id: null # this remains empty, because ignore flag prevented the release to create the counterpart object
+        - target_id: null # this remains empty, because ignore flag prevented the release to create the counterpart object
   SCHEMAS:
     - id: 222
       name: Purchase orders schema
       targets:
-        target_id: 2222
+        - target_id: 2222
   WORKSPACES:
     - QUEUES:
         - INBOX:
             id: 333
             name: Incoming Purchase Orders
             targets:
-              target_id: 3333
+              - target_id: 3333
           id: 4444
           name: Incoming Purchase Orders
           targets:
-            target_id: 4444
+            - target_id: 4444
       id: 321654
       name: Dev & test
       targets:
-        target_id: 321987
+        - target_id: 321987
           attribute_override:
             name: Prod
 ```
