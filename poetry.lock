@@ -361,7 +361,7 @@ jupyter = ["ipywidgets (>=7.5.1,<9)"]
 
 [[package]]
 name = "rossum_api"
-version = "1.0.0"
+version = "0.16.0"
 description = ""
 optional = false
 python-versions = "*"
@@ -421,5 +421,5 @@ files = [
 
 [metadata]
 lock-version = "2.0"
-python-versions = "^3.11"
-content-hash = "76d2ec72575f8789e11d8e4fe1f3a36bb95dd87db8363af21f8b2f6da1deeb61"
+python-versions = "^3.12"
+content-hash = "6b830d7b5fafb380c84ac32be24f457f4488bcc70bf733a4b2b00212b59be059"

@@ -12,6 +12,7 @@ from project_rossum_deploy.commands.download.helpers import (
     should_write_object,
 )
 from project_rossum_deploy.commands.download.hooks import download_hooks
+from project_rossum_deploy.common.client import create_and_validate_client
 from project_rossum_deploy.common.mapping import (
     create_update_mapping,
     extract_sources_targets,
@@ -113,12 +114,7 @@ async def download_organizations(
     if not mapping:
         mapping = create_empty_mapping()
 
-    source_client = ElisAPIClient(
-        base_url=settings.SOURCE_API_URL,
-        token=settings.SOURCE_TOKEN,
-        username=settings.SOURCE_USERNAME,
-        password=settings.SOURCE_PASSWORD,
-    )
+    source_client = await create_and_validate_client(settings.SOURCE_DIRNAME)
     (
         source_organization,
         source_workspaces,
@@ -132,12 +128,7 @@ async def download_organizations(
         download_all=download_all,
     )
 
-    target_client = ElisAPIClient(
-        base_url=settings.TARGET_API_URL,
-        token=settings.TARGET_TOKEN,
-        username=settings.TARGET_USERNAME,
-        password=settings.TARGET_PASSWORD,
-    )
+    target_client = await create_and_validate_client(settings.TARGET_DIRNAME)
     (
         _,
         target_workspaces,
@@ -255,12 +246,7 @@ async def download_organization_combined_source_target(
     download_all: bool = False,
 ):
     if not client:
-        client = ElisAPIClient(
-            base_url=settings.SOURCE_API_URL,
-            token=settings.SOURCE_TOKEN,
-            username=settings.SOURCE_USERNAME,
-            password=settings.SOURCE_PASSWORD,
-        )
+        client = await create_and_validate_client(settings.SOURCE_DIRNAME)
 
     # Make the previous mapping conform in structure
     await migrate_mapping("mapping.yaml", print_result=False)

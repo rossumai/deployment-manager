@@ -7,7 +7,7 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.12"
 httpx = "^0.25.2"
 rossum-api = {git = "https://github.com/rossumai/rossum-sdk"}
 click = "^8.1.7"
