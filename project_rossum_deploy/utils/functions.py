@@ -4,7 +4,6 @@ import re
 from anyio import Path
 
 from click import progressbar
-from rich import print
 
 
 def coro(f):
