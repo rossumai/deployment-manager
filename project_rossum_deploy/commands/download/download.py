@@ -8,6 +8,7 @@ from rich.panel import Panel
 
 import click
 from project_rossum_deploy.commands.download.helpers import (
+    get_all_objects_for_destination,
     remove_local_nonexistent_objects,
     should_write_object,
 )
@@ -39,6 +40,13 @@ Creates a local organization directory structure with the configs of these objec
 In case the directory already exists, it first deletes its contents and then downloads them anew.
                """,
 )
+@click.argument(
+    "destination",
+    default=settings.BOTH_DESTINATIONS,
+    type=click.Choice(
+        [settings.BOTH_DESTINATIONS, settings.SOURCE_DIRNAME, settings.TARGET_DIRNAME]
+    ),
+)
 @click.option(
     "--commit",
     "-c",
@@ -62,12 +70,15 @@ In case the directory already exists, it first deletes its contents and then dow
 @coro
 # To be able to run the command progammatically without the CLI decorators
 async def download_project_wrapper(
-    commit: bool = False, message: str = "", all: bool = False
+    destination: str, commit: bool = False, message: str = "", all: bool = False
 ):
-    await download_project(commit_message=message, commit=commit, download_all=all)
+    await download_project(
+        destination=destination, commit_message=message, commit=commit, download_all=all
+    )
 
 
 async def download_project(
+    destination: str = "",
     client: ElisAPIClient = None,
     org_path: Path = None,
     commit: bool = False,
@@ -77,7 +88,10 @@ async def download_project(
     if not org_path:
         org_path = Path("./")
 
-    changed_files = get_changed_file_paths(settings.SOURCE_DIRNAME)
+    changed_files = [
+        *get_changed_file_paths(settings.SOURCE_DIRNAME),
+        *get_changed_file_paths(settings.TARGET_DIRNAME),
+    ]
     changed_files = list(map(lambda x: x[1], changed_files))
 
     try:
@@ -89,8 +103,9 @@ async def download_project(
                 download_all=download_all,
             )
         else:
-            await download_organizations(
+            await download_organizations_separate(
                 org_path=org_path,
+                destination=destination,
                 changed_files=changed_files,
                 download_all=download_all,
             )
@@ -103,8 +118,9 @@ async def download_project(
         display_error(f"Error during project {settings.DOWNLOAD_COMMAND_NAME}: {e}", e)
 
 
-async def download_organizations(
+async def download_organizations_separate(
     org_path: Path = None,
+    destination: str = settings.BOTH_DESTINATIONS,
     changed_files: list = [],
     download_all: bool = False,
 ):
@@ -114,33 +130,53 @@ async def download_organizations(
     if not mapping:
         mapping = create_empty_mapping()
 
-    source_client = await create_and_validate_client(settings.SOURCE_DIRNAME)
-    (
-        source_organization,
-        source_workspaces,
-        source_schemas,
-        source_hooks,
-    ) = await download_organization_single(
-        client=source_client,
-        org_path=org_path,
-        destination=settings.SOURCE_DIRNAME,
-        changed_files=changed_files,
-        download_all=download_all,
-    )
+    if destination in [settings.SOURCE_DIRNAME, settings.BOTH_DESTINATIONS]:
+        source_client = await create_and_validate_client(settings.SOURCE_DIRNAME)
+        (
+            source_organization,
+            source_workspaces,
+            source_schemas,
+            source_hooks,
+        ) = await download_organization_single(
+            client=source_client,
+            org_path=org_path,
+            destination=settings.SOURCE_DIRNAME,
+            changed_files=changed_files,
+            download_all=download_all,
+        )
+    else:
+        (
+            source_organization,
+            source_workspaces,
+            source_schemas,
+            source_hooks,
+        ) = await get_all_objects_for_destination(
+            org_path=org_path, destination=settings.SOURCE_DIRNAME
+        )
 
-    target_client = await create_and_validate_client(settings.TARGET_DIRNAME)
-    (
-        _,
-        target_workspaces,
-        target_schemas,
-        target_hooks,
-    ) = await download_organization_single(
-        client=target_client,
-        org_path=org_path,
-        destination=settings.TARGET_DIRNAME,
-        changed_files=changed_files,
-        download_all=download_all,
-    )
+    if destination in [settings.TARGET_DIRNAME, settings.BOTH_DESTINATIONS]:
+        target_client = await create_and_validate_client(settings.TARGET_DIRNAME)
+        (
+            _,
+            target_workspaces,
+            target_schemas,
+            target_hooks,
+        ) = await download_organization_single(
+            client=target_client,
+            org_path=org_path,
+            destination=settings.TARGET_DIRNAME,
+            changed_files=changed_files,
+            download_all=download_all,
+        )
+    else:
+        (
+            _,
+            target_workspaces,
+            target_schemas,
+            target_hooks,
+        ) = await get_all_objects_for_destination(
+            org_path=org_path, destination=settings.TARGET_DIRNAME
+        )
 
     await create_update_mapping(
         org_path=org_path,
@@ -151,12 +187,14 @@ async def download_organizations(
         old_mapping=mapping,
     )
 
-    await remove_local_nonexistent_objects(
-        source_client, org_path, settings.SOURCE_DIRNAME, mapping
-    )
-    await remove_local_nonexistent_objects(
-        target_client, org_path, settings.TARGET_DIRNAME, mapping
-    )
+    if destination in [settings.SOURCE_DIRNAME, settings.BOTH_DESTINATIONS]:
+        await remove_local_nonexistent_objects(
+            source_client, org_path, settings.SOURCE_DIRNAME, mapping
+        )
+    if destination in [settings.TARGET_DIRNAME, settings.BOTH_DESTINATIONS]:
+        await remove_local_nonexistent_objects(
+            target_client, org_path, settings.TARGET_DIRNAME, mapping
+        )
 
 
 async def download_organization_single(

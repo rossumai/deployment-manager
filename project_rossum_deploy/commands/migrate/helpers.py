@@ -8,19 +8,11 @@ from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     extract_id_from_url,
 )
+from project_rossum_deploy.utils.functions import find_object_by_id
 
 
 def is_first_time_migration(submapping: dict):
     return not submapping.get("target_object", None)
-
-
-def find_object_by_id(id: int, objects: list):
-    object = None
-    for candidate in objects:
-        if candidate["id"] == id:
-            object = candidate
-            break
-    return object
 
 
 # TODO: not used for release

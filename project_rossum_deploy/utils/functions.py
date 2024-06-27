@@ -97,3 +97,16 @@ async def find_object_in_project(object: dict, base_path: Path):
         await (base_path / file_name).exists()
         or await (base_path / (file_name + ".json")).exists()
     )
+
+
+def find_object_by_key(key: str, value: str, objects: list):
+    object = None
+    for candidate in objects:
+        if candidate[key] == value:
+            object = candidate
+            break
+    return object
+
+
+def find_object_by_id(id: int, objects: list):
+    return find_object_by_key(key="id", value=id, objects=objects)

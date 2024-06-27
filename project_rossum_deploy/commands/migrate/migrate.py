@@ -248,8 +248,8 @@ async def migrate_project(
             )
             return
         else:
-            # TODO: pull only target when parameter is available
             await download_project(
+                destination=settings.TARGET_DIRNAME,
                 client=client,
                 org_path=org_path,
                 commit=commit,

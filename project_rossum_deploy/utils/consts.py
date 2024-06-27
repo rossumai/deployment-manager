@@ -30,6 +30,13 @@ def display_error(error_msg: str, exception: Exception = None):
     console.print(Panel(error_msg), style="bold red")
 
 
+def display_warning(msg: str, exception: Exception = None):
+    console = Console()
+    if exception:
+        logging.exception(exception)
+    console.print(Panel(msg), style="bold yellow")
+
+
 def validate_token(base_url: str, token: str):
     req = httpx.get(
         url=base_url + "/auth/user",
@@ -84,19 +91,6 @@ try:
             self.SOURCE_TOKEN = credentials.get(self.SOURCE_DIRNAME, {}).get(
                 "token", None
             )
-            # if self.SOURCE_TOKEN and not (
-            #     validate_token(self.SOURCE_API_BASE, self.SOURCE_TOKEN)
-            # ):
-            #     new_token = Prompt.ask(
-            #         "Source token is invalid or expired. Provide a new one"
-            #     )
-            #     if validate_token(self.SOURCE_API_BASE, new_token):
-            #         self.SOURCE_TOKEN = new_token
-            #         credentials["source"]["token"] = new_token
-            #         with open(cred_path, "w") as wf:
-            #             json.dump(credentials, wf, indent=2)
-            #     else:
-            #         raise click.ClickException("Source token is invalid or expired.")
 
             if not credentials.get("use_same_org_as_target", False):
                 self.IS_PROJECT_IN_SAME_ORG = False
@@ -118,21 +112,6 @@ try:
                 self.TARGET_TOKEN = credentials.get(self.TARGET_DIRNAME, {}).get(
                     "token", None
                 )
-                # if self.TARGET_TOKEN and not (
-                #     validate_token(self.TARGET_API_BASE, self.TARGET_TOKEN)
-                # ):
-                #     new_token = Prompt.ask(
-                #         "Target token is invalid or expired. Provide a new one"
-                #     )
-                #     if validate_token(self.TARGET_API_BASE, new_token):
-                #         self.TARGET_TOKEN = new_token
-                #         credentials["target"]["token"] = new_token
-                #         with open(cred_path, "w") as wf:
-                #             json.dump(credentials, wf, indent=2)
-                #     else:
-                #         raise click.ClickException(
-                #             "Target token is invalid or expired."
-                #         )
             else:
                 self.IS_PROJECT_IN_SAME_ORG = True
 
@@ -153,6 +132,7 @@ try:
         TARGET_USERNAME: str = ""
         TARGET_PASSWORD: str = ""
 
+        BOTH_DESTINATIONS: str = "both"
         SOURCE_DIRNAME: str = "source"
         TARGET_DIRNAME: str = "target"
 

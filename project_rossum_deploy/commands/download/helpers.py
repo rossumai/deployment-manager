@@ -9,6 +9,9 @@ from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
 from rich.panel import Panel
 
+from project_rossum_deploy.utils.functions import (
+    find_object_by_key,
+)
 from project_rossum_deploy.common.determine_path import (
     determine_object_type_from_path,
     determine_object_type_from_url,
@@ -20,7 +23,7 @@ from project_rossum_deploy.common.read_write import (
     find_formula_fields_in_schema,
     read_json,
 )
-from project_rossum_deploy.utils.consts import settings
+from project_rossum_deploy.utils.consts import display_warning, settings
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
     find_object_in_project,
@@ -314,3 +317,82 @@ async def determine_object_destination(
         )
 
     return destination
+
+
+async def get_all_objects_for_destination(org_path: Path, destination: str) -> tuple:
+    """Find all .json objects stored locally for the given destination.
+
+    Args:
+        org_path (Path): Base project path, usually simply `"./"`
+        destination (str): Either source or target
+
+    Returns:
+        tuple: The same tuple of objects as a download of a single organization (source/target) would
+    """
+    organization, workspaces, schemas, hooks, queues, inboxes = {}, [], [], [], [], []
+
+    object_paths = await find_all_object_paths(org_path / destination)
+    for object_path in object_paths:
+        object = await read_json(object_path)
+        if object_path.name == "organization.json":
+            organization = object
+            continue
+
+        object_url = object.get("url", None)
+        if not object_url:
+            display_warning(f"Object with path '{object_path}' has no url - skipping.")
+        type = determine_object_type_from_url(object_url)
+        match type:
+            case Resource.Workspace:
+                # Get rid of URLs, the actual objects will be 'sideloaded' in the next step
+                object["queues"] = []
+                workspaces.append(object)
+            case Resource.Schema:
+                schemas.append(object)
+            case Resource.Hook:
+                hooks.append(object)
+            case Resource.Queue:
+                # Get rid of URLs, the actual objects will be 'sideloaded' in the next step
+                object["inbox"] = None
+                queues.append(object)
+            case Resource.Inbox:
+                inboxes.append(object)
+            case _:
+                display_warning(f"Unrecognized type '{type}' - skipping.")
+                continue
+
+    # Put queues and inboxes into the corresponding parent object
+    for queue in queues:
+        ws_url = queue.get("workspace", None)
+        if not ws_url:
+            display_warning(
+                f"Queue '{queue.get('id', 'missing_id')}' has no workspace URL - skipping."
+            )
+            continue
+        workspace = find_object_by_key("url", ws_url, workspaces)
+        if not workspace:
+            display_warning(f"Could not find workspace with URL '{ws_url}' - skipping.")
+            continue
+        workspace["queues"] = workspace["queues"] if workspace["queues"] else []
+        workspace["queues"].append(queue)
+
+    for inbox in inboxes:
+        queue_url = inbox.get("queues", [None])[0]
+        if not queue_url:
+            display_warning(
+                f"Inbox '{inbox.get('id', 'missing_id')}' has no queue URL - skipping."
+            )
+            continue
+
+        queue = find_object_by_key("url", queue_url, queues)
+        if not queue:
+            display_warning(f"Could not find queue with URL '{queue_url}' - skipping.")
+            continue
+        queue["inbox"] = inbox
+
+    return (
+        organization,
+        [(destination, workspace) for workspace in workspaces],
+        [(destination, schema) for schema in schemas],
+        [(destination, hook) for hook in hooks],
+    )
