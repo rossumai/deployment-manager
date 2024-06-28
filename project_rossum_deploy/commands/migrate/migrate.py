@@ -267,6 +267,17 @@ async def migrate_project(
                 commit_message=commit_message,
             )
             print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
+            hints = """
+            ! attention !
+            The following was not migrated - queue.dedicated_engine, queue.generic_engine, queue.users, hook.secrets, queue.workflows.
+            Make sure to check the following:
+                1. assign dedicated/generic engine(s) to queues
+                2. set hook.secrets for migrated hooks
+                3. assign users to queues
+                4. assign workflows to queues
+            This applies only for newly created objects. Once these attributes are set on the target object, subsequent release commands keep the values.
+            """
+            print(Panel(f"{hints}"))
     except PrdVersionException as e:
         print(Panel(f"Unexpected error while migrating objects: {e}"))
         return
