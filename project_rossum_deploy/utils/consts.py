@@ -152,6 +152,7 @@ try:
         INITIALIZE_COMMAND_NAME: str = "init"
         DOWNLOAD_COMMAND_NAME: str = "pull"
         UPLOAD_COMMAND_NAME: str = "push"
+        PURGE_COMMAND_NAME: str = "purge"
         MIGRATE_COMMAND_NAME: str = "release"
 
         IGNORED_KEYS: dict = {

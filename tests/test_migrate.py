@@ -30,7 +30,10 @@ from tests.utils.compare import (
     ensure_hooks_have_same_dependency_graph,
     ensure_source_objects_have_target_counter_part,
 )
-from tests.utils.functions import create_self_targetting_org, delete_migrated_objects
+from project_rossum_deploy.commands.purge.delete_objects import (
+    delete_all_objects_with_ids,
+)
+from tests.utils.functions import create_self_targetting_org
 from tests.conftest import (
     base_url,
     username,
@@ -53,7 +56,7 @@ async def test_migrate_fails_without_specific_org_target(
             await migrate_project(client=client, org_path=tmp_path)
     finally:
         # Cleanup
-        await delete_migrated_objects(sources, client)
+        await delete_all_objects_with_ids(sources, client)
 
 
 @pytest.mark.asyncio
@@ -77,7 +80,7 @@ async def test_migrate_creates_new_objects_in_target(
         await ensure_hooks_have_same_dependency_graph(mapping, tmp_path)
     finally:
         # Cleanup
-        await delete_migrated_objects(sources, client)
+        await delete_all_objects_with_ids(sources, client)
 
 
 @pytest.mark.asyncio
@@ -162,7 +165,7 @@ async def test_migrate_works_with_attribute_override(
         )
     finally:
         # Cleanup
-        await delete_migrated_objects(sources, client)
+        await delete_all_objects_with_ids(sources, client)
 
 
 @pytest.mark.asyncio
@@ -185,7 +188,7 @@ async def test_migrate_twice_is_idempotent(
         await ensure_source_objects_have_target_counter_part(mapping, tmp_path)
     finally:
         # Cleanup
-        await delete_migrated_objects(sources, client)
+        await delete_all_objects_with_ids(sources, client)
 
 
 @pytest.mark.asyncio
@@ -224,7 +227,7 @@ async def test_migrate_ignores_designated_object(
         assert len(source_hook_paths) == len(target_hook_paths) + 1
     finally:
         # Cleanup
-        await delete_migrated_objects(sources, client)
+        await delete_all_objects_with_ids(sources, client)
 
 
 @pytest.mark.asyncio
@@ -268,7 +271,7 @@ async def test_migrate_adds_new_object_on_second_run(
         assert await target_schema_path.exists()
     finally:
         # Cleanup
-        await delete_migrated_objects(sources, client)
+        await delete_all_objects_with_ids(sources, client)
 
 
 @pytest.mark.asyncio
@@ -310,7 +313,7 @@ async def test_migrate_updates_object_on_second_run(
         assert not target_hook_after_migration["active"]
     finally:
         # Cleanup
-        await delete_migrated_objects(sources, client)
+        await delete_all_objects_with_ids(sources, client)
 
 
 @pytest.mark.asyncio
@@ -346,4 +349,4 @@ async def test_migrate_creates_new_objects_in_different_org(
         await ensure_source_objects_have_target_counter_part(mapping, tmp_path)
     finally:
         # Cleanup
-        await delete_migrated_objects(sources, target_client)
+        await delete_all_objects_with_ids(sources, target_client)
