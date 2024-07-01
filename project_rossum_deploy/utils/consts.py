@@ -1,7 +1,6 @@
 from enum import StrEnum
 import json
 import logging
-import os
 from pathlib import Path
 import re
 import sys
@@ -17,7 +16,6 @@ from rossum_api.api_client import Resource
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.ERROR)
 
-DEBUG_MODE = os.environ.get("DEBUG", "false").lower() == "true"
 
 API_SUFFIX_RE = re.compile(r"/api/v\d+$")
 
@@ -32,82 +30,94 @@ def display_error(error_msg: str, exception: Exception = None):
     console.print(Panel(error_msg), style="bold red")
 
 
+def display_warning(msg: str, exception: Exception = None):
+    console = Console()
+    if exception:
+        logging.exception(exception)
+    console.print(Panel(msg), style="bold yellow")
+
+
+def validate_token(base_url: str, token: str):
+    req = httpx.get(
+        url=base_url + "/auth/user",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    is_token_valid = req.status_code == 200
+
+    if not is_token_valid:
+        new_token = Prompt.ask(
+            f"Token for {base_url} is invalid or expired. Provide a new one"
+        )
+        req = httpx.get(
+            url=base_url + "/auth/user",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        is_token_valid = req.status_code == 200
+
+        if is_token_valid:
+            settings.SOURCE_TOKEN = new_token
+
+            cred_path = Path("./") / settings.CREDENTIALS_FILENAME
+            credentials = json.load(cred_path.open("r"))
+            credentials["source"]["token"] = new_token
+            json.dump(credentials, cred_path.open("w"), indent=2)
+        else:
+            raise click.ClickException(f"Token for {base_url} is invalid or expired.")
+
+
 try:
 
     class Settings:
         def __init__(self):
-            def validate_token(base_url: str, token: str) -> bool:
-                req = httpx.get(
-                    url=base_url + "/auth/user",
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                if req.status_code == 200:
-                    return True
-                return False
-
-            if DEBUG_MODE:
-                return
-
             cred_path = Path("./") / self.CREDENTIALS_FILENAME
             if not cred_path.exists():
                 return
             credentials = json.loads(cred_path.read_text())
 
-            self.SOURCE_API_BASE = credentials["source"]["api_base"]
-            self.SOURCE_USERNAME = credentials["source"].get("username", None)
-            self.SOURCE_PASSWORD = credentials["source"].get("password", None)
-            self.SOURCE_TOKEN = credentials["source"].get("token", None)
-            if self.SOURCE_TOKEN and not (
-                validate_token(self.SOURCE_API_BASE, self.SOURCE_TOKEN)
-            ):
-                new_token = Prompt.ask(
-                    "Source token is invalid or expired. Provide a new one"
+            if not isinstance(credentials, dict):
+                raise click.ClickException(
+                    f"{self.CREDENTIALS_FILENAME} is not a valid dictionary."
                 )
-                if validate_token(self.SOURCE_API_BASE, new_token):
-                    self.SOURCE_TOKEN = new_token
-                    credentials["source"]["token"] = new_token
-                    with open(cred_path, "w") as wf:
-                        json.dump(credentials, wf, indent=2)
-                else:
-                    raise click.ClickException("Source token is invalid or expired.")
+
+            self.SOURCE_API_BASE = credentials.get(self.SOURCE_DIRNAME, {}).get(
+                "api_base", ""
+            )
+            self.SOURCE_USERNAME = credentials.get(self.SOURCE_DIRNAME, {}).get(
+                "username", None
+            )
+            self.SOURCE_PASSWORD = credentials.get(self.SOURCE_DIRNAME, {}).get(
+                "password", None
+            )
+            self.SOURCE_TOKEN = credentials.get(self.SOURCE_DIRNAME, {}).get(
+                "token", None
+            )
 
             if not credentials.get("use_same_org_as_target", False):
                 self.IS_PROJECT_IN_SAME_ORG = False
-                if "target" not in credentials or not credentials.get("target", {}).get(
-                    "api_base", ""
-                ):
+                if "target" not in credentials or not credentials.get(
+                    self.TARGET_DIRNAME, {}
+                ).get("api_base", ""):
                     raise click.ClickException(
                         'Missing target credentials. If you are targetting the same org, set "use_same_org_as_target": true.'
                     )
-                self.TARGET_API_BASE = credentials["target"]["api_base"]
-                self.TARGET_USERNAME = credentials["target"].get("username", None)
-                self.TARGET_PASSWORD = credentials["target"].get("password", None)
-                self.TARGET_TOKEN = credentials["target"].get("token", None)
-                if self.TARGET_TOKEN and not (
-                    validate_token(self.TARGET_API_BASE, self.TARGET_TOKEN)
-                ):
-                    new_token = Prompt.ask(
-                        "Target token is invalid or expired. Provide a new one"
-                    )
-                    if validate_token(self.TARGET_API_BASE, new_token):
-                        self.TARGET_TOKEN = new_token
-                        credentials["target"]["token"] = new_token
-                        with open(cred_path, "w") as wf:
-                            json.dump(credentials, wf, indent=2)
-                    else:
-                        raise click.ClickException(
-                            "Target token is invalid or expired."
-                        )
+                self.TARGET_API_BASE = credentials.get(self.TARGET_DIRNAME, {}).get(
+                    "api_base", ""
+                )
+                self.TARGET_USERNAME = credentials.get(self.TARGET_DIRNAME, {}).get(
+                    "username", None
+                )
+                self.TARGET_PASSWORD = credentials.get(self.TARGET_DIRNAME, {}).get(
+                    "password", None
+                )
+                self.TARGET_TOKEN = credentials.get(self.TARGET_DIRNAME, {}).get(
+                    "token", None
+                )
             else:
                 self.IS_PROJECT_IN_SAME_ORG = True
-                self.TARGET_API_BASE = credentials["source"]["api_base"]
-                self.TARGET_USERNAME = credentials["source"].get("username", None)
-                self.TARGET_PASSWORD = credentials["source"].get("password", None)
-                self.TARGET_TOKEN = credentials["source"].get("token", None)
 
         IS_PROJECT_IN_SAME_ORG: bool = False
 
-        SOURCE_API_BASE: str = "https://you-forgot-to-cd-into-project.com"
+        SOURCE_API_BASE: str = ""
         # Empty string gives an API error even if there is username and password
         SOURCE_TOKEN: str = "dummy_token"
         SOURCE_USERNAME: str = ""
@@ -122,6 +132,7 @@ try:
         TARGET_USERNAME: str = ""
         TARGET_PASSWORD: str = ""
 
+        BOTH_DESTINATIONS: str = "both"
         SOURCE_DIRNAME: str = "source"
         TARGET_DIRNAME: str = "target"
 

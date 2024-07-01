@@ -4,7 +4,7 @@ from rossum_api import ElisAPIClient
 from rich import print
 from rich.panel import Panel
 
-from project_rossum_deploy.commands.migrate.helpers import (
+from project_rossum_deploy.utils.functions import (
     find_object_by_id,
 )
 from project_rossum_deploy.common.read_write import read_json

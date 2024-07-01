@@ -53,7 +53,7 @@ async def migrate_workspaces(
 
     async def migrate_workspace(ws_path: Path):
         try:
-            _, id = detemplatize_name_id(ws_path.stem)
+            _, id = detemplatize_name_id(ws_path.name)
             ws_config_path = ws_path / "workspace.json"
             workspace = await read_json(ws_config_path)
             sources_by_source_id_map[id] = workspace
@@ -147,7 +147,7 @@ async def migrate_queues_and_inboxes(
 
     async def migrate_queue_and_inbox(queue_path: Path):
         try:
-            _, id = detemplatize_name_id(queue_path.stem)
+            _, id = detemplatize_name_id(queue_path.name)
 
             queue_config_path = queue_path / "queue.json"
             queue = await read_json(queue_config_path)

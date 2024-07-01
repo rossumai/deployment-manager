@@ -111,7 +111,7 @@ async def download_queues_for_workspace(
                 queue_path / "queue.json",
                 queue,
                 Resource.Queue,
-                log_message=f"Pulled {queue_path / "queue.json"}",
+                log_message=f'Pulled {queue_path / "queue.json"}',
             )
 
         inbox_id = extract_id_from_url(queue["inbox"])

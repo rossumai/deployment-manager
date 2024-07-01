@@ -13,6 +13,7 @@ from project_rossum_deploy.common.attribute_override import (
     override_migrated_objects_attributes,
     validate_override_migrated_objects_attributes,
 )
+from project_rossum_deploy.common.client import create_and_validate_client
 from project_rossum_deploy.common.mapping import (
     extract_flat_lookup_table,
     extract_sources_targets,
@@ -132,20 +133,7 @@ async def migrate_project(
             )
 
         if not client:
-            if settings.IS_PROJECT_IN_SAME_ORG:
-                client = ElisAPIClient(
-                    base_url=settings.SOURCE_API_URL,
-                    token=settings.SOURCE_TOKEN,
-                    username=settings.SOURCE_USERNAME,
-                    password=settings.SOURCE_PASSWORD,
-                )
-            else:
-                client = ElisAPIClient(
-                    base_url=settings.TARGET_API_URL,
-                    token=settings.TARGET_TOKEN,
-                    username=settings.TARGET_USERNAME,
-                    password=settings.TARGET_PASSWORD,
-                )
+            client = await create_and_validate_client(settings.TARGET_DIRNAME)
 
         source_id_target_pairs = {}
         sources_by_source_id_map = {}
@@ -261,6 +249,7 @@ async def migrate_project(
             return
         else:
             await download_project(
+                destination=settings.TARGET_DIRNAME,
                 client=client,
                 org_path=org_path,
                 commit=commit,

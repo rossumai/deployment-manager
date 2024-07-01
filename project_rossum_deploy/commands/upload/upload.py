@@ -8,11 +8,16 @@ import click
 from rossum_api import ElisAPIClient
 
 from project_rossum_deploy.commands.download.download import download_project
-from project_rossum_deploy.commands.upload.dependencies import evaluate_create_dependencies, merge_formula_changes, merge_hook_changes
+from project_rossum_deploy.commands.upload.dependencies import (
+    evaluate_create_dependencies,
+    merge_formula_changes,
+    merge_hook_changes,
+)
 from project_rossum_deploy.commands.upload.operations import (
     create_object,
     update_object,
 )
+from project_rossum_deploy.common.client import create_and_validate_client
 from project_rossum_deploy.common.git import get_changed_file_paths
 from project_rossum_deploy.utils.consts import (
     GIT_CHARACTERS,
@@ -101,25 +106,7 @@ async def upload_project(
         org_path = Path("./")
 
         if not client:
-            match destination:
-                case settings.SOURCE_DIRNAME:
-                    client = ElisAPIClient(
-                        base_url=settings.SOURCE_API_URL,
-                        token=settings.SOURCE_TOKEN,
-                        username=settings.SOURCE_USERNAME,
-                        password=settings.SOURCE_PASSWORD,
-                    )
-                case settings.TARGET_DIRNAME:
-                    client = ElisAPIClient(
-                        base_url=settings.TARGET_API_URL,
-                        token=settings.TARGET_TOKEN,
-                        username=settings.TARGET_USERNAME,
-                        password=settings.TARGET_PASSWORD,
-                    )
-                case _:
-                    raise click.ClickException(
-                        f'Unrecognized destination "{destination}" to use {settings.UPLOAD_COMMAND_NAME}.'
-                    )
+            client = await create_and_validate_client(destination)
 
         changes = get_changed_file_paths(destination, indexed_only=indexed_only)
 
@@ -186,9 +173,7 @@ async def upload_project(
                     errors.append({"op": op, "path": path})
 
         with Progress() as progress:
-            task = progress.add_task(
-                "Pushing changes to Rossum.", total=len(requests)
-            )
+            task = progress.add_task("Pushing changes to Rossum.", total=len(requests))
             await gather_with_concurrency(
                 5,
                 *map(lambda r: make_request_with_progress(r, progress, task), requests),

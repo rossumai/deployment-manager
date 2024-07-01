@@ -5,11 +5,13 @@ from rich.progress import Progress
 from rich.panel import Panel
 from rich.prompt import Prompt
 
-from project_rossum_deploy.commands.migrate.helpers import (
+from project_rossum_deploy.common.client import create_and_validate_client
+from project_rossum_deploy.utils.functions import (
     find_object_by_id,
 )
 from project_rossum_deploy.common.modified_at import check_modified_timestamp
 from project_rossum_deploy.utils.consts import (
+    display_warning,
     settings,
 )
 from project_rossum_deploy.utils.functions import (
@@ -220,12 +222,15 @@ async def create_hook_based_on_template(hook: dict, client: ElisAPIClient):
         )
     else:
         # Client is different in case of cross-org migrations
-        source_client = ElisAPIClient(
-            base_url=settings.SOURCE_API_URL,
-            token=settings.SOURCE_TOKEN,
-            username=settings.SOURCE_USERNAME,
-            password=settings.SOURCE_PASSWORD,
-        )
+        try:
+            source_client = await create_and_validate_client(
+                destination=settings.SOURCE_DIRNAME
+            )
+        except Exception:
+            display_warning(
+                f"Invalid credentials for {settings.SOURCE_DIRNAME}, hooks will be created not based on their template."
+            )
+            return None
 
         # Hook template ids might differ in between orgs
         # We try to find the corresponding template by comparing names
