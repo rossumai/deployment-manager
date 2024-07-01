@@ -37,7 +37,7 @@ def init_project(name):
 
         os.chdir(name)
         subprocess.run(["git", "init"])
-        os.chdir('..')
+        os.chdir("..")
 
     with open(name + "/.gitignore", "a") as wf:
         wf.write("\ncredentials.json")

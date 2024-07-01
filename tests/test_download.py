@@ -5,7 +5,9 @@ import pytest_asyncio
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
-from project_rossum_deploy.commands.download.download import download_organization_combined_source_target
+from project_rossum_deploy.commands.download.download import (
+    download_organization_combined_source_target,
+)
 from project_rossum_deploy.common.mapping import read_mapping, write_mapping
 from project_rossum_deploy.common.read_write import read_json
 from project_rossum_deploy.utils.consts import settings

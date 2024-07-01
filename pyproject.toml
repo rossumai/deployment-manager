@@ -2,14 +2,18 @@
 name = "project-rossum-deploy"
 version = "1.0.0"
 description = ""
-authors = ["Miroslav Rehounek <miroslav.rehounek@rossum.ai>", "Jan Sporek <jan.sporek@rossum.ai>", "Ondrej Polesny <ondrej.polesny@rossum.ai>"]
+authors = [
+    "Miroslav Rehounek <miroslav.rehounek@rossum.ai>",
+    "Jan Sporek <jan.sporek@rossum.ai>",
+    "Ondrej Polesny <ondrej.polesny@rossum.ai>",
+]
 license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
 httpx = "^0.25.2"
-rossum-api = {git = "https://github.com/rossumai/rossum-sdk"}
+rossum-api = { git = "https://github.com/rossumai/rossum-sdk" }
 click = "^8.1.7"
 pyyaml = "^6.0.1"
 anyio = "^4.2.0"
@@ -20,9 +24,13 @@ jmespath = "^1.0.1"
 prd = "project_rossum_deploy.main:main"
 
 [tool.poetry.group.dev.dependencies]
-ruff = "^0.2.1"
 pytest-asyncio = "^0.23.7"
+ruff = "^0.5.0"
+pre-commit = "^3.7.1"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+exclude = ["dummy_project", "dist"]

@@ -28,7 +28,9 @@ async def test_simple_override(loaded_mapping: dict):
     )
 
     override_attributes_v2(
-        lookup_table={}, target_submapping=loaded_mapping["organization"], object=organization
+        lookup_table={},
+        target_submapping=loaded_mapping["organization"],
+        object=organization,
     )
 
     assert NAME == organization["name"]
@@ -205,7 +207,9 @@ async def test_override_uses_source_value_reference(loaded_mapping: dict):
     organization["name"] = OLD_NAME
 
     override_attributes_v2(
-        lookup_table={}, target_submapping=loaded_mapping["organization"], object=organization
+        lookup_table={},
+        target_submapping=loaded_mapping["organization"],
+        object=organization,
     )
 
     assert f"{NEW_NAME} - {OLD_NAME}" == organization["name"]

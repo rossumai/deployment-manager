@@ -6,6 +6,7 @@ This example function does 2 things:
 More about custom functions - https://developers.rossum.ai/docs/how-to-use-serverless-functions
 """
 
+
 def rossum_hook_request_handler(payload: dict) -> dict:
     """
     Obligatory main function
@@ -22,7 +23,9 @@ def rossum_hook_request_handler(payload: dict) -> dict:
     TOO_BIG_THRESHOLD = 1000000
 
     # List of all datapoints with item_amount_total schema id
-    amount_total_column_datapoints: list = find_by_schema_id(content, "item_amount_total")
+    amount_total_column_datapoints: list = find_by_schema_id(
+        content, "item_amount_total"
+    )
 
     # Display warning message for all the "item_amount_total" fields exceeding the threshold
     for amount_total_column_datapoint in amount_total_column_datapoints:
@@ -48,7 +51,9 @@ def rossum_hook_request_handler(payload: dict) -> dict:
 
     return {"messages": messages, "operations": operations}
 
+
 # --- HELPER FUNCTIONS ---
+
 
 def find_by_schema_id(content: list, schema_id: str) -> list:
     """
@@ -67,7 +72,9 @@ def find_by_schema_id(content: list, schema_id: str) -> list:
     return accumulator
 
 
-def create_message(message_type: str, message_content: str, datapoint_id: int = None) -> dict:
+def create_message(
+    message_type: str, message_content: str, datapoint_id: int = None
+) -> dict:
     """
     Create a message which will be shown to the user
     :param message_type: type of the message, any of {info|warning|error}. Errors prevent confirmation in the UI.

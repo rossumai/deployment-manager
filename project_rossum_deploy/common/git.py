@@ -30,7 +30,7 @@ def get_changed_file_paths(
             first_char, op_path = tuple(change.split(" ", maxsplit=1))
             if first_char != GIT_CHARACTERS.UPDATED:
                 continue
-        
+
         change = change.strip(" ")
         op, path = tuple(change.split(" ", maxsplit=1))
 

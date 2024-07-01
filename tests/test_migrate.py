@@ -9,7 +9,12 @@ from rossum_api import ElisAPIClient
 from project_rossum_deploy.commands.download.download import (
     download_organization_combined_source_target,
 )
-from project_rossum_deploy.common.mapping import extract_flat_lookup_table, extract_sources_targets, read_mapping, write_mapping
+from project_rossum_deploy.common.mapping import (
+    extract_flat_lookup_table,
+    extract_sources_targets,
+    read_mapping,
+    write_mapping,
+)
 from project_rossum_deploy.common.mapping import find_mapping_of_object
 from project_rossum_deploy.commands.migrate.migrate import migrate_project
 from project_rossum_deploy.common.read_write import read_json, write_json
@@ -150,7 +155,10 @@ async def test_migrate_works_with_attribute_override(
         source_queue_ids = jmespath.search(QUEUE_IDS_OVERRIDE_PATH, source_hook)
 
         assert jmespath.search(QUEUE_IDS_OVERRIDE_PATH, migrated_hook)[0] == list(
-            map(lambda source_queue_id: lookup_table[source_queue_id][0], source_queue_ids[0])
+            map(
+                lambda source_queue_id: lookup_table[source_queue_id][0],
+                source_queue_ids[0],
+            )
         )
     finally:
         # Cleanup
@@ -237,7 +245,9 @@ async def test_migrate_adds_new_object_on_second_run(
             {"name": "new source schema", "content": []}
         )
         monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-        await download_organization_combined_source_target(client=client, org_path=tmp_path)
+        await download_organization_combined_source_target(
+            client=client, org_path=tmp_path
+        )
 
         monkeypatch.setattr("sys.stdin", io.StringIO("y"))
         await migrate_project(client=client, org_path=tmp_path)
