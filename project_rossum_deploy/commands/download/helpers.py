@@ -184,7 +184,7 @@ async def remove_local_nonexistent_object(
 
         print(
             Panel(
-                f"Deleting a local object that no longer exists in Rossum or was moved between {settings.SOURCE_DIRNAME}/{settings.TARGET_DIRNAME}: {path}",
+                f"Deleting a local object that no longer exists in Rossum or was moved between {settings.SOURCE_DIRNAME}/{settings.TARGET_DIRNAME} ({str(e.__class__.__name__)}): {path}",
                 style="yellow",
             )
         )
@@ -214,18 +214,8 @@ async def check_queue_existence(client: ElisAPIClient, remote_object: dict, path
             raise e
 
         raise MissingParentObjectException
-    ws_path_part = templatize_name_id(ws["name"], ws["id"])
-    queue_path_path = templatize_name_id(remote_object["name"], remote_object["id"])
-    path_parts = str(path).split("/")
-    latest_path = (
-        Path(*path_parts[:-4])
-        / ws_path_part
-        / "queues"
-        / queue_path_path
-        / "queue.json"
-    )
-    if latest_path != path:
-        raise DifferentPathException
+
+    compare_paths(original_path=path, ws=ws, queue=remote_object, suffix="queue.json")
 
 
 async def check_inbox_existence(client: ElisAPIClient, remote_object: dict, path: Path):
@@ -244,17 +234,26 @@ async def check_inbox_existence(client: ElisAPIClient, remote_object: dict, path
 
         raise MissingParentObjectException
 
+    compare_paths(original_path=path, ws=ws, queue=queue, suffix="inbox.json")
+
+
+def compare_paths(original_path: Path, ws, queue, suffix):
+    """Verifies that the path of the local object is the same as the path of that objects downloaded from Rossum. Covers cases of names changing for workspaces, queues, and inboxes.
+
+    Raises:
+        DifferentPathException
+    """
     ws_path_part = templatize_name_id(ws["name"], ws["id"])
     queue_path_path = templatize_name_id(queue["name"], queue["id"])
-    path_parts = str(path).split("/")
+    path_parts = str(original_path).split("/")
     latest_path = (
-        Path(*path_parts[:-4])
-        / ws_path_part
-        / "queues"
-        / queue_path_path
-        / "inbox.json"
+        Path(*path_parts[:-4]) / ws_path_part / "queues" / queue_path_path / suffix
     )
-    if latest_path != path:
+
+    # If the original path was absollut
+    if original_path.is_absolute():
+        latest_path = Path("/" + str(latest_path))
+    if latest_path != original_path:
         raise DifferentPathException
 
 

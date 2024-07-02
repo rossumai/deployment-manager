@@ -45,14 +45,13 @@ async def test_override_not_adding_keys(loaded_mapping: dict):
         REFERENCE_PROJECT_PATH / settings.SOURCE_DIRNAME / "organization.json"
     )
 
-    with pytest.raises(Exception):
-        override_attributes_v2(
-            lookup_table={},
-            target_submapping=loaded_mapping["organization"],
-            object=organization,
-        )
+    override_attributes_v2(
+        lookup_table={},
+        target_submapping=loaded_mapping["organization"],
+        object=organization,
+    )
 
-    assert not organization.get(KEY, None)
+    assert organization.get(KEY, "nothing") == "nothing"
 
 
 @pytest.mark.asyncio
@@ -96,7 +95,7 @@ async def test_override_dict_value(loaded_mapping: dict):
 async def test_override_simple_target_reference(loaded_mapping: dict):
     SOURCE_REF, TARGET_REF = 123, 456
     PATH = "metadata.reference"
-    lookup_table = {SOURCE_REF: TARGET_REF}
+    lookup_table = {SOURCE_REF: [TARGET_REF]}
 
     loaded_mapping["organization"]["attribute_override"] = {
         PATH: ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD
@@ -113,14 +112,14 @@ async def test_override_simple_target_reference(loaded_mapping: dict):
         object=organization,
     )
 
-    assert jmespath.search(PATH, organization) == TARGET_REF
+    assert jmespath.search(PATH, organization) == [TARGET_REF]
 
 
 @pytest.mark.asyncio
 async def test_override_list_of_target_references(loaded_mapping: dict):
     SOURCE_REF, SOURCE_REF_2, TARGET_REF, TARGET_REF_2 = 123, 456, "haha", "hehe"
     PATH = "metadata.references"
-    lookup_table = {SOURCE_REF: TARGET_REF, SOURCE_REF_2: TARGET_REF_2}
+    lookup_table = {SOURCE_REF: [TARGET_REF], SOURCE_REF_2: [TARGET_REF_2]}
 
     loaded_mapping["organization"]["attribute_override"] = {
         PATH: ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD
@@ -136,14 +135,16 @@ async def test_override_list_of_target_references(loaded_mapping: dict):
         object=organization,
     )
 
-    assert jmespath.search(PATH, organization) == list(lookup_table.values())
+    assert jmespath.search(PATH, organization) == [
+        v[0] for v in list(lookup_table.values())
+    ]
 
 
 @pytest.mark.asyncio
 async def test_override_target_references_in_different_objects(loaded_mapping: dict):
     SOURCE_REF, SOURCE_REF_2, TARGET_REF, TARGET_REF_2 = 123, 456, "haha", "hehe"
     PATH = "metadata.references[*].key"
-    lookup_table = {SOURCE_REF: TARGET_REF, SOURCE_REF_2: TARGET_REF_2}
+    lookup_table = {SOURCE_REF: [TARGET_REF], SOURCE_REF_2: [TARGET_REF_2]}
 
     loaded_mapping["organization"]["attribute_override"] = {
         PATH: ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD

@@ -2,7 +2,10 @@
   "id": 263865,
   "url": "https://shared-eu2.rossum.app/api/v1/organizations/263865",
   "name": "PRD test source",
-  "workspaces": [],
+  "workspaces": [
+    "https://shared-eu2.rossum.app/api/v1/workspaces/525241",
+    "https://shared-eu2.rossum.app/api/v1/workspaces/525242"
+  ],
   "users": [
     "https://shared-eu2.rossum.app/api/v1/users/285991"
   ],

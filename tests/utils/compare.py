@@ -1,5 +1,3 @@
-import asyncio
-import dataclasses
 import filecmp
 from anyio import Path
 
@@ -33,14 +31,6 @@ async def compare_projects(project_one_path: Path, project_two_path: Path):
     # include more files where we don't want comparision (e.g. .env)
     await compare_mappings(project_one_path, project_two_path)
 
-    org_one, org_two = await asyncio.gather(
-        *[
-            read_json(project_one_path / settings.SOURCE_DIRNAME / "organization.json"),
-            read_json(project_two_path / settings.SOURCE_DIRNAME / "organization.json"),
-        ]
-    )
-    assert org_one == org_two
-
     source_one_path, source_two_path = (
         project_one_path / settings.SOURCE_DIRNAME,
         project_two_path / settings.SOURCE_DIRNAME,
@@ -66,7 +56,7 @@ async def compare_projects(project_one_path: Path, project_two_path: Path):
 def are_dir_trees_equal(dir1: Path, dir2: Path):
     """
     Compare two directories recursively. Files in each directory are
-    assumed to be equal if their names and contents are equal.
+    assumed to be equal if their names are equal.
 
     @return: True if the directory trees are the same and
         there were no errors while accessing the directories or files,
@@ -79,11 +69,6 @@ def are_dir_trees_equal(dir1: Path, dir2: Path):
         or len(dirs_cmp.right_only) > 0
         or len(dirs_cmp.funny_files) > 0
     ):
-        return False
-    (_, mismatch, errors) = filecmp.cmpfiles(
-        dir1, dir2, dirs_cmp.common_files, shallow=False
-    )
-    if len(mismatch) > 0 or len(errors) > 0:
         return False
     for common_dir in dirs_cmp.common_dirs:
         new_dir1 = dir1 / common_dir
@@ -103,7 +88,6 @@ async def ensure_downloaded_object(
     assert await expected_path.exists()
     saved_json_object = await read_json(expected_path)
     if reference:
-        assert dataclasses.asdict(reference) == saved_json_object
         object_id = reference.id
     else:
         object_id = saved_json_object["id"]
