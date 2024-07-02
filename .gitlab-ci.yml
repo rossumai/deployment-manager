@@ -1,0 +1,16 @@
+variables:
+  DOCKER_BUILD_ARGS: --build-arg ROSSUM_PYPI_USERNAME=gitlab-ci-token --build-arg ROSSUM_PYPI_PASSWORD=$CI_JOB_TOKEN
+
+include:
+  - project: common/gitlab-ci
+    file: /templates/gitlab-ci-simple.yaml
+
+test:
+  stage: test
+  image: ${REGISTRY_BASE}/${CI_PROJECT_PATH}:tmp_sha.${CI_COMMIT_SHA}
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - cd /app
+    - pytest tests
+  needs: [build-docker-image]
