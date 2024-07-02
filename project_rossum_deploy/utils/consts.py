@@ -50,7 +50,7 @@ def validate_token(base_url: str, token: str):
         )
         req = httpx.get(
             url=base_url + "/auth/user",
-            headers={"Authorization": f"Bearer {token}"},
+            headers={"Authorization": f"Bearer {new_token}"},
         )
         is_token_valid = req.status_code == 200
 
