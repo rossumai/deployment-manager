@@ -23,7 +23,7 @@ ENV PATH="/opt/venv/bin:${PATH}" \
     VIRTUAL_ENV="/opt/venv"
 
 COPY pyproject.toml poetry.lock ./
-RUN poetry install --no-interaction --only main --no-root
+RUN poetry install --no-interaction --no-root
 
 
 ARG GIT_COMMIT=unknown
