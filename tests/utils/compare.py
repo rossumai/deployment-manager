@@ -1,3 +1,4 @@
+import dataclasses
 import filecmp
 from anyio import Path
 
@@ -15,6 +16,20 @@ from project_rossum_deploy.utils.functions import (
     templatize_name_id,
 )
 from project_rossum_deploy.utils.consts import settings
+
+
+def is_object_equal(object_one: dict, object_two: dict):
+    if dataclasses.is_dataclass(object_one):
+        object_one = dataclasses.asdict(object_one)
+    if dataclasses.is_dataclass(object_two):
+        object_two = dataclasses.asdict(object_two)
+
+    object_one.pop("modified_at", "")
+    object_one.pop("modified_by", "")
+    object_two.pop("modified_at", "")
+    object_two.pop("modified_by", "")
+
+    return object_one == object_two
 
 
 async def compare_mappings(project_one_path: Path, project_two_path: Path):

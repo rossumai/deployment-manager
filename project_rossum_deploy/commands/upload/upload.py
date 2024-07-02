@@ -186,7 +186,7 @@ async def upload_project(
             )
             return
         else:
-            await download_project()
+            await download_project(destination=destination, client=client)
             if commit:
                 subprocess.run(["git", "add", "."])
                 subprocess.run(["git", "commit", "-m", commit_message])

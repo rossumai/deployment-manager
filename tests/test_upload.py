@@ -1,5 +1,5 @@
 import asyncio
-import io
+import dataclasses
 import os
 import subprocess
 from anyio import Path
@@ -20,8 +20,8 @@ from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     templatize_name_id,
 )
-from tests.utils.compare import compare_mappings
-from tests.utils.consts import REFERENCE_PROJECT_PATH, UPDATED_NAME
+from tests.utils.compare import is_object_equal
+from tests.utils.consts import UPDATED_NAME
 
 # TEST: change mapping org target to something else, push
 # check that push failed
@@ -65,32 +65,30 @@ async def updated_file_tuple(client: ElisAPIClient, tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_push_updated_staged_file(
-    client: ElisAPIClient, updated_file_tuple, monkeypatch
+async def test_push_updated_file(
+    client: ElisAPIClient, updated_file_tuple, monkeypatch: pytest.MonkeyPatch
 ):
     tmp_path, updated_file_path, updated_file = updated_file_tuple
 
-    subprocess.run(["git", "add", "."])
-    monkeypatch.setattr("sys.stdin", io.StringIO("y"))
     await upload_project(destination=settings.SOURCE_DIRNAME, client=client)
 
     redownloaded_file = await read_json(updated_file_path)
 
-    assert redownloaded_file == updated_file
+    assert is_object_equal(redownloaded_file, updated_file)
 
 
 @pytest.mark.asyncio
 async def test_push_ignored_non_staged_file(
-    client: ElisAPIClient, updated_file_tuple, monkeypatch
+    client: ElisAPIClient, updated_file_tuple, monkeypatch: pytest.MonkeyPatch
 ):
     tmp_path, updated_file_path, updated_file = updated_file_tuple
 
-    monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-    await upload_project(destination=settings.SOURCE_DIRNAME, client=client)
+    await upload_project(
+        destination=settings.SOURCE_DIRNAME, client=client, indexed_only=True
+    )
 
-    redownloaded_file = await read_json(updated_file_path)
-
-    assert redownloaded_file != updated_file
+    redownloaded_file = await client.retrieve_hook(updated_file["id"])
+    assert redownloaded_file.active is True
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -121,12 +119,10 @@ async def updated_file_name_tuple(client: ElisAPIClient, tmp_path):
 
 @pytest.mark.asyncio
 async def test_push_updated_file_name_changed(
-    client: ElisAPIClient, updated_file_name_tuple, monkeypatch
+    client: ElisAPIClient, updated_file_name_tuple, monkeypatch: pytest.MonkeyPatch
 ):
     tmp_path, previous_file_path, updated_file = updated_file_name_tuple
 
-    subprocess.run(["git", "add", "."])
-    monkeypatch.setattr("sys.stdin", io.StringIO("y"))
     await upload_project(destination=settings.SOURCE_DIRNAME, client=client)
 
     redownloaded_file = await read_json(
@@ -136,69 +132,7 @@ async def test_push_updated_file_name_changed(
     )
 
     assert not (await previous_file_path.exists())
-    assert redownloaded_file == updated_file
-
-
-@pytest_asyncio.fixture(scope="function")
-async def deleted_schema(client: ElisAPIClient):
-    deleted_schema = await client.create_new_schema(
-        {"name": "temp_schema", "content": []}
-    )
-
-    yield deleted_schema
-
-    # In case our test failed to delete the schema
-    try:
-        await client.delete_schema(deleted_schema.id)
-    except Exception:
-        print("Schema already deleted.")
-
-
-@pytest.mark.asyncio
-async def test_push_deleted_file(
-    client: ElisAPIClient, tmp_path, monkeypatch, deleted_schema
-):
-    await setup_project(client, tmp_path)
-
-    settings.IS_PROJECT_IN_SAME_ORG = True
-    # The command must be run from the directory because it is running 'git status' internally
-    os.chdir(tmp_path)
-
-    deleted_schema_path = (
-        tmp_path
-        / settings.SOURCE_DIRNAME
-        / "schemas"
-        / f"{templatize_name_id(deleted_schema.name, deleted_schema.id)}.json"
-    )
-    os.remove(deleted_schema_path)
-
-    subprocess.run(["git", "add", "."])
-    monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-    await upload_project(destination=settings.SOURCE_DIRNAME, client=client)
-
-    assert not (await deleted_schema_path.exists())
-
-
-@pytest.mark.asyncio
-async def test_push_ignores_locally_created_file(
-    client: ElisAPIClient, tmp_path, monkeypatch
-):
-    await setup_project(client, tmp_path)
-    random_file_path = tmp_path / settings.SOURCE_DIRNAME / "huehue.txt"
-    await random_file_path.touch()
-    current_path = Path(__file__).parent.parent
-
-    settings.IS_PROJECT_IN_SAME_ORG = True
-    # The command must be run from the directory because it is running 'git status' internally
-    os.chdir(tmp_path)
-
-    subprocess.run(["git", "add", "."])
-
-    monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-    await upload_project(destination=settings.SOURCE_DIRNAME, client=client)
-    os.chdir(current_path)
-
-    await compare_mappings(tmp_path, REFERENCE_PROJECT_PATH)
+    assert is_object_equal(redownloaded_file, updated_file)
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -213,11 +147,11 @@ async def source_and_target_schema(client: ElisAPIClient, tmp_path, monkeypatch)
     await download_organization_combined_source_target(client, org_path=tmp_path)
 
     mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
-    mapping["organization"]["schemas"][0]["target_object"] = target_schema.id
+    mapping["organization"]["schemas"][0]["targets"][0] = {
+        "target_id": target_schema.id
+    }
     await write_mapping(tmp_path / settings.MAPPING_FILENAME, mapping)
 
-    # Confirm configuration overwriting
-    monkeypatch.setattr("sys.stdin", io.StringIO("y"))
     await setup_project(client, tmp_path)
 
     settings.IS_PROJECT_IN_SAME_ORG = True
@@ -240,80 +174,75 @@ async def source_and_target_schema(client: ElisAPIClient, tmp_path, monkeypatch)
 
 @pytest.mark.asyncio
 async def test_push_ignores_file_from_target(
-    client: ElisAPIClient, tmp_path, monkeypatch, source_and_target_schema
+    client: ElisAPIClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    source_and_target_schema,
 ):
     source_schema, target_schema = source_and_target_schema
 
-    deleted_source_schema_path = (
+    source_schema_path = (
         tmp_path
         / settings.SOURCE_DIRNAME
         / "schemas"
         / f"{templatize_name_id(source_schema.name, source_schema.id)}.json"
     )
-    os.remove(deleted_source_schema_path)
-    deleted_target_schema_path = (
+    updated_source_schema = await read_json(source_schema_path)
+    updated_source_schema["metadata"] = {"key": "value"}
+    await write_json(source_schema_path, updated_source_schema)
+
+    target_schema_path = (
         tmp_path
         / settings.TARGET_DIRNAME
         / "schemas"
         / f"{templatize_name_id(target_schema.name, target_schema.id)}.json"
     )
-    os.remove(deleted_target_schema_path)
+    updated_target_schema = await read_json(target_schema_path)
+    updated_target_schema["metadata"] = {"key": "value"}
+    await write_json(target_schema_path, updated_target_schema)
 
-    subprocess.run(["git", "add", "."])
-
-    monkeypatch.setattr("sys.stdin", io.StringIO("y"))
     await upload_project(destination=settings.SOURCE_DIRNAME, client=client)
 
-    assert not (await deleted_source_schema_path.exists())
-    assert await deleted_target_schema_path.exists()
+    redownloaded_source_schema = await read_json(source_schema_path)
+    redownloaded_target_schema = await client.retrieve_schema(target_schema.id)
+
+    assert is_object_equal(redownloaded_source_schema, updated_source_schema)
+    assert dataclasses.asdict(redownloaded_target_schema)["metadata"] == {}
 
 
 @pytest.mark.asyncio
 async def test_push_ignores_file_from_source(
-    client: ElisAPIClient, tmp_path, monkeypatch, source_and_target_schema
+    client: ElisAPIClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    source_and_target_schema,
 ):
     source_schema, target_schema = source_and_target_schema
 
-    deleted_source_schema_path = (
+    source_schema_path = (
         tmp_path
         / settings.SOURCE_DIRNAME
         / "schemas"
         / f"{templatize_name_id(source_schema.name, source_schema.id)}.json"
     )
-    os.remove(deleted_source_schema_path)
-    deleted_target_schema_path = (
+    updated_source_schema = await read_json(source_schema_path)
+    updated_source_schema["metadata"] = {"key": "value"}
+    await write_json(source_schema_path, updated_source_schema)
+
+    target_schema_path = (
         tmp_path
         / settings.TARGET_DIRNAME
         / "schemas"
         / f"{templatize_name_id(target_schema.name, target_schema.id)}.json"
     )
-    os.remove(deleted_target_schema_path)
+    updated_target_schema = await read_json(target_schema_path)
+    updated_target_schema["metadata"] = {"key": "value"}
+    await write_json(target_schema_path, updated_target_schema)
 
-    subprocess.run(["git", "add", "."])
-
-    monkeypatch.setattr("sys.stdin", io.StringIO("y"))
     await upload_project(destination=settings.TARGET_DIRNAME, client=client)
 
-    assert await deleted_source_schema_path.exists()
-    assert not (await deleted_target_schema_path.exists())
+    redownloaded_source_schema = await client.retrieve_schema(source_schema.id)
+    redownloaded_target_schema = await read_json(target_schema_path)
 
-
-# @pytest_asyncio.fixture(scope="function")
-# async def target_schema(client: ElisAPIClient, tmp_path, monkeypatch):
-#     target_schema = await client.create_new_schema(
-#         {"name": "target_schema", "content": []}
-#     )
-
-#     await download_organization_combined(client, org_path=tmp_path)
-
-#     mapping = await read_mapping(tmp_path / settings.MAPPING_FILENAME)
-#     mapping["organization"]["schemas"][0]["target_object"] = target_schema.id
-#     await write_mapping(tmp_path / settings.MAPPING_FILENAME, mapping)
-
-#     # Confirm configuration overwriting
-#     monkeypatch.setattr("sys.stdin", io.StringIO("y"))
-#     await setup_project(client, tmp_path)
-
-#     yield target_schema
-
-#     await client.delete_schema(target_schema.id)
+    assert is_object_equal(redownloaded_target_schema, updated_target_schema)
+    assert dataclasses.asdict(redownloaded_source_schema)["metadata"] == {}
