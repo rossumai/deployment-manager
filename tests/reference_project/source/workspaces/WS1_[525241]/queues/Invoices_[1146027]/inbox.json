@@ -1,16 +1,13 @@
 {
-  "id": 460673,
-  "name": "Tax invoices (EU)",
-  "url": "https://rdttest.rossum.app/api/v1/inboxes/460673",
-  "queues": [
-    "https://rdttest.rossum.app/api/v1/queues/899854"
-  ],
-  "email": "rdttest-063bd4@rdttest.rossum.app",
-  "email_prefix": "rdttest",
+  "id": 536996,
+  "name": "Invoices",
+  "url": "https://shared-eu2.rossum.app/api/v1/inboxes/536996",
+  "email": "prd-test-source-aa7bc1@shared-eu2.rossum.app",
+  "email_prefix": "prd-test-source",
   "bounce_email_to": null,
   "bounce_unprocessable_attachments": false,
-  "bounce_postponed_annotations": false,
   "bounce_deleted_annotations": false,
+  "bounce_postponed_annotations": false,
   "bounce_email_with_no_attachments": true,
   "metadata": {},
   "filters": {
@@ -31,5 +28,10 @@
       ]
     }
   },
-  "dmarc_check_action": "accept"
+  "dmarc_check_action": "accept",
+  "modified_by": null,
+  "modified_at": null,
+  "queues": [
+    "https://shared-eu2.rossum.app/api/v1/queues/1146027"
+  ]
 }

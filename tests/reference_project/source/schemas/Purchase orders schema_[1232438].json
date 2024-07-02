@@ -1,10 +1,10 @@
 {
-  "id": 1116695,
+  "id": 1232438,
   "name": "Purchase orders schema",
   "queues": [
-    "https://rdttest.rossum.app/api/v1/queues/899853"
+    "https://shared-eu2.rossum.app/api/v1/queues/1146028"
   ],
-  "url": "https://rdttest.rossum.app/api/v1/schemas/1116695",
+  "url": "https://shared-eu2.rossum.app/api/v1/schemas/1232438",
   "content": [
     {
       "category": "section",
@@ -684,11 +684,15 @@
           ]
         },
         {
+          "rir_field_names": [
+            "tax_details"
+          ],
           "category": "multivalue",
           "id": "tax_details",
           "label": "VAT Rates",
           "hidden": true,
           "children": {
+            "rir_field_names": [],
             "category": "tuple",
             "id": "tax_detail",
             "label": "VAT Rates",
@@ -758,16 +762,12 @@
                 "can_export": false,
                 "format": "# ##0.#"
               }
-            ],
-            "rir_field_names": []
+            ]
           },
           "min_occurrences": null,
           "max_occurrences": null,
           "default_value": null,
-          "show_grid_by_default": false,
-          "rir_field_names": [
-            "tax_details"
-          ]
+          "show_grid_by_default": false
         }
       ],
       "icon": null
@@ -985,10 +985,14 @@
       "label": "Line Items",
       "children": [
         {
+          "rir_field_names": [
+            "line_items"
+          ],
           "category": "multivalue",
           "id": "line_items",
           "label": "Line Item",
           "children": {
+            "rir_field_names": [],
             "category": "tuple",
             "id": "line_item",
             "label": "Line Item",
@@ -1007,10 +1011,10 @@
                 "type": "string"
               },
               {
-                "width": 50,
                 "rir_field_names": [
                   "table_column_description"
                 ],
+                "width": 50,
                 "constraints": {
                   "required": false
                 },
@@ -1112,10 +1116,10 @@
                 "format": "#,##0.#"
               },
               {
-                "width": 15,
                 "rir_field_names": [
                   "table_column_amount_total_base"
                 ],
+                "width": 15,
                 "constraints": {
                   "required": false
                 },
@@ -1134,10 +1138,10 @@
                 }
               },
               {
-                "width": 15,
                 "rir_field_names": [
                   "table_column_amount_total"
                 ],
+                "width": 15,
                 "constraints": {
                   "required": false
                 },
@@ -1168,16 +1172,12 @@
                 "type": "string",
                 "can_export": false
               }
-            ],
-            "rir_field_names": []
+            ]
           },
           "min_occurrences": null,
           "max_occurrences": null,
           "default_value": null,
-          "show_grid_by_default": false,
-          "rir_field_names": [
-            "line_items"
-          ]
+          "show_grid_by_default": false
         }
       ],
       "icon": null
@@ -1206,5 +1206,7 @@
       "icon": null
     }
   ],
-  "metadata": {}
+  "metadata": {},
+  "modified_by": null,
+  "modified_at": "2022-10-11T12:13:22.312000Z"
 }

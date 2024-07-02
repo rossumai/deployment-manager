@@ -1,50 +1,52 @@
 ORGANIZATION:
-  id: 251437
-  name: rdttest
-  target_object: null
+  id: 263865
+  name: PRD test source
+  targets:
+  - target_id: null
   WORKSPACES:
-  - id: 508915
-    name: rdttestt
-    target_object: null
+  - id: 525241
+    name: WS1
+    targets:
+    - target_id: null
     QUEUES:
-    - id: 899853
-      name: Purchase orders
-      target_object: null
+    - id: 1146027
+      name: Invoices
+      targets:
+      - target_id: null
       INBOX:
-        id: 460672
-        name: Purchase orders
-        target_object: null
-    - id: 899854
-      name: Tax invoices (EU)
-      target_object: null
+        id: 536996
+        name: Invoices
+        targets:
+        - target_id: null
+  - id: 525242
+    name: WS2
+    targets:
+    - target_id: null
+    QUEUES:
+    - id: 1146028
+      name: POs
+      targets:
+      - target_id: null
       INBOX:
-        id: 460673
-        name: Tax invoices (EU)
-        target_object: null
-    - id: 899855
-      name: Credit notes
-      target_object: null
-      INBOX:
-        id: 460674
-        name: Credit notes
-        target_object: null
+        id: 536997
+        name: POs
+        targets:
+        - target_id: null
   HOOKS:
-  - id: 257317
-    name: Dummy Custom Function
-    target_object: null
-  - id: 257318
-    name: Master Data Hub
-    target_object: null
-  - id: 257319
-    name: Find & Replace Values
-    target_object: null
+  - id: 354127
+    name: Business Rules Validation
+    targets:
+    - target_id: null
+  - id: 354128
+    name: Custom Webhook
+    targets:
+    - target_id: null
   SCHEMAS:
-  - id: 1116693
-    name: Tax invoices (EU) schema
-    target_object: null
-  - id: 1116694
-    name: Credit notes schema
-    target_object: null
-  - id: 1116695
+  - id: 1232437
+    name: Tax invoices (UK) schema
+    targets:
+    - target_id: null
+  - id: 1232438
     name: Purchase orders schema
-    target_object: null
+    targets:
+    - target_id: null

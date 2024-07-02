@@ -1,0 +1,49 @@
+{
+  "id": 354128,
+  "type": "webhook",
+  "name": "Custom Webhook",
+  "url": "https://shared-eu2.rossum.app/api/v1/hooks/354128",
+  "description": "",
+  "settings": {},
+  "active": true,
+  "events": [
+    "invocation.manual"
+  ],
+  "queues": [
+    "https://shared-eu2.rossum.app/api/v1/queues/1146028"
+  ],
+  "run_after": [],
+  "metadata": {},
+  "config": {
+    "schedule": {
+      "cron": ""
+    },
+    "app": null,
+    "payload_logging_enabled": false,
+    "timeout_s": 30,
+    "retry_count": 4,
+    "url": "https://cib.rossum.app/api/v1",
+    "secret": null,
+    "insecure_ssl": false,
+    "client_ssl_certificate": null,
+    "retry_on_any_non_2xx": false
+  },
+  "test": {},
+  "sideload": [],
+  "settings_schema": null,
+  "secrets_schema": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "string"
+    }
+  },
+  "token_owner": null,
+  "extension_source": "custom",
+  "guide": null,
+  "read_more_url": null,
+  "extension_image_url": null,
+  "token_lifetime_s": null,
+  "hook_template": null,
+  "modified_by": "https://shared-eu2.rossum.app/api/v1/users/257986",
+  "modified_at": "2024-07-02T07:36:39.262865Z"
+}

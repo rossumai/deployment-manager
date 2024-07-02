@@ -1,0 +1,58 @@
+{
+  "id": 354127,
+  "type": "webhook",
+  "name": "Business Rules Validation",
+  "url": "https://shared-eu2.rossum.app/api/v1/hooks/354127",
+  "description": "Automate compliance with business rules and enhance data validation processes.",
+  "settings": {
+    "checks": [
+      {
+        "rule": "has_value({document_id})",
+        "message": "Invoice number is mandatory."
+      }
+    ],
+    "variables": {}
+  },
+  "active": true,
+  "events": [
+    "annotation_content.initialize",
+    "annotation_content.started",
+    "annotation_content.updated"
+  ],
+  "queues": [
+    "https://shared-eu2.rossum.app/api/v1/queues/1146027"
+  ],
+  "run_after": [],
+  "metadata": {},
+  "config": {
+    "private": true,
+    "schedule": {},
+    "app": null,
+    "payload_logging_enabled": false,
+    "timeout_s": 30,
+    "retry_count": 4,
+    "insecure_ssl": false,
+    "client_ssl_certificate": null,
+    "retry_on_any_non_2xx": false
+  },
+  "test": {},
+  "sideload": [
+    "schemas"
+  ],
+  "settings_schema": null,
+  "secrets_schema": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "string"
+    }
+  },
+  "token_owner": null,
+  "extension_source": "rossum_store",
+  "guide": "<p>How to set up your Business Rules Validation extension:\r\n<ol>\r\n<li>Specify the queue(s) that the extension is going to be used for.\r\n<li>Set up the business rules.\r\n</ol>\r\n<a href=\"https://rossum.ai/help/article/business-rules-validation-extension/\">Read this article</a> if you need help.\r\n</p>",
+  "read_more_url": "https://rossum.ai/help/article/business-rules-validation-extension/",
+  "extension_image_url": "https://rossum.ai/help/wp-content/uploads/2024/01/Business-Rules-Validation-3.png",
+  "token_lifetime_s": null,
+  "hook_template": "https://shared-eu2.rossum.app/api/v1/hook_templates/30",
+  "modified_by": "https://shared-eu2.rossum.app/api/v1/users/257986",
+  "modified_at": "2024-07-02T07:35:47.189377Z"
+}
