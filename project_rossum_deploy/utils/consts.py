@@ -37,7 +37,7 @@ def display_warning(msg: str, exception: Exception = None):
     console.print(Panel(msg), style="bold yellow")
 
 
-def validate_token(base_url: str, token: str):
+def validate_token(base_url: str, token: str, destination: str):
     req = httpx.get(
         url=base_url + "/auth/user",
         headers={"Authorization": f"Bearer {token}"},
@@ -55,11 +55,14 @@ def validate_token(base_url: str, token: str):
         is_token_valid = req.status_code == 200
 
         if is_token_valid:
-            settings.SOURCE_TOKEN = new_token
-
             cred_path = Path("./") / settings.CREDENTIALS_FILENAME
             credentials = json.load(cred_path.open("r"))
-            credentials["source"]["token"] = new_token
+            if destination == "source":
+                settings.SOURCE_TOKEN = new_token
+                credentials["source"]["token"] = new_token
+            elif destination == "target":
+                settings.TARGET_TOKEN = new_token
+                credentials["target"]["token"] = new_token
             json.dump(credentials, cred_path.open("w"), indent=2)
         else:
             raise click.ClickException(f"Token for {base_url} is invalid or expired.")

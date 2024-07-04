@@ -14,7 +14,7 @@ async def create_and_validate_client(
             raise click.ClickException(f"No base URL provided for {destination}.")
 
         if settings.SOURCE_TOKEN and not settings.SOURCE_PASSWORD:
-            validate_token(settings.SOURCE_API_BASE, settings.SOURCE_TOKEN)
+            validate_token(settings.SOURCE_API_BASE, settings.SOURCE_TOKEN, "source")
 
         try:
             client = ElisAPIClient(
@@ -33,7 +33,7 @@ async def create_and_validate_client(
             raise click.ClickException(f"No base URL provided for {destination}.")
 
         if settings.TARGET_TOKEN and not settings.TARGET_PASSWORD:
-            validate_token(settings.TARGET_API_BASE, settings.TARGET_TOKEN)
+            validate_token(settings.TARGET_API_BASE, settings.TARGET_TOKEN, "target")
 
         try:
             client = ElisAPIClient(
