@@ -59,10 +59,9 @@ def validate_token(base_url: str, token: str, destination: str):
             credentials = json.load(cred_path.open("r"))
             if destination == "source":
                 settings.SOURCE_TOKEN = new_token
-                credentials["source"]["token"] = new_token
             elif destination == "target":
                 settings.TARGET_TOKEN = new_token
-                credentials["target"]["token"] = new_token
+            credentials[destination]["token"] = new_token
             json.dump(credentials, cred_path.open("w"), indent=2)
         else:
             raise click.ClickException(f"Token for {base_url} is invalid or expired.")
