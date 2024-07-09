@@ -34,6 +34,11 @@ def get_changed_file_paths(
         change = change.strip(" ")
         op, path = tuple(change.split(" ", maxsplit=1))
 
+        # The code file has changed, but only .json files are compared when pulling
+        # Use the .json path to prevent code changes being lost
         path = Path(path.strip().strip('"'))
+        if path.suffix in [".py", ".js"]:
+            path = path.with_suffix(".json")
+
         changes.append((op, path))
     return changes

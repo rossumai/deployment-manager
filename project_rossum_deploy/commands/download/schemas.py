@@ -71,16 +71,17 @@ async def download_schemas(
                 Resource.Schema,
                 log_message=f"Pulled {schema_config_path}",
             )
-        schemas.append((destination_local, schema))
 
-        formula_fields = find_formula_fields_in_schema(schema["content"])
-        if formula_fields:
-            formula_directory_path = create_formula_directory_path(
-                schema_config_path, schema.get("name", ""), schema.get("id", "")
-            )
-            for field_id, code in formula_fields:
-                await create_formula_file(
-                    formula_directory_path / f"{field_id}.py", code
+            formula_fields = find_formula_fields_in_schema(schema["content"])
+            if formula_fields:
+                formula_directory_path = create_formula_directory_path(
+                    schema_config_path, schema.get("name", ""), schema.get("id", "")
                 )
+                for field_id, code in formula_fields:
+                    await create_formula_file(
+                        formula_directory_path / f"{field_id}.py", code
+                    )
+
+        schemas.append((destination_local, schema))
 
     return schemas

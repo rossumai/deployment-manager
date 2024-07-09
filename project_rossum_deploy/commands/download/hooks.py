@@ -67,12 +67,13 @@ async def download_hooks(
                 Resource.Hook,
                 log_message=f"Pulled {hook_config_path}",
             )
-        hooks.append((destination_local, hook))
 
-        custom_hook_code_path = create_custom_hook_code_path(hook_config_path, hook)
-        if custom_hook_code_path:
-            await write_str(
-                custom_hook_code_path, hook.get("config", {}).get("code", None)
-            )
+            custom_hook_code_path = create_custom_hook_code_path(hook_config_path, hook)
+            if custom_hook_code_path:
+                await write_str(
+                    custom_hook_code_path, hook.get("config", {}).get("code", None)
+                )
+
+        hooks.append((destination_local, hook))
 
     return hooks
