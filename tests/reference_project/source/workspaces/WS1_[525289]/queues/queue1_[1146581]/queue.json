@@ -1,40 +1,40 @@
 {
-  "id": 1146028,
-  "name": "POs",
-  "url": "https://shared-eu2.rossum.app/api/v1/queues/1146028",
-  "workspace": "https://shared-eu2.rossum.app/api/v1/workspaces/525242",
+  "id": 1146581,
+  "name": "queue1",
+  "url": "https://shared-eu2.rossum.app/api/v1/queues/1146581",
+  "workspace": "https://shared-eu2.rossum.app/api/v1/workspaces/525289",
   "connector": null,
   "hooks": [
-    "https://shared-eu2.rossum.app/api/v1/hooks/354128"
+    "https://shared-eu2.rossum.app/api/v1/hooks/354317"
   ],
   "webhooks": [
-    "https://shared-eu2.rossum.app/api/v1/webhooks/354128"
+    "https://shared-eu2.rossum.app/api/v1/webhooks/354317"
   ],
-  "schema": "https://shared-eu2.rossum.app/api/v1/schemas/1232438",
-  "inbox": "https://shared-eu2.rossum.app/api/v1/inboxes/536997",
+  "schema": "https://shared-eu2.rossum.app/api/v1/schemas/1232797",
+  "inbox": "https://shared-eu2.rossum.app/api/v1/inboxes/537188",
   "session_timeout": "01:00:00",
   "rir_url": null,
   "rir_params": null,
   "default_score_threshold": 0.975,
   "automation_enabled": false,
   "automation_level": "never",
-  "locale": "en_US",
+  "locale": "en_GB",
   "metadata": {
-    "queueTemplate": "purchaseorder"
+    "queueTemplate": "taxinvoiceeu"
   },
   "settings": {
     "columns": [
       {
+        "schema_id": "document_id"
+      },
+      {
         "schema_id": "order_id"
       },
       {
-        "schema_id": "date_issue"
+        "schema_id": "date_due"
       },
       {
-        "schema_id": "amount_total_tax"
-      },
-      {
-        "schema_id": "amount_due"
+        "schema_id": "amount_total"
       },
       {
         "schema_id": "sender_name"
@@ -119,6 +119,13 @@
           "visible": true,
           "column_type": "schema",
           "width": 170.0,
+          "schema_id": "document_id",
+          "data_type": "string"
+        },
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 170.0,
           "schema_id": "order_id",
           "data_type": "string"
         },
@@ -126,21 +133,14 @@
           "visible": true,
           "column_type": "schema",
           "width": 170.0,
-          "schema_id": "date_issue",
+          "schema_id": "date_due",
           "data_type": "date"
         },
         {
           "visible": true,
           "column_type": "schema",
           "width": 170.0,
-          "schema_id": "amount_total_tax",
-          "data_type": "number"
-        },
-        {
-          "visible": true,
-          "column_type": "schema",
-          "width": 170.0,
-          "schema_id": "amount_due",
+          "schema_id": "amount_total",
           "data_type": "number"
         },
         {
@@ -238,7 +238,7 @@
   "delete_after": null,
   "status": "active",
   "modified_by": "https://shared-eu2.rossum.app/api/v1/users/257986",
-  "modified_at": "2024-07-02T07:35:29.952222Z",
+  "modified_at": "2024-07-02T13:17:36.803252Z",
   "engine": null,
   "training_enabled": true
 }

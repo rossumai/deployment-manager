@@ -1,8 +1,8 @@
 {
-  "id": 354127,
+  "id": 354317,
   "type": "webhook",
   "name": "Business Rules Validation",
-  "url": "https://shared-eu2.rossum.app/api/v1/hooks/354127",
+  "url": "https://shared-eu2.rossum.app/api/v1/hooks/354317",
   "description": "Automate compliance with business rules and enhance data validation processes.",
   "settings": {
     "checks": [
@@ -20,7 +20,7 @@
     "annotation_content.updated"
   ],
   "queues": [
-    "https://shared-eu2.rossum.app/api/v1/queues/1146027"
+    "https://shared-eu2.rossum.app/api/v1/queues/1146581"
   ],
   "run_after": [],
   "metadata": {},
@@ -46,7 +46,7 @@
       "type": "string"
     }
   },
-  "token_owner": null,
+  "token_owner": "https://shared-eu2.rossum.app/api/v1/users/285991",
   "extension_source": "rossum_store",
   "guide": "<p>How to set up your Business Rules Validation extension:\r\n<ol>\r\n<li>Specify the queue(s) that the extension is going to be used for.\r\n<li>Set up the business rules.\r\n</ol>\r\n<a href=\"https://rossum.ai/help/article/business-rules-validation-extension/\">Read this article</a> if you need help.\r\n</p>",
   "read_more_url": "https://rossum.ai/help/article/business-rules-validation-extension/",
@@ -54,5 +54,5 @@
   "token_lifetime_s": null,
   "hook_template": "https://shared-eu2.rossum.app/api/v1/hook_templates/30",
   "modified_by": "https://shared-eu2.rossum.app/api/v1/users/257986",
-  "modified_at": "2024-07-02T07:35:47.189377Z"
+  "modified_at": "2024-07-02T13:17:52.930931Z"
 }

@@ -1,15 +1,15 @@
 {
-  "id": 1232437,
-  "name": "Tax invoices (UK) schema",
+  "id": 1232797,
+  "name": "Tax invoices (EU) schema",
   "queues": [
-    "https://shared-eu2.rossum.app/api/v1/queues/1146027"
+    "https://shared-eu2.rossum.app/api/v1/queues/1146581"
   ],
-  "url": "https://shared-eu2.rossum.app/api/v1/schemas/1232437",
+  "url": "https://shared-eu2.rossum.app/api/v1/schemas/1232797",
   "content": [
     {
       "category": "section",
       "id": "basic_info_section",
-      "label": "Basic information",
+      "label": "Basic Information",
       "children": [
         {
           "rir_field_names": [
@@ -22,6 +22,23 @@
           "category": "datapoint",
           "id": "document_id",
           "label": "Document ID",
+          "type": "string",
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          }
+        },
+        {
+          "rir_field_names": [
+            "order_id"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "order_id",
+          "label": "Order Number",
           "type": "string",
           "ui_configuration": {
             "type": "captured",
@@ -44,7 +61,25 @@
             "type": "captured",
             "edit": "enabled"
           },
-          "format": "D/M/YYYY"
+          "format": "D.M.YYYY"
+        },
+        {
+          "rir_field_names": [
+            "date_due"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "date_due",
+          "label": "Due Date",
+          "type": "date",
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          },
+          "format": "D.M.YYYY"
         },
         {
           "rir_field_names": [
@@ -178,45 +213,6 @@
         },
         {
           "rir_field_names": [
-            "date_due"
-          ],
-          "constraints": {
-            "required": false
-          },
-          "default_value": null,
-          "category": "datapoint",
-          "id": "date_due",
-          "label": "Due Date",
-          "hidden": true,
-          "type": "date",
-          "can_export": false,
-          "ui_configuration": {
-            "type": "captured",
-            "edit": "enabled"
-          },
-          "format": "D/M/YYYY"
-        },
-        {
-          "rir_field_names": [
-            "order_id"
-          ],
-          "constraints": {
-            "required": false
-          },
-          "default_value": null,
-          "category": "datapoint",
-          "id": "order_id",
-          "label": "Order Number",
-          "hidden": true,
-          "type": "string",
-          "can_export": false,
-          "ui_configuration": {
-            "type": "captured",
-            "edit": "enabled"
-          }
-        },
-        {
-          "rir_field_names": [
             "customer_id"
           ],
           "constraints": {
@@ -252,7 +248,235 @@
             "type": "captured",
             "edit": "enabled"
           },
-          "format": "D/M/YYYY"
+          "format": "D.M.YYYY"
+        },
+        {
+          "rir_field_names": [
+            "sender_order_id"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "sender_order_id",
+          "label": "Vendor Order ID",
+          "hidden": true,
+          "type": "string",
+          "can_export": false,
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          }
+        },
+        {
+          "rir_field_names": [
+            "delivery_note_id"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "delivery_note_id",
+          "label": "Delivery Note ID",
+          "hidden": true,
+          "type": "string",
+          "can_export": false,
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          }
+        },
+        {
+          "rir_field_names": [
+            "supply_place"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "supply_place",
+          "label": "Place of Supply",
+          "hidden": true,
+          "type": "string",
+          "can_export": false,
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          }
+        }
+      ],
+      "icon": null
+    },
+    {
+      "category": "section",
+      "id": "payment_info_section",
+      "label": "Payment Instructions",
+      "children": [
+        {
+          "rir_field_names": [
+            "account_num"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "account_num",
+          "label": "Account Number",
+          "type": "string",
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          }
+        },
+        {
+          "rir_field_names": [
+            "bank_num"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "bank_num",
+          "label": "Bank Code",
+          "hidden": true,
+          "type": "string",
+          "can_export": false,
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          }
+        },
+        {
+          "rir_field_names": [
+            "iban"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "iban",
+          "label": "IBAN",
+          "type": "string",
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          }
+        },
+        {
+          "rir_field_names": [
+            "bic"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "bic",
+          "label": "BIC/SWIFT",
+          "type": "string",
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          }
+        },
+        {
+          "rir_field_names": [
+            "terms"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "terms",
+          "label": "Terms",
+          "hidden": true,
+          "type": "string",
+          "can_export": false,
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          }
+        },
+        {
+          "rir_field_names": [
+            "const_sym"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "const_sym",
+          "label": "Constant Symbol",
+          "hidden": true,
+          "type": "string",
+          "can_export": false,
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          }
+        },
+        {
+          "rir_field_names": [
+            "var_sym"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "var_sym",
+          "label": "Payment Reference",
+          "hidden": true,
+          "type": "string",
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          }
+        },
+        {
+          "rir_field_names": [
+            "spec_sym"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "spec_sym",
+          "label": "Specific Symbol",
+          "hidden": true,
+          "type": "string",
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          }
+        },
+        {
+          "rir_field_names": [
+            "payment_method"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "payment_method",
+          "label": "Payment Method",
+          "hidden": true,
+          "type": "string",
+          "can_export": false,
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          }
         }
       ],
       "icon": null
@@ -262,42 +486,6 @@
       "id": "amounts_section",
       "label": "VAT & Amounts",
       "children": [
-        {
-          "rir_field_names": [
-            "amount_total_base"
-          ],
-          "constraints": {
-            "required": false
-          },
-          "default_value": null,
-          "category": "datapoint",
-          "id": "amount_total_base",
-          "label": "Subtotal",
-          "type": "number",
-          "ui_configuration": {
-            "type": "captured",
-            "edit": "enabled"
-          },
-          "format": "# ##0.#"
-        },
-        {
-          "rir_field_names": [
-            "amount_total_tax"
-          ],
-          "constraints": {
-            "required": false
-          },
-          "default_value": null,
-          "category": "datapoint",
-          "id": "amount_total_tax",
-          "label": "Total Tax",
-          "type": "number",
-          "ui_configuration": {
-            "type": "captured",
-            "edit": "enabled"
-          },
-          "format": "# ##0.#"
-        },
         {
           "rir_field_names": [
             "amount_total"
@@ -326,7 +514,45 @@
           "default_value": null,
           "category": "datapoint",
           "id": "amount_due",
-          "label": "Due Amount",
+          "label": "Amount Due",
+          "hidden": true,
+          "type": "number",
+          "can_export": false,
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          },
+          "format": "# ##0.#"
+        },
+        {
+          "rir_field_names": [
+            "amount_total_base"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "amount_total_base",
+          "label": "Total Without Tax",
+          "type": "number",
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          },
+          "format": "# ##0.#"
+        },
+        {
+          "rir_field_names": [
+            "amount_total_tax"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "amount_total_tax",
+          "label": "Total Tax",
           "type": "number",
           "ui_configuration": {
             "type": "captured",
@@ -467,12 +693,14 @@
           ],
           "category": "multivalue",
           "id": "tax_details",
-          "label": "VAT",
+          "label": "VAT Rates",
+          "hidden": true,
           "children": {
-            "rir_field_names": null,
+            "rir_field_names": [],
             "category": "tuple",
             "id": "tax_detail",
-            "label": "VAT",
+            "label": "VAT Rates",
+            "hidden": true,
             "children": [
               {
                 "rir_field_names": [
@@ -485,7 +713,7 @@
                 "category": "datapoint",
                 "id": "tax_detail_rate",
                 "label": "VAT Rate",
-                "hidden": false,
+                "hidden": true,
                 "type": "number",
                 "can_export": false,
                 "format": "# ##0.#"
@@ -501,7 +729,7 @@
                 "category": "datapoint",
                 "id": "tax_detail_base",
                 "label": "VAT Base",
-                "hidden": false,
+                "hidden": true,
                 "type": "number",
                 "can_export": false,
                 "format": "# ##0.#"
@@ -517,7 +745,7 @@
                 "category": "datapoint",
                 "id": "tax_detail_tax",
                 "label": "VAT Amount",
-                "hidden": false,
+                "hidden": true,
                 "type": "number",
                 "can_export": false,
                 "format": "# ##0.#"
@@ -533,7 +761,7 @@
                 "category": "datapoint",
                 "id": "tax_detail_total",
                 "label": "VAT Total",
-                "hidden": false,
+                "hidden": true,
                 "type": "number",
                 "can_export": false,
                 "format": "# ##0.#"
@@ -589,6 +817,24 @@
         },
         {
           "rir_field_names": [
+            "sender_ic"
+          ],
+          "constraints": {
+            "required": false
+          },
+          "default_value": null,
+          "category": "datapoint",
+          "id": "sender_ic",
+          "label": "Vendor Company ID",
+          "hidden": true,
+          "type": "string",
+          "ui_configuration": {
+            "type": "captured",
+            "edit": "enabled"
+          }
+        },
+        {
+          "rir_field_names": [
             "sender_vat_id",
             "sender_dic"
           ],
@@ -607,17 +853,18 @@
         },
         {
           "rir_field_names": [
-            "sender_ic"
+            "sender_email"
           ],
           "constraints": {
             "required": false
           },
           "default_value": null,
           "category": "datapoint",
-          "id": "sender_ic",
-          "label": "Vendor Company ID",
+          "id": "sender_email",
+          "label": "Vendor Email",
           "hidden": true,
           "type": "string",
+          "can_export": false,
           "ui_configuration": {
             "type": "captured",
             "edit": "enabled"
@@ -687,33 +934,6 @@
           "category": "datapoint",
           "id": "recipient_vat_id",
           "label": "Customer VAT Number",
-          "hidden": true,
-          "type": "string",
-          "can_export": false,
-          "ui_configuration": {
-            "type": "captured",
-            "edit": "enabled"
-          }
-        }
-      ],
-      "icon": null
-    },
-    {
-      "category": "section",
-      "id": "payment_info_section",
-      "label": "Payment instructions",
-      "children": [
-        {
-          "rir_field_names": [
-            "account_num"
-          ],
-          "constraints": {
-            "required": false
-          },
-          "default_value": null,
-          "category": "datapoint",
-          "id": "account_num",
-          "label": "Account Number",
           "type": "string",
           "ui_configuration": {
             "type": "captured",
@@ -722,15 +942,15 @@
         },
         {
           "rir_field_names": [
-            "bank_num"
+            "recipient_delivery_name"
           ],
           "constraints": {
             "required": false
           },
           "default_value": null,
           "category": "datapoint",
-          "id": "bank_num",
-          "label": "Sort Code",
+          "id": "recipient_delivery_name",
+          "label": "Customer Delivery Name",
           "type": "string",
           "ui_configuration": {
             "type": "captured",
@@ -739,146 +959,16 @@
         },
         {
           "rir_field_names": [
-            "iban"
+            "recipient_delivery_address"
           ],
           "constraints": {
             "required": false
           },
           "default_value": null,
           "category": "datapoint",
-          "id": "iban",
-          "label": "IBAN",
-          "hidden": true,
+          "id": "recipient_delivery_address",
+          "label": "Customer Delivery Address",
           "type": "string",
-          "can_export": false,
-          "ui_configuration": {
-            "type": "captured",
-            "edit": "enabled"
-          }
-        },
-        {
-          "rir_field_names": [
-            "bic"
-          ],
-          "constraints": {
-            "required": false
-          },
-          "default_value": null,
-          "category": "datapoint",
-          "id": "bic",
-          "label": "BIC/SWIFT",
-          "hidden": true,
-          "type": "string",
-          "can_export": false,
-          "ui_configuration": {
-            "type": "captured",
-            "edit": "enabled"
-          }
-        },
-        {
-          "rir_field_names": [
-            "terms"
-          ],
-          "constraints": {
-            "required": false
-          },
-          "default_value": null,
-          "category": "datapoint",
-          "id": "terms",
-          "label": "Terms",
-          "hidden": true,
-          "type": "string",
-          "can_export": false,
-          "ui_configuration": {
-            "type": "captured",
-            "edit": "enabled"
-          }
-        },
-        {
-          "rir_field_names": [
-            "payment_state"
-          ],
-          "constraints": {
-            "required": false
-          },
-          "default_value": null,
-          "category": "datapoint",
-          "id": "payment_state",
-          "label": "Payment State",
-          "hidden": true,
-          "type": "enum",
-          "can_export": false,
-          "ui_configuration": {
-            "type": "captured",
-            "edit": "enabled"
-          },
-          "options": [
-            {
-              "value": "automatic",
-              "label": "automatic"
-            },
-            {
-              "value": "manual",
-              "label": "manual"
-            },
-            {
-              "value": "pending",
-              "label": "pending"
-            }
-          ]
-        },
-        {
-          "rir_field_names": [
-            "const_sym"
-          ],
-          "constraints": {
-            "required": false
-          },
-          "default_value": null,
-          "category": "datapoint",
-          "id": "const_sym",
-          "label": "Constant Symbol",
-          "hidden": true,
-          "type": "string",
-          "can_export": false,
-          "ui_configuration": {
-            "type": "captured",
-            "edit": "enabled"
-          }
-        },
-        {
-          "rir_field_names": [
-            "var_sym"
-          ],
-          "constraints": {
-            "required": false
-          },
-          "default_value": null,
-          "category": "datapoint",
-          "id": "var_sym",
-          "label": "Payment Reference",
-          "hidden": true,
-          "type": "string",
-          "can_export": false,
-          "ui_configuration": {
-            "type": "captured",
-            "edit": "enabled"
-          }
-        },
-        {
-          "rir_field_names": [
-            "spec_sym"
-          ],
-          "constraints": {
-            "required": false
-          },
-          "default_value": null,
-          "category": "datapoint",
-          "id": "spec_sym",
-          "label": "Specific Symbol",
-          "hidden": true,
-          "type": "string",
-          "can_export": false,
           "ui_configuration": {
             "type": "captured",
             "edit": "enabled"
@@ -907,6 +997,33 @@
             "children": [
               {
                 "rir_field_names": [
+                  "table_column_code"
+                ],
+                "constraints": {
+                  "required": false
+                },
+                "default_value": null,
+                "category": "datapoint",
+                "id": "item_code",
+                "label": "Code",
+                "type": "string"
+              },
+              {
+                "rir_field_names": [
+                  "table_column_description"
+                ],
+                "width": 50,
+                "constraints": {
+                  "required": false
+                },
+                "default_value": null,
+                "category": "datapoint",
+                "id": "item_description",
+                "label": "Description",
+                "type": "string"
+              },
+              {
+                "rir_field_names": [
                   "table_column_quantity"
                 ],
                 "constraints": {
@@ -921,29 +1038,15 @@
               },
               {
                 "rir_field_names": [
-                  "table_column_code"
-                ],
-                "width": 50,
-                "constraints": {
-                  "required": false
-                },
-                "default_value": null,
-                "category": "datapoint",
-                "id": "item_code",
-                "label": "Code",
-                "type": "string"
-              },
-              {
-                "rir_field_names": [
-                  "table_column_description"
+                  "table_column_uom"
                 ],
                 "constraints": {
                   "required": false
                 },
                 "default_value": null,
                 "category": "datapoint",
-                "id": "item_description",
-                "label": "Description",
+                "id": "item_uom",
+                "label": "UOM",
                 "type": "string"
               },
               {
@@ -962,56 +1065,6 @@
               },
               {
                 "rir_field_names": [
-                  "table_column_amount_total_base"
-                ],
-                "constraints": {
-                  "required": false
-                },
-                "default_value": null,
-                "category": "datapoint",
-                "id": "item_total_base",
-                "label": "Total Base",
-                "type": "number",
-                "format": "# ##0.#",
-                "aggregations": {
-                  "sum": {
-                    "label": "Sum"
-                  }
-                }
-              },
-              {
-                "rir_field_names": [
-                  "table_column_amount_total"
-                ],
-                "constraints": {
-                  "required": false
-                },
-                "default_value": null,
-                "category": "datapoint",
-                "id": "item_amount_total",
-                "label": "Total Amount",
-                "hidden": true,
-                "type": "number",
-                "can_export": false,
-                "format": "# ##0.#"
-              },
-              {
-                "rir_field_names": [
-                  "table_column_uom"
-                ],
-                "constraints": {
-                  "required": false
-                },
-                "default_value": null,
-                "category": "datapoint",
-                "id": "item_uom",
-                "label": "UOM",
-                "hidden": true,
-                "type": "string",
-                "can_export": false
-              },
-              {
-                "rir_field_names": [
                   "table_column_rate"
                 ],
                 "constraints": {
@@ -1020,7 +1073,7 @@
                 "default_value": null,
                 "category": "datapoint",
                 "id": "item_rate",
-                "label": "Tax Rate",
+                "label": "VAT Rate",
                 "hidden": true,
                 "type": "number",
                 "can_export": false,
@@ -1036,7 +1089,7 @@
                 "default_value": null,
                 "category": "datapoint",
                 "id": "item_tax",
-                "label": "Tax",
+                "label": "VAT",
                 "hidden": true,
                 "type": "number",
                 "can_export": false,
@@ -1053,10 +1106,50 @@
                 "category": "datapoint",
                 "id": "item_amount",
                 "label": "Unit Price",
+                "type": "number",
+                "format": "# ##0.#"
+              },
+              {
+                "rir_field_names": [
+                  "table_column_amount_total_base"
+                ],
+                "width": 15,
+                "constraints": {
+                  "required": false
+                },
+                "default_value": null,
+                "category": "datapoint",
+                "id": "item_total_base",
+                "label": "Total Base",
                 "hidden": true,
                 "type": "number",
                 "can_export": false,
-                "format": "# ##0.#"
+                "format": "# ##0.#",
+                "aggregations": {
+                  "sum": {
+                    "label": "Sum"
+                  }
+                }
+              },
+              {
+                "rir_field_names": [
+                  "table_column_amount_total"
+                ],
+                "width": 15,
+                "constraints": {
+                  "required": false
+                },
+                "default_value": null,
+                "category": "datapoint",
+                "id": "item_amount_total",
+                "label": "Total Amount",
+                "type": "number",
+                "format": "# ##0.#",
+                "aggregations": {
+                  "sum": {
+                    "label": "Sum"
+                  }
+                }
               },
               {
                 "rir_field_names": [
@@ -1108,6 +1201,6 @@
     }
   ],
   "metadata": {},
-  "modified_by": "https://shared-eu2.rossum.app/api/v1/users/285991",
-  "modified_at": "2024-07-02T09:22:38.858896Z"
+  "modified_by": null,
+  "modified_at": "2022-10-11T12:33:25.860000Z"
 }

@@ -1,8 +1,8 @@
 {
-  "id": 536996,
-  "name": "Invoices",
-  "url": "https://shared-eu2.rossum.app/api/v1/inboxes/536996",
-  "email": "prd-test-source-aa7bc1@shared-eu2.rossum.app",
+  "id": 537188,
+  "name": "queue1",
+  "url": "https://shared-eu2.rossum.app/api/v1/inboxes/537188",
+  "email": "prd-test-source-280248@shared-eu2.rossum.app",
   "email_prefix": "prd-test-source",
   "bounce_email_to": null,
   "bounce_unprocessable_attachments": false,
@@ -32,6 +32,6 @@
   "modified_by": null,
   "modified_at": null,
   "queues": [
-    "https://shared-eu2.rossum.app/api/v1/queues/1146027"
+    "https://shared-eu2.rossum.app/api/v1/queues/1146581"
   ]
 }
