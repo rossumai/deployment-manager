@@ -1,10 +1,10 @@
 {
-  "id": 1232798,
+  "id": 1241834,
   "name": "Purchase orders schema",
   "queues": [
-    "https://shared-eu2.rossum.app/api/v1/queues/1146582"
+    "https://shared-eu2.rossum.app/api/v1/queues/1162843"
   ],
-  "url": "https://shared-eu2.rossum.app/api/v1/schemas/1232798",
+  "url": "https://shared-eu2.rossum.app/api/v1/schemas/1241834",
   "content": [
     {
       "category": "section",
@@ -1207,6 +1207,6 @@
     }
   ],
   "metadata": {},
-  "modified_by": null,
-  "modified_at": "2022-10-11T12:13:22.312000Z"
+  "modified_by": "https://shared-eu2.rossum.app/api/v1/users/285991",
+  "modified_at": "2024-07-10T10:42:17.203046Z"
 }

@@ -1,8 +1,8 @@
 {
-  "id": 537189,
+  "id": 541603,
   "name": "queue2",
-  "url": "https://shared-eu2.rossum.app/api/v1/inboxes/537189",
-  "email": "prd-test-source-3e2363@shared-eu2.rossum.app",
+  "url": "https://shared-eu2.rossum.app/api/v1/inboxes/541603",
+  "email": "prd-test-source-89272d@shared-eu2.rossum.app",
   "email_prefix": "prd-test-source",
   "bounce_email_to": null,
   "bounce_unprocessable_attachments": false,
@@ -29,9 +29,9 @@
     }
   },
   "dmarc_check_action": "accept",
-  "modified_by": null,
-  "modified_at": null,
+  "modified_by": "https://shared-eu2.rossum.app/api/v1/users/285991",
+  "modified_at": "2024-07-10T10:42:18.136545Z",
   "queues": [
-    "https://shared-eu2.rossum.app/api/v1/queues/1146582"
+    "https://shared-eu2.rossum.app/api/v1/queues/1162843"
   ]
 }

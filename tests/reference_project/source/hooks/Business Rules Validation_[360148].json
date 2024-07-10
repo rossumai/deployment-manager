@@ -1,8 +1,8 @@
 {
-  "id": 354317,
+  "id": 360148,
   "type": "webhook",
   "name": "Business Rules Validation",
-  "url": "https://shared-eu2.rossum.app/api/v1/hooks/354317",
+  "url": "https://shared-eu2.rossum.app/api/v1/hooks/360148",
   "description": "Automate compliance with business rules and enhance data validation processes.",
   "settings": {
     "checks": [
@@ -20,7 +20,7 @@
     "annotation_content.updated"
   ],
   "queues": [
-    "https://shared-eu2.rossum.app/api/v1/queues/1146581"
+    "https://shared-eu2.rossum.app/api/v1/queues/1162844"
   ],
   "run_after": [],
   "metadata": {},
@@ -53,6 +53,6 @@
   "extension_image_url": "https://rossum.ai/help/wp-content/uploads/2024/01/Business-Rules-Validation-3.png",
   "token_lifetime_s": null,
   "hook_template": "https://shared-eu2.rossum.app/api/v1/hook_templates/30",
-  "modified_by": "https://shared-eu2.rossum.app/api/v1/users/257986",
-  "modified_at": "2024-07-02T13:17:52.930931Z"
+  "modified_by": "https://shared-eu2.rossum.app/api/v1/users/285991",
+  "modified_at": "2024-07-10T10:42:18.694227Z"
 }

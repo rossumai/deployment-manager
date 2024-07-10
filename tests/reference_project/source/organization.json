@@ -3,8 +3,8 @@
   "url": "https://shared-eu2.rossum.app/api/v1/organizations/263865",
   "name": "PRD test source",
   "workspaces": [
-    "https://shared-eu2.rossum.app/api/v1/workspaces/525241",
-    "https://shared-eu2.rossum.app/api/v1/workspaces/525242"
+    "https://shared-eu2.rossum.app/api/v1/workspaces/526237",
+    "https://shared-eu2.rossum.app/api/v1/workspaces/526238"
   ],
   "users": [
     "https://shared-eu2.rossum.app/api/v1/users/285991"
@@ -26,6 +26,6 @@
   },
   "creator": "https://shared-eu2.rossum.app/api/v1/users/285991",
   "settings": {},
-  "modified_by": null,
-  "modified_at": null
+  "modified_by": "https://shared-eu2.rossum.app/api/v1/users/285991",
+  "modified_at": "2024-07-10T10:42:18.292114Z"
 }

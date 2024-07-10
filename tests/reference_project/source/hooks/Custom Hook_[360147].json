@@ -1,8 +1,8 @@
 {
-  "id": 354318,
+  "id": 360147,
   "type": "webhook",
   "name": "Custom Hook",
-  "url": "https://shared-eu2.rossum.app/api/v1/hooks/354318",
+  "url": "https://shared-eu2.rossum.app/api/v1/hooks/360147",
   "description": "",
   "settings": {},
   "active": true,
@@ -10,7 +10,7 @@
     "invocation.manual"
   ],
   "queues": [
-    "https://shared-eu2.rossum.app/api/v1/queues/1146582"
+    "https://shared-eu2.rossum.app/api/v1/queues/1162843"
   ],
   "run_after": [],
   "metadata": {},
@@ -44,6 +44,6 @@
   "extension_image_url": null,
   "token_lifetime_s": null,
   "hook_template": null,
-  "modified_by": "https://shared-eu2.rossum.app/api/v1/users/257986",
-  "modified_at": "2024-07-02T13:18:22.966927Z"
+  "modified_by": "https://shared-eu2.rossum.app/api/v1/users/285991",
+  "modified_at": "2024-07-10T10:42:18.807925Z"
 }

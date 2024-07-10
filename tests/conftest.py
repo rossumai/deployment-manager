@@ -32,6 +32,13 @@ target_password = os.getenv("TARGET_PASSWORD")
 
 @pytest.fixture
 def target_client():
+    settings.SOURCE_API_BASE = base_url
+    settings.SOURCE_USERNAME = username
+    settings.SOURCE_PASSWORD = password
+    settings.TARGET_API_BASE = target_base_url
+    settings.TARGET_USERNAME = target_username
+    settings.TARGET_PASSWORD = target_password
+
     return ElisAPIClient(
         base_url=target_base_url,
         username=target_username,

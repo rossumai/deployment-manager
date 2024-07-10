@@ -4,49 +4,49 @@ ORGANIZATION:
   targets:
   - target_id: null
   WORKSPACES:
-  - id: 525289
-    name: WS1
-    targets:
-    - target_id: null
-    QUEUES:
-    - id: 1146581
-      name: queue1
-      targets:
-      - target_id: null
-      INBOX:
-        id: 537188
-        name: queue1
-        targets:
-        - target_id: null
-  - id: 525290
+  - id: 526237
     name: WS2
     targets:
     - target_id: null
     QUEUES:
-    - id: 1146582
+    - id: 1162843
       name: queue2
       targets:
       - target_id: null
       INBOX:
-        id: 537189
+        id: 541603
         name: queue2
         targets:
         - target_id: null
-  HOOKS:
-  - id: 354317
-    name: Business Rules Validation
+  - id: 526238
+    name: WS1
     targets:
     - target_id: null
-  - id: 354318
+    QUEUES:
+    - id: 1162844
+      name: queue1
+      targets:
+      - target_id: null
+      INBOX:
+        id: 541604
+        name: queue1
+        targets:
+        - target_id: null
+  HOOKS:
+  - id: 360147
     name: Custom Hook
     targets:
     - target_id: null
+  - id: 360148
+    name: Business Rules Validation
+    targets:
+    - target_id: null
   SCHEMAS:
-  - id: 1232797
+  - id: 1241833
     name: Tax invoices (EU) schema
     targets:
     - target_id: null
-  - id: 1232798
+  - id: 1241834
     name: Purchase orders schema
     targets:
     - target_id: null
