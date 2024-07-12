@@ -1,3 +1,5 @@
+<h1><font color="#FF0000"> Warning: this repo is not actively maintained, further updates can be found here: https://github.com/rossumai/prd </font></h1>
+
 <h1><font color="#006FE8"> Project deployment tool </font></h1>
 
 This command line tool is used to help users customizing and delivering projects on Rossum platform to easily track changes, deploy and release changes/entire project to different environments inside the same cluster.
