@@ -5,9 +5,9 @@ from rossum_api import ElisAPIClient
 
 from project_rossum_deploy.utils.consts import settings
 
-base_url = os.getenv("SOURCE_API_BASE")
-username = os.getenv("SOURCE_USERNAME")
-password = os.getenv("SOURCE_PASSWORD")
+base_url = os.environ.get("SOURCE_API_BASE")
+username = os.environ.get("SOURCE_USERNAME")
+password = os.environ.get("SOURCE_PASSWORD")
 
 
 @pytest.fixture
@@ -25,9 +25,9 @@ def client():
     )
 
 
-target_base_url = os.getenv("TARGET_API_BASE")
-target_username = os.getenv("TARGET_USERNAME")
-target_password = os.getenv("TARGET_PASSWORD")
+target_base_url = os.environ.get("TARGET_API_BASE")
+target_username = os.environ.get("TARGET_USERNAME")
+target_password = os.environ.get("TARGET_PASSWORD")
 
 
 @pytest.fixture
