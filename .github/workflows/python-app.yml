@@ -29,4 +29,4 @@ jobs:
           TARGET_API_BASE: ${{secrets.TARGET_API_BASE}}
           TARGET_USERNAME: ${{secrets.TARGET_USERNAME}}
           TARGET_PASSWORD: ${{secrets.TARGET_PASSWORD}}
-        run: pytest tests
+        run: pytest tests -s
