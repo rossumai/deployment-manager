@@ -34,6 +34,8 @@ async def setup_project(client: ElisAPIClient, tmp_path):
     current_path = Path(__file__).parent.parent
     os.chdir(tmp_path)
     subprocess.run(["git", "init"])
+    subprocess.run(["git", "config", "user.email", "gh_pipeline_runner"])
+    subprocess.run(["git", "config", "user.name", "gh_pipeline_runner"])
     subprocess.run(["git", "add", "."])
     subprocess.run(["git", "commit", "-m", "init"])
     os.chdir(current_path)
