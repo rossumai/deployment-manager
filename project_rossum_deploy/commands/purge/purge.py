@@ -29,7 +29,7 @@ Deletes all objects in Rossum based on IDs in the mappping file. This operation 
 )
 @click.argument(
     "destination",
-    type=click.Choice([settings.TARGET_DIRNAME]),
+    type=click.Choice([settings.TARGET_DIRNAME, settings.UNUSED_SCHEMAS]),
 )
 @coro
 async def purge_project_wrapper(destination):
@@ -41,33 +41,20 @@ async def purge_project_wrapper(destination):
 
 async def purge_project(
     destination: str,
-    client: ElisAPIClient = None,
 ):
     try:
         display_warning(
-            "This operation cannot be undone, the objects will be deleted from the database."
+            "This operation cannot be undone, the objects will be deleted from the Rossum database."
         )
         if not Confirm.ask("Are you sure you want to continue?"):
             return
 
-        org_path = Path("./")
-
-        # Make the previous mapping conform in structure
-        await migrate_mapping("mapping.yaml", print_result=False)
-        mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
-        if not mapping:
-            print(Panel("No mappping file found."))
-            return
-
-        if not client:
-            client = await create_and_validate_client(destination)
-
-        sources, targets = extract_sources_targets(mapping)
-
-        if destination == settings.SOURCE_DIRNAME:
-            await delete_all_objects_with_ids(sources, client)
+        if destination == settings.UNUSED_SCHEMAS:
+            await purge_unused_schemas(destination=settings.SOURCE_DIRNAME)
+            if not settings.IS_PROJECT_IN_SAME_ORG:
+                await purge_unused_schemas(destination=settings.TARGET_DIRNAME)
         else:
-            await delete_all_objects_with_ids(targets, client)
+            await purge_destination(destination=destination)
 
         print(
             Panel(
@@ -77,3 +64,38 @@ async def purge_project(
 
     except Exception as e:
         display_error(f"Error during project {settings.UPLOAD_COMMAND_NAME}: {e}", e)
+
+
+async def purge_unused_schemas(destination: str, client: ElisAPIClient = None):
+    if not client:
+        client = await create_and_validate_client(destination)
+
+    async for schema in client.list_all_schemas():
+        try:
+            if not len(schema.queues):
+                await client.delete_schema(schema.id)
+        except Exception as e:
+            display_error(f'Error while purging schema "{schema.id}"', e)
+
+
+async def purge_destination(
+    destination: str,
+    client: ElisAPIClient = None,
+):
+    org_path = Path("./")
+    # Make the previous mapping conform in structure
+    await migrate_mapping("mapping.yaml", print_result=False)
+    mapping = await read_mapping(org_path / settings.MAPPING_FILENAME)
+    if not mapping:
+        print(Panel("No mappping file found."))
+        return
+
+    if not client:
+        client = await create_and_validate_client(destination)
+
+    sources, targets = extract_sources_targets(mapping)
+
+    if destination == settings.SOURCE_DIRNAME:
+        await delete_all_objects_with_ids(sources, client)
+    else:
+        await delete_all_objects_with_ids(targets, client)

@@ -137,6 +137,7 @@ try:
         BOTH_DESTINATIONS: str = "both"
         SOURCE_DIRNAME: str = "source"
         TARGET_DIRNAME: str = "target"
+        UNUSED_SCHEMAS: str = "unused_schemas"
 
         ORGANIZATION_FIELDS: list[str] = ["ui_settings", "metadata"]
         PRIVATE_HOOK_DUMMY_URL: str = "https://example.com"
