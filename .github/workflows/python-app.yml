@@ -22,4 +22,11 @@ jobs:
       - name: Lint all files
         run: pre-commit run --all-files --show-diff-on-failure
       - name: Run tests
+        env:
+          SOURCE_API_BASE: ${{secrets.SOURCE_API_BASE}}
+          SOURCE_USERNAME: ${{secrets.SOURCE_USERNAME}}
+          SOURCE_PASSWORD: ${{secrets.SOURCE_PASSWORD}}
+          TARGET_API_BASE: ${{secrets.TARGET_API_BASE}}
+          TARGET_USERNAME: ${{secrets.TARGET_USERNAME}}
+          TARGET_PASSWORD: ${{secrets.TARGET_PASSWORD}}
         run: pytest tests
