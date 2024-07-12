@@ -1,0 +1,11 @@
+{
+  "id": 526238,
+  "name": "WS1",
+  "url": "https://shared-eu2.rossum.app/api/v1/workspaces/526238",
+  "organization": "https://shared-eu2.rossum.app/api/v1/organizations/263865",
+  "queues": [
+    "https://shared-eu2.rossum.app/api/v1/queues/1162844"
+  ],
+  "metadata": {},
+  "autopilot": true
+}

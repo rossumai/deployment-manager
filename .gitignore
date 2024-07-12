@@ -1,0 +1,10 @@
+__pycache__/
+.venv
+*/**/__pycache__
+.env
+credentials.json
+dist
+
+dummy_project
+temp_project
+.vscode

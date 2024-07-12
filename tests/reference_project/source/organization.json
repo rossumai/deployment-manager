@@ -1,0 +1,31 @@
+{
+  "id": 263865,
+  "url": "https://shared-eu2.rossum.app/api/v1/organizations/263865",
+  "name": "PRD test source",
+  "workspaces": [
+    "https://shared-eu2.rossum.app/api/v1/workspaces/526237",
+    "https://shared-eu2.rossum.app/api/v1/workspaces/526238"
+  ],
+  "users": [
+    "https://shared-eu2.rossum.app/api/v1/users/285991"
+  ],
+  "ui_settings": {},
+  "metadata": {},
+  "expires_at": null,
+  "trial_expires_at": "2024-08-01T07:20:36.610028Z",
+  "is_trial": true,
+  "oidc_provider": null,
+  "organization_group": "https://shared-eu2.rossum.app/api/v1/organization_groups/11138",
+  "created_at": "2024-07-02T07:20:36.618728Z",
+  "internal_info": {
+    "cs_account_classification": null,
+    "customer_type": null,
+    "market_category": null,
+    "overdue_payment_date": null,
+    "sso_active": false
+  },
+  "creator": "https://shared-eu2.rossum.app/api/v1/users/285991",
+  "settings": {},
+  "modified_by": "https://shared-eu2.rossum.app/api/v1/users/285991",
+  "modified_at": "2024-07-10T10:42:18.292114Z"
+}
