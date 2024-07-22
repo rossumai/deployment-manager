@@ -292,7 +292,9 @@ async def test_push_uses_change_in_code_file(
         / "hooks"
         / f"{templatize_name_id(custom_code_hook.name, custom_code_hook.id)}.json"
     )
-    hook_code_path = create_custom_hook_code_path(hook_path, dataclasses.asdict(custom_code_hook))
+    hook_code_path = create_custom_hook_code_path(
+        hook_path, dataclasses.asdict(custom_code_hook)
+    )
 
     NEW_CODE = 'print("The world has changed.")'
     await write_str(hook_code_path, NEW_CODE)
