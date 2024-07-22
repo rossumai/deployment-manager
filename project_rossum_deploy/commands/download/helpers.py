@@ -53,6 +53,22 @@ class MissingParentObjectException(Exception):
     status_code = 404
 
 
+def replace_code_paths(file_paths: list[Path]):
+    """Since only .json files are compared when pulling, this flags the json file as changed if its code (.py/.js) file has changed."""
+    replaced_paths = []
+
+    for path in file_paths:
+        if path.suffix in [".py", ".js"]:
+            if path.parent.name == "hooks":
+                path = path.with_suffix(".json")
+            elif settings.FORMULA_DIR_PREFIX in path.parent.name:
+                only_schema_name = path.parent.name.split(":")[1]
+                path = path.parent.with_name(only_schema_name).with_suffix(".json")
+        replaced_paths.append(path)
+
+    return replaced_paths
+
+
 async def should_write_object(path: Path, remote_object: Any, changed_files: list):
     if await path.exists():
         local_file = await read_json(path)

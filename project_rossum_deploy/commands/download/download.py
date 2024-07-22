@@ -10,6 +10,7 @@ import click
 from project_rossum_deploy.commands.download.helpers import (
     get_all_objects_for_destination,
     remove_local_nonexistent_objects,
+    replace_code_paths,
     should_write_object,
 )
 from project_rossum_deploy.commands.download.hooks import download_hooks
@@ -93,6 +94,7 @@ async def download_project(
         *get_changed_file_paths(settings.TARGET_DIRNAME),
     ]
     changed_files = list(map(lambda x: x[1], changed_files))
+    changed_files = replace_code_paths(changed_files)
 
     try:
         if settings.IS_PROJECT_IN_SAME_ORG:
