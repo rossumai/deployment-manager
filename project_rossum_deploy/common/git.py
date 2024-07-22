@@ -7,7 +7,7 @@ from project_rossum_deploy.utils.consts import GIT_CHARACTERS
 
 def get_changed_file_paths(
     destination: str, indexed_only=False
-) -> list[tuple[str, str]]:
+) -> list[tuple[str, Path]]:
     # The -s flag is there to show a simplified list of changes
     # The -u flag is there to show each individual file (and not a subdir)
     # The change in git config is because of potential 'unusual' (non-ASCII) characters in paths
@@ -34,11 +34,7 @@ def get_changed_file_paths(
         change = change.strip(" ")
         op, path = tuple(change.split(" ", maxsplit=1))
 
-        # The code file has changed, but only .json files are compared when pulling
-        # Use the .json path to prevent code changes being lost
         path = Path(path.strip().strip('"'))
-        if path.suffix in [".py", ".js"]:
-            path = path.with_suffix(".json")
 
         changes.append((op, path))
     return changes
