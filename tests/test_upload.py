@@ -15,7 +15,12 @@ from project_rossum_deploy.commands.download.download import (
 )
 from project_rossum_deploy.common.mapping import read_mapping, write_mapping
 from project_rossum_deploy.commands.upload.upload import upload_project
-from project_rossum_deploy.common.read_write import read_json, write_json
+from project_rossum_deploy.common.read_write import (
+    create_custom_hook_code_path,
+    read_json,
+    write_json,
+    write_str,
+)
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     templatize_name_id,
@@ -68,7 +73,8 @@ async def updated_file_tuple(client: ElisAPIClient, tmp_path):
 
 @pytest.mark.asyncio
 async def test_push_updated_file(
-    client: ElisAPIClient, updated_file_tuple, monkeypatch: pytest.MonkeyPatch
+    client: ElisAPIClient,
+    updated_file_tuple,
 ):
     tmp_path, updated_file_path, updated_file = updated_file_tuple
 
@@ -81,7 +87,8 @@ async def test_push_updated_file(
 
 @pytest.mark.asyncio
 async def test_push_ignored_non_staged_file(
-    client: ElisAPIClient, updated_file_tuple, monkeypatch: pytest.MonkeyPatch
+    client: ElisAPIClient,
+    updated_file_tuple,
 ):
     tmp_path, updated_file_path, updated_file = updated_file_tuple
 
@@ -121,7 +128,8 @@ async def updated_file_name_tuple(client: ElisAPIClient, tmp_path):
 
 @pytest.mark.asyncio
 async def test_push_updated_file_name_changed(
-    client: ElisAPIClient, updated_file_name_tuple, monkeypatch: pytest.MonkeyPatch
+    client: ElisAPIClient,
+    updated_file_name_tuple,
 ):
     tmp_path, previous_file_path, updated_file = updated_file_name_tuple
 
@@ -138,7 +146,7 @@ async def test_push_updated_file_name_changed(
 
 
 @pytest_asyncio.fixture(scope="function")
-async def source_and_target_schema(client: ElisAPIClient, tmp_path, monkeypatch):
+async def source_and_target_schema(client: ElisAPIClient, tmp_path):
     source_schema = await client.create_new_schema(
         {"name": "source_schema", "content": []}
     )
@@ -178,7 +186,6 @@ async def source_and_target_schema(client: ElisAPIClient, tmp_path, monkeypatch)
 async def test_push_ignores_file_from_target(
     client: ElisAPIClient,
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
     source_and_target_schema,
 ):
     source_schema, target_schema = source_and_target_schema
@@ -216,7 +223,6 @@ async def test_push_ignores_file_from_target(
 async def test_push_ignores_file_from_source(
     client: ElisAPIClient,
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
     source_and_target_schema,
 ):
     source_schema, target_schema = source_and_target_schema
@@ -248,3 +254,52 @@ async def test_push_ignores_file_from_source(
 
     assert is_object_equal(redownloaded_target_schema, updated_target_schema)
     assert dataclasses.asdict(redownloaded_source_schema)["metadata"] == {}
+
+
+@pytest_asyncio.fixture(scope="function")
+async def custom_code_hook(client: ElisAPIClient, tmp_path):
+    custom_code_hook = await client.create_new_hook(
+        {
+            "name": "custom_code_hook",
+            "type": "function",
+            "events": ["invocation.manual"],
+            "queues": [],
+            "config": {"runtime": "python3.12", "code": "print('hello')"},
+        }
+    )
+
+    await download_organization_combined_source_target(client, org_path=tmp_path)
+
+    await setup_project(client, tmp_path)
+
+    settings.IS_PROJECT_IN_SAME_ORG = True
+    # The command must be run from the directory because it is running 'git status' internally
+    os.chdir(tmp_path)
+
+    yield custom_code_hook
+
+    # Cleanup
+    await client._http_client.delete(Resource.Hook, custom_code_hook.id)
+
+
+@pytest.mark.asyncio
+async def test_push_uses_change_in_code_file(
+    client: ElisAPIClient, tmp_path, custom_code_hook
+):
+    hook_path = (
+        tmp_path
+        / settings.SOURCE_DIRNAME
+        / "hooks"
+        / f"{templatize_name_id(custom_code_hook.name, custom_code_hook.id)}.json"
+    )
+    hook_code_path = create_custom_hook_code_path(hook_path, dataclasses.asdict(custom_code_hook))
+
+    NEW_CODE = 'print("The world has changed.")'
+    await write_str(hook_code_path, NEW_CODE)
+
+    await upload_project(destination=settings.SOURCE_DIRNAME, client=client)
+    redownloaded_hook = await read_json(hook_path)
+    redownloaded_code = await hook_code_path.read_text()
+
+    assert redownloaded_hook.get("config", {}).get("code") == NEW_CODE
+    assert redownloaded_code == NEW_CODE
