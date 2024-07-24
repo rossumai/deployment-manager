@@ -96,10 +96,26 @@ async def should_write_object(path: Path, remote_object: Any, changed_files: lis
         return True
 
 
+def is_within_git_dir(path: Path) -> bool:
+    """
+    Check if the given path is within a .git directory.
+    """
+    for parent in path.parents:
+        if parent.name == '.git':
+            return True
+    return False
+
+
 def delete_empty_folders(root: Path):
     deleted = set()
 
     for current_dir, subdirs, files in os.walk(root, topdown=False):
+        current_dir_path = Path(current_dir)
+
+        # Skip if the current directory is within a .git directory
+        if is_within_git_dir(current_dir_path):
+            continue
+
         still_has_subdirs = False
         for subdir in subdirs:
             if os.path.join(current_dir, subdir) not in deleted:
