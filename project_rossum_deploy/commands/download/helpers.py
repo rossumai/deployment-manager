@@ -101,7 +101,7 @@ def is_within_git_dir(path: Path) -> bool:
     Check if the given path is within a .git directory.
     """
     for parent in path.parents:
-        if parent.name == '.git':
+        if parent.name == ".git":
             return True
     return False
 
