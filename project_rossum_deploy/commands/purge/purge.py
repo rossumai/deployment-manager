@@ -6,6 +6,7 @@ from rich.prompt import Confirm
 import click
 from rossum_api import ElisAPIClient
 
+from project_rossum_deploy.commands.download.download import download_project
 from project_rossum_deploy.commands.migrate_mapping import migrate_mapping
 from project_rossum_deploy.commands.purge.delete_objects import (
     delete_all_objects_with_ids,
@@ -56,9 +57,15 @@ async def purge_project(
         else:
             await purge_destination(destination=destination)
 
+        await download_project(
+            destination=destination
+            if destination != settings.UNUSED_SCHEMAS
+            else settings.BOTH_DESTINATIONS,
+        )
+
         print(
             Panel(
-                f"{settings.PURGE_COMMAND_NAME} finished. Please run {settings.DOWNLOAD_COMMAND_NAME} before making further changes since local and remote are now out of sync."
+                f"{settings.PURGE_COMMAND_NAME} finished and changes were {settings.DOWNLOAD_COMMAND_NAME}ed."
             )
         )
 
