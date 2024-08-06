@@ -153,6 +153,7 @@ try:
 
         MIGRATE_MAPPING_COMMAND_NAME: str = "migrate-mapping"
         INITIALIZE_COMMAND_NAME: str = "init"
+        VISUALIZE_COMMAND_NAME: str = "visualize"
         DOWNLOAD_COMMAND_NAME: str = "pull"
         UPLOAD_COMMAND_NAME: str = "push"
         PURGE_COMMAND_NAME: str = "purge"
