@@ -79,6 +79,8 @@ async def create_graph_json(schema_path: Path):
         "links": [],
     }
 
+    # TODO: remove levels
+
     add_nodes(schema["content"], graph["nodes"])
     add_formula_links(schema["content"], graph["links"])
     add_nonexisting_nodes(graph)
