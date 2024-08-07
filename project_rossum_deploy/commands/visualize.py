@@ -79,35 +79,31 @@ async def create_graph_json(schema_path: Path):
         "links": [],
     }
 
-    # TODO: remove levels
-
     add_nodes(schema["content"], graph["nodes"])
     add_formula_links(schema["content"], graph["links"])
     add_nonexisting_nodes(graph)
-    redo_levels_for_dependencies(graph)
     mark_orphans(graph)
 
     return graph
 
 
-def add_nodes(tree: list, nodes: list, running_index: int = 0):
+def add_nodes(tree: list, nodes: list):
     for node in tree:
         if node["category"] == "section" or node["category"] == "tuple":
             if "children" in node:
-                add_nodes(node["children"], nodes, running_index := running_index + 1)
+                add_nodes(node["children"], nodes)
 
         elif node["category"] == "datapoint":
-            nodes.append(create_new_node(node, running_index))
+            nodes.append(create_new_node(node))
 
         elif node["category"] == "multivalue":
-            add_nodes([node["children"]], nodes, running_index := running_index + 1)
+            add_nodes([node["children"]], nodes)
 
 
-def create_new_node(node: dict, level: int):
+def create_new_node(node: dict):
     graph_node = {
         "id": node["id"],
         "name": node["label"],
-        "level": level,
         "is_orphan": False,
         "is_hidden": node.get("hidden", False),
         "field_type": "default",
@@ -141,21 +137,12 @@ def add_nonexisting_nodes(graph: dict):
     for link in graph["links"]:
         if link["source"] not in node_ids:
             graph["nodes"].append(
-                create_new_node({"id": link["source"], "label": link["source"]}, 0)
+                create_new_node({"id": link["source"], "label": link["source"]})
             )
         if link["target"] not in node_ids:
             graph["nodes"].append(
-                create_new_node({"id": link["target"], "label": link["target"]}, 0)
+                create_new_node({"id": link["target"], "label": link["target"]})
             )
-
-
-def redo_levels_for_dependencies(graph: dict):
-    for link in graph["links"]:
-        source = find_graph_node(graph["nodes"], link["source"])
-        target = find_graph_node(graph["nodes"], link["target"])
-
-        if source["level"] == target["level"]:
-            target["level"] += 1
 
 
 def mark_orphans(graph: dict):
