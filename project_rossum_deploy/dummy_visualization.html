@@ -41,17 +41,22 @@
 
     .ingoing {
         stroke: #237690 !important;
-        stroke-width: 4px !important;
+        stroke-width: 3px !important;
+        stroke-opacity: 1 !important;
     }
 
     .outgoing {
         stroke: #FA1209 !important;
-        stroke-width: 4px !important;
+        stroke-width: 3px !important;
+        stroke-opacity: 1 !important;
+
     }
 
     .selected {
         stroke: #000000 !important;
-        stroke-width: 3px !important;
+        stroke-width: 2px !important;
+        stroke-opacity: 1 !important;
+
     }
 
     .color-box {
@@ -84,6 +89,7 @@
     <script>DUMMY_DATA</script>
     <script>
         // Specify the dimensions of the chart.
+        const NODE_WIDTH = 25;
         const width = 1920;
         const height = 1200;
 
@@ -121,7 +127,22 @@
             d.distance = findNode(nodes, d.target).level - findNode(nodes, d.source).level
         });
 
-        var white_background = svg.append("svg:defs")
+        svg.append("defs")
+            .selectAll("marker")
+            .data(["marker"])
+            .enter().append("marker")
+            .attr("id", `arrow`)
+            .attr("viewBox", "0 -5 10 10")
+            // .attr("refX", 15)
+            // .attr("refY", -0.5)
+            .attr("markerWidth", 6)
+            .attr("markerHeight", 6)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("fill", "black")
+            .attr("d", "M0,-5L10,0L0,5");
+
+        const white_background = svg.append("svg:defs")
             .append("filter")
             .attr("x", 0)
             .attr("y", 0)
@@ -138,12 +159,16 @@
             .attr("in", "SourceGraphic")
 
         // Add a line for each link, and a circle for each node.
-        const link = svg
-            .selectAll()
-            .data(links)
-            .join("line")
-            .attr("stroke", "#999")
-            .attr("stroke-opacity", 0.6)
+        const link =
+            svg.append("g")
+                .attr("fill", "none")
+                .attr("stroke-width", 1.5)
+                .selectAll("path")
+                .data(links)
+                .join("line")
+                .attr("stroke", "#999")
+                .attr("stroke-opacity", 0.6)
+                .attr("marker-end", `url(#arrow)`)
 
         const node = svg
             .selectAll('circle')
@@ -151,7 +176,7 @@
 
         const circle = node.append("circle")
             .attr("z", 0)
-            .attr("r", 25)
+            .attr("r", NODE_WIDTH)
             .attr("fill", d => color(d.group))
             .on("mouseover", highlight(true))
             .on("mouseout", highlight(false))
@@ -199,12 +224,39 @@
 
         // Set the position attributes of links and nodes each time the simulation ticks.
         function ticked() {
+            function getTargetNodeCircumferencePoint(d) {
+
+                var t_radius = NODE_WIDTH + 10 / 2; // nodeWidth is just a custom attribute I calculate during the creation of the nodes depending on the node width
+                var dx = d.target.x - d.source.x;
+                var dy = d.target.y - d.source.y;
+                var gamma = Math.atan2(dy, dx); // Math.atan2 returns the angle in the correct quadrant as opposed to Math.atan
+                var tx = d.target.x - (Math.cos(gamma) * t_radius);
+                var ty = d.target.y - (Math.sin(gamma) * t_radius);
+
+                return [tx, ty];
+            }
+
+
             link
                 .attr("x1", d => Math.max(25, Math.min(width - 25, d.source.x)))
                 .attr("y1", d => Math.max(25, Math.min(height - 25, d.source.y)))
-                .attr("x2", d => Math.max(25, Math.min(width - 25, d.target.x)))
-                .attr("y2", d => Math.max(25, Math.min(height - 25, d.target.y)));
-
+                .attr("x2", function (d) {
+                    return Math.max(25, Math.min(width - 25, getTargetNodeCircumferencePoint(d)[0]));
+                })
+                .attr("y2", function (d) {
+                    return Math.max(25, Math.min(width - 25, getTargetNodeCircumferencePoint(d)[1]));
+                });
+            // .attr("x1", d => Math.max(25, Math.min(width - 25, d.source.x)))
+            // .attr("y1", d => Math.max(25, Math.min(height - 25, d.source.y)))
+            // .attr("x2", d => Math.max(25, Math.min(width - 25, d.target.x)))
+            // .attr("y2", d => Math.max(25, Math.min(height - 25, d.target.y)));
+            // .attr('d', (d) => {
+            //     const r = 0// Math.hypot(d.target.x - d.source.x, d.target.y - d.source.y);
+            //     return `
+            //            M${d.source.x},${d.source.y}
+            //            A${r},${r} 0 0,1 ${d.target.x},${d.target.y}
+            //              `;
+            // })
 
             node
                 .attr("cx", function (d) {
