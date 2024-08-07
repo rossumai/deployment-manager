@@ -28,7 +28,7 @@
     }
 
     circle {
-        fill: #ccc;
+        /* fill: #ccc; */
         stroke: #fff;
         stroke-width: 1.5px;
     }
@@ -41,20 +41,20 @@
 
     .ingoing {
         stroke: #237690 !important;
-        stroke-width: 3px !important;
+        stroke-width: 4px !important;
         stroke-opacity: 1 !important;
     }
 
     .outgoing {
         stroke: #FA1209 !important;
-        stroke-width: 3px !important;
+        stroke-width: 4px !important;
         stroke-opacity: 1 !important;
 
     }
 
     .selected {
         stroke: #000000 !important;
-        stroke-width: 2px !important;
+        stroke-width: 1.75px !important;
         stroke-opacity: 1 !important;
 
     }
@@ -90,8 +90,8 @@
     <script>
         // Specify the dimensions of the chart.
         const NODE_WIDTH = 25;
-        const width = 1920;
-        const height = 1200;
+        const width = 1800;
+        const height = 900;
 
         var chartDiv = document.getElementById("chart");
         var svg = d3.select(chartDiv).append("svg")
@@ -101,6 +101,7 @@
             .attr("style", "max-width: 100%; max-height: 100%;");
 
 
+        field_types = ['captured', 'data_matching', 'data', 'formula', 'manual']
         // Specify the color scale.
         const color = d3.scaleOrdinal(d3.schemeCategory10);
 
@@ -133,13 +134,12 @@
             .enter().append("marker")
             .attr("id", `arrow`)
             .attr("viewBox", "0 -5 10 10")
-            // .attr("refX", 15)
-            // .attr("refY", -0.5)
-            .attr("markerWidth", 6)
-            .attr("markerHeight", 6)
+            .attr("markerWidth", 4)
+            .attr("markerHeight", 4)
             .attr("orient", "auto")
             .append("path")
             .attr("fill", "black")
+            .attr("stroke-width", "2px")
             .attr("d", "M0,-5L10,0L0,5");
 
         const white_background = svg.append("svg:defs")
@@ -168,7 +168,9 @@
                 .join("line")
                 .attr("stroke", "#999")
                 .attr("stroke-opacity", 0.6)
-                .attr("marker-end", `url(#arrow)`)
+
+        link
+            .attr("marker-end", `url(#arrow)`)
 
         const node = svg
             .selectAll('circle')
@@ -177,13 +179,15 @@
         const circle = node.append("circle")
             .attr("z", 0)
             .attr("r", NODE_WIDTH)
-            .attr("fill", d => color(d.group))
+            .attr("fill", d => color(d.field_type))
             .on("mouseover", highlight(true))
             .on("mouseout", highlight(false))
 
         node.append("text")
             .attr("class", "fa")
             .style("text-anchor", "middle")
+            .style("stroke-width", "2px")
+            .style("stroke", "white")
             .text((d) => {
                 if (d.field_type == 'formula') {
                     return "\u0046";
@@ -191,6 +195,10 @@
                     return '\u004d';
                 } else if (d.field_type == 'data_matching') {
                     return '\u0044\u004d';
+                } else if (d.field_type == 'data') {
+                    return '\u0044\u0041\u0054\u0041';
+                } else {
+                    return '\u0041\u0049';
                 }
             });
 
@@ -209,8 +217,9 @@
         // add the text to nodes
         const title = node.append("text")
             .attr("filter", "url(#white_background)")
-            .attr("dy", '1.5em')
+            .attr("dy", '2em')
             .style("text-anchor", "middle")
+            .style("font-size", "14px")
             .text(function (d) {
                 return d.id;
             });
@@ -244,7 +253,7 @@
                     return Math.max(25, Math.min(width - 25, getTargetNodeCircumferencePoint(d)[0]));
                 })
                 .attr("y2", function (d) {
-                    return Math.max(25, Math.min(width - 25, getTargetNodeCircumferencePoint(d)[1]));
+                    return Math.max(25, Math.min(height - 25, getTargetNodeCircumferencePoint(d)[1]));
                 });
             // .attr("x1", d => Math.max(25, Math.min(width - 25, d.source.x)))
             // .attr("y1", d => Math.max(25, Math.min(height - 25, d.source.y)))
@@ -272,10 +281,10 @@
 
         // Create a simulation with several forces.
         const simulation = d3.forceSimulation(nodes)
-            .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+            .force("link", d3.forceLink(links).id(d => d.id).distance(150))
             .force("charge", d3.forceManyBody())
             .force("center", d3.forceCenter(width / 2, height / 2))
-            .force("collide", d3.forceCollide((d) => 50))
+            .force("collide", d3.forceCollide((d) => 70))
             // .force("x", d3.forceX())
             // .force("y", d3.forceY())
             .on("tick", ticked);
