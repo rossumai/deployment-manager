@@ -6,10 +6,12 @@ def create_node(node: dict):
         "is_orphan": False,
         "is_hidden": node.get("hidden", False),
         "field_type": "default",
+        "tooltip_content": "",
     }
 
     if node.get("formula", None):
         graph_node["field_type"] = "formula"
+        graph_node["tooltip_content"] = f"<pre>{node['formula']}</pre>"
     elif node.get("ui_configuration", {}).get("type", "captured") == "manual":
         graph_node["field_type"] = "manual"
     elif (
@@ -27,3 +29,10 @@ def create_node(node: dict):
 
 def create_link(source: str, target: str):
     return {"source": source, "target": target}
+
+
+def find_node(node_id: str, graph: dict):
+    for node in graph["nodes"]:
+        if node["id"] == node_id:
+            return node
+    return None

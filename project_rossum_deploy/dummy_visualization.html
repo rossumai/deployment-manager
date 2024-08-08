@@ -1,5 +1,7 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
+<script src="https://unpkg.com/@popperjs/core@2/dist/umd/popper.min.js"></script>
+<script src="https://unpkg.com/tippy.js@6/dist/tippy-bundle.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
     integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg=="
@@ -88,7 +90,17 @@
     </div>
     <script>DUMMY_DATA</script>
     <script>
-        // Specify the dimensions of the chart.
+        function setTooltips() {
+            node.attr('data-tippy-content', (d, i) => {
+                return `<div>${d.tooltip_content}</div>`;
+            });
+
+            tippy(node.nodes(), {
+                // content: `<i>hehehe</i>`,
+                allowHTML: true
+            });
+        }
+
         const NODE_WIDTH = 25;
         const width = 1800;
         const height = 900;
@@ -114,7 +126,7 @@
             for (const node of nodes) {
                 if (node.id == id) return node
             }
-            return { level: 0 }
+            return { level: 0, delay: 500 }
         }
 
         var linkedByIndex = {};
@@ -176,6 +188,7 @@
             .selectAll('circle')
             .data(nodes).enter().append("g")
 
+
         const circle = node.append("circle")
             .attr("z", 0)
             .attr("r", NODE_WIDTH)
@@ -202,15 +215,15 @@
                 }
             });
 
-        node.append('title').text((d) => {
-            if (d.field_type == 'formula') {
-                return "Formula field";
-            } else if (d.field_type == 'manual') {
-                return "Manual field";
-            } else if (d.field_type == 'data_matching') {
-                return "Data matching field";
-            }
-        })
+        // node.append('title').text((d) => {
+        //     if (d.field_type == 'formula') {
+        //         return "Formula field";
+        //     } else if (d.field_type == 'manual') {
+        //         return "Manual field";
+        //     } else if (d.field_type == 'data_matching') {
+        //         return "Data matching field";
+        //     }
+        // })
 
         node.attr('class', (d) => d.is_hidden ? "hidden-in-schema" : "")
 
@@ -277,6 +290,7 @@
                 .attr("transform", function (d) {
                     return "translate(" + d.x + "," + d.y + ")";
                 });
+
         }
 
         // Create a simulation with several forces.
@@ -329,6 +343,8 @@
 
         function highlight(active) {
             return function (e, d) {
+                setTooltips()
+
                 link.classed("ingoing", function (link) {
                     return active && link.target === d;
                 });

@@ -2,7 +2,7 @@ import json
 import re
 from rossum_api import ElisAPIClient
 
-from project_rossum_deploy.commands.visualize.utils import create_link
+from project_rossum_deploy.commands.visualize.utils import create_link, find_node
 from project_rossum_deploy.utils.consts import display_error
 
 
@@ -32,7 +32,7 @@ def recognize_master_data_hub_hook(hook: dict) -> bool:
 
 def enrich_graph_with_data_matching_information(hook: dict, graph: dict):
     for configuration in hook["settings"]["configurations"]:
-        # TODO: dataset information
+        dataset_name = configuration["source"].get("dataset", "")
 
         target_schema_ids = [
             configuration["mapping"]["target_schema_id"],
@@ -55,3 +55,8 @@ def enrich_graph_with_data_matching_information(hook: dict, graph: dict):
                     graph["links"].append(
                         create_link(source=match, target=target_schema_id)
                     )
+
+        for target_schema_id in target_schema_ids:
+            node = find_node(target_schema_id, graph)
+            if node:
+                node["tooltip_content"] = f"Dataset: {dataset_name}"
