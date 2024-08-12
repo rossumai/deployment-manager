@@ -4,6 +4,7 @@ from rossum_api import ElisAPIClient
 from rich import print
 from rich.panel import Panel
 
+from project_rossum_deploy.commands.migrate.helpers import check_if_selected
 from project_rossum_deploy.utils.functions import (
     find_object_by_id,
 )
@@ -30,6 +31,7 @@ async def migrate_organization(
     target_organization_id: int,
     progress: Progress,
     plan_only: bool = False,
+    selected_only: bool = False,
     target_objects: list[dict] = [],
     errors: dict = {},
     force: bool = False,
@@ -51,15 +53,20 @@ async def migrate_organization(
                     f"Missing local target object, please {settings.DOWNLOAD_COMMAND_NAME} it first."
                 )
 
+        source_id_target_pairs[mapping["organization"]["id"]] = [
+            local_target_organization
+        ]
+
+        if selected_only and not check_if_selected(mapping["organization"]):
+            progress.update(task, advance=1)
+            return
+
         if plan_only:
             print(
                 Panel(
                     f'Simulating organization "{organization['id']}" -> "{target_organization_id}".'
                 )
             )
-            source_id_target_pairs[mapping["organization"]["id"]] = [
-                local_target_organization
-            ]
         else:
             source_id_target_pairs[mapping["organization"]["id"]] = [
                 await upload_organization(

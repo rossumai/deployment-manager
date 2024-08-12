@@ -9,6 +9,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 
 from project_rossum_deploy.commands.migrate.helpers import (
+    check_if_selected,
     get_token_owner,
     migrate_object_to_multiple_targets,
     simulate_migrate_object,
@@ -36,6 +37,7 @@ async def migrate_hooks(
     sources_by_source_id_map: dict,
     progress: Progress,
     plan_only: bool = False,
+    selected_only: bool = False,
     target_objects: list[dict] = [],
     errors: dict = {},
     force: bool = False,
@@ -73,18 +75,20 @@ async def migrate_hooks(
                 )
 
             hook_mapping = find_mapping_of_object(mapping["organization"]["hooks"], id)
-            if hook_mapping.get("ignore", None):
-                progress.update(task, advance=1)
-                return
+
+            skip_migration = hook_mapping.get("ignore", None) or (
+                selected_only and not check_if_selected(hook_mapping)
+            )
 
             await update_hook_code(hook_path, hook)
 
-            if plan_only:
+            if plan_only or skip_migration:
                 partial_upload_hook = functools.partial(
                     simulate_migrate_object,
                     client=client,
                     source_object=hook,
                     target_object_type=Resource.Hook,
+                    silent=skip_migration,
                 )
             else:
                 partial_upload_hook = functools.partial(

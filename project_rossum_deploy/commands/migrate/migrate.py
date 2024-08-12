@@ -55,6 +55,13 @@ The specifics of what objects to migrate and where to migrate them are specified
     is_flag=True,
 )
 @click.option(
+    "--selected-only",
+    "-so",
+    default=False,
+    is_flag=True,
+    help="Releases only objects with a `selected: true` attribute in mapping.yaml and ignores the rest even without an ignore flag. Unlike ignore, this flag is not recursive = you have to put it on sub-objects (e.g., both queue AND inbox).",
+)
+@click.option(
     "--force",
     "-f",
     default=False,
@@ -76,11 +83,15 @@ The specifics of what objects to migrate and where to migrate them are specified
 )
 @coro
 async def migrate_project_wrapper(
-    plan_only: bool, force: bool, commit: bool, message: str
+    plan_only: bool, selected_only: bool, force: bool, commit: bool, message: str
 ):
     await migrate_config()
     await migrate_project(
-        plan_only=plan_only, force=force, commit=commit, commit_message=message
+        plan_only=plan_only,
+        selected_only=selected_only,
+        force=force,
+        commit=commit,
+        commit_message=message,
     )
 
 
@@ -88,6 +99,7 @@ async def migrate_project(
     client: ElisAPIClient = None,
     org_path: Path = None,
     plan_only: bool = False,
+    selected_only: bool = False,
     force: bool = False,
     commit: bool = False,
     commit_message: str = "",
@@ -103,6 +115,11 @@ async def migrate_project(
         if "target_object" in mapping["organization"]:
             raise PrdVersionException(
                 f'Detected "target_object" for organization. Please run "prd {settings.MIGRATE_MAPPING_COMMAND_NAME}" to have the correct mapping format.'
+            )
+
+        if "ignore" in mapping["organization"]:
+            raise click.ClickException(
+                "Cannot ignore the whole organization, please remove the attribute from mapping."
             )
 
         source_organization_id = mapping["organization"].get("id", "")
@@ -162,6 +179,7 @@ async def migrate_project(
                 target_organization_id=target_organization_id,
                 progress=progress,
                 plan_only=plan_only,
+                selected_only=selected_only,
                 target_objects=target_objects,
                 errors=errors_by_target_id,
                 force=force,
@@ -175,6 +193,7 @@ async def migrate_project(
                 sources_by_source_id_map=sources_by_source_id_map,
                 progress=progress,
                 plan_only=plan_only,
+                selected_only=selected_only,
                 target_objects=target_objects,
                 errors=errors_by_target_id,
                 force=force,
@@ -187,6 +206,7 @@ async def migrate_project(
                 sources_by_source_id_map=sources_by_source_id_map,
                 progress=progress,
                 plan_only=plan_only,
+                selected_only=selected_only,
                 target_objects=target_objects,
                 errors=errors_by_target_id,
                 force=force,
@@ -199,6 +219,7 @@ async def migrate_project(
                 sources_by_source_id_map=sources_by_source_id_map,
                 progress=progress,
                 plan_only=plan_only,
+                selected_only=selected_only,
                 target_objects=target_objects,
                 errors=errors_by_target_id,
                 force=force,
@@ -233,6 +254,7 @@ async def migrate_project(
             lookup_table=lookup_table,
             errors=errors_by_target_id,
             plan_only=plan_only,
+            selected_only=selected_only,
         )
 
         if plan_only:
@@ -257,7 +279,7 @@ async def migrate_project(
                 commit=commit,
                 commit_message=commit_message,
             )
-            print(Panel(f"Finished {settings.MIGRATE_COMMAND_NAME}."))
+
             hints = """
             ! attention !
             The following was not migrated - queue.dedicated_engine, queue.generic_engine, queue.users, hook.secrets, queue.workflows.
@@ -269,6 +291,11 @@ async def migrate_project(
             This applies only for newly created objects. Once these attributes are set on the target object, subsequent release commands keep the values.
             """
             print(Panel(f"{hints}"))
+            print(
+                Panel(
+                    f"Finished {settings.MIGRATE_COMMAND_NAME}. Please check all messages printed during the process."
+                )
+            )
     except PrdVersionException as e:
         print(Panel(f"Unexpected error while migrating objects: {e}"))
         return

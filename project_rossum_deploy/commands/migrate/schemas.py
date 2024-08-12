@@ -10,6 +10,7 @@ from rich import print
 from rossum_api.api_client import Resource
 
 from project_rossum_deploy.commands.migrate.helpers import (
+    check_if_selected,
     migrate_object_to_multiple_targets,
     simulate_migrate_object,
 )
@@ -35,6 +36,7 @@ async def migrate_schemas(
     sources_by_source_id_map: dict,
     progress: Progress,
     plan_only: bool = False,
+    selected_only: bool = False,
     target_objects: list[dict] = [],
     errors: dict = {},
     force: bool = False,
@@ -45,6 +47,10 @@ async def migrate_schemas(
     task = progress.add_task("Releasing schemas.", total=len(schema_paths))
 
     async def migrate_schema(schema_path: Path):
+        if schema_path.suffix != ".json":
+            progress.update(task, advance=1)
+            return
+
         try:
             _, id = detemplatize_name_id(schema_path.stem)
             schema = await read_json(schema_path)
@@ -55,18 +61,20 @@ async def migrate_schemas(
             schema_mapping = find_mapping_of_object(
                 mapping["organization"]["schemas"], id
             )
-            if schema_mapping.get("ignore", None):
-                progress.update(task, advance=1)
-                return
+
+            skip_migration = schema_mapping.get("ignore", None) or (
+                selected_only and not check_if_selected(schema_mapping)
+            )
 
             await update_formula_fields_code(schema_path, schema)
 
-            if plan_only:
+            if plan_only or skip_migration:
                 partial_upload_schema = functools.partial(
                     simulate_migrate_object,
                     client=client,
                     source_object=schema,
                     target_object_type=Resource.Schema,
+                    silent=skip_migration,
                 )
             else:
                 partial_upload_schema = functools.partial(

@@ -23,6 +23,8 @@ API_SUFFIX_RE = re.compile(r"/api/v\d+$")
 ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD = "$prd_ref"
 ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD = "$source_value"
 
+MAPPING_SELECTED_ATTRIBUTE = "is_selected"
+
 
 def display_error(error_msg: str, exception: Exception = None):
     console = Console()

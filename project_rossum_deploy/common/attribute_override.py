@@ -20,6 +20,7 @@ from project_rossum_deploy.utils.functions import (
     find_all_object_paths,
 )
 from project_rossum_deploy.commands.migrate.helpers import (
+    check_if_selected,
     traverse_mapping,
 )
 from project_rossum_deploy.common.determine_path import determine_object_type_from_url
@@ -256,10 +257,13 @@ async def override_migrated_objects_attributes(
     lookup_table: dict,
     errors: dict,
     plan_only: bool = False,
+    selected_only: bool = False,
 ):
     print(Panel(f"Running attribute_override{' (simulated)' if plan_only else ''}."))
     for mapping_object in traverse_mapping(mapping["organization"]):
-        if mapping_object.get("ignore", None):
+        if mapping_object.get("ignore", None) or (
+            selected_only and not check_if_selected(mapping_object)
+        ):
             continue
 
         source_object = sources_by_source_id_map.get(mapping_object["id"], None)
