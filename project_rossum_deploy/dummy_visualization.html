@@ -16,6 +16,7 @@
     }
 
     #chart {
+        overflow: scroll;
         position: fixed;
         left: 0px;
         right: 0px;
@@ -41,24 +42,63 @@
         pointer-events: none;
     }
 
-    .ingoing {
+    .ingoing-link {
         stroke: #237690 !important;
         stroke-width: 4px !important;
         stroke-opacity: 1 !important;
+        opacity: 1 !important;
     }
 
-    .outgoing {
+    .outgoing-link {
         stroke: #FA1209 !important;
         stroke-width: 4px !important;
         stroke-opacity: 1 !important;
+        opacity: 1 !important;
+    }
+
+
+    .ingoing {
+        circle {
+
+            stroke: #237690 !important;
+            stroke-width: 4px !important;
+            stroke-opacity: 1 !important;
+            opacity: 1 !important;
+        }
+
+        text {
+            opacity: 1 !important;
+        }
+    }
+
+    .outgoing {
+
+        circle {
+
+            stroke: #FA1209 !important;
+            stroke-width: 4px !important;
+            stroke-opacity: 1 !important;
+            opacity: 1 !important;
+        }
+
+        text {
+            opacity: 1 !important;
+        }
 
     }
 
     .selected {
-        stroke: #000000 !important;
-        stroke-width: 1.75px !important;
-        stroke-opacity: 1 !important;
 
+        circle {
+            stroke: #000000 !important;
+            stroke-width: 1.75px !important;
+            stroke-opacity: 1 !important;
+            opacity: 1 !important;
+        }
+
+        text {
+            opacity: 1 !important;
+        }
     }
 
     .color-box {
@@ -74,6 +114,21 @@
         background: #237690 !important;
     }
 
+    .link-hidden-by-highlight {
+        stroke-width: 0;
+
+    }
+
+    .node-hidden-by-highlight {
+        circle {
+            opacity: 0;
+        }
+
+        text {
+            opacity: 0;
+        }
+    }
+
     .hidden-in-schema {
         opacity: 0.5;
     }
@@ -83,6 +138,7 @@
     <div id="chart"></div>
     <div id="controls">
         <input type="checkbox" id="cb_hide_orphans" onclick='redraw();'>Hide orphans<br>
+        <input type="checkbox" id="cb_hide_tooltips" onclick='redraw();'>Hide tooltips<br>
         <div>
             <div class="color-box box-red">Dependency of </div>
             <div class="color-box box-blue">Dependends on </div>
@@ -92,25 +148,34 @@
     <script>
         function setTooltips() {
             node.attr('data-tippy-content', (d, i) => {
-                return `<div>${d.tooltip_content}</div>`;
+                return `<div style="overflow: scroll;">${d.tooltip_content}</div>`;
             });
 
-            tippy(node.nodes(), {
-                // content: `<i>hehehe</i>`,
-                allowHTML: true
+            return tippy(node.nodes(), {
+                allowHTML: true,
+                interactive: true,
+                maxWidth: 'none',
+                appendTo: () => document.body,
+                delay: [100, 100],
             });
         }
 
         const NODE_WIDTH = 25;
+        const MARGIN = 25;
         const width = 1800;
-        const height = 900;
 
-        var chartDiv = document.getElementById("chart");
-        var svg = d3.select(chartDiv).append("svg")
-            .attr("width", '100%')
-            .attr("height", '100%')
-            .attr("viewBox", [0, 0, width, height])
-            .attr("style", "max-width: 100%; max-height: 100%;");
+        const chartDiv = document.getElementById("chart");
+
+        const heightMultiplier = data.nodes.length * 0.01
+        const height = chartDiv.getBoundingClientRect()['height'] * heightMultiplier;
+
+        const svg = d3.select(chartDiv).append("svg")
+            // .attr("width", '100%')
+            // .attr("height", '100%')
+            .attr("preserveAspectRatio", "xMinYMin meet")
+            .attr("viewBox", `0 0 ${width + MARGIN * 2} ${height + MARGIN * 2}`)
+        // .attr("viewBox", [0, 0, width, height])
+        // .attr("style", `max-width: 100%; height: ${height}px;`)
 
 
         field_types = ['captured', 'data_matching', 'data', 'formula', 'manual']
@@ -196,6 +261,7 @@
             .on("mouseover", highlight(true))
             .on("mouseout", highlight(false))
 
+
         node.append("text")
             .attr("class", "fa")
             .style("text-anchor", "middle")
@@ -215,17 +281,7 @@
                 }
             });
 
-        // node.append('title').text((d) => {
-        //     if (d.field_type == 'formula') {
-        //         return "Formula field";
-        //     } else if (d.field_type == 'manual') {
-        //         return "Manual field";
-        //     } else if (d.field_type == 'data_matching') {
-        //         return "Data matching field";
-        //     }
-        // })
-
-        node.attr('class', (d) => d.is_hidden ? "hidden-in-schema" : "")
+        // node.attr('class', (d) => d.is_hidden ? "hidden-in-schema" : "")
 
         // add the text to nodes
         const title = node.append("text")
@@ -260,13 +316,13 @@
 
 
             link
-                .attr("x1", d => Math.max(25, Math.min(width - 25, d.source.x)))
-                .attr("y1", d => Math.max(25, Math.min(height - 25, d.source.y)))
+                .attr("x1", d => Math.max(MARGIN + NODE_WIDTH, Math.min(width - 25, d.source.x)))
+                .attr("y1", d => Math.max(MARGIN + NODE_WIDTH, Math.min(height - 25, d.source.y)))
                 .attr("x2", function (d) {
-                    return Math.max(25, Math.min(width - 25, getTargetNodeCircumferencePoint(d)[0]));
+                    return Math.max(MARGIN + NODE_WIDTH, Math.min(width - 25, getTargetNodeCircumferencePoint(d)[0]));
                 })
                 .attr("y2", function (d) {
-                    return Math.max(25, Math.min(height - 25, getTargetNodeCircumferencePoint(d)[1]));
+                    return Math.max(MARGIN + NODE_WIDTH, Math.min(height - 25, getTargetNodeCircumferencePoint(d)[1]));
                 });
             // .attr("x1", d => Math.max(25, Math.min(width - 25, d.source.x)))
             // .attr("y1", d => Math.max(25, Math.min(height - 25, d.source.y)))
@@ -282,10 +338,10 @@
 
             node
                 .attr("cx", function (d) {
-                    return d.x = Math.max(25, Math.min(width - 25, d.x));
+                    return d.x = Math.max(MARGIN + NODE_WIDTH, Math.min(width - 25, d.x));
                 })
                 .attr("cy", function (d) {
-                    return d.y = Math.max(25, Math.min(height - 25, d.y));
+                    return d.y = Math.max(MARGIN + NODE_WIDTH, Math.min(height - 25, d.y));
                 })
                 .attr("transform", function (d) {
                     return "translate(" + d.x + "," + d.y + ")";
@@ -297,11 +353,15 @@
         const simulation = d3.forceSimulation(nodes)
             .force("link", d3.forceLink(links).id(d => d.id).distance(150))
             .force("charge", d3.forceManyBody())
-            .force("center", d3.forceCenter(width / 2, height / 2))
-            .force("collide", d3.forceCollide((d) => 70))
+            .force("center", d3.forceCenter(width / 2, height / 2).strength(0.5))
             // .force("x", d3.forceX())
             // .force("y", d3.forceY())
+            .force("collide", d3.forceCollide((d) => 58))
+            // .force("x", d3.forceX())
+            // .force("y", d3.forceY())
+            .alphaDecay(0.3)
             .on("tick", ticked);
+
 
         // const maxlevel = nodes.reduce(function (currentValue, node) {
         //     return Math.max(node.level, currentValue);
@@ -343,36 +403,51 @@
 
         function highlight(active) {
             return function (e, d) {
-                setTooltips()
+                // simulation.force("collide", d3.forceLink((d2) => active && (d.id === d2.id || linkedByIndex[d.id + "," + d2.id] || linkedByIndex[d2.id + "," + d.id]) ? 200 : 55)).alphaTarget(active ? 0.3 : 0).restart()
+                // simulation.force("link", d3.forceLink(links).id(d2 => d2.id).distance((d2) => active && (d.id === d2.id || linkedByIndex[d.id + "," + d2.id] || linkedByIndex[d2.id + "," + d.id]) ? 55 : 250)).alphaTarget(active ? 0.3 : 0).restart()
 
-                link.classed("ingoing", function (link) {
+                link.classed("link-hidden-by-highlight", function (link) {
+                    return active;
+                });
+                node.classed("node-hidden-by-highlight", function (node) {
+                    return active;
+                });
+
+                link.classed("ingoing-link", function (link) {
                     return active && link.target === d;
                 });
-                link.classed("outgoing", function (link) {
+                link.classed("outgoing-link", function (link) {
                     return active && link.source === d;
                 });
-                circle.classed("ingoing", function (circle) {
-                    return active && linkedByIndex[circle.id + "," + d.id];
+                node.classed("ingoing", function (node) {
+                    return active && linkedByIndex[node.id + "," + d.id];
                 });
-                circle.classed("outgoing", function (circle) {
-                    return active && linkedByIndex[d.id + "," + circle.id];
+                node.classed("outgoing", function (node) {
+                    return active && linkedByIndex[d.id + "," + node.id];
                 });
-                circle.classed("selected", function (circle) {
-                    return active && d.id === circle.id;
+                node.classed("selected", function (node) {
+                    return active && d.id === node.id;
                 });
-                circle.classed("ingoing", function (circle) {
-                    return active && linkedByIndex[circle.id + "," + d.id];
+                node.classed("ingoing", function (node) {
+                    return active && linkedByIndex[node.id + "," + d.id];
                 });
-                circle.classed("outgoing", function (circle) {
-                    return active && linkedByIndex[d.id + "," + circle.id];
+                node.classed("outgoing", function (node) {
+                    return active && linkedByIndex[d.id + "," + node.id];
                 });
-                circle.classed("selected", function (circle) {
-                    return active && d.id === circle.id;
+                node.classed("selected", function (node) {
+                    return active && d.id === node.id;
                 });
             };
         }
 
         function redraw() {
+            let cb_hide_tooltips = document.getElementById("cb_hide_tooltips");
+            if (cb_hide_tooltips.checked) {
+                tippyInstance.map((i) => i.disable())
+            } else {
+                tippyInstance.map((i) => i.enable())
+            }
+
             let cb_hide_orphans = document.getElementById("cb_hide_orphans");
             if (cb_hide_orphans.checked) {
                 node.style('visibility', (d) => d.is_orphan ? 'hidden' : 'visible')
@@ -381,6 +456,8 @@
             }
             simulation.restart();
         }
+
+        const tippyInstance = setTooltips()
 
     </script>
 </body>

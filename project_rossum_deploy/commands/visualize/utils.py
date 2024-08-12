@@ -14,6 +14,7 @@ def create_node(node: dict):
         graph_node["tooltip_content"] = f"<pre>{node['formula']}</pre>"
     elif node.get("ui_configuration", {}).get("type", "captured") == "manual":
         graph_node["field_type"] = "manual"
+        graph_node["tooltip_content"] = "Manual field"
     elif (
         node.get("ui_configuration", {}).get("type", "captured") == "data"
         and node["type"] == "enum"
@@ -21,8 +22,10 @@ def create_node(node: dict):
         graph_node["field_type"] = "data_matching"
     elif node.get("ui_configuration", {}).get("type", "captured") == "data":
         graph_node["field_type"] = "data"
+        # TODO: extension type in tooltip
     else:
         graph_node["field_type"] = "captured"
+        graph_node["tooltip_content"] = "Captured field"
 
     return graph_node
 
