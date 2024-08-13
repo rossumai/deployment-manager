@@ -1,4 +1,3 @@
-from rich.progress import Progress
 from anyio import Path
 from rossum_api import ElisAPIClient
 from rich import print
@@ -29,15 +28,12 @@ async def migrate_organization(
     source_id_target_pairs: dict[int, list],
     sources_by_source_id_map: dict,
     target_organization_id: int,
-    progress: Progress,
     plan_only: bool = False,
     selected_only: bool = False,
     target_objects: list[dict] = [],
     errors: dict = {},
     force: bool = False,
 ):
-    task = progress.add_task("Releasing organization.", total=1)
-
     try:
         organization = await read_json(source_path / "organization.json")
         sources_by_source_id_map[organization["id"]] = organization
@@ -58,7 +54,6 @@ async def migrate_organization(
         ]
 
         if selected_only and not check_if_selected(mapping["organization"]):
-            progress.update(task, advance=1)
             return
 
         if plan_only:
@@ -77,7 +72,10 @@ async def migrate_organization(
                     force=force,
                 )
             ]
-        progress.update(task, advance=1)
+
+            print(
+                f'Released organization "{organization['id']}" -> "{target_organization_id}".'
+            )
     except PrdVersionException as e:
         raise e
     except MissingTargetOrganizationException as e:

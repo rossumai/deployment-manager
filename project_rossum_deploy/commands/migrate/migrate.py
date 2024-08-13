@@ -2,7 +2,6 @@ from copy import deepcopy
 from anyio import Path
 from rich import print
 from rich.panel import Panel
-from rich.progress import Progress
 import click
 from rossum_api import ElisAPIClient
 from project_rossum_deploy.commands.download.download import (
@@ -169,61 +168,56 @@ async def migrate_project(
         target_paths = await find_all_object_paths(org_path / settings.TARGET_DIRNAME)
         target_objects = [await read_json(path) for path in target_paths]
 
-        with Progress() as progress:
-            await migrate_organization(
-                source_path=source_path,
-                client=client,
-                mapping=mapping,
-                source_id_target_pairs=source_id_target_pairs,
-                sources_by_source_id_map=sources_by_source_id_map,
-                target_organization_id=target_organization_id,
-                progress=progress,
-                plan_only=plan_only,
-                selected_only=selected_only,
-                target_objects=target_objects,
-                errors=errors_by_target_id,
-                force=force,
-            )
+        await migrate_organization(
+            source_path=source_path,
+            client=client,
+            mapping=mapping,
+            source_id_target_pairs=source_id_target_pairs,
+            sources_by_source_id_map=sources_by_source_id_map,
+            target_organization_id=target_organization_id,
+            plan_only=plan_only,
+            selected_only=selected_only,
+            target_objects=target_objects,
+            errors=errors_by_target_id,
+            force=force,
+        )
 
-            await migrate_schemas(
-                source_path=source_path,
-                client=client,
-                mapping=mapping,
-                source_id_target_pairs=source_id_target_pairs,
-                sources_by_source_id_map=sources_by_source_id_map,
-                progress=progress,
-                plan_only=plan_only,
-                selected_only=selected_only,
-                target_objects=target_objects,
-                errors=errors_by_target_id,
-                force=force,
-            )
-            await migrate_hooks(
-                source_path=source_path,
-                client=client,
-                mapping=mapping,
-                source_id_target_pairs=source_id_target_pairs,
-                sources_by_source_id_map=sources_by_source_id_map,
-                progress=progress,
-                plan_only=plan_only,
-                selected_only=selected_only,
-                target_objects=target_objects,
-                errors=errors_by_target_id,
-                force=force,
-            )
-            await migrate_workspaces(
-                source_path=source_path,
-                client=client,
-                mapping=mapping,
-                source_id_target_pairs=source_id_target_pairs,
-                sources_by_source_id_map=sources_by_source_id_map,
-                progress=progress,
-                plan_only=plan_only,
-                selected_only=selected_only,
-                target_objects=target_objects,
-                errors=errors_by_target_id,
-                force=force,
-            )
+        await migrate_schemas(
+            source_path=source_path,
+            client=client,
+            mapping=mapping,
+            source_id_target_pairs=source_id_target_pairs,
+            sources_by_source_id_map=sources_by_source_id_map,
+            plan_only=plan_only,
+            selected_only=selected_only,
+            target_objects=target_objects,
+            errors=errors_by_target_id,
+            force=force,
+        )
+        await migrate_hooks(
+            source_path=source_path,
+            client=client,
+            mapping=mapping,
+            source_id_target_pairs=source_id_target_pairs,
+            sources_by_source_id_map=sources_by_source_id_map,
+            plan_only=plan_only,
+            selected_only=selected_only,
+            target_objects=target_objects,
+            errors=errors_by_target_id,
+            force=force,
+        )
+        await migrate_workspaces(
+            source_path=source_path,
+            client=client,
+            mapping=mapping,
+            source_id_target_pairs=source_id_target_pairs,
+            sources_by_source_id_map=sources_by_source_id_map,
+            plan_only=plan_only,
+            selected_only=selected_only,
+            target_objects=target_objects,
+            errors=errors_by_target_id,
+            force=force,
+        )
 
         if not plan_only:
             # Update the mapping with right hand sides (targets) created during migration

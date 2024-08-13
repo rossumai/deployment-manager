@@ -1,7 +1,6 @@
 import asyncio
 import copy
 from typing import Callable
-from rich.progress import Progress
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
@@ -11,7 +10,6 @@ from project_rossum_deploy.utils.consts import (
     MAPPING_SELECTED_ATTRIBUTE,
 )
 from project_rossum_deploy.utils.functions import (
-    PauseProgress,
     extract_id_from_url,
 )
 from project_rossum_deploy.utils.functions import find_object_by_id
@@ -52,7 +50,6 @@ def replace_dependency_url(
     dependency: str,
     source_id_target_pairs: dict[int, list],
     target_object: dict = None,
-    progress: Progress = None,
 ):
     if isinstance(object[dependency], list):
         replace_list_of_dependency_urls(
@@ -62,7 +59,6 @@ def replace_dependency_url(
             dependency=dependency,
             source_id_target_pairs=source_id_target_pairs,
             target_object=target_object,
-            progress=progress,
         )
     else:
         source_dependency_url = object[dependency]
@@ -87,10 +83,9 @@ def replace_dependency_url(
             if settings.IS_PROJECT_IN_SAME_ORG and dependency == "organization":
                 return
 
-            with PauseProgress(progress):
-                display_warning(
-                    f'Dependency "{dependency}" for object "{object.get('id', 'no-ID')}" was not modified. Source and target objects share the dependency. This can happen if you did not {settings.MIGRATE_COMMAND_NAME} the dependency and no target equivalent exists.'
-                )
+            display_warning(
+                f'Dependency "{dependency}" for object "{object.get('id', 'no-ID')}" was not modified. Source and target objects share the dependency. This can happen if you did not {settings.MIGRATE_COMMAND_NAME} the dependency and no target equivalent exists.'
+            )
 
 
 # TODO: refactor to use the same replace URL function
@@ -101,7 +96,6 @@ def replace_list_of_dependency_urls(
     dependency: str,
     source_id_target_pairs: dict[int, list],
     target_object: dict = None,
-    progress: Progress = None,
 ):
     new_urls = []
     for source_index, source_dependency_url in enumerate(object[dependency]):
@@ -121,10 +115,9 @@ def replace_list_of_dependency_urls(
         new_urls.append(new_url)
 
         if source_id_str == target_id_str:
-            with PauseProgress(progress):
-                display_warning(
-                    f'Dependency "{dependency}"[{source_index}] for object "{object.get('id', 'no-ID')}" was not modified. Source and target objects share the dependency. This can happen if you did not {settings.MIGRATE_COMMAND_NAME} the dependency and no target equivalent exists.'
-                )
+            display_warning(
+                f'Dependency "{dependency}"[{source_index}] for object "{object.get('id', 'no-ID')}" was not modified. Source and target objects share the dependency. This can happen if you did not {settings.MIGRATE_COMMAND_NAME} the dependency and no target equivalent exists.'
+            )
 
     # Target queues can have 'dangling' hooks that exist only on target, these should not be overwritten.
     if target_object:
@@ -205,6 +198,9 @@ async def migrate_object_to_multiple_targets(
             submapping.get("targets", [])[index]["target_id"] = result.get("id", None)
 
     return list(filter(lambda x: x, results))
+
+
+# TODO: add separate function for ignoring that will log and return
 
 
 # Extra args are there to accomodate all upload function signatures

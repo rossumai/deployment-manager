@@ -1,6 +1,5 @@
 import asyncio
 import functools
-from rich.progress import Progress
 from anyio import Path
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
@@ -23,7 +22,6 @@ from project_rossum_deploy.utils.consts import (
 )
 from project_rossum_deploy.commands.migrate.upload_helpers import upload_hook
 from project_rossum_deploy.utils.functions import (
-    PauseProgress,
     detemplatize_name_id,
     extract_id_from_url,
 )
@@ -35,7 +33,6 @@ async def migrate_hooks(
     mapping: dict,
     source_id_target_pairs: dict[int, list],
     sources_by_source_id_map: dict,
-    progress: Progress,
     plan_only: bool = False,
     selected_only: bool = False,
     target_objects: list[dict] = [],
@@ -43,22 +40,19 @@ async def migrate_hooks(
     force: bool = False,
 ):
     hook_paths = [hook_path async for hook_path in (source_path / "hooks").iterdir()]
-    task = progress.add_task("Releasing hooks.", total=len(hook_paths))
 
     target_token_owner_id = ""
     if not settings.IS_PROJECT_IN_SAME_ORG:
         target_org_token_owner = await get_token_owner(client)
         if not target_org_token_owner:
-            with PauseProgress(progress):
-                target_token_owner_id = Prompt.ask(
-                    "Please input user ID of the hook token owner (e.g., 938382)"
-                )
+            target_token_owner_id = Prompt.ask(
+                "Please input user ID of the hook token owner (e.g., 938382)"
+            )
         else:
             target_token_owner_id = target_org_token_owner.id
 
     async def migrate_hook(hook_path: Path):
         if hook_path.suffix != ".json":
-            progress.update(task, advance=1)
             return
 
         try:
@@ -96,7 +90,6 @@ async def migrate_hooks(
                     client=client,
                     hook=hook,
                     hook_mapping=hook_mapping,
-                    progress=progress,
                     target_objects=target_objects,
                     errors=errors,
                     force=force,
@@ -113,8 +106,6 @@ async def migrate_hooks(
                 plan_only=plan_only,
             )
             source_id_target_pairs[id].extend(results)
-
-            progress.update(task, advance=1)
         except PrdVersionException as e:
             raise e
         except Exception as e:

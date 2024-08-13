@@ -4,7 +4,6 @@ import functools
 import logging
 from anyio import Path
 from rich import print
-from rich.progress import Progress
 from rich.panel import Panel
 
 from rossum_api import ElisAPIClient
@@ -40,7 +39,6 @@ async def migrate_workspaces(
     mapping: dict,
     source_id_target_pairs: dict[int, list],
     sources_by_source_id_map: dict,
-    progress: Progress,
     plan_only: bool = False,
     selected_only: bool = False,
     target_objects: list[dict] = [],
@@ -51,7 +49,6 @@ async def migrate_workspaces(
         workspace_path
         async for workspace_path in (source_path / "workspaces").iterdir()
     ]
-    task = progress.add_task("Releasing workspaces.", total=len(workspace_paths))
 
     async def migrate_workspace(ws_path: Path):
         try:
@@ -67,16 +64,20 @@ async def migrate_workspaces(
                 1,
                 "organization",
                 source_id_target_pairs,
-                progress=progress,
             )
 
             workspace_mapping = find_mapping_of_object(
                 mapping["organization"]["workspaces"], id
             )
 
-            skip_migration = workspace_mapping.get("ignore", None) or (
-                selected_only and not check_if_selected(workspace_mapping)
-            )
+            # Ignoring WS should be hierarchical - queues and inboxes should get ignored as well
+            if workspace_mapping.get("ignore", None):
+                print(
+                    f'Ignored workspace "{workspace['id']}" including its queues and inboxes.'
+                )
+                return
+
+            skip_migration = selected_only and not check_if_selected(workspace_mapping)
 
             if plan_only or skip_migration:
                 partial_upload_workspace = functools.partial(
@@ -119,10 +120,8 @@ async def migrate_workspaces(
                 target_objects=target_objects,
                 errors=errors,
                 force=force,
-                progress=progress,
             )
 
-            progress.update(task, advance=1)
         except PrdVersionException as e:
             raise e
         except Exception as e:
@@ -149,7 +148,6 @@ async def migrate_queues_and_inboxes(
     target_objects: list[dict] = [],
     errors: dict = {},
     force: bool = False,
-    progress: Progress = None,
 ):
     if not (await (ws_path / "queues").exists()):
         return
@@ -187,7 +185,6 @@ async def migrate_queues_and_inboxes(
                     target_objects=target_objects,
                     errors=errors,
                     force=force,
-                    progress=progress,
                 )
 
             source_id_target_pairs[id] = []
@@ -273,7 +270,6 @@ async def prepare_queue_upload(
     target_objects: list[dict] = [],
     errors: dict = {},
     force: bool = False,
-    progress: Progress = None,
 ):
     queue = deepcopy(queue)
     target_object = (
@@ -290,7 +286,6 @@ async def prepare_queue_upload(
         dependency="workspace",
         source_id_target_pairs=source_id_target_pairs,
         target_object=target_object,
-        progress=progress,
     )
 
     if previous_workspace_url == queue["workspace"] and not target_id:
@@ -306,7 +301,6 @@ async def prepare_queue_upload(
         dependency="schema",
         source_id_target_pairs=source_id_target_pairs,
         target_object=target_object,
-        progress=progress,
     )
     # Both should be updated, otherwise Elis API uses 'webhooks' in case of a mismatch even though it is deprecated
     replace_dependency_url(
@@ -316,7 +310,6 @@ async def prepare_queue_upload(
         dependency="hooks",
         source_id_target_pairs=source_id_target_pairs,
         target_object=target_object,
-        progress=progress,
     )
     replace_dependency_url(
         object=queue,
@@ -325,7 +318,6 @@ async def prepare_queue_upload(
         dependency="webhooks",
         source_id_target_pairs=source_id_target_pairs,
         target_object=target_object,
-        progress=progress,
     )
     queue.pop("inbox", None)
 
@@ -349,7 +341,6 @@ async def prepare_inbox_upload(
     target_objects: list[dict] = [],
     errors: dict = {},
     force: bool = False,
-    progress: Progress = None,
 ):
     inbox = deepcopy(inbox)
 
@@ -360,7 +351,6 @@ async def prepare_inbox_upload(
         target_index=target_index,
         target_objects_count=target_objects_count,
         source_id_target_pairs=source_id_target_pairs,
-        progress=progress,
     )
 
     if previous_queue_urls == inbox["queues"] and not target_id:

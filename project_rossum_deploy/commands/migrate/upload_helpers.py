@@ -1,7 +1,6 @@
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 from rich import print
-from rich.progress import Progress
 from rich.panel import Panel
 from rich.prompt import Prompt
 
@@ -15,7 +14,6 @@ from project_rossum_deploy.utils.consts import (
     settings,
 )
 from project_rossum_deploy.utils.functions import (
-    PauseProgress,
     extract_id_from_url,
 )
 
@@ -82,11 +80,15 @@ async def upload_workspace(
             errors[target_id] = (Resource.Workspace, local_object.get("name", ""))
             return local_object
 
-        return await client._http_client.update(
+        result = await client._http_client.update(
             Resource.Workspace, id_=target_id, data=workspace
         )
+        print(f'Released (updated) workspace "{workspace['id']}" -> "{target_id}".')
+        return result
     else:
-        return await client._http_client.create(Resource.Workspace, workspace)
+        result = await client._http_client.create(Resource.Workspace, workspace)
+        print(f'Released (created) workspace "{workspace['id']}" -> "{result['id']}".')
+        return result
 
 
 async def upload_queue(
@@ -111,11 +113,15 @@ async def upload_queue(
             errors[target_id] = (Resource.Queue, local_object.get("name", ""))
             return local_object
 
-        return await client._http_client.update(
+        result = await client._http_client.update(
             Resource.Queue, id_=target_id, data=queue
         )
+        print(f'Released (updated) queue "{queue['id']}" -> "{target_id}".')
+        return result
     else:
-        return await client._http_client.create(Resource.Queue, queue)
+        result = await client._http_client.create(Resource.Queue, queue)
+        print(f'Released (created) queue "{queue['id']}" -> "{result['id']}".')
+        return result
 
 
 async def upload_inbox(
@@ -140,11 +146,15 @@ async def upload_inbox(
             errors[target_id] = (Resource.Inbox, local_object.get("name", ""))
             return local_object
 
-        return await client._http_client.update(
+        result = await client._http_client.update(
             Resource.Inbox, id_=target_id, data=inbox
         )
+        print(f'Released (updated) inbox "{inbox['id']}" -> "{target_id}".')
+        return result
     else:
-        return await client._http_client.create(Resource.Inbox, inbox)
+        result = await client._http_client.create(Resource.Inbox, inbox)
+        print(f'Released (created) inbox "{inbox['id']}" -> "{result['id']}".')
+        return result
 
 
 async def upload_schema(
@@ -169,11 +179,15 @@ async def upload_schema(
             errors[target_id] = (Resource.Schema, local_object.get("name", ""))
             return local_object
 
-        return await client._http_client.update(
+        result = await client._http_client.update(
             Resource.Schema, id_=target_id, data=schema
         )
+        print(f'Released (updated) schema "{schema['id']}" -> "{target_id}".')
+        return result
     else:
-        return await client._http_client.create(Resource.Schema, schema)
+        result = await client._http_client.create(Resource.Schema, schema)
+        print(f'Released (created) schema "{schema['id']}" -> "{result['id']}".')
+        return result
 
 
 async def upload_hook(
@@ -181,7 +195,6 @@ async def upload_hook(
     hook: dict,
     hook_mapping: dict,
     target_id: int,
-    progress: Progress,
     target_objects=[],
     errors={},
     force=False,
@@ -200,13 +213,19 @@ async def upload_hook(
             errors[target_id] = (Resource.Hook, local_object.get("name", ""))
             return local_object
 
-        return await client._http_client.update(Resource.Hook, id_=target_id, data=hook)
+        result = await client._http_client.update(
+            Resource.Hook, id_=target_id, data=hook
+        )
+        print(f'Released (updated) hook "{hook['id']}" -> "{target_id}".')
+        return result
+
     else:
         created_hook = await create_hook_based_on_template(hook=hook, client=client)
         if not created_hook:
             created_hook = await create_hook_without_template(
-                hook=hook, client=client, hook_mapping=hook_mapping, progress=progress
+                hook=hook, client=client, hook_mapping=hook_mapping
             )
+        print(f'Released (created) hook "{hook['id']}" -> "{created_hook['id']}".')
         return created_hook
 
 
@@ -269,7 +288,7 @@ async def create_hook_based_on_template(hook: dict, client: ElisAPIClient):
 
 
 async def create_hook_without_template(
-    hook: dict, hook_mapping: dict, client: ElisAPIClient, progress: Progress
+    hook: dict, hook_mapping: dict, client: ElisAPIClient
 ):
     # Use the dummy URL only for newly-created private hooks
     # And only if attribute override does not specify the url
@@ -279,14 +298,11 @@ async def create_hook_without_template(
         and hook_mapping.get("attribute_override", {}).get("config", {}).get("path", "")
         != "url"
     ):
-        with PauseProgress(progress):
-            private_hook_url = Prompt.ask(
-                f"Please provide hook url (target base_url is '{client._http_client.base_url}') for '{hook['name']}'"
-            )
-            hook["config"]["url"] = (
-                private_hook_url
-                if private_hook_url
-                else settings.PRIVATE_HOOK_DUMMY_URL
-            )
+        private_hook_url = Prompt.ask(
+            f"Please provide hook url (target base_url is '{client._http_client.base_url}') for '{hook['name']}'"
+        )
+        hook["config"]["url"] = (
+            private_hook_url if private_hook_url else settings.PRIVATE_HOOK_DUMMY_URL
+        )
 
     return await client._http_client.create(Resource.Hook, hook)

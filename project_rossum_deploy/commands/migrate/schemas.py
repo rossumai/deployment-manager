@@ -4,7 +4,6 @@ from typing import Any
 from anyio import Path
 
 from rossum_api import ElisAPIClient
-from rich.progress import Progress
 from rich.panel import Panel
 from rich import print
 from rossum_api.api_client import Resource
@@ -34,7 +33,6 @@ async def migrate_schemas(
     mapping: dict,
     source_id_target_pairs: dict[int, list],
     sources_by_source_id_map: dict,
-    progress: Progress,
     plan_only: bool = False,
     selected_only: bool = False,
     target_objects: list[dict] = [],
@@ -44,11 +42,9 @@ async def migrate_schemas(
     schema_paths = [
         schema_path async for schema_path in (source_path / "schemas").iterdir()
     ]
-    task = progress.add_task("Releasing schemas.", total=len(schema_paths))
 
     async def migrate_schema(schema_path: Path):
         if schema_path.suffix != ".json":
-            progress.update(task, advance=1)
             return
 
         try:
@@ -98,7 +94,6 @@ async def migrate_schemas(
             )
             source_id_target_pairs[id].extend(results)
 
-            progress.update(task, advance=1)
         except PrdVersionException as e:
             raise e
         except Exception as e:
