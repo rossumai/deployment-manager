@@ -277,7 +277,7 @@ async def override_migrated_objects_attributes(
             if target_object["id"] in errors:
                 continue
 
-            resource = determine_object_type_from_url(target_object["url"])
+            object_type = determine_object_type_from_url(target_object["url"])
 
             # Implicit override for settings
             if "settings" in target_object:
@@ -306,13 +306,17 @@ async def override_migrated_objects_attributes(
                         )
                         if diff.stdout:
                             print(
-                                Panel(
-                                    f'Simulated implicit attribute override of source "{source_object['id']}" -> target "{target_object['id']}" replaced IDs:\n{diff.stdout}'
+                                print_simulation_message(
+                                    attribute_override_type="implicit",
+                                    object_type=object_type.value,
+                                    source_object=source_object,
+                                    target_object=target_object,
+                                    source_object_subset=diff.stdout,
                                 )
                             )
                 else:
                     await client._http_client.update(
-                        resource, target_object["id"], {"settings": target_settings}
+                        object_type, target_object["id"], {"settings": target_settings}
                     )
             # Explicit override for settings and anything else
             attribute_overrides = find_attribute_override_for_target(
@@ -341,14 +345,28 @@ async def override_migrated_objects_attributes(
                 del source_object_subset["id"]
                 del source_object_subset["url"]
                 print(
-                    Panel(
-                        f'Simulated explicit attribute override from source "{source_object['id']}" to target "{target_object['id']}":\n {json.dumps(source_object_subset, indent=2)}'
+                    print_simulation_message(
+                        attribute_override_type="explicit",
+                        object_type=object_type.value,
+                        source_object=source_object,
+                        target_object=target_object,
+                        source_object_subset=source_object_subset,
                     )
                 )
             else:
                 await client._http_client.update(
-                    resource, target_object["id"], source_object_subset
+                    object_type, target_object["id"], source_object_subset
                 )
+
+
+def print_simulation_message(
+    attribute_override_type: str,
+    object_type: str,
+    source_object: dict,
+    target_object: dict,
+    source_object_subset: dict,
+):
+    return f'Simulated [green]{attribute_override_type}[/green] attribute override of [yellow]{object_type}[/yellow]: source "{source_object['id']} {source_object.get('name', 'no-name')}" to target "{target_object['id']} {target_object.get('name', 'no-name')}": {json.dumps(source_object_subset, indent=2)}'
 
 
 def find_attribute_override_for_target(targets_in_mapping: dict, target_id: int):

@@ -14,6 +14,7 @@ from project_rossum_deploy.commands.migrate.helpers import (
     migrate_object_to_multiple_targets,
     replace_dependency_url,
     simulate_migrate_object,
+    skip_migrate_object,
 )
 from project_rossum_deploy.commands.migrate.upload_helpers import (
     upload_inbox,
@@ -79,13 +80,16 @@ async def migrate_workspaces(
 
             skip_migration = selected_only and not check_if_selected(workspace_mapping)
 
-            if plan_only or skip_migration:
+            if plan_only:
                 partial_upload_workspace = functools.partial(
                     simulate_migrate_object,
                     client=client,
                     source_object=workspace,
-                    target_object_type=Resource.Workspace,
-                    silent=skip_migration,
+                )
+            elif skip_migration:
+                partial_upload_workspace = functools.partial(
+                    skip_migrate_object,
+                    source_object=workspace,
                 )
             else:
                 partial_upload_workspace = functools.partial(
@@ -130,7 +134,7 @@ async def migrate_workspaces(
             )
 
     if plan_only:
-        print(Panel("Simulating workspaces."))
+        print(Panel("Simulating workspaces, queues, and inboxes."))
 
     await asyncio.gather(
         *[migrate_workspace(ws_path=ws_path) for ws_path in workspace_paths]
@@ -168,13 +172,16 @@ async def migrate_queues_and_inboxes(
                 selected_only and not check_if_selected(queue_mapping)
             )
 
-            if plan_only or skip_migration:
+            if plan_only:
                 partial_upload_queue_function = functools.partial(
                     simulate_migrate_object,
                     client=client,
                     source_object=queue,
-                    target_object_type=Resource.Queue,
-                    silent=skip_migration,
+                )
+            elif skip_migration:
+                partial_upload_queue_function = functools.partial(
+                    skip_migrate_object,
+                    source_object=queue,
                 )
             else:
                 partial_upload_queue_function = functools.partial(
@@ -215,13 +222,16 @@ async def migrate_queues_and_inboxes(
                 selected_only and not check_if_selected(inbox_mapping)
             )
 
-            if plan_only or skip_migration:
+            if plan_only:
                 partial_upload_inbox_function = functools.partial(
                     simulate_migrate_object,
                     client=client,
                     source_object=inbox,
-                    target_object_type=Resource.Inbox,
-                    silent=skip_migration,
+                )
+            elif skip_migration:
+                partial_upload_inbox_function = functools.partial(
+                    skip_migrate_object,
+                    source_object=inbox,
                 )
             else:
                 partial_upload_inbox_function = functools.partial(

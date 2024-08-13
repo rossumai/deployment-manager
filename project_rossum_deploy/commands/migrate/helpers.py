@@ -2,8 +2,9 @@ import asyncio
 import copy
 from typing import Callable
 from rossum_api import ElisAPIClient
-from rossum_api.api_client import Resource
+from rich import print
 
+from project_rossum_deploy.common.determine_path import determine_object_type_from_url
 from project_rossum_deploy.utils.consts import (
     display_warning,
     settings,
@@ -200,30 +201,35 @@ async def migrate_object_to_multiple_targets(
     return list(filter(lambda x: x, results))
 
 
-# TODO: add separate function for ignoring that will log and return
-
-
 # Extra args are there to accomodate all upload function signatures
 async def simulate_migrate_object(
     client: ElisAPIClient,
     source_object: dict,
-    target_object_type: Resource,
     target_id: int,
     target_index: int = 0,
     target_objects_count: int = None,
-    source_id_target_pairs: dict[int, list] = None,
-    silent: bool = False,
 ):
     object_counter = f"({target_index +1}/{target_objects_count if target_objects_count is not None else 1})"
+    object_type = determine_object_type_from_url(source_object["url"])
     if target_id:
-        if not silent:
-            print(
-                f'UPDATE source {target_object_type} "{source_object.get('id', None)} {source_object.get('name', '')}" -> target "{target_id}" {object_counter}.'
-            )
-        return await client._http_client.fetch_one(target_object_type, target_id)
+        target_object = await client.request_json(
+            method="GET",
+            url=source_object["url"].replace(str(source_object["id"]), str(target_id)),
+        )
+        print(
+            f'[blue]UPDATE[/blue] [yellow]{object_type.value}[/yellow]: source "{source_object.get('id', None)} {source_object.get('name', '')}" -> target "{target_id} {target_object.get('name', 'no-name')}" {object_counter}.'
+        )
+        return target_object
     else:
-        if not silent:
-            print(
-                f'CREATE source {target_object_type} "{source_object.get('id', None)} {source_object.get('name', '')}" -> target {object_counter}.'
-            )
+        print(
+            f'[red]CREATE[/red] [yellow]{object_type.value}[/yellow]: source "{source_object.get('id', None)} {source_object.get('name', '')}" -> target "{target_id} {target_object.get('name', 'no-name')}" {object_counter}.'
+        )
         return copy.deepcopy(source_object)
+
+
+async def skip_migrate_object(source_object):
+    object_type = determine_object_type_from_url(source_object["url"])
+    print(
+        f'Skipping {settings.MIGRATE_COMMAND_NAME} of {object_type} "{source_object['id']} {source_object['name']}".'
+    )
+    return copy.deepcopy(source_object)

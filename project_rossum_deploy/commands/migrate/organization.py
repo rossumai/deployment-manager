@@ -1,9 +1,11 @@
 from anyio import Path
 from rossum_api import ElisAPIClient
 from rich import print
-from rich.panel import Panel
 
-from project_rossum_deploy.commands.migrate.helpers import check_if_selected
+from project_rossum_deploy.commands.migrate.helpers import (
+    check_if_selected,
+    simulate_migrate_object,
+)
 from project_rossum_deploy.utils.functions import (
     find_object_by_id,
 )
@@ -57,10 +59,10 @@ async def migrate_organization(
             return
 
         if plan_only:
-            print(
-                Panel(
-                    f'Simulating organization "{organization['id']}" -> "{target_organization_id}".'
-                )
+            await simulate_migrate_object(
+                client=client,
+                source_object=organization,
+                target_id=target_organization_id,
             )
         else:
             source_id_target_pairs[mapping["organization"]["id"]] = [

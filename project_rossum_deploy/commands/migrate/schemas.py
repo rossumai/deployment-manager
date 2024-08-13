@@ -6,12 +6,12 @@ from anyio import Path
 from rossum_api import ElisAPIClient
 from rich.panel import Panel
 from rich import print
-from rossum_api.api_client import Resource
 
 from project_rossum_deploy.commands.migrate.helpers import (
     check_if_selected,
     migrate_object_to_multiple_targets,
     simulate_migrate_object,
+    skip_migrate_object,
 )
 from project_rossum_deploy.common.mapping import find_mapping_of_object
 from project_rossum_deploy.common.read_write import read_formula_file, read_json
@@ -64,13 +64,16 @@ async def migrate_schemas(
 
             await update_formula_fields_code(schema_path, schema)
 
-            if plan_only or skip_migration:
+            if plan_only:
                 partial_upload_schema = functools.partial(
                     simulate_migrate_object,
                     client=client,
                     source_object=schema,
-                    target_object_type=Resource.Schema,
-                    silent=skip_migration,
+                )
+            elif skip_migration:
+                partial_upload_schema = functools.partial(
+                    skip_migrate_object,
+                    source_object=schema,
                 )
             else:
                 partial_upload_schema = functools.partial(

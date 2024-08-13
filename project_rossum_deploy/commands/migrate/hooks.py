@@ -12,6 +12,7 @@ from project_rossum_deploy.commands.migrate.helpers import (
     get_token_owner,
     migrate_object_to_multiple_targets,
     simulate_migrate_object,
+    skip_migrate_object,
 )
 from project_rossum_deploy.common.mapping import find_mapping_of_object
 from project_rossum_deploy.common.read_write import read_json
@@ -76,13 +77,16 @@ async def migrate_hooks(
 
             await update_hook_code(hook_path, hook)
 
-            if plan_only or skip_migration:
+            if plan_only:
                 partial_upload_hook = functools.partial(
                     simulate_migrate_object,
                     client=client,
                     source_object=hook,
-                    target_object_type=Resource.Hook,
-                    silent=skip_migration,
+                )
+            elif skip_migration:
+                partial_upload_hook = functools.partial(
+                    skip_migrate_object,
+                    source_object=hook,
                 )
             else:
                 partial_upload_hook = functools.partial(
