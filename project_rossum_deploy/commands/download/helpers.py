@@ -192,7 +192,11 @@ async def remove_local_nonexistent_object(
         )
         cleaned_name, _ = detemplatize_name_id(path_from_remote)
         # Inboxes are in the queue folder, but can have a different name than their queue
-        if cleaned_name != previous_name and object_type != Resource.Inbox:
+        # The names are lowercased because some OS's (mainly MacOS) are case-insensitive in their paths
+        if (
+            cleaned_name.casefold() != previous_name.casefold()
+            and object_type != Resource.Inbox
+        ):
             raise DifferentNameException
 
         # Workspace name might have changed, remove queue and inbox files inside

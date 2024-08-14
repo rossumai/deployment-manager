@@ -8,3 +8,4 @@ dist
 dummy_project
 temp_project
 .vscode
+**/.DS_Store
