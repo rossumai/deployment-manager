@@ -1,0 +1,22 @@
+{
+  "id": 5851988,
+  "url": "https://shared-eu2.rossum.app/api/v1/email_templates/5851988",
+  "name": "Annotation status change - received",
+  "queue": "https://shared-eu2.rossum.app/api/v1/queues/1162843",
+  "organization": "https://shared-eu2.rossum.app/api/v1/organizations/263865",
+  "subject": "Documents received: {{ parent_email_subject }}",
+  "message": "<p>Dear sender,<br><br>Your documents have been successfully received.<br><br>{{ document_list }}<br><br>Regards</p>\n",
+  "type": "custom",
+  "enabled": false,
+  "automate": false,
+  "triggers": [
+    "https://shared-eu2.rossum.app/api/v1/triggers/4687092"
+  ],
+  "to": [
+    {
+      "email": "{{sender_email}}"
+    }
+  ],
+  "cc": [],
+  "bcc": []
+}

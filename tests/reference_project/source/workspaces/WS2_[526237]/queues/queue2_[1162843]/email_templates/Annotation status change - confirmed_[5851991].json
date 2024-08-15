@@ -1,0 +1,22 @@
+{
+  "id": 5851991,
+  "url": "https://shared-eu2.rossum.app/api/v1/email_templates/5851991",
+  "name": "Annotation status change - confirmed",
+  "queue": "https://shared-eu2.rossum.app/api/v1/queues/1162843",
+  "organization": "https://shared-eu2.rossum.app/api/v1/organizations/263865",
+  "subject": "Verified documents: {{ parent_email_subject }}",
+  "message": "<p>Dear sender,<br><br>Your documents have been checked by annotator.<br><br>{{ document_list }}<br><br>Regards</p>\n",
+  "type": "custom",
+  "enabled": false,
+  "automate": false,
+  "triggers": [
+    "https://shared-eu2.rossum.app/api/v1/triggers/4687094"
+  ],
+  "to": [
+    {
+      "email": "{{sender_email}}"
+    }
+  ],
+  "cc": [],
+  "bcc": []
+}
