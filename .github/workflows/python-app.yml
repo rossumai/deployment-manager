@@ -30,7 +30,7 @@ jobs:
           TARGET_USERNAME: ${{secrets.TARGET_USERNAME}}
           TARGET_PASSWORD: ${{secrets.TARGET_PASSWORD}}
         run: pytest tests
-deploy:
+  deploy:
     runs-on: ubuntu-latest
     needs: build-and-test
     if: github.ref == 'refs/heads/main'
