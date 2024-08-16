@@ -43,7 +43,7 @@ def detemplatize_name_id(path: Path | str) -> tuple[str, int]:
     if str(path.stem) in ["queue", "workspace", "inbox"]:
         parts = path.parent.name.split("_")
         return "_".join(parts[:-1]), int(parts[-1].removeprefix("[").removesuffix("]"))
-    elif str(path.parent.stem) in ("hooks, schemas"):
+    elif str(path.parent.stem) in ["hooks", "schemas", "email_templates"]:
         parts = path.stem.split("_")
         return "_".join(parts[:-1]), int(parts[-1].removeprefix("[").removesuffix("]"))
 

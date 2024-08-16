@@ -3,6 +3,9 @@ from anyio import Path
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
+from project_rossum_deploy.commands.download.email_templates import (
+    download_email_templates_for_queue,
+)
 from project_rossum_deploy.commands.download.helpers import (
     determine_object_destination,
     should_write_object,
@@ -116,19 +119,28 @@ async def download_queues_for_workspace(
 
         inbox_id = extract_id_from_url(queue["inbox"])
         if inbox_id:
-            queue["inbox"] = await download_inbox(
+            queue["inbox"] = await download_inbox_for_queue(
                 client=client,
                 parent_dir=queue_path,
                 inbox_id=inbox_id,
                 changed_files=changed_files,
                 download_all=download_all,
             )
+
+        await download_email_templates_for_queue(
+            client=client,
+            parent_dir=queue_path,
+            queue_id=queue["id"],
+            changed_files=changed_files,
+            download_all=download_all,
+        )
+
         queues.append(queue)
 
     return queues
 
 
-async def download_inbox(
+async def download_inbox_for_queue(
     client: ElisAPIClient,
     parent_dir: Path,
     inbox_id: int,

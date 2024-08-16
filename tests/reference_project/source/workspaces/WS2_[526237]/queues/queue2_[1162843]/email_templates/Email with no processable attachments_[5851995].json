@@ -1,0 +1,22 @@
+{
+  "id": 5851995,
+  "url": "https://shared-eu2.rossum.app/api/v1/email_templates/5851995",
+  "name": "Email with no processable attachments",
+  "queue": "https://shared-eu2.rossum.app/api/v1/queues/1162843",
+  "organization": "https://shared-eu2.rossum.app/api/v1/organizations/263865",
+  "subject": "No processable documents: {{ parent_email_subject }}",
+  "message": "<p>Dear sender,<br><br>Unfortunately, we have not received any document in the email that we can process. Please send a corrected version if appropriate.<br><br>Regards</p>",
+  "type": "email_with_no_processable_attachments",
+  "enabled": false,
+  "automate": false,
+  "triggers": [
+    "https://shared-eu2.rossum.app/api/v1/triggers/4687098"
+  ],
+  "to": [
+    {
+      "email": "{{sender_email}}"
+    }
+  ],
+  "cc": [],
+  "bcc": []
+}
