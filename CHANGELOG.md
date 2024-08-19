@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v0.1.0 (2024-08-19)
+
+### Feature
+
+* feat: Move non-secret information into prd_config.yaml file (#8) ([`c05281d`](https://github.com/rossumai/prd/commit/c05281d6d01ad488c19c70ddd0754a8b9d31b53c))
+
+### Unknown
+
+* Update pyproject.toml ([`98c8035`](https://github.com/rossumai/prd/commit/98c80357a35d4d756ef56ce2a52e601d6f3ae6fe))
+
 ## v0.0.0 (2024-08-16)
 
 ### Unknown
