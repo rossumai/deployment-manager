@@ -1,4 +1,3 @@
-import asyncio
 import dataclasses
 import os
 import subprocess
@@ -172,14 +171,13 @@ async def source_and_target_schema(client: ElisAPIClient, tmp_path):
 
     # In case our test failed to delete the schema(s)
     try:
-        await asyncio.gather(
-            *[
-                client.delete_schema(source_schema.id),
-                client.delete_schema(target_schema.id),
-            ]
-        )
+        await client.delete_schema(source_schema.id)
     except Exception:
-        print("Schema already deleted.")
+        print("source_schema already deleted.")
+    try:
+        await client.delete_schema(target_schema.id)
+    except Exception:
+        print("target_schema already deleted.")
 
 
 @pytest.mark.asyncio
