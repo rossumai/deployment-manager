@@ -1,6 +1,9 @@
 
 name: Run Tests & Deploy
-on: [push]
+on: 
+  push:
+    tags-ignore:
+      - '**'
 
 jobs:
   build-and-test:
