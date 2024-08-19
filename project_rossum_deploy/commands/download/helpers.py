@@ -140,13 +140,17 @@ async def check_schema_formula_fields_existence(remote_object: dict, path: Path)
 
     async for formula_path in formula_directory_path.iterdir():
         if formula_path.stem not in formula_field_ids:
-            print(
-                Panel(
-                    f"Deleting a local formula field code file that no longer exists in Rossum: {path}",
-                    style="yellow",
+            try:
+                os.remove(formula_path)
+                print(
+                    Panel(
+                        f"Deleted a local formula field code file that no longer exists in Rossum: {formula_path}",
+                        style="yellow",
+                    )
                 )
-            )
-            os.remove(formula_path)
+            # Permissions errors (e.g., hidden __pycache__ dirs could make the operation fail)
+            except Exception:
+                ...
 
 
 async def remove_local_nonexistent_object(

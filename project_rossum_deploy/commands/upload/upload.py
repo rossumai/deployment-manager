@@ -8,6 +8,7 @@ import click
 from rossum_api import ElisAPIClient
 
 from project_rossum_deploy.commands.download.download import download_project
+from project_rossum_deploy.common.migrate_config import migrate_config
 from project_rossum_deploy.commands.upload.dependencies import (
     evaluate_create_dependencies,
     merge_formula_changes,
@@ -82,6 +83,7 @@ Only source files are taken into account by default.
 async def upload_project_wrapper(
     destination, all, force, indexed_only, commit, message
 ):
+    await migrate_config()
     # To be able to run the command progammatically without the CLI decorators
     await upload_project(
         destination=destination,

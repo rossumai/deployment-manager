@@ -11,6 +11,7 @@ from rich.prompt import Prompt
 from rich.console import Console
 from rich.panel import Panel
 from rossum_api.api_client import Resource
+import yaml
 
 
 logging.basicConfig(level=logging.INFO)
@@ -81,9 +82,18 @@ try:
                     f"{self.CREDENTIALS_FILENAME} is not a valid dictionary."
                 )
 
-            self.SOURCE_API_BASE = credentials.get(self.SOURCE_DIRNAME, {}).get(
-                "api_base", ""
-            )
+            config_path = Path("./") / self.CONFIG_FILENAME
+            if not config_path.exists():
+                return
+            config = yaml.safe_load(config_path.open("r"))
+
+            if not isinstance(config, dict):
+                raise click.ClickException(
+                    f"{self.CONFIG_FILENAME} is not a valid dictionary."
+                )
+
+            self.SOURCE_API_BASE = config.get("source_api_base")
+
             self.SOURCE_USERNAME = credentials.get(self.SOURCE_DIRNAME, {}).get(
                 "username", None
             )
@@ -94,17 +104,14 @@ try:
                 "token", None
             )
 
-            if not credentials.get("use_same_org_as_target", False):
+            if not config.get("use_same_org_as_target", False):
                 self.IS_PROJECT_IN_SAME_ORG = False
-                if "target" not in credentials or not credentials.get(
-                    self.TARGET_DIRNAME, {}
-                ).get("api_base", ""):
+                if "target" not in credentials:
                     raise click.ClickException(
-                        'Missing target credentials. If you are targetting the same org, set "use_same_org_as_target": true.'
+                        f'Missing target credentials. If you are targetting the same org, set "use_same_org_as_target": true in {self.CONFIG_FILENAME}.'
                     )
-                self.TARGET_API_BASE = credentials.get(self.TARGET_DIRNAME, {}).get(
-                    "api_base", ""
-                )
+                self.TARGET_API_BASE = config.get("target_api_base")
+
                 self.TARGET_USERNAME = credentials.get(self.TARGET_DIRNAME, {}).get(
                     "username", None
                 )
@@ -126,6 +133,7 @@ try:
         SOURCE_PASSWORD: str = ""
 
         MAPPING_FILENAME: str = "mapping.yaml"
+        CONFIG_FILENAME: str = "prd_config.yaml"
         CREDENTIALS_FILENAME: str = "credentials.json"
         MAPPING_KEYS_ORDER: list = ["comment", "id", "name", "ignore", "targets"]
 

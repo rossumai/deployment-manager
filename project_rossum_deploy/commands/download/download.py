@@ -14,6 +14,7 @@ from project_rossum_deploy.commands.download.helpers import (
     should_write_object,
 )
 from project_rossum_deploy.commands.download.hooks import download_hooks
+from project_rossum_deploy.common.migrate_config import migrate_config
 from project_rossum_deploy.common.client import create_and_validate_client
 from project_rossum_deploy.common.mapping import (
     create_update_mapping,
@@ -73,6 +74,7 @@ In case the directory already exists, it first deletes its contents and then dow
 async def download_project_wrapper(
     destination: str, commit: bool = False, message: str = "", all: bool = False
 ):
+    await migrate_config()
     await download_project(
         destination=destination, commit_message=message, commit=commit, download_all=all
     )
