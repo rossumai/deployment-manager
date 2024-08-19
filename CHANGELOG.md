@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.1.1 (2024-08-19)
+
+### Fix
+
+* fix: Tests not cleaning up properly ([`b7d8833`](https://github.com/rossumai/prd/commit/b7d8833c209583cf1e259decf862eb1b963abcbd))
+
 ## v0.1.0 (2024-08-19)
 
 ### Feature
