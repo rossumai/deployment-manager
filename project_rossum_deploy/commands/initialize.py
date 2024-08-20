@@ -29,10 +29,12 @@ def init_project(name: Path):
     git_ignore_path = name / ".gitignore"
     credentials_ignore_line = "\ncredentials.json"
 
-    git_ignore_contents = git_ignore_path.read_text()
+    git_ignore_contents = (
+        git_ignore_path.read_text() if git_ignore_path.exists() else ""
+    )
 
     if credentials_ignore_line not in git_ignore_contents:
-        with open(name + "/.gitignore", "a") as wf:
+        with open(name / ".gitignore", "a") as wf:
             wf.write(credentials_ignore_line)
 
     credentials_path = name / "credentials.json"
