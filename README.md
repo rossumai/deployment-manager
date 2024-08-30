@@ -34,9 +34,10 @@ To reinstall with newer version, run `pipx install . --force`.
 <span style="color:#004795"> **Initialize empty project and repository** </span>  
 
 1. Run `prd init <project_name>` which will initialize an empty GIT repository. You can also use `.` for the project name and use the current directory.
-2. Fill in the required credentials in the `credentials.json` file that was created in the project folder - either `source.token` (retrieved using /auth endpoint) or `source.username` and `source.password`.
-3. Fill in `source_api_base` in the `prd_config.yaml` file.
-4. If you are going to deploy the code to a different Rossum organization configure `target_api_base` and `use_same_org_as_target: false` in `prd_config.yaml` and either `target.token` or `target.username` and `target.password` in `credentials.json`.
+2. Copy `credentials.template.json` to `credentials.json`
+3. Fill in the required credentials in the `credentials.json` file that was created in the project folder - either `source.token` (retrieved using /auth endpoint) or `source.username` and `source.password`.
+4. Fill in `source_api_base` in the `prd_config.yaml` file.
+5. If you are going to deploy the code to a different Rossum organization configure `target_api_base` and `use_same_org_as_target: false` in `prd_config.yaml` and either `target.token` or `target.username` and `target.password` in `credentials.json`.
 
 > ℹ️ This command creates local git repository. If you want to connect it to an existing remote repository, call `git remote add <reponame> <giturl>`. If you already have an existing remote repository, it might be easier to clone it from the remote and create an `credentials.json` file manually in the root folder.
 

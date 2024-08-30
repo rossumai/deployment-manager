@@ -37,7 +37,7 @@ def init_project(name: Path):
         with open(name / ".gitignore", "a") as wf:
             wf.write(credentials_ignore_line)
 
-    credentials_path = name / "credentials.json"
+    credentials_path = name / "credentials.template.json"
     copy_dummy_credentials_file(credentials_path)
 
     config_path = name / "prd_config.yaml"
