@@ -14,6 +14,7 @@ from project_rossum_deploy.common.read_write import read_json
 from project_rossum_deploy.utils.consts import (
     ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD,
     ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD,
+    MIGRATE_PLANNING_MODE_OBJECT_PLACEHOLDER,
 )
 from project_rossum_deploy.utils.functions import (
     flatten,
@@ -269,11 +270,13 @@ async def override_migrated_objects_attributes(
         if not source_object or not len(target_objects):
             continue
 
+        target_objects_count = len(target_objects)
         for target_index, target_object in enumerate(target_objects):
             if target_object["id"] in errors:
                 continue
 
             resource = determine_object_type_from_url(target_object["url"])
+            object_counter = f"({target_index +1}/{target_objects_count if target_objects_count is not None else 1})"
 
             # Implicit override for settings
             if "settings" in target_object:
@@ -301,9 +304,14 @@ async def override_migrated_objects_attributes(
                             text=True,
                         )
                         if diff.stdout:
+                            target_id = (
+                                target_object["id"]
+                                if target_object["id"] != source_object["id"]
+                                else MIGRATE_PLANNING_MODE_OBJECT_PLACEHOLDER
+                            )
                             print(
                                 Panel(
-                                    f'Simulated implicit attribute override of source "{source_object['id']}" -> target "{target_object['id']}" replaced IDs:\n{diff.stdout}'
+                                    f'Simulated AUTOMATIC attribute override: source {resource} "{source_object['id']}" -> target "{target_id}" {object_counter} replaced IDs:\n{diff.stdout}'
                                 )
                             )
                 else:
@@ -336,9 +344,14 @@ async def override_migrated_objects_attributes(
                 # Clean up for display
                 del source_object_subset["id"]
                 del source_object_subset["url"]
+                target_id = (
+                    target_object["id"]
+                    if target_object["id"] != source_object["id"]
+                    else MIGRATE_PLANNING_MODE_OBJECT_PLACEHOLDER
+                )
                 print(
                     Panel(
-                        f'Simulated explicit attribute override from source "{source_object['id']}" to target "{target_object['id']}":\n {json.dumps(source_object_subset, indent=2)}'
+                        f'Simulated EXPLICIT attribute override: source {resource} "{source_object['id']}" -> target "{target_id}" {object_counter}:\n {json.dumps(source_object_subset, indent=2)}'
                     )
                 )
             else:

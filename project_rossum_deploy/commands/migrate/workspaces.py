@@ -45,6 +45,9 @@ async def migrate_workspaces(
     errors: dict = {},
     force: bool = False,
 ):
+    if not (await (source_path / "workspaces").exists()):
+        return
+
     workspace_paths = [
         workspace_path
         async for workspace_path in (source_path / "workspaces").iterdir()

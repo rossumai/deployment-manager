@@ -179,6 +179,7 @@ async def migrate_project(
                 errors=errors_by_target_id,
                 force=force,
             )
+
             await migrate_hooks(
                 source_path=source_path,
                 client=client,
