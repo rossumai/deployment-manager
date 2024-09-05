@@ -4,7 +4,10 @@ from typing import Callable
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
-from project_rossum_deploy.utils.consts import settings
+from project_rossum_deploy.utils.consts import (
+    MIGRATE_PLANNING_MODE_OBJECT_PLACEHOLDER,
+    settings,
+)
 from project_rossum_deploy.utils.functions import (
     extract_id_from_url,
 )
@@ -184,6 +187,6 @@ async def simulate_migrate_object(
         return await client._http_client.fetch_one(target_object_type, target_id)
     else:
         print(
-            f'CREATE source {target_object_type} "{source_object.get('id', None)} {source_object.get('name', '')}" -> target {object_counter}.'
+            f'CREATE source {target_object_type} "{source_object.get('id', None)} {source_object.get('name', '')}" -> target "{MIGRATE_PLANNING_MODE_OBJECT_PLACEHOLDER}" {object_counter}.'
         )
         return copy.deepcopy(source_object)
