@@ -76,13 +76,6 @@ async def create_object(
         object["id"] = None
         resource = determine_object_type_from_path(path)
 
-        local_remote_timestamp_synced = await check_modified_timestamp(
-            client, resource, id, object
-        )
-        if not force and not local_remote_timestamp_synced:
-            display_error(create_mismatch_warning(resource, id))
-            return
-
         result = await client._http_client.create(resource, object)
 
         # Just to update the timestamp
