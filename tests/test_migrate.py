@@ -8,6 +8,7 @@ from project_rossum_deploy.commands.download.download import (
     download_organization_combined_source_target,
     download_organizations_separate,
 )
+from project_rossum_deploy.commands.migrate.helpers import traverse_mapping
 from project_rossum_deploy.common.mapping import (
     extract_sources_targets,
     find_mapping_of_object,
@@ -18,6 +19,7 @@ from project_rossum_deploy.commands.migrate.migrate import migrate_project
 from project_rossum_deploy.common.read_write import read_json, write_json
 from project_rossum_deploy.utils.consts import (
     ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD,
+    MAPPING_SELECTED_ATTRIBUTE,
     settings,
 )
 from project_rossum_deploy.utils.functions import templatize_name_id
@@ -204,6 +206,35 @@ async def test_migrate_ignores_designated_object(
         if path.suffix != ".py"
     ]
     assert len(source_hook_paths) == len(target_hook_paths) + 1
+
+
+@pytest.mark.asyncio
+async def test_migrate_ignores_non_selected_objects(
+    client: ElisAPIClient, same_org_migration_path
+):
+    mapping = await read_mapping(same_org_migration_path / settings.MAPPING_FILENAME)
+
+    selected_hook_mapping = mapping["organization"]["hooks"][0]
+    selected_hook_mapping[MAPPING_SELECTED_ATTRIBUTE] = True
+    await write_mapping(same_org_migration_path / settings.MAPPING_FILENAME, mapping)
+
+    await migrate_project(
+        client=client, org_path=same_org_migration_path, selected_only=True
+    )
+
+    mapping = await read_mapping(same_org_migration_path / settings.MAPPING_FILENAME)
+
+    for mapping_object in traverse_mapping(mapping["organization"]):
+        if mapping_object["id"] == mapping["organization"]["id"]:
+            continue
+
+        if mapping_object["id"] == selected_hook_mapping["id"]:
+            assert len(mapping_object.get("targets", [])) == 1
+            assert mapping_object.get("targets", [{"target_id": None}])[0]["target_id"]
+        else:
+            assert not mapping_object.get("targets", [{"target_id": None}])[0][
+                "target_id"
+            ]
 
 
 @pytest.mark.asyncio

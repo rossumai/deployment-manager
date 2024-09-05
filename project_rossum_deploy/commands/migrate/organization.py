@@ -1,9 +1,11 @@
-from rich.progress import Progress
 from anyio import Path
 from rossum_api import ElisAPIClient
 from rich import print
-from rich.panel import Panel
 
+from project_rossum_deploy.commands.migrate.helpers import (
+    check_if_selected,
+    simulate_migrate_object,
+)
 from project_rossum_deploy.utils.functions import (
     find_object_by_id,
 )
@@ -28,14 +30,12 @@ async def migrate_organization(
     source_id_target_pairs: dict[int, list],
     sources_by_source_id_map: dict,
     target_organization_id: int,
-    progress: Progress,
     plan_only: bool = False,
+    selected_only: bool = False,
     target_objects: list[dict] = [],
     errors: dict = {},
     force: bool = False,
 ):
-    task = progress.add_task("Releasing organization.", total=1)
-
     try:
         organization = await read_json(source_path / "organization.json")
         sources_by_source_id_map[organization["id"]] = organization
@@ -51,15 +51,19 @@ async def migrate_organization(
                     f"Missing local target object, please {settings.DOWNLOAD_COMMAND_NAME} it first."
                 )
 
+        source_id_target_pairs[mapping["organization"]["id"]] = [
+            local_target_organization
+        ]
+
+        if selected_only and not check_if_selected(mapping["organization"]):
+            return
+
         if plan_only:
-            print(
-                Panel(
-                    f'Simulating organization "{organization['id']}" -> "{target_organization_id}".'
-                )
+            await simulate_migrate_object(
+                client=client,
+                source_object=organization,
+                target_id=target_organization_id,
             )
-            source_id_target_pairs[mapping["organization"]["id"]] = [
-                local_target_organization
-            ]
         else:
             source_id_target_pairs[mapping["organization"]["id"]] = [
                 await upload_organization(
@@ -70,7 +74,10 @@ async def migrate_organization(
                     force=force,
                 )
             ]
-        progress.update(task, advance=1)
+
+            print(
+                f'Released organization "{organization['id']}" -> "{target_organization_id}".'
+            )
     except PrdVersionException as e:
         raise e
     except MissingTargetOrganizationException as e:

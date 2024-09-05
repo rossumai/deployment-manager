@@ -4,16 +4,17 @@ import functools
 import logging
 from anyio import Path
 from rich import print
-from rich.progress import Progress
 from rich.panel import Panel
 
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
 from project_rossum_deploy.commands.migrate.helpers import (
+    check_if_selected,
     migrate_object_to_multiple_targets,
     replace_dependency_url,
     simulate_migrate_object,
+    skip_migrate_object,
 )
 from project_rossum_deploy.commands.migrate.upload_helpers import (
     upload_inbox,
@@ -39,17 +40,20 @@ async def migrate_workspaces(
     mapping: dict,
     source_id_target_pairs: dict[int, list],
     sources_by_source_id_map: dict,
-    progress: Progress,
     plan_only: bool = False,
+    selected_only: bool = False,
     target_objects: list[dict] = [],
     errors: dict = {},
     force: bool = False,
 ):
+    if not (await (source_path / "workspaces").exists()):
+        return
+
     workspace_paths = [
         workspace_path
         async for workspace_path in (source_path / "workspaces").iterdir()
+        if await workspace_path.is_dir()
     ]
-    task = progress.add_task("Releasing workspaces.", total=len(workspace_paths))
 
     async def migrate_workspace(ws_path: Path):
         try:
@@ -60,22 +64,36 @@ async def migrate_workspaces(
 
             workspace["queues"] = []
             replace_dependency_url(
-                workspace, 0, 1, "organization", source_id_target_pairs
+                workspace,
+                0,
+                1,
+                "organization",
+                source_id_target_pairs,
             )
 
             workspace_mapping = find_mapping_of_object(
                 mapping["organization"]["workspaces"], id
             )
+
+            # Ignoring WS should be hierarchical - queues and inboxes should get ignored as well
             if workspace_mapping.get("ignore", None):
-                progress.update(task, advance=1)
+                print(
+                    f'Ignored workspace "{workspace['id']}" including its queues and inboxes.'
+                )
                 return
+
+            skip_migration = selected_only and not check_if_selected(workspace_mapping)
 
             if plan_only:
                 partial_upload_workspace = functools.partial(
                     simulate_migrate_object,
                     client=client,
                     source_object=workspace,
-                    target_object_type=Resource.Workspace,
+                )
+            elif skip_migration:
+                partial_upload_workspace = functools.partial(
+                    skip_migrate_object,
+                    source_object=workspace,
                 )
             else:
                 partial_upload_workspace = functools.partial(
@@ -103,16 +121,15 @@ async def migrate_workspaces(
                 ws_path=ws_path,
                 client=client,
                 workspace_mapping=workspace_mapping,
-                mapping=mapping,
                 sources_by_source_id_map=sources_by_source_id_map,
                 source_id_target_pairs=source_id_target_pairs,
                 plan_only=plan_only,
+                selected_only=selected_only,
                 target_objects=target_objects,
                 errors=errors,
                 force=force,
             )
 
-            progress.update(task, advance=1)
         except PrdVersionException as e:
             raise e
         except Exception as e:
@@ -121,7 +138,7 @@ async def migrate_workspaces(
             )
 
     if plan_only:
-        print(Panel("Simulating workspaces."))
+        print(Panel("Simulating workspaces, queues, and inboxes."))
 
     await asyncio.gather(
         *[migrate_workspace(ws_path=ws_path) for ws_path in workspace_paths]
@@ -132,10 +149,10 @@ async def migrate_queues_and_inboxes(
     ws_path: Path,
     client: ElisAPIClient,
     workspace_mapping: dict,
-    mapping: dict,
     sources_by_source_id_map: dict,
     source_id_target_pairs: dict[int, list],
     plan_only: bool = False,
+    selected_only: bool = False,
     target_objects: list[dict] = [],
     errors: dict = {},
     force: bool = False,
@@ -154,15 +171,21 @@ async def migrate_queues_and_inboxes(
             sources_by_source_id_map[id] = queue
 
             queue_mapping = find_mapping_of_object(workspace_mapping["queues"], id)
-            if queue_mapping.get("ignore", None):
-                return
+
+            skip_migration = queue_mapping.get("ignore", None) or (
+                selected_only and not check_if_selected(queue_mapping)
+            )
 
             if plan_only:
                 partial_upload_queue_function = functools.partial(
                     simulate_migrate_object,
                     client=client,
                     source_object=queue,
-                    target_object_type=Resource.Queue,
+                )
+            elif skip_migration:
+                partial_upload_queue_function = functools.partial(
+                    skip_migrate_object,
+                    source_object=queue,
                 )
             else:
                 partial_upload_queue_function = functools.partial(
@@ -199,14 +222,20 @@ async def migrate_queues_and_inboxes(
             sources_by_source_id_map[inbox["id"]] = inbox
             inbox_mapping = queue_mapping["inbox"]
 
-            # Inbox cannot be ignored because a queue depends on it
+            skip_migration = inbox_mapping.get("ignore", None) or (
+                selected_only and not check_if_selected(inbox_mapping)
+            )
 
             if plan_only:
                 partial_upload_inbox_function = functools.partial(
                     simulate_migrate_object,
                     client=client,
                     source_object=inbox,
-                    target_object_type=Resource.Inbox,
+                )
+            elif skip_migration:
+                partial_upload_inbox_function = functools.partial(
+                    skip_migrate_object,
+                    source_object=inbox,
                 )
             else:
                 partial_upload_inbox_function = functools.partial(
@@ -263,6 +292,7 @@ async def prepare_queue_upload(
         else None
     )
 
+    previous_workspace_url = queue["workspace"]
     replace_dependency_url(
         object=queue,
         target_index=target_index,
@@ -271,6 +301,13 @@ async def prepare_queue_upload(
         source_id_target_pairs=source_id_target_pairs,
         target_object=target_object,
     )
+
+    if previous_workspace_url == queue["workspace"] and not target_id:
+        display_error(
+            f'Cannot create target for queue "{queue['id']}" - there is no target workspace to put it into.'
+        )
+        return queue
+
     replace_dependency_url(
         object=queue,
         target_index=target_index,
@@ -321,6 +358,7 @@ async def prepare_inbox_upload(
 ):
     inbox = deepcopy(inbox)
 
+    previous_queue_urls = inbox["queues"]
     replace_dependency_url(
         object=inbox,
         dependency="queues",
@@ -328,6 +366,13 @@ async def prepare_inbox_upload(
         target_objects_count=target_objects_count,
         source_id_target_pairs=source_id_target_pairs,
     )
+
+    if previous_queue_urls == inbox["queues"] and not target_id:
+        display_error(
+            f'Cannot create target for inbox "{inbox['id']}" - there is no target queue to associate it with.'
+        )
+        return inbox
+
     # Should either create a new one or it is already present
     inbox.pop("email", None)
 

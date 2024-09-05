@@ -4,14 +4,14 @@ from typing import Any
 from anyio import Path
 
 from rossum_api import ElisAPIClient
-from rich.progress import Progress
 from rich.panel import Panel
 from rich import print
-from rossum_api.api_client import Resource
 
 from project_rossum_deploy.commands.migrate.helpers import (
+    check_if_selected,
     migrate_object_to_multiple_targets,
     simulate_migrate_object,
+    skip_migrate_object,
 )
 from project_rossum_deploy.common.mapping import find_mapping_of_object
 from project_rossum_deploy.common.read_write import read_formula_file, read_json
@@ -33,18 +33,25 @@ async def migrate_schemas(
     mapping: dict,
     source_id_target_pairs: dict[int, list],
     sources_by_source_id_map: dict,
-    progress: Progress,
     plan_only: bool = False,
+    selected_only: bool = False,
     target_objects: list[dict] = [],
     errors: dict = {},
     force: bool = False,
 ):
+    if not await (source_path / "schemas").exists():
+        return
+
     schema_paths = [
-        schema_path async for schema_path in (source_path / "schemas").iterdir()
+        schema_path
+        async for schema_path in (source_path / "schemas").iterdir()
+        if await schema_path.is_file()
     ]
-    task = progress.add_task("Releasing schemas.", total=len(schema_paths))
 
     async def migrate_schema(schema_path: Path):
+        if schema_path.suffix != ".json":
+            return
+
         try:
             _, id = detemplatize_name_id(schema_path.stem)
             schema = await read_json(schema_path)
@@ -55,9 +62,10 @@ async def migrate_schemas(
             schema_mapping = find_mapping_of_object(
                 mapping["organization"]["schemas"], id
             )
-            if schema_mapping.get("ignore", None):
-                progress.update(task, advance=1)
-                return
+
+            skip_migration = schema_mapping.get("ignore", None) or (
+                selected_only and not check_if_selected(schema_mapping)
+            )
 
             await update_formula_fields_code(schema_path, schema)
 
@@ -66,7 +74,11 @@ async def migrate_schemas(
                     simulate_migrate_object,
                     client=client,
                     source_object=schema,
-                    target_object_type=Resource.Schema,
+                )
+            elif skip_migration:
+                partial_upload_schema = functools.partial(
+                    skip_migrate_object,
+                    source_object=schema,
                 )
             else:
                 partial_upload_schema = functools.partial(
@@ -90,14 +102,13 @@ async def migrate_schemas(
             )
             source_id_target_pairs[id].extend(results)
 
-            progress.update(task, advance=1)
         except PrdVersionException as e:
             raise e
         except Exception as e:
             display_error(f"Error while migrating schema: {e}", e)
 
     if plan_only:
-        print(Panel("Simulating workspaces."))
+        print(Panel("Simulating schemas."))
 
     await asyncio.gather(
         *[
@@ -140,6 +151,9 @@ async def update_formula_fields_code(schema_path: Path, schema: dict):
         return
 
     async for field_file_path in formula_directory.iterdir():
+        if not await field_file_path.is_file():
+            continue
+
         formula_code = await read_formula_file(field_file_path)
         formula_name = field_file_path.stem
 

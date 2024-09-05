@@ -14,12 +14,14 @@ from project_rossum_deploy.common.read_write import read_json
 from project_rossum_deploy.utils.consts import (
     ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD,
     ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD,
+    MIGRATE_PLANNING_MODE_OBJECT_PLACEHOLDER,
 )
 from project_rossum_deploy.utils.functions import (
     flatten,
     find_all_object_paths,
 )
 from project_rossum_deploy.commands.migrate.helpers import (
+    check_if_selected,
     traverse_mapping,
 )
 from project_rossum_deploy.common.determine_path import determine_object_type_from_url
@@ -256,10 +258,13 @@ async def override_migrated_objects_attributes(
     lookup_table: dict,
     errors: dict,
     plan_only: bool = False,
+    selected_only: bool = False,
 ):
     print(Panel(f"Running attribute_override{' (simulated)' if plan_only else ''}."))
     for mapping_object in traverse_mapping(mapping["organization"]):
-        if mapping_object.get("ignore", None):
+        if mapping_object.get("ignore", None) or (
+            selected_only and not check_if_selected(mapping_object)
+        ):
             continue
 
         source_object = sources_by_source_id_map.get(mapping_object["id"], None)
@@ -273,7 +278,7 @@ async def override_migrated_objects_attributes(
             if target_object["id"] in errors:
                 continue
 
-            resource = determine_object_type_from_url(target_object["url"])
+            object_type = determine_object_type_from_url(target_object["url"])
 
             # Implicit override for settings
             if "settings" in target_object:
@@ -302,17 +307,21 @@ async def override_migrated_objects_attributes(
                         )
                         if diff.stdout:
                             print(
-                                Panel(
-                                    f'Simulated implicit attribute override of source "{source_object['id']}" -> target "{target_object['id']}" replaced IDs:\n{diff.stdout}'
+                                print_simulation_message(
+                                    attribute_override_type="implicit",
+                                    object_type=object_type.value,
+                                    source_object=source_object,
+                                    target_object=target_object,
+                                    source_object_subset=diff.stdout,
                                 )
                             )
                 else:
                     await client._http_client.update(
-                        resource, target_object["id"], {"settings": target_settings}
+                        object_type, target_object["id"], {"settings": target_settings}
                     )
             # Explicit override for settings and anything else
             attribute_overrides = find_attribute_override_for_target(
-                targets_in_mapping, target_object["id"]
+                targets_in_mapping, target_object["id"], target_index
             )
             if not attribute_overrides:
                 continue
@@ -337,20 +346,45 @@ async def override_migrated_objects_attributes(
                 del source_object_subset["id"]
                 del source_object_subset["url"]
                 print(
-                    Panel(
-                        f'Simulated explicit attribute override from source "{source_object['id']}" to target "{target_object['id']}":\n {json.dumps(source_object_subset, indent=2)}'
+                    print_simulation_message(
+                        attribute_override_type="explicit",
+                        object_type=object_type.value,
+                        source_object=source_object,
+                        target_object=target_object,
+                        source_object_subset=source_object_subset,
                     )
                 )
             else:
                 await client._http_client.update(
-                    resource, target_object["id"], source_object_subset
+                    object_type, target_object["id"], source_object_subset
                 )
 
 
-def find_attribute_override_for_target(targets_in_mapping: dict, target_id: int):
-    for target in targets_in_mapping:
-        if target.get("target_id", None) == target_id:
+def print_simulation_message(
+    attribute_override_type: str,
+    object_type: str,
+    source_object: dict,
+    target_object: dict,
+    source_object_subset: dict,
+):
+    target_name = (
+        f'{target_object['id']} {target_object.get('name', 'no-name')}'
+        if target_object["id"] != source_object["id"]
+        else MIGRATE_PLANNING_MODE_OBJECT_PLACEHOLDER
+    )
+    return f'Simulated [green]{attribute_override_type}[/green] attribute override of [yellow]{object_type}[/yellow]: source "{source_object['id']} {source_object.get('name', 'no-name')}" to target "{target_name}": {json.dumps(source_object_subset, indent=2)}'
+
+
+def find_attribute_override_for_target(
+    targets_in_mapping: dict, target_id: int, target_index: int
+):
+    for iterated_target_index, target in enumerate(targets_in_mapping):
+        iterated_target_id = target.get("target_id", None)
+        if iterated_target_id is None and target_index == iterated_target_index:
             return target.get("attribute_override", {})
+        elif iterated_target_id == target_id:
+            return target.get("attribute_override", {})
+
     return {}
 
 
