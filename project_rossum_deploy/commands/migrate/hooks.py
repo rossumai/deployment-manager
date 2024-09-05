@@ -40,9 +40,6 @@ async def migrate_hooks(
     errors: dict = {},
     force: bool = False,
 ):
-    if not await (source_path / "hooks").exists():
-        return
-
     hook_paths = [hook_path async for hook_path in (source_path / "hooks").iterdir()]
     task = progress.add_task("Releasing hooks.", total=len(hook_paths))
 

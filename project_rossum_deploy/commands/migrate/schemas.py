@@ -39,9 +39,6 @@ async def migrate_schemas(
     errors: dict = {},
     force: bool = False,
 ):
-    if not await (source_path / "schemas").exists():
-        return
-
     schema_paths = [
         schema_path async for schema_path in (source_path / "schemas").iterdir()
     ]
