@@ -14,6 +14,7 @@ from project_rossum_deploy.common.read_write import read_json
 from project_rossum_deploy.utils.consts import (
     ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD,
     ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD,
+    MIGRATE_PLANNING_MODE_OBJECT_PLACEHOLDER,
 )
 from project_rossum_deploy.utils.functions import (
     flatten,
@@ -320,7 +321,7 @@ async def override_migrated_objects_attributes(
                     )
             # Explicit override for settings and anything else
             attribute_overrides = find_attribute_override_for_target(
-                targets_in_mapping, target_object["id"]
+                targets_in_mapping, target_object["id"], target_index
             )
             if not attribute_overrides:
                 continue
@@ -366,13 +367,24 @@ def print_simulation_message(
     target_object: dict,
     source_object_subset: dict,
 ):
-    return f'Simulated [green]{attribute_override_type}[/green] attribute override of [yellow]{object_type}[/yellow]: source "{source_object['id']} {source_object.get('name', 'no-name')}" to target "{target_object['id']} {target_object.get('name', 'no-name')}": {json.dumps(source_object_subset, indent=2)}'
+    target_name = (
+        f'{target_object['id']} {target_object.get('name', 'no-name')}'
+        if target_object["id"] != source_object["id"]
+        else MIGRATE_PLANNING_MODE_OBJECT_PLACEHOLDER
+    )
+    return f'Simulated [green]{attribute_override_type}[/green] attribute override of [yellow]{object_type}[/yellow]: source "{source_object['id']} {source_object.get('name', 'no-name')}" to target "{target_name}": {json.dumps(source_object_subset, indent=2)}'
 
 
-def find_attribute_override_for_target(targets_in_mapping: dict, target_id: int):
-    for target in targets_in_mapping:
-        if target.get("target_id", None) == target_id:
+def find_attribute_override_for_target(
+    targets_in_mapping: dict, target_id: int, target_index: int
+):
+    for iterated_target_index, target in enumerate(targets_in_mapping):
+        iterated_target_id = target.get("target_id", None)
+        if iterated_target_id is None and target_index == iterated_target_index:
             return target.get("attribute_override", {})
+        elif iterated_target_id == target_id:
+            return target.get("attribute_override", {})
+
     return {}
 
 

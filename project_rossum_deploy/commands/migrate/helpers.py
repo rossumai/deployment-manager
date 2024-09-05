@@ -6,6 +6,7 @@ from rich import print
 
 from project_rossum_deploy.common.determine_path import determine_object_type_from_url
 from project_rossum_deploy.utils.consts import (
+    MIGRATE_PLANNING_MODE_OBJECT_PLACEHOLDER,
     display_warning,
     settings,
     MAPPING_SELECTED_ATTRIBUTE,
@@ -222,7 +223,7 @@ async def simulate_migrate_object(
         return target_object
     else:
         print(
-            f'[red]CREATE[/red] [yellow]{object_type.value}[/yellow]: source "{source_object.get('id', None)} {source_object.get('name', '')}" -> target "{target_id} {target_object.get('name', 'no-name')}" {object_counter}.'
+            f'[red]CREATE[/red] [yellow]{object_type.value}[/yellow]: source "{source_object.get('id', None)} {source_object.get('name', '')}" -> target "{MIGRATE_PLANNING_MODE_OBJECT_PLACEHOLDER}" {object_counter}.'
         )
         return copy.deepcopy(source_object)
 

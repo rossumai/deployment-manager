@@ -39,8 +39,13 @@ async def migrate_schemas(
     errors: dict = {},
     force: bool = False,
 ):
+    if not await (source_path / "schemas").exists():
+        return
+
     schema_paths = [
-        schema_path async for schema_path in (source_path / "schemas").iterdir()
+        schema_path
+        async for schema_path in (source_path / "schemas").iterdir()
+        if await schema_path.is_file()
     ]
 
     async def migrate_schema(schema_path: Path):
@@ -103,7 +108,7 @@ async def migrate_schemas(
             display_error(f"Error while migrating schema: {e}", e)
 
     if plan_only:
-        print(Panel("Simulating workspaces."))
+        print(Panel("Simulating schemas."))
 
     await asyncio.gather(
         *[
@@ -146,6 +151,9 @@ async def update_formula_fields_code(schema_path: Path, schema: dict):
         return
 
     async for field_file_path in formula_directory.iterdir():
+        if not await field_file_path.is_file():
+            continue
+
         formula_code = await read_formula_file(field_file_path)
         formula_name = field_file_path.stem
 

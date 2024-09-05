@@ -40,7 +40,14 @@ async def migrate_hooks(
     errors: dict = {},
     force: bool = False,
 ):
-    hook_paths = [hook_path async for hook_path in (source_path / "hooks").iterdir()]
+    if not await (source_path / "hooks").exists():
+        return
+
+    hook_paths = [
+        hook_path
+        async for hook_path in (source_path / "hooks").iterdir()
+        if await hook_path.is_file()
+    ]
 
     target_token_owner_id = ""
     if not settings.IS_PROJECT_IN_SAME_ORG:
