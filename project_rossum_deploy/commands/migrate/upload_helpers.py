@@ -263,6 +263,13 @@ async def create_hook_based_on_template(hook: dict, client: ElisAPIClient):
         created_hook = await client._http_client.request_json(
             "POST", url="hooks/create", json=create_payload
         )
+
+        # In case the hook became private, remove conflicting fields
+        if (hook_config := created_hook.get("config", {})).get("private", False):
+            fields_to_remove = ["code", "third_part_library_pack", "runtime"]
+            for field in fields_to_remove:
+                hook_config.pop("code", field)
+
         return await client._http_client.update(
             resource=Resource.Hook, id_=created_hook["id"], data=hook
         )
