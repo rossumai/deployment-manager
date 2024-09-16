@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-PRD_GIT_URL=https://github.com/rossumai/prd.git
+PRD_GIT_URL=https://github.com/rossumai/deployment-manager.git
 
 TEMP_GIT_DIR=$(mktemp -d)
 
