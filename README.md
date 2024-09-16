@@ -1,4 +1,4 @@
-<h1><font color="#006FE8"> Project deployment tool </font></h1>
+<h1><font color="#006FE8"> Deployment Manager </font></h1>
 
 This command line tool is used to help users customizing and delivering projects on Rossum platform to easily track changes, deploy and release changes/entire project to different environments inside the same cluster.
 
