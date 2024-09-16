@@ -15,15 +15,26 @@ This command line tool is used to help users customizing and delivering projects
 </br>
 <h2><font color="#004795"> Installation guide </font></h2>
 
+1. You can use this one-liner to download the installation script and let it execute the steps automatically:
 ```
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/rossumai/prd/main/install.sh)"
+```
+2. You can also do these steps manually:
+```
+git clone https://github.com/rossumai/prd.git
+cd prd
+
 brew install pipx
+
 pipx ensurepath
 pipx install .
 ```
 
 Restart the terminal.
 
-To reinstall with newer version, run `pipx install . --force`.
+When updating, you can:
+1. Run `prd update`.
+2. Run `git pull` where you manually pulled the repository and then run `pipx install . --force`.
 
 </br>
 <h2><font color="#004795"> User guide </font></h2>
