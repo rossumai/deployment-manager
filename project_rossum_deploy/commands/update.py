@@ -4,7 +4,7 @@ import click
 
 from project_rossum_deploy.utils.consts import settings
 
-PRD_GIT_URL = "https://github.com/rossumai/prd/blob/main/install.sh"
+PRD_GIT_URL = "https://raw.githubusercontent.com/rossumai/prd/main/install.sh"
 
 
 @click.command(
@@ -12,4 +12,7 @@ PRD_GIT_URL = "https://github.com/rossumai/prd/blob/main/install.sh"
     help="""Updates the PRD command to the latest version.""",
 )
 def update_prd():
-    subprocess.run(["sh", "-c", f"$(curl -fsSL {PRD_GIT_URL})"])
+    script = subprocess.run(
+        ["curl", "-fsSL", PRD_GIT_URL], capture_output=True
+    ).stdout.decode()
+    subprocess.run([script], shell=True)
