@@ -163,6 +163,7 @@ try:
         ]
         MAPPING_TRAVERSE_IGNORE_FIELDS: list[str] = ["targets"]
 
+        UPDATE_COMMAND_NAME: str = "update"
         MIGRATE_MAPPING_COMMAND_NAME: str = "migrate-mapping"
         INITIALIZE_COMMAND_NAME: str = "init"
         DOWNLOAD_COMMAND_NAME: str = "pull"

@@ -1,5 +1,6 @@
 import click
 
+from project_rossum_deploy.commands.update import update_prd
 from project_rossum_deploy.commands.download.download import (
     download_project_wrapper,
 )
@@ -21,6 +22,7 @@ main.add_command(migrate_project_wrapper)
 main.add_command(migrate_mapping_wrapper)
 main.add_command(purge_project_wrapper)
 main.add_command(upload_project_wrapper)
+main.add_command(update_prd)
 
 # For debugging purposes
 if __name__ == "__main__":
