@@ -7,7 +7,7 @@ cd "$TEMP_GIT_DIR"
 
 git clone "$PRD_GIT_URL"
 
-cd prd
+cd deployment-manager
 
 if ! command -v pipx &> /dev/null
 then
