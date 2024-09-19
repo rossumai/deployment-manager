@@ -84,7 +84,7 @@ async def migrate_hooks(
 
             await update_hook_code(hook_path, hook)
 
-            if plan_only:
+            if plan_only and not skip_migration:
                 partial_upload_hook = functools.partial(
                     simulate_migrate_object,
                     client=client,

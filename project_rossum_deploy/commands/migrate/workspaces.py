@@ -84,7 +84,7 @@ async def migrate_workspaces(
 
             skip_migration = selected_only and not check_if_selected(workspace_mapping)
 
-            if plan_only:
+            if plan_only and not skip_migration:
                 partial_upload_workspace = functools.partial(
                     simulate_migrate_object,
                     client=client,
@@ -176,7 +176,7 @@ async def migrate_queues_and_inboxes(
                 selected_only and not check_if_selected(queue_mapping)
             )
 
-            if plan_only:
+            if plan_only and not skip_migration:
                 partial_upload_queue_function = functools.partial(
                     simulate_migrate_object,
                     client=client,
@@ -226,7 +226,7 @@ async def migrate_queues_and_inboxes(
                 selected_only and not check_if_selected(inbox_mapping)
             )
 
-            if plan_only:
+            if plan_only and not skip_migration:
                 partial_upload_inbox_function = functools.partial(
                     simulate_migrate_object,
                     client=client,

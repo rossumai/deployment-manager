@@ -69,7 +69,7 @@ async def migrate_schemas(
 
             await update_formula_fields_code(schema_path, schema)
 
-            if plan_only:
+            if plan_only and not skip_migration:
                 partial_upload_schema = functools.partial(
                     simulate_migrate_object,
                     client=client,
