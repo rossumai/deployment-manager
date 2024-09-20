@@ -348,7 +348,7 @@ async def determine_object_destination(
         destination = settings.SOURCE_DIRNAME
     else:
         object_name, object_id = object["name"], object["id"]
-        user_decision = Confirm(
+        user_decision = Confirm.ask(
             f'Should the {object_type} "{object_name}" ({object_id}) be in {settings.SOURCE_DIRNAME}? Otherwise, it will be understood as {settings.TARGET_DIRNAME}.'
         )
         destination = (

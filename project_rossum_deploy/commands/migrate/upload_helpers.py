@@ -18,6 +18,12 @@ from project_rossum_deploy.utils.functions import (
 )
 
 
+class TargetObjectNotFoundException(Exception):
+    def __init__(self, target_id, *args, **kwargs):
+        msg = f'Not could not find target object with ID "{target_id}" locally. If it exists only on remote or is in {settings.SOURCE_DIRNAME}, please {settings.DOWNLOAD_COMMAND_NAME} it first.'
+        super().__init__(msg, *args, **kwargs)
+
+
 async def upload_organization(
     client: ElisAPIClient,
     organization: dict,
@@ -69,9 +75,7 @@ async def upload_workspace(
     if target_id:
         local_object = find_object_by_id(target_id, target_objects)
         if not local_object:
-            raise Exception(
-                f'Not could not find target object with ID "{target_id}" locally. If it exists, please {settings.DOWNLOAD_COMMAND_NAME} it first.'
-            )
+            raise TargetObjectNotFoundException(target_id)
 
         local_remote_timestamp_synced = await check_modified_timestamp(
             client, Resource.Workspace, target_id, local_object
@@ -102,9 +106,7 @@ async def upload_queue(
     if target_id:
         local_object = find_object_by_id(target_id, target_objects)
         if not local_object:
-            raise Exception(
-                f'Not could not find target object with ID "{target_id}" locally. If it exists, please {settings.DOWNLOAD_COMMAND_NAME} it first.'
-            )
+            raise TargetObjectNotFoundException(target_id)
 
         local_remote_timestamp_synced = await check_modified_timestamp(
             client, Resource.Queue, target_id, local_object
@@ -135,9 +137,7 @@ async def upload_inbox(
     if target_id:
         local_object = find_object_by_id(target_id, target_objects)
         if not local_object:
-            raise Exception(
-                f'Not could not find target object with ID "{target_id}" locally. If it exists, please {settings.DOWNLOAD_COMMAND_NAME} it first.'
-            )
+            raise TargetObjectNotFoundException(target_id)
 
         local_remote_timestamp_synced = await check_modified_timestamp(
             client, Resource.Inbox, target_id, local_object
@@ -168,9 +168,7 @@ async def upload_schema(
     if target_id:
         local_object = find_object_by_id(target_id, target_objects)
         if not local_object:
-            raise Exception(
-                f'Not could not find target object with ID "{target_id}" locally. If it exists, please {settings.DOWNLOAD_COMMAND_NAME} it first.'
-            )
+            raise TargetObjectNotFoundException(target_id)
 
         local_remote_timestamp_synced = await check_modified_timestamp(
             client, Resource.Schema, target_id, local_object
@@ -202,9 +200,7 @@ async def upload_hook(
     if target_id:
         local_object = find_object_by_id(target_id, target_objects)
         if not local_object:
-            raise Exception(
-                f'Not could not find target object with ID "{target_id}" locally. If it exists, please {settings.DOWNLOAD_COMMAND_NAME} it first.'
-            )
+            raise TargetObjectNotFoundException(target_id)
 
         local_remote_timestamp_synced = await check_modified_timestamp(
             client, Resource.Hook, target_id, local_object

@@ -7,6 +7,9 @@ from rossum_api import ElisAPIClient
 from project_rossum_deploy.commands.download.download import (
     download_project,
 )
+from project_rossum_deploy.commands.migrate.checks import (
+    check_ids_exclusively_source_or_target,
+)
 from project_rossum_deploy.commands.migrate.organization import migrate_organization
 from project_rossum_deploy.common.migrate_config import migrate_config
 from project_rossum_deploy.common.attribute_override import (
@@ -162,6 +165,9 @@ async def migrate_project(
                 org_path / settings.SOURCE_DIRNAME, mapping
             )
         ):
+            return
+
+        if not check_ids_exclusively_source_or_target(mapping):
             return
 
         source_path = org_path / settings.SOURCE_DIRNAME
