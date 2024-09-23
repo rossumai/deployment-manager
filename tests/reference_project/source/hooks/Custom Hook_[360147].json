@@ -21,7 +21,9 @@
     "app": null,
     "payload_logging_enabled": false,
     "timeout_s": 30,
+    "max_polling_time_s": 300,
     "retry_count": 4,
+    "retry_count_for_polling_failure": 0,
     "url": "https://shared-eu2.rossum.app/settings/extensions/create",
     "secret": null,
     "insecure_ssl": false,
@@ -45,5 +47,5 @@
   "token_lifetime_s": null,
   "hook_template": null,
   "modified_by": "https://shared-eu2.rossum.app/api/v1/users/285991",
-  "modified_at": "2024-08-13T09:44:28.066752Z"
+  "modified_at": "2024-08-19T08:59:13.912998Z"
 }

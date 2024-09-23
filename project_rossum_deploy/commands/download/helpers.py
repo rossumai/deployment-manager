@@ -153,6 +153,33 @@ async def check_schema_formula_fields_existence(remote_object: dict, path: Path)
                 ...
 
 
+async def check_email_template_existence(
+    client: ElisAPIClient, remote_object: dict, path: Path
+):
+    try:
+        queue = await client._http_client.request_json(
+            method="GET", url=remote_object["queue"]
+        )
+        if not queue["workspace"]:
+            raise MissingParentObjectException
+        ws = await client._http_client.request_json(
+            method="GET", url=queue["workspace"]
+        )
+    except (APIClientError, MissingParentObjectException) as e:
+        if e.status_code != 404:
+            raise e
+
+        raise MissingParentObjectException
+
+    # Suffix = email_templates / <name>.json
+    compare_paths(
+        original_path=path,
+        ws=ws,
+        queue=queue,
+        suffix=Path(path.parent.name) / path.name,
+    )
+
+
 async def remove_local_nonexistent_object(
     path: Path,
     client: ElisAPIClient,
@@ -210,6 +237,8 @@ async def remove_local_nonexistent_object(
             await check_inbox_existence(client, remote_object, path)
         elif object_type == Resource.Schema:
             await check_schema_formula_fields_existence(remote_object, path)
+        elif object_type == Resource.EmailTemplate:
+            await check_email_template_existence(client, remote_object, path)
 
     except (
         APIClientError,
@@ -287,7 +316,11 @@ def compare_paths(original_path: Path, ws, queue, suffix):
     queue_path_path = templatize_name_id(queue["name"], queue["id"])
     path_parts = str(original_path).split("/")
     latest_path = (
-        Path(*path_parts[:-4]) / ws_path_part / "queues" / queue_path_path / suffix
+        Path(*path_parts[: -5 if "email_templates" in str(suffix) else -4])
+        / ws_path_part
+        / "queues"
+        / queue_path_path
+        / suffix
     )
 
     # If the original path was absollut
@@ -348,7 +381,8 @@ async def determine_object_destination(
         destination = settings.SOURCE_DIRNAME
     else:
         object_name, object_id = object["name"], object["id"]
-        user_decision = Confirm.ask(
+        # TODO: fix logic
+        user_decision = Confirm(
             f'Should the {object_type} "{object_name}" ({object_id}) be in {settings.SOURCE_DIRNAME}? Otherwise, it will be understood as {settings.TARGET_DIRNAME}.'
         )
         destination = (

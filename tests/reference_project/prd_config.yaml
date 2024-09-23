@@ -1,0 +1,3 @@
+source_api_base: https://shared-eu2.rossum.app/api/v1
+use_same_org_as_target: true
+target_api_base: ''

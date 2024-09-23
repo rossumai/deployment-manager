@@ -30,7 +30,9 @@
     "app": null,
     "payload_logging_enabled": false,
     "timeout_s": 30,
+    "max_polling_time_s": 300,
     "retry_count": 4,
+    "retry_count_for_polling_failure": 0,
     "insecure_ssl": false,
     "client_ssl_certificate": null,
     "retry_on_any_non_2xx": false
@@ -54,5 +56,5 @@
   "token_lifetime_s": null,
   "hook_template": "https://shared-eu2.rossum.app/api/v1/hook_templates/30",
   "modified_by": "https://shared-eu2.rossum.app/api/v1/users/285991",
-  "modified_at": "2024-08-14T13:42:23.661462Z"
+  "modified_at": "2024-09-17T06:50:38.010407Z"
 }
