@@ -50,7 +50,7 @@ When updating, you can:
 4. Fill in `source_api_base` in the `prd_config.yaml` file.
 5. If you are going to deploy the code to a different Rossum organization configure `target_api_base` and `use_same_org_as_target: false` in `prd_config.yaml` and either `target.token` or `target.username` and `target.password` in `credentials.json`.
 
-> ℹ️ This command creates local git repository. If you want to connect it to an existing remote repository, call `git remote add <reponame> <giturl>`. If you already have an existing remote repository, it might be easier to clone it from the remote and create an `credentials.json` file manually in the root folder.
+> ℹ️ This command creates a local git repository. If you want to connect it to an existing remote repository, call `git remote add <reponame> <giturl>`. For existing remote repositories created with PRD, it might be easier to clone them from the remote and create a `credentials.json` file manually in the root folder.
 
 
 <span style="color:#004795">**Pull (download) configuration of existing project**</span>
