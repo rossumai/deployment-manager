@@ -21,7 +21,7 @@ This command line tool is used to help users customizing and delivering projects
 ```
 2. You can also do these steps manually:
 ```
-git clone https://github.com/rossumai/depyloment-manager.git
+git clone https://github.com/rossumai/deployment-manager.git
 cd prd
 
 brew install pipx
