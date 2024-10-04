@@ -11,7 +11,6 @@ from project_rossum_deploy.commands.migrate.checks import (
     check_ids_exclusively_source_or_target,
 )
 from project_rossum_deploy.commands.migrate.organization import migrate_organization
-from project_rossum_deploy.common.migrate_config import migrate_config
 from project_rossum_deploy.common.attribute_override import (
     override_migrated_objects_attributes,
     validate_override_migrated_objects_attributes,
@@ -87,7 +86,6 @@ The specifics of what objects to migrate and where to migrate them are specified
 async def migrate_project_wrapper(
     plan_only: bool, selected_only: bool, force: bool, commit: bool, message: str
 ):
-    await migrate_config()
     await migrate_project(
         plan_only=plan_only,
         selected_only=selected_only,
