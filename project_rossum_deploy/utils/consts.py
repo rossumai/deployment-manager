@@ -25,7 +25,7 @@ ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD = "$source_value"
 
 MIGRATE_PLANNING_MODE_OBJECT_PLACEHOLDER = "ID-WOULD-BE-CREATED"
 
-MAPPING_SELECTED_ATTRIBUTE = "is_selected"
+MAPPING_SELECTED_ATTRIBUTE = "selected"
 
 
 def display_error(error_msg: str, exception: Exception = None):

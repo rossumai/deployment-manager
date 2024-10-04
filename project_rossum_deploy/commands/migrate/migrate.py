@@ -29,6 +29,7 @@ from project_rossum_deploy.commands.migrate.workspaces import migrate_workspaces
 
 from project_rossum_deploy.common.read_write import read_json
 from project_rossum_deploy.utils.consts import (
+    MAPPING_SELECTED_ATTRIBUTE,
     PrdVersionException,
     display_error,
     settings,
@@ -60,7 +61,7 @@ The specifics of what objects to migrate and where to migrate them are specified
     "-so",
     default=False,
     is_flag=True,
-    help="Releases only objects with a `selected: true` attribute in mapping.yaml and ignores the rest even without an ignore flag. Unlike ignore, this flag is not recursive = you have to put it on sub-objects (e.g., both queue AND inbox).",
+    help=f"Releases only objects with a `{MAPPING_SELECTED_ATTRIBUTE}: true` attribute in mapping.yaml and ignores the rest even without an ignore flag. Unlike ignore, this flag is not recursive = you have to put it on sub-objects (e.g., both queue AND inbox).",
 )
 @click.option(
     "--force",

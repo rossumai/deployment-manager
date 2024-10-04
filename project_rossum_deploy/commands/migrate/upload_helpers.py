@@ -281,10 +281,18 @@ async def create_hook_based_on_template(hook: dict, client: ElisAPIClient):
 
         # In case the hook became private, remove conflicting fields
         if created_hook.get("config", {}).get("private", False):
-            fields_to_remove = ["code", "third_party_library_pack", "runtime"]
+            fields_to_remove = [
+                "code",
+                "third_party_library_pack",
+                "runtime",
+                "private",
+            ]
             hook_config = hook.get("config", {})
             for field in fields_to_remove:
                 hook_config.pop(field, None)
+
+        # Do not try patching the type of extension in case it changed (e.g., SF to lambda)
+        hook.pop("type", None)
 
         return await client._http_client.update(
             resource=Resource.Hook, id_=created_hook["id"], data=hook
