@@ -104,7 +104,10 @@ def replace_list_of_dependency_urls(
         source_id = extract_id_from_url(source_dependency_url)
         target_dependency_objects = source_id_target_pairs.get(source_id, [])
 
-        # Assume each object should have its own dependency
+        # Dependency object has no target equivalents (when ignored, they have at least the one source, this if-branch is likely an error/edge case)
+        if not len(target_dependency_objects):
+            continue
+        # There are multiple objects released (e.g., queues) and their number is the same as the number of their dependencies (e.g., hooks) -> assume that each object should have its own dependency
         if len(target_dependency_objects) == target_objects_count:
             target_id_str = str(target_dependency_objects[target_index]["id"])
         # All objects will have the same dependency
@@ -114,12 +117,12 @@ def replace_list_of_dependency_urls(
         source_id_str = str(source_id)
         new_url = source_dependency_url.replace(source_id_str, target_id_str)
 
-        new_urls.append(new_url)
-
         if source_id_str == target_id_str:
             display_warning(
-                f'Dependency "{dependency}"[{source_index}] for object "{object.get('id', 'no-ID')}" was not modified. Source and target objects share the dependency. This can happen if you did not {settings.MIGRATE_COMMAND_NAME} the dependency and no target equivalent exists.'
+                f'Dependency "{dependency}"[{source_index}] for object "{object.get('id', 'no-ID')}" was not changed to a target counterpart because none was found.'
             )
+        else:
+            new_urls.append(new_url)
 
     # Target queues can have 'dangling' hooks that exist only on target, these should not be overwritten.
     if target_object:
