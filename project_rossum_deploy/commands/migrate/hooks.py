@@ -209,7 +209,6 @@ async def migrate_hook_dependency_graph(
                 )
         except Exception as e:
             display_error(
-                f"Error while migrating dependency graph for hook '{source_path}': {e}",
+                f"Error while migrating dependency graph for hook '{hook_path}':",
                 e,
             )
-            raise e

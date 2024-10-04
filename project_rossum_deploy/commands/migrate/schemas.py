@@ -105,7 +105,7 @@ async def migrate_schemas(
         except PrdVersionException as e:
             raise e
         except Exception as e:
-            display_error(f"Error while migrating schema: {e}", e)
+            display_error(f"Error while migrating schema {schema_path}:", e)
 
     if plan_only:
         print(Panel("Simulating schemas."))
