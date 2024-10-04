@@ -7,7 +7,6 @@ import click
 from rossum_api import ElisAPIClient
 
 from project_rossum_deploy.commands.download.download import download_project
-from project_rossum_deploy.common.migrate_config import migrate_config
 from project_rossum_deploy.commands.migrate_mapping import migrate_mapping
 from project_rossum_deploy.commands.purge.delete_objects import (
     delete_all_objects_with_ids,
@@ -37,7 +36,6 @@ Deletes all objects in Rossum based on IDs in the mappping file. This operation 
 )
 @coro
 async def purge_project_wrapper(destination):
-    await migrate_config()
     # To be able to run the command progammatically without the CLI decorators
     await purge_project(
         destination=destination,
