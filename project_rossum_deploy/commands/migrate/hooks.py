@@ -46,7 +46,7 @@ async def migrate_hooks(
     hook_paths = [
         hook_path
         async for hook_path in (source_path / "hooks").iterdir()
-        if await hook_path.is_file()
+        if await hook_path.is_file() and hook_path.suffix == ".json"
     ]
 
     target_token_owner_id = ""
@@ -60,9 +60,6 @@ async def migrate_hooks(
             target_token_owner_id = target_org_token_owner.id
 
     async def migrate_hook(hook_path: Path):
-        if hook_path.suffix != ".json":
-            return
-
         try:
             _, id = detemplatize_name_id(hook_path.stem)
             hook = await read_json(hook_path)
@@ -132,7 +129,7 @@ async def migrate_hooks(
     if plan_only:
         return
 
-    await migrate_hook_dependency_graph(client, source_path, source_id_target_pairs)
+    await migrate_hook_dependency_graph(client, hook_paths, source_id_target_pairs)
 
     print(
         Panel(
@@ -155,60 +152,90 @@ async def update_hook_code(hook_path: Path, hook: dict):
 
 
 async def migrate_hook_dependency_graph(
-    client: ElisAPIClient, source_path: Path, source_id_target_pairs: dict[int, list]
+    client: ElisAPIClient,
+    hook_paths: list[Path],
+    source_id_target_pairs: dict[int, list],
 ):
-    async for hook_path in (source_path / "hooks").iterdir():
-        if hook_path.suffix != ".json":
-            continue
-
+    for hook_path in hook_paths:
         try:
-            _, old_hook_id = detemplatize_name_id(hook_path.stem)
-            old_hook = await read_json(hook_path)
-            new_hooks = source_id_target_pairs.get(old_hook_id, None)
+            _, source_hook_id = detemplatize_name_id(hook_path.stem)
+            source_hook = await read_json(hook_path)
+            target_hooks = source_id_target_pairs.get(source_hook_id, [])
 
             # The hook was ignored, it has no targets equivalent
-            if not new_hooks or not len(new_hooks):
+            if not len(target_hooks):
                 continue
 
-            for new_hook_index, new_hook in enumerate(new_hooks):
-                new_run_after = []
-                for predecessor_url in old_hook["run_after"]:
-                    predecessor_id = extract_id_from_url(predecessor_url)
-                    target_objects = source_id_target_pairs.get(predecessor_id, [])
-                    # The hook was ignored, it has no targets equivalent
-                    if not len(target_objects):
-                        continue
-                    # Assume each hook should have its own run_after
-                    elif len(new_hooks) == len(target_objects):
-                        new_url = predecessor_url.replace(
-                            str(predecessor_id),
-                            str(target_objects[new_hook_index]["id"]),
-                        )
-                        new_run_after.append(new_url)
-                    # All hooks will have the same single run_after
-                    elif len(target_objects) == 1:
-                        new_url = predecessor_url.replace(
-                            str(predecessor_id), str(target_objects[0]["id"])
-                        )
-                        new_run_after.append(new_url)
-                    else:
-                        new_url = predecessor_url.replace(
-                            str(predecessor_id), str(target_objects[0]["id"])
-                        )
-                        new_run_after.append(new_url)
-                        new_hook_ids = "".join(list(map(lambda x: x["id"], new_hooks)))
-                        print(
-                            Panel(
-                                f'Could not determine new predecessors for migrated hooks "{new_hook_ids}". The source predecessor ID is "{predecessor_id}". Assigning everything to target predecessor "{target_objects[0]["id"]}"'
-                            )
-                        )
-                        continue
-
+            for target_hook_index, target_hook in enumerate(target_hooks):
+                target_run_after = await migrate_target_hook_run_after(
+                    client=client,
+                    target_hook_index=target_hook_index,
+                    target_hook_count=len(target_hooks),
+                    source_run_after=source_hook.get("run_after", []),
+                    source_id_target_pairs=source_id_target_pairs,
+                )
                 await client._http_client.update(
-                    Resource.Hook, id_=new_hook["id"], data={"run_after": new_run_after}
+                    Resource.Hook,
+                    id_=target_hook["id"],
+                    data={"run_after": target_run_after},
                 )
         except Exception as e:
             display_error(
                 f"Error while migrating dependency graph for hook '{hook_path}':",
                 e,
             )
+
+
+async def migrate_target_hook_run_after(
+    client: ElisAPIClient,
+    source_run_after: dict,
+    target_hook_index: int,
+    target_hook_count: int,
+    source_id_target_pairs: dict[int, list],
+):
+    async def find_missing_hook_run_after(predecessor_id: int):
+        # The predecessor hook was ignored, it has no targets equivalent
+        # Take the predecessor's source and find its predecessor (if none, stop)
+        # Find the predecessors' target and put that into run_after for this hook
+        # If there is no target, repeat from line one
+        try:
+            predecessor = await client.retrieve_hook(predecessor_id)
+        except Exception as e:
+            display_error(
+                f'Error while finding predecessor hook with ID "{predecessor_id}" in Rossum.',
+                e,
+            )
+            return []
+
+        return await migrate_target_hook_run_after(
+            client=client,
+            source_run_after=predecessor.run_after,
+            target_hook_index=target_hook_index,
+            target_hook_count=target_hook_count,
+            source_id_target_pairs=source_id_target_pairs,
+        )
+
+    target_run_after = []
+
+    for predecessor_url in source_run_after:
+        predecessor_id = extract_id_from_url(predecessor_url)
+        predecessor_target_objects = source_id_target_pairs.get(predecessor_id, [])
+
+        if not len(predecessor_target_objects):
+            target_run_after += await find_missing_hook_run_after(predecessor_id)
+        # Assume each newly created hook should have its own run_after
+        elif target_hook_count == len(predecessor_target_objects):
+            new_url = predecessor_url.replace(
+                str(predecessor_id),
+                str(predecessor_target_objects[target_hook_index]["id"]),
+            )
+            target_run_after.append(new_url)
+        # All hooks will have the same single run_after
+        else:
+            new_url = predecessor_url.replace(
+                str(predecessor_id),
+                str(predecessor_target_objects[0]["id"]),
+            )
+            target_run_after.append(new_url)
+
+    return target_run_after
