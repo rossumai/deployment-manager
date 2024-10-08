@@ -67,7 +67,10 @@ def replace_dependency_url(
         source_id = extract_id_from_url(source_dependency_url)
         target_dependency_objects = source_id_target_pairs.get(source_id, [])
 
-        # Assume each object should have its own dependency
+        # Dependency object has no target equivalents (e.g., when ignored)
+        if not len(target_dependency_objects):
+            return
+        # There are multiple objects released (e.g., queues) and their number is the same as the number of their dependencies (e.g., hooks) -> assume that each object should have its own dependency
         if len(target_dependency_objects) == target_objects_count:
             target_id_str = str(target_dependency_objects[target_index]["id"])
         # All objects will have the same dependency
@@ -104,7 +107,7 @@ def replace_list_of_dependency_urls(
         source_id = extract_id_from_url(source_dependency_url)
         target_dependency_objects = source_id_target_pairs.get(source_id, [])
 
-        # Dependency object has no target equivalents (when ignored, they have at least the one source, this if-branch is likely an error/edge case)
+        # Dependency object has no target equivalents (e.g., when ignored)
         if not len(target_dependency_objects):
             continue
         # There are multiple objects released (e.g., queues) and their number is the same as the number of their dependencies (e.g., hooks) -> assume that each object should have its own dependency
@@ -243,4 +246,4 @@ async def skip_migrate_object(
     print(
         f'Skipping {settings.MIGRATE_COMMAND_NAME} of {object_type} "{source_object['id']} {source_object['name']}".'
     )
-    return copy.deepcopy(source_object)
+    return None
