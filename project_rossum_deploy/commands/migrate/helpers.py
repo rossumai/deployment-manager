@@ -242,8 +242,4 @@ async def skip_migrate_object(
     target_index: int = 0,
     target_objects_count: int = None,
 ):
-    object_type = determine_object_type_from_url(source_object["url"])
-    print(
-        f'Skipping {settings.MIGRATE_COMMAND_NAME} of {object_type} "{source_object['id']} {source_object['name']}".'
-    )
     return None
