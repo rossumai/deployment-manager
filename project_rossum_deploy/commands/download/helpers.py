@@ -430,6 +430,8 @@ async def get_all_objects_for_destination(org_path: Path, destination: str) -> t
                 queues.append(object)
             case Resource.Inbox:
                 inboxes.append(object)
+            case Resource.EmailTemplate:
+                ...
             case _:
                 display_warning(f"Unrecognized type '{type}' - skipping.")
                 continue
