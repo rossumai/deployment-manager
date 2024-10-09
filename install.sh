@@ -9,6 +9,11 @@ git clone "$PRD_GIT_URL"
 
 cd deployment-manager
 
+if [ -n "$1" ]
+then
+    git checkout "$1"
+fi
+
 if ! command -v pipx &> /dev/null
 then
     echo 'pipx not found, attempting install...'
