@@ -9,9 +9,9 @@ git clone "$PRD_GIT_URL"
 
 cd deployment-manager
 
-if [ -n "$1" ]
+if [ -n "$BRANCH" ]
 then
-    git checkout "$1"
+    git checkout "$BRANCH"
 fi
 
 if ! command -v pipx &> /dev/null
