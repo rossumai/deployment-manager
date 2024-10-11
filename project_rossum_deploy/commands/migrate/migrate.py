@@ -287,9 +287,10 @@ async def migrate_project(
                 2. set hook.secrets for migrated hooks
                 3. assign users to queues
                 4. assign workflows to queues
+                5. add datasets (if the target organization is different)
             This applies only for newly created objects. Once these attributes are set on the target object, subsequent release commands keep the values.
             """
-            print(Panel(f"{hints}"))
+            print(Panel(f"{hints}", style="yellow"))
             print(
                 Panel(
                     f"Finished {settings.MIGRATE_COMMAND_NAME}. Please check all messages printed during the process."
