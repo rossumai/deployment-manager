@@ -191,10 +191,22 @@ async def replace_ids_in_settings(
         source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
         if not re.search(source_id_regex, stringified_dict):
             continue
-        if len(target_ids) != 1 and num_targets != len(target_ids):
+
+        basic_error_message = (
+            f"Could not override source '{source_id}' in settings of '{object_id}'."
+        )
+        if not target_ids:
             print(
                 Panel(
-                    f"Could not override source '{source_id}' in settings of '{object_id}'. There are multiple target IDs. Please do the attribute_override explicitly.",
+                    f"{basic_error_message} No target IDs found.",
+                    style="yellow",
+                ),
+            )
+            continue
+        elif num_targets != len(target_ids):
+            print(
+                Panel(
+                    f"{basic_error_message} There are multiple target IDs that could be assigned. Please do the attribute_override explicitly.",
                     style="yellow",
                 ),
             )
