@@ -5,7 +5,6 @@ from ruamel.yaml import YAML
 class DeployYaml:
     RELEASE_KEYWORD_REGEX = re.compile(r"^release(_(\w)+)?$")
 
-    # File can be both a filepath and a string with YAML
     def __init__(self, file: str):
         self._yaml = YAML()
         # Used also by auto-formatting in VSCode

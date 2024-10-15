@@ -1,10 +1,9 @@
 from project_rossum_deploy.common.read_write import read_json
-
-
+from pydantic import HttpUrl, ValidationError
 import questionary
 from anyio import Path
 
-from project_rossum_deploy.utils.consts import settings
+from project_rossum_deploy.utils.consts import display_error, settings
 from project_rossum_deploy.utils.functions import (
     extract_id_from_url,
     find_all_hook_paths_in_destination,
@@ -13,19 +12,23 @@ from project_rossum_deploy.utils.functions import (
 )
 
 
-def create_deploy_file_template(target_org_url: str = None, source_dir: str = None):
+def create_deploy_file_template():
+    # This is done to control the order of the keys
     return f"""\
 # The API URL where changes should be deployed (e.g., https://my-org.rossum.app/api/v1)
 # The organization's ID is determined automatically based on the token / user credentials.
-{settings.DEPLOY_TARGET_URL_KEY}: {target_org_url}
+{settings.DEPLOY_TARGET_URL_KEY}:
 # Which local folder is considered to be the source
-{settings.DEPLOY_SOURCE_DIR_KEY}: {source_dir}
+{settings.DEPLOY_SOURCE_DIR_KEY}:
 
 # Define anchors in the following way:
 # x_any_name: &anchor_name
 #     name: Name from Variable
 #     another_attr: 4
 # You can then use them in the objects by adding '<<: *anchor_name'
+
+# Update attributes of target organization with those from source organization
+{settings.DEPLOY_PATCH_TARGET_ORG_KEY}: true
 
 workspaces:
 
@@ -35,13 +38,15 @@ hooks:
 
 schemas:
 
-### PRD internal ###
-# List IDs of queues that should not be deployed, even if they belong to selected WS
-unselected_queues:
+unselected_hooks: # List hook IDs that should not be deployed, even if they belong to selected queues
 """
 
 
-async def prepare_choices(paths: list[Path], preselect: bool = False):
+async def prepare_choices(
+    paths: list[Path], preselected_ids: list = None, preselect_all: bool = False
+):
+    if not preselected_ids:
+        preselected_ids = []
     choices = []
 
     for path in paths:
@@ -52,11 +57,48 @@ async def prepare_choices(paths: list[Path], preselect: bool = False):
         choice = questionary.Choice(
             title=f"{name} [{id}]" if name else id,
             value={**object, "path": path},
-            checked=preselect,
+            checked=preselect_all or id in preselected_ids,
         )
         choices.append(choice)
 
     return choices
+
+
+async def get_target_url_from_user(default: str = ""):
+    if not default:
+        default = settings.DEPLOY_DEFAULT_TARGET_URL
+    target_url = await questionary.text(
+        "What is the target API URL:",
+        default=default,
+    ).ask_async()
+
+    try:
+        HttpUrl(target_url)
+    except ValidationError:
+        display_error(f"Invalid URL provided: {target_url}. Please retry.")
+        return await get_target_url_from_user(default=default)
+
+    return target_url
+
+
+async def get_source_dir_from_user(org_path: Path, default: str = None):
+    source_candidates = [
+        dir_path
+        async for dir_path in org_path.iterdir()
+        if await dir_path.is_dir() and str(dir_path) not in settings.DEPLOY_IGNORED_DIRS
+    ]
+    source_choices = [
+        questionary.Choice(title=str(source_path)) for source_path in source_candidates
+    ]
+
+    # Reset default if it is not found in the current options
+    if default not in [choice.title for choice in source_choices]:
+        default = None
+
+    source_dir = await questionary.select(
+        "Which folder is the source?", choices=source_choices, default=default
+    ).ask_async()
+    return source_dir
 
 
 async def get_filename_from_user(org_path: Path, default: str = None):
@@ -154,3 +196,94 @@ def prepare_deploy_file_objects(objects: list[dict], include_path: bool = False)
             deploy_representation.pop(settings.DEPLOY_BASE_PATH_KEY)
         deploy_objects.append(deploy_representation)
     return deploy_objects
+
+
+async def get_workspaces_from_user(
+    source_path: Path, interactive: bool, deploy_file_workspaces: list[dict] = None
+):
+    if not deploy_file_workspaces:
+        deploy_file_workspaces = []
+    selected_ws_ids = [ws["id"] for ws in deploy_file_workspaces]
+    ws_paths = await find_ws_paths_for_dir(source_path)
+    ws_choices = await prepare_choices(
+        paths=[ws_path / "workspace.json" for ws_path in ws_paths],
+        preselected_ids=selected_ws_ids,
+    )
+    deploy_file_workspaces = [ws.value for ws in ws_choices if ws.checked]
+    if interactive or not selected_ws_ids:
+        deploy_file_workspaces = await questionary.checkbox(
+            "Select WS:", choices=ws_choices
+        ).ask_async()
+
+    return deploy_file_workspaces
+
+
+async def get_queues_from_user(
+    deploy_ws_paths: list[dict],
+    interactive: bool,
+    deploy_file_queues: list[dict] = None,
+):
+    if not deploy_file_queues:
+        deploy_file_queues = []
+    # TODO: let user select extra queues not in the WS already selected
+    selected_queue_ids = [queue["id"] for queue in deploy_file_queues]
+    queue_paths = await find_queue_paths_for_workspaces(deploy_ws_paths)
+    if not queue_paths:
+        display_error("No queues in the selected workspaces.")
+        return []
+
+    # If there are no preselected queues, assume the file is being created and preselect everything
+    queue_choices = await prepare_choices(
+        queue_paths,
+        preselected_ids=selected_queue_ids,
+        preselect_all=len(selected_queue_ids) == 0,
+    )
+    deploy_file_queues = [queue.value for queue in queue_choices if queue.checked]
+    if interactive or not selected_queue_ids:
+        deploy_file_queues = await questionary.checkbox(
+            "Modify selection of the queues or just continue:", choices=queue_choices
+        ).ask_async()
+    return deploy_file_queues
+
+
+async def get_hooks_from_user(
+    source_path: Path,
+    queues: list[dict],
+    interactive: bool,
+    deploy_file_hooks: list[dict] = None,
+    unselected_hook_ids: list[int] = None,
+):
+    if not deploy_file_hooks:
+        deploy_file_hooks = []
+    if not unselected_hook_ids:
+        unselected_hook_ids = []
+    selected_hook_ids = [hook["id"] for hook in deploy_file_hooks]
+    hook_ids_for_selected_queues = [
+        hook["id"] for hook in await find_hooks_for_queues(source_path, queues)
+    ]
+    # Take all hooks for the selected queues and any extra hooks in the preexisting file
+    # Automatically remove hooks that were previously unselected by the user (during previous deploy file creation)
+    preselected_hook_ids = (
+        set(hook_ids_for_selected_queues)
+        .union(selected_hook_ids)
+        .difference(unselected_hook_ids)
+    )
+    hook_paths = await find_all_hook_paths_in_destination(source_path)
+
+    hook_choices = await prepare_choices(
+        paths=[hook_path for hook_path in hook_paths],
+        preselected_ids=list(preselected_hook_ids),
+    )
+    hooks = [hook.value for hook in hook_choices if hook.checked]
+    if interactive or not selected_hook_ids:
+        hooks = await questionary.checkbox(
+            "Modify selection of the hooks:", choices=hook_choices
+        ).ask_async()
+    selected_hooks = prepare_deploy_file_objects([hook for hook in hooks if hook["id"]])
+    # Automatically unselected all hooks that belonged to selected queues, but the user did not select them
+    unselected_hooks = list(
+        set(hook_ids_for_selected_queues)
+        .union(unselected_hook_ids)
+        .difference([hook["id"] for hook in hooks])
+    )
+    return selected_hooks, unselected_hooks

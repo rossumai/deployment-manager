@@ -53,8 +53,10 @@ async def init_deploy_template_wrapper():
     default=False,
 )
 @coro
-async def create_deploy_template_wrapper(input_file: Path = None):
-    await create_deploy_template(input_file=input_file)
+async def create_deploy_template_wrapper(
+    deploy_file: Path = None, interactive: bool = False
+):
+    await create_deploy_template(input_file=deploy_file, interactive=interactive)
 
 
 @deploy.command(

@@ -61,6 +61,8 @@ async def deploy_release_file(
     # TODO: parallelize release API requests
 
     # TODO: token from other places
+
+    # TODO: hook dep graph and unselected hooks handling
     if not client:
         client = await create_and_validate_client(settings.TARGET_DIRNAME)
 
