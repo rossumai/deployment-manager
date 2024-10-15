@@ -30,9 +30,7 @@ Applies selected changes onto other objects based on the provided release.yaml f
 If these objects don't exist, they get created.
                """,
 )
-@click.argument(
-    "release_file", default="./release.yaml", type=click.Path(path_type=Path)
-)
+@click.argument("release_file", type=click.Path(path_type=Path))
 # @click.option(
 #     "--force",
 #     "-f",
@@ -204,8 +202,6 @@ async def deploy_release_file(
     yaml.save_to_file(str(release_file_path))
 
     return
-
-    # TODO: parse variables
 
     # TODO: check if remote was not modified when updating?
 

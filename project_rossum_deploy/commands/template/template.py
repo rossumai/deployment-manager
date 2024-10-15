@@ -76,13 +76,19 @@ async def create_deploy_template_file(
 # Which local folder is considered to be the source
 {settings.DEPLOY_SOURCE_DIR_KEY}: {source_dir}
 
-workspaces: []
+# Define anchors in the following way:
+x_any_name: &anchor_name
+    name: Name from Variable
+    another_attr: 4
+# You can then use them in the objects by adding '<<: *anchor_name'
 
-queues: []
+workspaces:
 
-hooks: []
+queues:
 
-schemas: []
+hooks:
+
+schemas:
 """
 
     yaml = YAML()
