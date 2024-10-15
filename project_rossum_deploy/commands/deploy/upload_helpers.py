@@ -1,8 +1,8 @@
+import questionary
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 from rich import print
 from rich.panel import Panel
-from rich.prompt import Prompt
 
 from project_rossum_deploy.common.client import create_and_validate_client
 from project_rossum_deploy.utils.functions import (
@@ -357,9 +357,9 @@ async def create_hook_without_template(
         and hook_mapping.get("attribute_override", {}).get("config", {}).get("path", "")
         != "url"
     ):
-        private_hook_url = Prompt.ask(
-            f"Please provide hook url (target base_url is '{client._http_client.base_url}') for '{hook['name']}'"
-        )
+        private_hook_url = await questionary.text(
+            f"Please provide hook url (target base_url is '{client._http_client.base_url}') for '{hook['name']}':"
+        ).ask_async()
         hook["config"]["url"] = (
             private_hook_url if private_hook_url else settings.PRIVATE_HOOK_DUMMY_URL
         )

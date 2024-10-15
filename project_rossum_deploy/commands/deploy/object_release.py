@@ -9,6 +9,7 @@ from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
 from project_rossum_deploy.utils.consts import display_error
+from project_rossum_deploy.utils.functions import templatize_name_id
 
 
 class Target(BaseModel):
@@ -37,7 +38,7 @@ class ObjectRelease(BaseModel):
     id: int
     name: str
     type: Resource
-    path: str | Path
+    base_path: str = None
     yaml_reference: dict = None
     data: dict = None
     client: ElisAPIClient = None
@@ -45,18 +46,26 @@ class ObjectRelease(BaseModel):
     targets: list[TargetWithDefault] = []
 
     async def initialize(
-        self,
-        yaml: DeployYaml,
-        client: ElisAPIClient,
+        self, yaml: DeployYaml, client: ElisAPIClient, source_dir_path: Path
     ):
-        self.path = Path(self.path)
+        if not self.base_path:
+            self.base_path = source_dir_path
         self.yaml_reference = yaml.get_object_in_yaml(self.type.value, self.id)
+        # TODO: error handling of missing objects
         self.data = await read_json(self.path)
         self.client = client
 
     async def plan(self): ...
 
     async def deploy(self): ...
+
+    @property
+    def path(self) -> Path:
+        return (
+            Path(self.base_path)
+            / self.type.value
+            / f"{templatize_name_id(self.name, self.id)}.json"
+        )
 
     @property
     def display_type(self):

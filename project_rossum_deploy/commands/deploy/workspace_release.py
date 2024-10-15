@@ -1,5 +1,6 @@
 import asyncio
 from copy import deepcopy
+from anyio import Path
 from rossum_api.api_client import Resource
 
 from project_rossum_deploy.commands.deploy.attribute_override import (
@@ -9,15 +10,25 @@ from project_rossum_deploy.commands.deploy.object_release import ObjectRelease
 from project_rossum_deploy.utils.consts import (
     display_error,
 )
+from project_rossum_deploy.utils.functions import templatize_name_id
 
 
 class WorkspaceRelease(ObjectRelease):
     type: Resource = Resource.Workspace
     target_org_url: str = None
 
-    async def initialize(self, yaml, client, target_org_url: str):
-        await super().initialize(yaml, client)
+    async def initialize(self, yaml, client, target_org_url, source_dir_path):
+        await super().initialize(yaml, client, source_dir_path)
         self.target_org_url = target_org_url
+
+    @property
+    def path(self) -> Path:
+        return (
+            Path(self.base_path)
+            / self.type.value
+            / templatize_name_id(self.name, self.id)
+            / "workspace.json"
+        )
 
     async def deploy(self):
         try:

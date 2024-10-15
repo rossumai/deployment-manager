@@ -98,6 +98,7 @@ async def deploy_release_file(
 
     if not org_path:
         org_path = Path("./")
+    source_dir_path = org_path / yaml.data[settings.DEPLOY_SOURCE_DIR_KEY]
 
     # TODO: same-org release solve
 
@@ -110,7 +111,11 @@ async def deploy_release_file(
     ### Schemas
     await asyncio.gather(
         *[
-            schema_release.initialize(yaml=yaml, client=client)
+            schema_release.initialize(
+                yaml=yaml,
+                client=client,
+                source_dir_path=source_dir_path,
+            )
             for schema_release in release.schemas
         ]
     )
@@ -135,6 +140,7 @@ async def deploy_release_file(
     await asyncio.gather(
         *[
             hook_release.initialize(
+                source_dir_path=source_dir_path,
                 yaml=yaml,
                 client=client,
                 token_owner_id=target_token_owner_id,
@@ -161,7 +167,10 @@ async def deploy_release_file(
     await asyncio.gather(
         *[
             workspace_release.initialize(
-                yaml=yaml, client=client, target_org_url=target_org_url
+                yaml=yaml,
+                client=client,
+                target_org_url=target_org_url,
+                source_dir_path=source_dir_path,
             )
             for workspace_release in release.workspaces
         ]
@@ -179,6 +188,7 @@ async def deploy_release_file(
             queue_release.initialize(
                 yaml=yaml,
                 client=client,
+                source_dir_path=source_dir_path,
                 workspace_targets=workspace_targets,
                 hook_targets=hook_targets,
                 schema_targets=schema_targets,

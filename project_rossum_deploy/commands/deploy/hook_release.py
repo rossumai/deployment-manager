@@ -26,8 +26,8 @@ class HookRelease(ObjectRelease):
     type: Resource = Resource.Hook
     token_owner_id: int = None
 
-    async def initialize(self, yaml, client, token_owner_id):
-        await super().initialize(yaml, client)
+    async def initialize(self, yaml, client, token_owner_id, source_dir_path):
+        await super().initialize(yaml, client, source_dir_path)
         self.token_owner_id = token_owner_id
 
     async def deploy(self):

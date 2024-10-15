@@ -91,11 +91,7 @@ schemas: []
     yaml.preserve_quotes = True
     deploy_file_object = yaml.load(deploy_file_template)
 
-    ws_paths = [
-        workspace_path
-        async for workspace_path in (source_path / "workspaces").iterdir()
-        if await workspace_path.is_dir()
-    ]
+    ws_paths = await find_ws_paths_for_dir(source_path)
     ws_choices = await prepare_choices(
         [ws_path / "workspace.json" for ws_path in ws_paths]
     )
@@ -126,7 +122,7 @@ schemas: []
     queues = await questionary.checkbox(
         "Unselect some of the queues or just continue:", choices=queue_choices
     ).ask_async()
-    deploy_queue_objects = prepare_deploy_file_objects(queues)
+    deploy_queue_objects = prepare_deploy_file_objects(queues, include_path=True)
     deploy_file_object["queues"] = deploy_queue_objects
 
     hooks = await find_hooks_for_queues(source_path=source_path, queues=queues)
@@ -168,17 +164,27 @@ schemas: []
         yaml.dump(deploy_file_object, wf)
 
 
-def prepare_deploy_file_objects(objects: list[dict]):
+def prepare_deploy_file_objects(objects: list[dict], include_path: bool = False):
     deploy_objects = []
     for object in objects:
         deploy_representation = {
             "id": object["id"],
             "name": object["name"],
-            "path": str(object["path"]),
+            settings.DEPLOY_BASE_PATH_KEY: str(object["path"].parent.parent.parent),
             "targets": [{"id": None}],
         }
+        if not include_path:
+            deploy_representation.pop(settings.DEPLOY_BASE_PATH_KEY)
         deploy_objects.append(deploy_representation)
     return deploy_objects
+
+
+async def find_ws_paths_for_dir(base_dir: Path):
+    return [
+        workspace_path
+        async for workspace_path in (base_dir / "workspaces").iterdir()
+        if await workspace_path.is_dir()
+    ]
 
 
 async def find_queue_paths_for_workspaces(ws_paths: list[Path]):

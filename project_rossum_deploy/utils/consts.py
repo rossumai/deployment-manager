@@ -184,8 +184,8 @@ class Settings:
     DEPLOY_IGNORED_DIRS = [".git"]
     DEFAULT_DEPLOY_FILENAME = "prd_deploy.yaml"
     DEPLOY_SOURCE_DIR_KEY = "source_dir"
-    # DEPLOY_SOURCE_URL_KEY = "source_url"
     DEPLOY_TARGET_URL_KEY = "target_url"
+    DEPLOY_BASE_PATH_KEY = "base_path"
 
     IGNORED_KEYS: dict = {
         Resource.Queue: ["counts", "users", "workflows"],

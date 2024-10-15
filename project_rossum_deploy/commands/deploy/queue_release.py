@@ -1,5 +1,7 @@
 import asyncio
 from copy import deepcopy
+
+from anyio import Path
 from project_rossum_deploy.commands.deploy.attribute_override import (
     override_attributes_v2,
 )
@@ -10,10 +12,16 @@ from rossum_api.api_client import Resource
 
 from project_rossum_deploy.commands.migrate.helpers import replace_dependency_url
 from project_rossum_deploy.utils.consts import display_error
+from project_rossum_deploy.utils.functions import (
+    templatize_name_id,
+)
 
 
 class QueueRelease(ObjectRelease):
     type: Resource = Resource.Queue
+
+    ws_path: Path = None
+
     workspace_targets: dict[int, list] = []
     schema_targets: dict[int, list] = []
     hook_targets: dict[int, list] = []
@@ -22,14 +30,24 @@ class QueueRelease(ObjectRelease):
         self,
         yaml,
         client,
+        source_dir_path,
         workspace_targets: dict[int, list],
         schema_targets: dict[int, list],
         hook_targets: dict[int, list],
     ):
-        await super().initialize(yaml, client)
+        await super().initialize(yaml, client, source_dir_path)
         self.workspace_targets = workspace_targets
         self.schema_targets = schema_targets
         self.hook_targets = hook_targets
+
+    @property
+    def path(self) -> Path:
+        return (
+            Path(self.base_path)
+            / self.type.value
+            / templatize_name_id(self.name, self.id)
+            / "queue.json"
+        )
 
     async def deploy(self):
         try:
