@@ -1,7 +1,9 @@
-from project_rossum_deploy.commands.deploy.attribute_override import (
+from project_rossum_deploy.commands.deploy.subcommands.run.attribute_override import (
     override_attributes_v2,
 )
-from project_rossum_deploy.commands.deploy.object_release import ObjectRelease
+from project_rossum_deploy.commands.deploy.subcommands.run.object_release import (
+    ObjectRelease,
+)
 from project_rossum_deploy.commands.migrate.schemas import update_formula_fields_code
 from project_rossum_deploy.utils.consts import display_error
 

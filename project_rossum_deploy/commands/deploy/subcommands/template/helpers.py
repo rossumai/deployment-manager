@@ -13,6 +13,34 @@ from project_rossum_deploy.utils.functions import (
 )
 
 
+def create_deploy_file_template(target_org_url: str = None, source_dir: str = None):
+    return f"""\
+# The API URL where changes should be deployed (e.g., https://my-org.rossum.app/api/v1)
+# The organization's ID is determined automatically based on the token / user credentials.
+{settings.DEPLOY_TARGET_URL_KEY}: {target_org_url}
+# Which local folder is considered to be the source
+{settings.DEPLOY_SOURCE_DIR_KEY}: {source_dir}
+
+# Define anchors in the following way:
+# x_any_name: &anchor_name
+#     name: Name from Variable
+#     another_attr: 4
+# You can then use them in the objects by adding '<<: *anchor_name'
+
+workspaces:
+
+queues:
+
+hooks:
+
+schemas:
+
+### PRD internal ###
+# List IDs of queues that should not be deployed, even if they belong to selected WS
+unselected_queues:
+"""
+
+
 async def prepare_choices(paths: list[Path], preselect: bool = False):
     choices = []
 
@@ -31,9 +59,10 @@ async def prepare_choices(paths: list[Path], preselect: bool = False):
     return choices
 
 
-async def get_deploy_filename(org_path: Path):
+async def get_filename_from_user(org_path: Path, default: str = None):
     deploy_filename: str = await questionary.text(
-        "Name for the deploy file:", default=settings.DEFAULT_DEPLOY_FILENAME
+        "Name for the deploy file:",
+        default=default,
     ).ask_async()
     deploy_filepath = org_path / deploy_filename
 
@@ -42,7 +71,7 @@ async def get_deploy_filename(org_path: Path):
             f'File "{deploy_filepath}" already exists. Overwrite?', default=False
         ).ask_async()
         if not overwrite:
-            return await get_deploy_filename(org_path)
+            return await get_filename_from_user(org_path)
 
     return deploy_filepath
 

@@ -1,5 +1,5 @@
 from typing import Annotated
-from project_rossum_deploy.commands.deploy.helpers import DeployYaml
+from project_rossum_deploy.commands.deploy.subcommands.run.helpers import DeployYaml
 from project_rossum_deploy.common.read_write import read_json
 from rich import print
 import json

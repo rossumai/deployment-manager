@@ -2,10 +2,12 @@ import asyncio
 from copy import deepcopy
 
 from anyio import Path
-from project_rossum_deploy.commands.deploy.attribute_override import (
+from project_rossum_deploy.commands.deploy.subcommands.run.attribute_override import (
     override_attributes_v2,
 )
-from project_rossum_deploy.commands.deploy.object_release import ObjectRelease
+from project_rossum_deploy.commands.deploy.subcommands.run.object_release import (
+    ObjectRelease,
+)
 
 
 from rossum_api.api_client import Resource

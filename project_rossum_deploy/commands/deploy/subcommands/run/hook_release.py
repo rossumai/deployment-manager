@@ -1,9 +1,12 @@
-from project_rossum_deploy.commands.deploy.attribute_override import (
+from project_rossum_deploy.commands.deploy.subcommands.run.attribute_override import (
     override_attributes_v2,
 )
 from rich import print
-from project_rossum_deploy.commands.deploy.object_release import ObjectRelease, Target
-from project_rossum_deploy.commands.deploy.upload_helpers import (
+from project_rossum_deploy.commands.deploy.subcommands.run.object_release import (
+    ObjectRelease,
+    Target,
+)
+from project_rossum_deploy.commands.deploy.subcommands.run.upload_helpers import (
     create_hook_based_on_template,
     create_hook_without_template,
 )

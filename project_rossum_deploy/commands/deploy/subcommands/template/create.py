@@ -1,41 +1,24 @@
-import click
-import questionary
-from anyio import Path
-from rossum_api import ElisAPIClient
-from ruamel.yaml import YAML, comments
-
-
-from project_rossum_deploy.commands.template.helpers import (
+from project_rossum_deploy.commands.deploy.subcommands.run.helpers import DeployYaml
+from project_rossum_deploy.commands.deploy.subcommands.template.helpers import (
+    create_deploy_file_template,
     find_hooks_for_queues,
     find_queue_paths_for_workspaces,
     find_schemas_for_queues,
     find_ws_paths_for_dir,
-    get_deploy_filename,
+    get_filename_from_user,
     prepare_choices,
     prepare_deploy_file_objects,
 )
-from project_rossum_deploy.utils.consts import (
-    display_error,
-    display_warning,
-    settings,
-)
-from project_rossum_deploy.utils.functions import (
-    coro,
-)
-
-CS = comments.CommentedSeq
+from project_rossum_deploy.utils.consts import display_error, display_warning, settings
 
 
-@click.command(
-    name=settings.TEMPLATE_COMMAND_NAME,
-    help="""""",
-)
-@coro
-async def create_deploy_template_wrapper():
-    await create_deploy_template_file()
+import questionary
+from anyio import Path
+from rossum_api import ElisAPIClient
 
 
-async def create_deploy_template_file(
+async def create_deploy_template(
+    input_file: Path = None,
     org_path: Path = None,
     source_client: ElisAPIClient = None,
     target_client: ElisAPIClient = None,
@@ -56,8 +39,6 @@ async def create_deploy_template_file(
     ).ask_async()
     source_path = org_path / source_dir
 
-    # TODO: validate the dir has the expected subdirs (e.g., WS)
-
     if not (await (source_path / "workspaces").exists()):
         display_error(
             f'Did not find "workspaces" directory in the "{source_dir}" directory.'
@@ -70,33 +51,12 @@ async def create_deploy_template_file(
     ).ask_async()
 
     # This is done to control the order of the keys
-    deploy_file_template = f"""\
-# The API URL where changes should be deployed (e.g., https://my-org.rossum.app/api/v1)
-# The organization's ID is determined automatically based on the token / user credentials.
-{settings.DEPLOY_TARGET_URL_KEY}: {target_org_url}
-# Which local folder is considered to be the source
-{settings.DEPLOY_SOURCE_DIR_KEY}: {source_dir}
+    deploy_file_template = create_deploy_file_template(
+        target_org_url=target_org_url, source_dir=source_dir
+    )
 
-# Define anchors in the following way:
-x_any_name: &anchor_name
-    name: Name from Variable
-    another_attr: 4
-# You can then use them in the objects by adding '<<: *anchor_name'
-
-workspaces:
-
-queues:
-
-hooks:
-
-schemas:
-"""
-
-    yaml = YAML()
-    # Used also by auto-formatting in VSCode
-    yaml.indent(mapping=2, sequence=4, offset=2)
-    yaml.preserve_quotes = True
-    deploy_file_object = yaml.load(deploy_file_template)
+    yaml = DeployYaml(deploy_file_template)
+    deploy_file_object = yaml.data
 
     ws_paths = await find_ws_paths_for_dir(source_path)
     ws_choices = await prepare_choices(
@@ -142,14 +102,18 @@ schemas:
 
     # TODO: patching one org with another
 
+    # TODO: attribute override specification in input file
+    # TODO: unselected hooks (once dep graph and dep replacement works better)
+
     # TODO: name regex for attribute override
     # TODO: attr override helper
 
-    deploy_filepath = await get_deploy_filename(org_path)
+    deploy_filepath = await get_filename_from_user(
+        org_path, default=settings.DEFAULT_DEPLOY_FILENAME
+    )
 
     # !!!
     # TODO: input file with unselected hooks etc.
     # variables, attributes override, user token owner
 
-    with open(deploy_filepath, "w") as wf:
-        yaml.dump(deploy_file_object, wf)
+    yaml.save_to_file(deploy_filepath)
