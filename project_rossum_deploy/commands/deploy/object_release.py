@@ -2,6 +2,10 @@ from typing import Annotated
 from project_rossum_deploy.commands.deploy.helpers import DeployYaml
 from project_rossum_deploy.common.read_write import read_json
 from rich import print
+import json
+import re
+from rich.panel import Panel
+
 
 from anyio import Path
 from pydantic import AliasChoices, BaseModel, BeforeValidator, Field
@@ -10,6 +14,9 @@ from rossum_api.api_client import Resource
 
 from project_rossum_deploy.utils.consts import display_error
 from project_rossum_deploy.utils.functions import templatize_name_id
+
+type LookupTable = dict[int, list[int]]
+IMPLICIT_OVERRIDE_KEYS = ["settings", "metadata"]
 
 
 class Target(BaseModel):
@@ -79,11 +86,11 @@ class ObjectRelease(BaseModel):
             return await self.create_remote(object=object, target=target)
 
     # Target is provided so that subclasses can use it (even if this basic method does not)
-    async def create_remote(self, object: dict, target: Target):
+    async def create_remote(self, object: dict, target: Target = None):
         try:
             result = await self.client._http_client.create(self.type, object)
             print(
-                f'Released (created) {self.display_type} "{object['name']} ({object['id']})" -> "{result['id']}".'
+                f'Released (created) {self.display_type} "{object['name']} ({object['id']})" -> "{result['name']} ({result['id']})".'
             )
             return result
         except Exception as e:
@@ -99,7 +106,7 @@ class ObjectRelease(BaseModel):
                 self.type, id_=target.id, data=object
             )
             print(
-                f'Released (updated) {self.display_type} "{object['id']}" -> "{result['id']}".'
+                f'Released (updated) {self.display_type} "{object['name']} ({object['id']})" -> "{result['name']} ({result['id']})".'
             )
             return result
         except Exception as e:
@@ -108,3 +115,68 @@ class ObjectRelease(BaseModel):
                 e,
             )
             return {}
+
+    def implicit_override(self, lookup_table: LookupTable):
+        for target_index, target in enumerate(self.targets):
+            for key in IMPLICIT_OVERRIDE_KEYS:
+                if key not in target:
+                    continue
+
+                self.replace_ids_in_target_subobject(
+                    target_id=target.id,
+                    subobject=target.data[key],
+                    lookup_table=lookup_table,
+                    target_index=target_index,
+                    num_targets=len(self.targets),
+                )
+
+    def replace_ids_in_target_subobject(
+        self,
+        target_id: int,
+        subobject: dict,
+        lookup_table: dict,
+        object_index: int,
+        num_targets: int,
+    ):
+        stringified_dict = json.dumps(subobject)
+        for source_id, target_ids in lookup_table.items():
+            source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
+            # This ID from source was not found in the subobject
+            if not re.search(source_id_regex, stringified_dict):
+                continue
+
+            basic_error_message = f"Could not override source_id '{source_id}' to its target equivalent in {self.type.value} '{target_id}'."
+            if not target_ids:
+                print(
+                    Panel(
+                        f"{basic_error_message} No target IDs found.",
+                        style="yellow",
+                    ),
+                )
+                continue
+            # Using lambdas for sub() because of quotes inside strings
+            # N:N objects -> objects are referenced in pairs
+            elif num_targets == len(target_ids):
+                stringified_dict = re.sub(
+                    source_id_regex,
+                    lambda m: str(target_ids[object_index])
+                    if m[0] == str(source_id)
+                    else m[0],
+                    stringified_dict,
+                )
+            # N:1 objects -> everything should be mapped to the first target ID
+            else:
+                stringified_dict = re.sub(
+                    source_id_regex,
+                    lambda m: str(target_ids[0]) if m[0] == str(source_id) else m[0],
+                    stringified_dict,
+                )
+                if len(target_ids) != 1:
+                    print(
+                        Panel(
+                            f"For overriding source_id '{source_id}' in {self.type.value} '{target_id}', There are multiple target IDs that could be assigned. The first one was used.",
+                            style="yellow",
+                        ),
+                    )
+
+        return json.loads(stringified_dict)

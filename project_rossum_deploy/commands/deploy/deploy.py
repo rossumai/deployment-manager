@@ -86,9 +86,6 @@ async def deploy_release_file(
 
     yaml = DeployYaml(release_file)
 
-    # TODO: generate template file with defaults
-    # TODO: pydantic for defining all possible "release file" forms
-
     if not check_required_keys(yaml.data):
         return
 
@@ -194,12 +191,29 @@ async def deploy_release_file(
             for queue_release in release.queues
         ]
     )
-    queue_targets = []
+    queue_targets = {}
     for queue_release in release.queues:
         await queue_release.deploy()
-        queue_targets.extend([target.data for target in queue_release.targets])
+        queue_targets[queue_release.id] = [
+            target.data for target in queue_release.targets
+        ]
 
     yaml.save_to_file(str(release_file_path))
+
+    lookup_table = {
+        **schema_targets,
+        **hook_targets,
+        **workspace_targets,
+        **queue_targets,
+    }
+
+    for release_object in [
+        *release.schemas,
+        *release.hooks,
+        *release.workspaces,
+        *release.queues,
+    ]:
+        release_object.implicit_override(lookup_table)
 
     return
 
@@ -210,6 +224,8 @@ async def deploy_release_file(
     # Plan should check the files exist locally...
     # check if queue has its WS being deployed or it is a queue with an existing target_id
 
+    # TODO: better representation of the deploy process
+
     # TODO: migrate org
 
     # TODO: ??? How to solve name changes? (path and name will be different and won't locate the object)
@@ -217,11 +233,6 @@ async def deploy_release_file(
     # Eventually, create utility to update a release file (template --update or whatever)
 
     # TODO: log all messages to stdout and into a separate file as well
-
-    # TODO: write to file after release
-
-    # TODO: attribute override <- only implicit, explicit can be done with the release itself
-    # Implicit should also look into metadata + other places (not just settings), but not everywhere in the JSON
 
 
 def check_required_keys(release: dict):
