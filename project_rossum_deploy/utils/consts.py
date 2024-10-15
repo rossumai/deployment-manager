@@ -177,6 +177,15 @@ class Settings:
     UPLOAD_COMMAND_NAME: str = "push"
     PURGE_COMMAND_NAME: str = "purge"
     MIGRATE_COMMAND_NAME: str = "release"
+    DEPLOY_COMMAND_NAME: str = "deploy"
+    TEMPLATE_COMMAND_NAME: str = "template"
+
+    # Deploy consts
+    DEPLOY_IGNORED_DIRS = [".git"]
+    DEFAULT_DEPLOY_FILENAME = "prd_deploy.yaml"
+    DEPLOY_SOURCE_DIR_KEY = "source_dir"
+    # DEPLOY_SOURCE_URL_KEY = "source_url"
+    DEPLOY_TARGET_URL_KEY = "target_url"
 
     IGNORED_KEYS: dict = {
         Resource.Queue: ["counts", "users", "workflows"],

@@ -109,3 +109,26 @@ def find_object_by_key(key: str, value: str, objects: list):
 
 def find_object_by_id(id: int, objects: list):
     return find_object_by_key(key="id", value=id, objects=objects)
+
+
+async def find_all_hook_paths_in_destination(destination_path: Path):
+    hooks_dir = destination_path / "hooks"
+    if not (await hooks_dir.exists()):
+        return []
+    return [
+        hook_path
+        async for hook_path in hooks_dir.iterdir()
+        if await hook_path.is_file() and hook_path.suffix == ".json"
+    ]
+
+
+async def find_all_schema_paths_in_destination(destination_path: Path):
+    schemas_dir = destination_path / "schemas"
+    if not (await schemas_dir.exists()):
+        return []
+
+    return [
+        schema_path
+        async for schema_path in schemas_dir.iterdir()
+        if await schema_path.is_file()
+    ]

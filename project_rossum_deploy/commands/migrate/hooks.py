@@ -25,6 +25,7 @@ from project_rossum_deploy.commands.migrate.upload_helpers import upload_hook
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
     extract_id_from_url,
+    find_all_hook_paths_in_destination,
 )
 
 
@@ -40,14 +41,7 @@ async def migrate_hooks(
     errors: dict = {},
     force: bool = False,
 ):
-    if not await (source_path / "hooks").exists():
-        return
-
-    hook_paths = [
-        hook_path
-        async for hook_path in (source_path / "hooks").iterdir()
-        if await hook_path.is_file() and hook_path.suffix == ".json"
-    ]
+    hook_paths = await find_all_hook_paths_in_destination(source_path)
 
     target_token_owner_id = ""
     if not settings.IS_PROJECT_IN_SAME_ORG:

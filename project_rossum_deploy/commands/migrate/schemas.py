@@ -23,6 +23,7 @@ from project_rossum_deploy.utils.consts import (
 from project_rossum_deploy.commands.migrate.upload_helpers import upload_schema
 from project_rossum_deploy.utils.functions import (
     detemplatize_name_id,
+    find_all_schema_paths_in_destination,
     templatize_name_id,
 )
 
@@ -39,14 +40,7 @@ async def migrate_schemas(
     errors: dict = {},
     force: bool = False,
 ):
-    if not await (source_path / "schemas").exists():
-        return
-
-    schema_paths = [
-        schema_path
-        async for schema_path in (source_path / "schemas").iterdir()
-        if await schema_path.is_file()
-    ]
+    schema_paths = await find_all_schema_paths_in_destination(source_path)
 
     async def migrate_schema(schema_path: Path):
         if schema_path.suffix != ".json":
