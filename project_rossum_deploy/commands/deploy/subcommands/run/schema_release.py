@@ -20,13 +20,12 @@ class SchemaRelease(ObjectRelease):
 
     async def deploy(self):
         try:
-            self.data["queues"] = []
-
             await update_formula_fields_code(self.path, self.data)
 
             release_requests = []
             for target in self.targets:
                 schema_copy = deepcopy(self.data)
+                schema_copy["queues"] = []
                 override_attributes_v2(
                     object=schema_copy, attribute_overrides=target.attribute_override
                 )

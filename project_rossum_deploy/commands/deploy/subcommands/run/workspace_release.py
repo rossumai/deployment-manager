@@ -34,12 +34,11 @@ class WorkspaceRelease(ObjectRelease):
 
     async def deploy(self):
         try:
-            self.data["queues"] = []
-            self.data["organization"] = self.target_org_url
-
             release_requests = []
             for target in self.targets:
                 ws_copy = deepcopy(self.data)
+                ws_copy["queues"] = []
+                ws_copy["organization"] = self.target_org_url
                 override_attributes_v2(
                     object=ws_copy, attribute_overrides=target.attribute_override
                 )
