@@ -17,9 +17,12 @@ def create_deploy_file_template():
     return f"""\
 # The API URL where changes should be deployed (e.g., https://my-org.rossum.app/api/v1)
 # The organization's ID is determined automatically based on the token / user credentials.
-{settings.DEPLOY_TARGET_URL_KEY}:
+{settings.DEPLOY_KEY_TARGET_URL}:
 # Which local folder is considered to be the source
-{settings.DEPLOY_SOURCE_DIR_KEY}:
+{settings.DEPLOY_KEY_SOURCE_DIR}:
+
+# User ID to use as the hook owner (unnecessary if using username+password credentials for target)
+{settings.DEPLOY_KEY_TOKEN_OWNER}:
 
 # Define anchors in the following way:
 # x_any_name: &anchor_name
@@ -28,7 +31,7 @@ def create_deploy_file_template():
 # You can then use them in the objects by adding '<<: *anchor_name'
 
 # Update attributes of target organization with those from source organization
-{settings.DEPLOY_PATCH_TARGET_ORG_KEY}: true
+{settings.DEPLOY_KEY_PATCH_TARGET_ORG}: true
 
 workspaces:
 
@@ -189,11 +192,11 @@ def prepare_deploy_file_objects(objects: list[dict], include_path: bool = False)
         deploy_representation = {
             "id": object["id"],
             "name": object["name"],
-            settings.DEPLOY_BASE_PATH_KEY: str(object["path"].parent.parent.parent),
+            settings.DEPLOY_KEY_BASE_PATH: str(object["path"].parent.parent.parent),
             "targets": [{"id": None}],
         }
         if not include_path:
-            deploy_representation.pop(settings.DEPLOY_BASE_PATH_KEY)
+            deploy_representation.pop(settings.DEPLOY_KEY_BASE_PATH)
         deploy_objects.append(deploy_representation)
     return deploy_objects
 

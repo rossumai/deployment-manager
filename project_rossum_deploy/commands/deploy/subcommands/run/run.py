@@ -5,7 +5,10 @@ import questionary
 from rossum_api import ElisAPIClient
 
 
-from project_rossum_deploy.commands.deploy.subcommands.run.helpers import DeployYaml
+from project_rossum_deploy.commands.deploy.subcommands.run.helpers import (
+    DeployYaml,
+    check_required_keys,
+)
 from project_rossum_deploy.commands.deploy.subcommands.run.hook_release import (
     HookRelease,
 )
@@ -18,17 +21,17 @@ from project_rossum_deploy.commands.deploy.subcommands.run.schema_release import
 from project_rossum_deploy.commands.deploy.subcommands.run.workspace_release import (
     WorkspaceRelease,
 )
-from project_rossum_deploy.commands.migrate.helpers import get_token_owner
 from project_rossum_deploy.common.client import create_and_validate_client
 
 from project_rossum_deploy.utils.consts import (
-    display_error,
     settings,
 )
 
 
 class ReleaseFile(BaseModel):
-    variables: dict = {}
+    patch_target_org: bool = True
+    token_owner_id: str = ""
+
     workspaces: list[WorkspaceRelease] = []
     queues: list[QueueRelease] = []
     hooks: list[HookRelease] = []
@@ -54,7 +57,7 @@ async def deploy_release_file(
 
     if not org_path:
         org_path = Path("./")
-    source_dir_path = org_path / yaml.data[settings.DEPLOY_SOURCE_DIR_KEY]
+    source_dir_path = org_path / yaml.data[settings.DEPLOY_KEY_SOURCE_DIR]
 
     # TODO: same-org release solve
 
@@ -84,16 +87,6 @@ async def deploy_release_file(
             target.data for target in schema_release.targets
         ]
 
-    target_token_owner_id = None
-    if not settings.IS_PROJECT_IN_SAME_ORG:
-        target_org_token_owner = await get_token_owner(client)
-        if not target_org_token_owner:
-            target_token_owner_id = await questionary.text(
-                "Please input user ID of the hook token owner (e.g., 938382):"
-            ).ask_async()
-        else:
-            target_token_owner_id = target_org_token_owner.id
-
     # TODO: dep graph
     # TODO: ignored hooks handling
     ### Hooks
@@ -103,7 +96,7 @@ async def deploy_release_file(
                 source_dir_path=source_dir_path,
                 yaml=yaml,
                 client=client,
-                token_owner_id=target_token_owner_id,
+                token_owner_id=release.token_owner_id,
             )
             for hook_release in release.hooks
         ]
@@ -198,18 +191,3 @@ async def deploy_release_file(
     # Eventually, create utility to update a release file (template --update or whatever)
 
     # TODO: log all messages to stdout and into a separate file as well
-
-
-def check_required_keys(release: dict):
-    required_keys = [settings.DEPLOY_SOURCE_DIR_KEY, settings.DEPLOY_TARGET_URL_KEY]
-    missing_keys = []
-
-    for req_key in required_keys:
-        if req_key not in release:
-            missing_keys.append(req_key)
-
-    if missing_keys:
-        display_error(f"Release is missing the following required keys: {missing_keys}")
-        return False
-    else:
-        return True

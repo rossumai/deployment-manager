@@ -186,10 +186,12 @@ class Settings:
     DEPLOY_IGNORED_DIRS = [".git"]
     DEPLOY_DEFAULT_TARGET_URL = "https://my-org.rossum.app/api/v1"
     DEFAULT_DEPLOY_FILENAME = "prd_deploy.yaml"
-    DEPLOY_SOURCE_DIR_KEY = "source_dir"
-    DEPLOY_TARGET_URL_KEY = "target_url"
-    DEPLOY_BASE_PATH_KEY = "base_path"
-    DEPLOY_PATCH_TARGET_ORG_KEY = "patch_target_org"
+    DEPLOY_KEY_TOKEN_OWNER = "token_owner_id"
+    DEPLOY_KEY_SOURCE_DIR = "source_dir"
+    DEPLOY_KEY_TARGET_URL = "target_url"
+    DEPLOY_KEY_BASE_PATH = "base_path"
+    DEPLOY_KEY_UNSELECTED_HOOK_IDS = "unselected_hooks"
+    DEPLOY_KEY_PATCH_TARGET_ORG = "patch_target_org"
 
     IGNORED_KEYS: dict = {
         Resource.Queue: ["counts", "users", "workflows"],

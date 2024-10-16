@@ -1,4 +1,3 @@
-import questionary
 from project_rossum_deploy.commands.deploy.subcommands.run.helpers import DeployYaml
 from project_rossum_deploy.commands.deploy.subcommands.template.helpers import (
     create_deploy_file_template,
@@ -39,12 +38,12 @@ async def create_deploy_template(
         org_path = Path("./")
 
     # Source dir
-    source_dir = deploy_file_object.get(settings.DEPLOY_SOURCE_DIR_KEY, None)
+    source_dir = deploy_file_object.get(settings.DEPLOY_KEY_SOURCE_DIR, None)
     if interactive or not source_dir:
         source_dir = await get_source_dir_from_user(
             org_path=org_path, default=source_dir
         )
-    deploy_file_object[settings.DEPLOY_SOURCE_DIR_KEY] = source_dir
+    deploy_file_object[settings.DEPLOY_KEY_SOURCE_DIR] = source_dir
 
     source_path = Path(source_dir)
     if not (await (source_path / "workspaces").exists()):
@@ -54,10 +53,10 @@ async def create_deploy_template(
         return
 
     # Target URL
-    target_url = deploy_file_object.get(settings.DEPLOY_TARGET_URL_KEY, "")
+    target_url = deploy_file_object.get(settings.DEPLOY_KEY_TARGET_URL, "")
     if interactive or not target_url:
         target_url = await get_target_url_from_user(default=target_url)
-    deploy_file_object[settings.DEPLOY_TARGET_URL_KEY] = target_url
+    deploy_file_object[settings.DEPLOY_KEY_TARGET_URL] = target_url
 
     # TODO: sort choices better
 
@@ -85,7 +84,9 @@ async def create_deploy_template(
 
     # Hooks
     hooks = deploy_file_object.get("hooks", [])
-    unselected_hook_ids = deploy_file_object.get("unselected_hooks", [])
+    unselected_hook_ids = deploy_file_object.get(
+        settings.DEPLOY_KEY_UNSELECTED_HOOK_IDS, []
+    )
     selected_hooks, unselected_hooks = await get_hooks_from_user(
         deploy_file_hooks=hooks,
         unselected_hook_ids=unselected_hook_ids,
@@ -94,7 +95,7 @@ async def create_deploy_template(
         interactive=interactive,
     )
     deploy_file_object["hooks"] = selected_hooks
-    deploy_file_object["unselected_hooks"] = unselected_hooks
+    deploy_file_object[settings.DEPLOY_KEY_UNSELECTED_HOOK_IDS] = unselected_hooks
 
     # Schemas
     schemas = await find_schemas_for_queues(
@@ -102,13 +103,6 @@ async def create_deploy_template(
     )
     deploy_schema_objects = prepare_deploy_file_objects(schemas)
     deploy_file_object["schemas"] = deploy_schema_objects
-
-    # Patch target org
-    if interactive:
-        patch_target_org = await questionary.confirm(
-            "Patch target org?", default=True
-        ).ask_async()
-        deploy_file_object[settings.DEPLOY_PATCH_TARGET_ORG_KEY] = patch_target_org
 
     # TODO: attribute override specification in input file
 
