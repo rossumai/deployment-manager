@@ -164,7 +164,6 @@ async def deploy_release_file(
     # TODO: better representation of the deploy process
 
     # TODO: migrate org
-    # TODO: inboxes
 
     # TODO: ??? How to solve name changes? (path and name will be different and won't locate the object)
     # During planning, show error that it cannot be found

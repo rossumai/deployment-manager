@@ -55,5 +55,6 @@ class WorkspaceRelease(ObjectRelease):
 
         except Exception as e:
             display_error(
-                f"Error while migrating hook {self.name} ({self.path}): {e}", e
+                f"Error while migrating {self.display_type} {self.name} ({self.id}): {e}",
+                e,
             )

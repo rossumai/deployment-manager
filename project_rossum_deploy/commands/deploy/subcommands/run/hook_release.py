@@ -68,7 +68,8 @@ class HookRelease(ObjectRelease):
             raise e
         except Exception as e:
             display_error(
-                f"Error while migrating hook {self.name} ({self.path}): {e}", e
+                f"Error while migrating {self.display_type} {self.name} ({self.id}): {e}",
+                e,
             )
 
     async def create_remote(self, object: dict, target: Target):
@@ -81,12 +82,13 @@ class HookRelease(ObjectRelease):
                     target=target,
                 )
             print(
-                f'Released (created) hook "{object['name']} ({object['id']})" -> "{result['id']}".'
+                f'Released (created) {self.display_type} "{object['name']} ({object['id']})" -> "{result['id']}".'
             )
             return result
         except Exception as e:
             display_error(
-                f'Error while creating hook "{object['name']} ({object['id']})":', e
+                f'Error while creating {self.display_type} "{object['name']} ({object['id']})":',
+                e,
             )
             return {}
 

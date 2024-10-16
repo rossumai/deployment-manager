@@ -77,6 +77,8 @@ class ObjectRelease(BaseModel):
     @property
     def display_type(self):
         # Remove the plural 's'
+        if self.type in [Resource.Inbox]:
+            return self.type.value[:-2]
         return self.type.value[:-1]
 
     async def upload(self, object: dict, target: Target):

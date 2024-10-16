@@ -41,4 +41,6 @@ class SchemaRelease(ObjectRelease):
                 self.yaml_reference["targets"][index]["id"] = target.id
 
         except Exception as e:
-            display_error(f"Error while migrating schema {self.name} ({self.id}):", e)
+            display_error(
+                f"Error while migrating {self.display_type} {self.name} ({self.id}):", e
+            )
