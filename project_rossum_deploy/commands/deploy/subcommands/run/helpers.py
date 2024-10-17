@@ -82,5 +82,5 @@ async def get_token_from_user(target_url: str):
         return Credentials(token=token)
     except APIClientError as e:
         if e.status_code == 401:
-            display_error(f"Invalid token ({token}) try again.")
+            display_error(f'Invalid token "{token}" try again.')
             return await get_token_from_user(target_url)

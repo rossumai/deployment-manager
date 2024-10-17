@@ -62,11 +62,11 @@ async def create_deploy_template_wrapper(
 @deploy.command(
     name=settings.DEPLOY_RUN_COMMAND_NAME,
     help="""
-Applies selected changes onto other objects based on the provided release.yaml file.
+Applies selected changes onto other objects based on the provided deploy.yaml file.
 If these objects don't exist, they get created.
                """,
 )
-@click.argument("release_file", type=click.Path(path_type=Path))
+@click.argument("deploy_file", type=click.Path(path_type=Path))
 # @click.option(
 #     "--force",
 #     "-f",
@@ -89,13 +89,13 @@ If these objects don't exist, they get created.
 # )
 @coro
 async def deploy_project_wrapper(
-    release_file: Path,
+    deploy_file: Path,
     # force: bool,
     # commit: bool,
     # message: str,
 ):
     await deploy_release_file(
-        release_file_path=release_file,
+        deploy_file_path=deploy_file,
         # force=force,
         # commit=commit,
         # commit_message=message,

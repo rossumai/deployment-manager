@@ -24,14 +24,16 @@ from project_rossum_deploy.utils.consts import (
 
 
 async def deploy_release_file(
-    release_file_path: Path,
+    deploy_file_path: Path,
     org_path: Path = None,
     target_client: ElisAPIClient = None,
     # force: bool = False,
     # commit: bool = False,
     # commit_message: str = "",
 ):
-    release_file = await release_file_path.read_text()
+    first_deploy = True
+
+    release_file = await deploy_file_path.read_text()
     yaml = DeployYaml(release_file)
     if not check_required_keys(yaml.data):
         return
@@ -45,8 +47,6 @@ async def deploy_release_file(
     source_org = await read_json(source_dir_path / "organization.json")
 
     # TODO: parallelize release API requests
-
-    # TODO: create a deployed version with target ids and keep the original file as is
 
     if not target_client:
         target_url = yaml.data[settings.DEPLOY_KEY_TARGET_URL]
@@ -63,6 +63,7 @@ async def deploy_release_file(
     release = ReleaseFile(**yaml.data, client=target_client)
 
     if release.deployed_org_id:
+        first_deploy = False
         try:
             await target_client.retrieve_organization(release.deployed_org_id)
         except APIClientError as e:
@@ -168,7 +169,15 @@ async def deploy_release_file(
         ]
 
     yaml.data[settings.DEPLOY_KEY_DEPLOYED_ORG_ID] = target_org.id
-    yaml.save_to_file(str(release_file_path))
+
+    if first_deploy:
+        deployed_deploy_file_path = deploy_file_path.with_stem(
+            f"{deploy_file_path.stem}_deployed"
+        )
+    else:
+        deployed_deploy_file_path = deploy_file_path
+
+    yaml.save_to_file(deployed_deploy_file_path)
 
     lookup_table = {
         **schema_targets,
