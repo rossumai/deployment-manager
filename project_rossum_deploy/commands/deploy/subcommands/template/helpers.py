@@ -18,11 +18,17 @@ def create_deploy_file_template():
 # The API URL where changes should be deployed (e.g., https://my-org.rossum.app/api/v1)
 # The organization's ID is determined automatically based on the token / user credentials.
 {settings.DEPLOY_KEY_TARGET_URL}:
-# Which local folder is considered to be the source
+# Which local folder is considered to be the source (takes JSON objects from there)
 {settings.DEPLOY_KEY_SOURCE_DIR}:
+
+# [Optional] Which local folder is considered to be the target (takes credentials if found)
+{settings.DEPLOY_KEY_TARGET_DIR}:
 
 # User ID to use as the hook owner (unnecessary if using username+password credentials for target)
 {settings.DEPLOY_KEY_TOKEN_OWNER}:
+
+# [Automatic] Marks the deploy file as used and validates that another deploy is into the same org
+{settings.DEPLOY_KEY_DEPLOYED_ORG_ID}:
 
 # Define anchors in the following way:
 # x_any_name: &anchor_name

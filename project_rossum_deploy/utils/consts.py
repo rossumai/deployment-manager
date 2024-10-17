@@ -186,8 +186,10 @@ class Settings:
     DEPLOY_IGNORED_DIRS = [".git"]
     DEPLOY_DEFAULT_TARGET_URL = "https://my-org.rossum.app/api/v1"
     DEFAULT_DEPLOY_FILENAME = "prd_deploy.yaml"
+    DEPLOY_KEY_DEPLOYED_ORG_ID = "deployed_org_id"
     DEPLOY_KEY_TOKEN_OWNER = "token_owner_id"
     DEPLOY_KEY_SOURCE_DIR = "source_dir"
+    DEPLOY_KEY_TARGET_DIR = "target_dir"
     DEPLOY_KEY_TARGET_URL = "target_url"
     DEPLOY_KEY_BASE_PATH = "base_path"
     DEPLOY_KEY_UNSELECTED_HOOK_IDS = "unselected_hooks"

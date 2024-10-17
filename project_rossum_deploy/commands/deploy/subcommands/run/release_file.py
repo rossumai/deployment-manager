@@ -1,3 +1,4 @@
+import questionary
 from project_rossum_deploy.commands.deploy.subcommands.run.hook_release import (
     HookRelease,
 )
@@ -10,8 +11,10 @@ from project_rossum_deploy.commands.deploy.subcommands.run.schema_release import
 from project_rossum_deploy.commands.deploy.subcommands.run.workspace_release import (
     WorkspaceRelease,
 )
+from project_rossum_deploy.commands.migrate.helpers import get_token_owner
 from project_rossum_deploy.utils.consts import display_error
 from project_rossum_deploy.utils.functions import extract_id_from_url
+from project_rossum_deploy.utils.consts import settings
 
 
 from pydantic import BaseModel
@@ -25,6 +28,7 @@ class ReleaseFile(BaseModel):
 
     patch_target_org: bool = True
     token_owner_id: str = ""
+    deployed_org_id: int = None
 
     client: ElisAPIClient
 
@@ -32,6 +36,17 @@ class ReleaseFile(BaseModel):
     queues: list[QueueRelease] = []
     hooks: list[HookRelease] = []
     schemas: list[SchemaRelease] = []
+
+    async def ensure_token_owner(self):
+        if not settings.IS_PROJECT_IN_SAME_ORG:
+            if not self.token_owner_id:
+                token_owner_from_remote = await get_token_owner(self.client)
+                if token_owner_from_remote:
+                    self.token_owner_id = token_owner_from_remote.id
+                else:
+                    self.token_owner_id = await questionary.text(
+                        "Please input user ID of the hook token owner (e.g., 938382):"
+                    ).ask_async()
 
     async def migrate_hook_dependency_graph(
         self,

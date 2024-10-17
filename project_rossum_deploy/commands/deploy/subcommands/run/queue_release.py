@@ -38,6 +38,8 @@ class InboxRelease(ObjectRelease):
                 inbox_copy = deepcopy(self.data)
                 # Should either create a new one or it is already present
                 inbox_copy.pop("email", None)
+                # Name target inbox as its target queue (includes attribute override of the queue's name)
+                inbox_copy["name"] = queue_target.data["name"]
 
                 previous_queue_urls = inbox_copy.get("queues", [])
                 replace_dependency_url(

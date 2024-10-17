@@ -1,19 +1,24 @@
 import asyncio
 from anyio import Path
 import questionary
-from rossum_api import ElisAPIClient
+from rossum_api import APIClientError, ElisAPIClient
 
 
+from project_rossum_deploy.commands.deploy.subcommands.run.organization_release import (
+    OrganizationRelease,
+)
 from project_rossum_deploy.commands.deploy.subcommands.run.release_file import (
     ReleaseFile,
 )
 from project_rossum_deploy.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
     check_required_keys,
+    get_target_credentials,
 )
-from project_rossum_deploy.common.client import create_and_validate_client
 
+from project_rossum_deploy.common.read_write import read_json
 from project_rossum_deploy.utils.consts import (
+    display_error,
     settings,
 )
 
@@ -21,15 +26,13 @@ from project_rossum_deploy.utils.consts import (
 async def deploy_release_file(
     release_file_path: Path,
     org_path: Path = None,
-    client: ElisAPIClient = None,
+    target_client: ElisAPIClient = None,
     # force: bool = False,
     # commit: bool = False,
     # commit_message: str = "",
 ):
     release_file = await release_file_path.read_text()
-
     yaml = DeployYaml(release_file)
-
     if not check_required_keys(yaml.data):
         return
 
@@ -37,24 +40,65 @@ async def deploy_release_file(
         org_path = Path("./")
     source_dir_path = org_path / yaml.data[settings.DEPLOY_KEY_SOURCE_DIR]
 
+    # TODO: enable other non-target destinations
     # TODO: cross-org release test
+    source_org = await read_json(source_dir_path / "organization.json")
 
     # TODO: parallelize release API requests
 
-    # TODO: token from other places
+    # TODO: specify target_org in deploy file?
+    # I have a deploy file which is used and has target IDs
+    # I then change the token (for a different org in the gruop) and run deploy again
+    # The objects do not exist in target...
+    # TODO: create a deployed version with target ids and keep the original file as is
 
-    # TODO: enable other non-target destinations
-    if not client:
-        client = await create_and_validate_client(settings.TARGET_DIRNAME)
+    if not target_client:
+        target_url = yaml.data[settings.DEPLOY_KEY_TARGET_URL]
+        target_credentials = await get_target_credentials(
+            org_path=org_path, yaml_data=yaml.data
+        )
+        if not target_credentials:
+            display_error("Missing credentials for target API.")
+            return
+        target_client = ElisAPIClient(
+            base_url=target_url, token=target_credentials.token
+        )
 
-    release = ReleaseFile(**yaml.data, client=client)
+    release = ReleaseFile(**yaml.data, client=target_client)
+
+    if release.deployed_org_id:
+        try:
+            await target_client.retrieve_organization(release.deployed_org_id)
+        except APIClientError as e:
+            if e.status_code == 404:
+                display_error(
+                    f'Organization with ID "{release.deployed_org_id}" not found with the specified token in {target_client._http_client.base_url}. Please make sure you have to correct token and target URL.'
+                )
+                return
+
+    organization_choices = []
+    async for org in target_client.list_all_organizations():
+        organization_choices.append(questionary.Choice(title=org.name, value=org))
+    if len(organization_choices) > 1:
+        target_org = await questionary.select(
+            "Select target organization:", choices=organization_choices
+        ).ask_async()
+    else:
+        target_org = organization_choices[0].value
+
+    ### Organization
+    if release.patch_target_org and target_org.id != source_org["id"]:
+        organization_release = OrganizationRelease(
+            client=target_client, data=source_org, target_org=target_org
+        )
+        await organization_release.deploy()
 
     ### Schemas
     await asyncio.gather(
         *[
             schema_release.initialize(
                 yaml=yaml,
-                client=client,
+                client=target_client,
                 source_dir_path=source_dir_path,
             )
             for schema_release in release.schemas
@@ -73,7 +117,7 @@ async def deploy_release_file(
             hook_release.initialize(
                 source_dir_path=source_dir_path,
                 yaml=yaml,
-                client=client,
+                client=target_client,
                 token_owner_id=release.token_owner_id,
             )
             for hook_release in release.hooks
@@ -86,22 +130,12 @@ async def deploy_release_file(
     await release.migrate_hook_dependency_graph(hook_targets=hook_targets)
 
     ### Workspaces
-    organization_choices = []
-    async for org in client.list_all_organizations():
-        organization_choices.append(questionary.Choice(title=org.name, value=org.url))
-    if len(organization_choices) > 1:
-        target_org_url = await questionary.select(
-            "Select target organization:", choices=organization_choices
-        ).ask_async()
-    else:
-        target_org_url = organization_choices[0].value
-
     await asyncio.gather(
         *[
             workspace_release.initialize(
                 yaml=yaml,
-                client=client,
-                target_org_url=target_org_url,
+                client=target_client,
+                target_org_url=target_org.url,
                 source_dir_path=source_dir_path,
             )
             for workspace_release in release.workspaces
@@ -119,7 +153,7 @@ async def deploy_release_file(
         *[
             queue_release.initialize(
                 yaml=yaml,
-                client=client,
+                client=target_client,
                 source_dir_path=source_dir_path,
                 workspace_targets=workspace_targets,
                 hook_targets=hook_targets,
@@ -135,6 +169,7 @@ async def deploy_release_file(
             target.data for target in queue_release.targets
         ]
 
+    yaml.data[settings.DEPLOY_KEY_DEPLOYED_ORG_ID] = target_org.id
     yaml.save_to_file(str(release_file_path))
 
     lookup_table = {
@@ -163,8 +198,6 @@ async def deploy_release_file(
 
     # TODO: better representation of the deploy process
 
-    # TODO: migrate org
-
     # TODO: ??? How to solve name changes? (path and name will be different and won't locate the object)
     # During planning, show error that it cannot be found
     # Eventually, create utility to update a release file (template --update or whatever)
@@ -172,3 +205,5 @@ async def deploy_release_file(
     # TODO: log all messages to stdout and into a separate file as well
 
     # TODO: make purge work with deploy files as well
+
+    # TODO: download changes into proper dir (based on the deploy file)
