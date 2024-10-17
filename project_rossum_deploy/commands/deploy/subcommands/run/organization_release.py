@@ -2,6 +2,8 @@ from project_rossum_deploy.commands.deploy.subcommands.run.object_release import
     ObjectRelease,
 )
 from project_rossum_deploy.utils.consts import display_error
+from rich import print
+
 
 from rossum_api.models.organization import Organization
 from rossum_api.api_client import Resource
@@ -25,6 +27,9 @@ class OrganizationRelease(ObjectRelease):
 
             await self.client._http_client.update(
                 self.type, id=self.target_org.id, data=org_copy
+            )
+            print(
+                f'Released (updated) {self.display_type} "{self.data['name']} ({self.data['id']})" -> "{self.target_org.name} ({self.target_org.id})".'
             )
         except Exception as e:
             display_error(
