@@ -1,7 +1,9 @@
 from project_rossum_deploy.commands.deploy.subcommands.run.helpers import DeployYaml
 from project_rossum_deploy.commands.deploy.subcommands.template.helpers import (
+    add_override_to_deploy_file_objects,
     create_deploy_file_template,
     find_schemas_for_queues,
+    get_attribute_overrides_from_user,
     get_filename_from_user,
     get_hooks_from_user,
     get_queues_from_user,
@@ -59,28 +61,25 @@ async def create_deploy_template(
     deploy_file_object[settings.DEPLOY_KEY_TARGET_URL] = target_url
 
     # TODO: sort choices better
+    # TODO: consts keys for all object names (workspaces, queues, ...)
 
     # Workspaces
     workspaces = deploy_file_object.get("workspaces", [])
-    deploy_file_workspaces = await get_workspaces_from_user(
-        deploy_file_workspaces=workspaces,
+    deploy_file_workspaces, selected_ws_paths = await get_workspaces_from_user(
+        previous_deploy_file_workspaces=workspaces,
         source_path=source_path,
         interactive=interactive,
     )
-    deploy_file_object["workspaces"] = prepare_deploy_file_objects(
-        deploy_file_workspaces
-    )
+    deploy_file_object["workspaces"] = deploy_file_workspaces
 
     # Queues
     queues = deploy_file_object.get("queues", [])
-    deploy_file_queues = await get_queues_from_user(
-        deploy_file_queues=queues,
-        deploy_ws_paths=[ws["path"].parent for ws in deploy_file_workspaces],
+    deploy_file_queues, selected_queues = await get_queues_from_user(
+        previous_deploy_file_queues=queues,
+        deploy_ws_paths=[ws.parent for ws in selected_ws_paths],
         interactive=interactive,
     )
-    deploy_file_object["queues"] = prepare_deploy_file_objects(
-        deploy_file_queues, include_path=True
-    )
+    deploy_file_object["queues"] = deploy_file_queues
 
     # Hooks
     hooks = deploy_file_object.get("hooks", [])
@@ -88,7 +87,7 @@ async def create_deploy_template(
         settings.DEPLOY_KEY_UNSELECTED_HOOK_IDS, []
     )
     selected_hooks, unselected_hooks = await get_hooks_from_user(
-        deploy_file_hooks=hooks,
+        previous_deploy_file_hooks=hooks,
         unselected_hook_ids=unselected_hook_ids,
         source_path=source_path,
         queues=deploy_file_queues,
@@ -98,16 +97,19 @@ async def create_deploy_template(
     deploy_file_object[settings.DEPLOY_KEY_UNSELECTED_HOOK_IDS] = unselected_hooks
 
     # Schemas
-    schemas = await find_schemas_for_queues(
-        source_path=source_path, queues=deploy_file_queues
+    # No point letting the user select a schema, each queue should just get its schema
+    previous_schemas = deploy_file_object.get("schemas", [])
+    new_schemas = await find_schemas_for_queues(
+        source_path=source_path, queues=selected_queues
     )
-    deploy_schema_objects = prepare_deploy_file_objects(schemas)
+    deploy_schema_objects = prepare_deploy_file_objects(
+        objects=new_schemas, objects_in_previous_file=previous_schemas
+    )
     deploy_file_object["schemas"] = deploy_schema_objects
 
-    # TODO: attribute override specification in input file
-
-    # TODO: name regex for attribute override
-    # TODO: attr override helper
+    overrides = await get_attribute_overrides_from_user()
+    for override in overrides:
+        add_override_to_deploy_file_objects(override, deploy_file_object)
 
     deploy_filepath = await get_filename_from_user(
         org_path,

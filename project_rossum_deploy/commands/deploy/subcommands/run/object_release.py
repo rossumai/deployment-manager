@@ -81,39 +81,39 @@ class ObjectRelease(BaseModel):
             return self.type.value[:-2]
         return self.type.value[:-1]
 
-    async def upload(self, object: dict, target: Target):
+    async def upload(self, target_object: dict, target: Target):
         if target.id:
-            return await self.update_remote(object=object, target=target)
+            return await self.update_remote(target_object=target_object, target=target)
         else:
-            return await self.create_remote(object=object, target=target)
+            return await self.create_remote(target_object=target_object, target=target)
 
     # Target is provided so that subclasses can use it (even if this basic method does not)
-    async def create_remote(self, object: dict, target: Target = None):
+    async def create_remote(self, target_object: dict, target: Target = None):
         try:
-            result = await self.client._http_client.create(self.type, object)
+            result = await self.client._http_client.create(self.type, target_object)
             print(
-                f'Released (created) {self.display_type} "{object['name']} ({object['id']})" -> "{result['name']} ({result['id']})".'
+                f'Released (created) {self.display_type} "{self.data['name']} ({self.data['id']})" -> "{result['name']} ({result['id']})".'
             )
             return result
         except Exception as e:
             display_error(
-                f'Error while creating {self.display_type}  "{object['name']} ({object['id']})" ^',
+                f'Error while creating {self.display_type}  "{self.data['name']} ({self.data['id']})" ^',
                 e,
             )
             return {}
 
-    async def update_remote(self, object: dict, target: Target):
+    async def update_remote(self, target_object: dict, target: Target):
         try:
             result = await self.client._http_client.update(
-                self.type, id_=target.id, data=object
+                self.type, id_=target.id, data=target_object
             )
             print(
-                f'Released (updated) {self.display_type} "{object['name']} ({object['id']})" -> "{result['name']} ({result['id']})".'
+                f'Released (updated) {self.display_type} "{self.data['name']} ({self.data['id']})" -> "{result['name']} ({result['id']})".'
             )
             return result
         except Exception as e:
             display_error(
-                f'Error while updating {self.display_type} "{object['name']} ({object['id']})" -> "{target.id} ^',
+                f'Error while updating {self.display_type} "{self.data['name']} ({self.data['id']})" -> "{target.id} ^',
                 e,
             )
             return {}

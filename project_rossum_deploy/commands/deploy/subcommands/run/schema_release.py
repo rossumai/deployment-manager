@@ -30,7 +30,7 @@ class SchemaRelease(ObjectRelease):
                     object=schema_copy, attribute_overrides=target.attribute_override
                 )
 
-                request = self.upload(object=schema_copy, target=target)
+                request = self.upload(target_object=schema_copy, target=target)
                 release_requests.append(request)
 
             results = await asyncio.gather(*release_requests)

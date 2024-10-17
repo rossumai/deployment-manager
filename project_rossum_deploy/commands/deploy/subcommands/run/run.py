@@ -46,10 +46,6 @@ async def deploy_release_file(
 
     # TODO: parallelize release API requests
 
-    # TODO: specify target_org in deploy file?
-    # I have a deploy file which is used and has target IDs
-    # I then change the token (for a different org in the gruop) and run deploy again
-    # The objects do not exist in target...
     # TODO: create a deployed version with target ids and keep the original file as is
 
     if not target_client:
@@ -108,7 +104,7 @@ async def deploy_release_file(
     for schema_release in release.schemas:
         await schema_release.deploy()
         schema_targets[schema_release.id] = [
-            target.data for target in schema_release.targets
+            target.data for target in schema_release.targets if target.data
         ]
 
     ### Hooks
@@ -126,7 +122,9 @@ async def deploy_release_file(
     hook_targets = {}
     for hook_release in release.hooks:
         await hook_release.deploy()
-        hook_targets[hook_release.id] = [target.data for target in hook_release.targets]
+        hook_targets[hook_release.id] = [
+            target.data for target in hook_release.targets if target.data
+        ]
     await release.migrate_hook_dependency_graph(hook_targets=hook_targets)
 
     ### Workspaces
@@ -145,7 +143,7 @@ async def deploy_release_file(
     for workspace_release in release.workspaces:
         await workspace_release.deploy()
         workspace_targets[workspace_release.id] = [
-            target.data for target in workspace_release.targets
+            target.data for target in workspace_release.targets if target.data
         ]
 
     ### Queues
@@ -166,7 +164,7 @@ async def deploy_release_file(
     for queue_release in release.queues:
         await queue_release.deploy()
         queue_targets[queue_release.id] = [
-            target.data for target in queue_release.targets
+            target.data for target in queue_release.targets if target.data
         ]
 
     yaml.data[settings.DEPLOY_KEY_DEPLOYED_ORG_ID] = target_org.id

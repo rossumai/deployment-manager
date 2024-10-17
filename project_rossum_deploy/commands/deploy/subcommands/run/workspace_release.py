@@ -43,7 +43,7 @@ class WorkspaceRelease(ObjectRelease):
                     object=ws_copy, attribute_overrides=target.attribute_override
                 )
 
-                request = self.upload(object=ws_copy, target=target)
+                request = self.upload(target_object=ws_copy, target=target)
                 release_requests.append(request)
 
             results = await asyncio.gather(*release_requests)

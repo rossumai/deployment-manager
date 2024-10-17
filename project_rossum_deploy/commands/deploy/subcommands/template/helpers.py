@@ -1,9 +1,12 @@
+from project_rossum_deploy.commands.deploy.subcommands.run.attribute_override import (
+    create_regex_override_syntax,
+)
 from project_rossum_deploy.common.read_write import read_json
-from pydantic import HttpUrl, ValidationError
+from pydantic import BaseModel, HttpUrl, ValidationError
 import questionary
 from anyio import Path
 
-from project_rossum_deploy.utils.consts import display_error, settings
+from project_rossum_deploy.utils.consts import display_error, display_warning, settings
 from project_rossum_deploy.utils.functions import (
     extract_id_from_url,
     find_all_hook_paths_in_destination,
@@ -192,14 +195,27 @@ async def find_ws_paths_for_dir(base_dir: Path):
     ]
 
 
-def prepare_deploy_file_objects(objects: list[dict], include_path: bool = False):
+DEFAULT_TARGETS = [{"id": None}]
+
+
+def prepare_deploy_file_objects(
+    objects: list[dict],
+    include_path: bool = False,
+    objects_in_previous_file: list[dict] = [],
+):
+    previous_objects_by_id = {
+        object["id"]: object for object in objects_in_previous_file
+    }
+
     deploy_objects = []
     for object in objects:
         deploy_representation = {
             "id": object["id"],
             "name": object["name"],
             settings.DEPLOY_KEY_BASE_PATH: str(object["path"].parent.parent.parent),
-            "targets": [{"id": None}],
+            settings.DEPLOY_KEY_TARGETS: previous_objects_by_id.get(
+                object["id"], {}
+            ).get(settings.DEPLOY_KEY_TARGETS, DEFAULT_TARGETS),
         }
         if not include_path:
             deploy_representation.pop(settings.DEPLOY_KEY_BASE_PATH)
@@ -208,11 +224,13 @@ def prepare_deploy_file_objects(objects: list[dict], include_path: bool = False)
 
 
 async def get_workspaces_from_user(
-    source_path: Path, interactive: bool, deploy_file_workspaces: list[dict] = None
+    source_path: Path,
+    interactive: bool,
+    previous_deploy_file_workspaces: list[dict] = None,
 ):
-    if not deploy_file_workspaces:
-        deploy_file_workspaces = []
-    selected_ws_ids = [ws["id"] for ws in deploy_file_workspaces]
+    if not previous_deploy_file_workspaces:
+        previous_deploy_file_workspaces = []
+    selected_ws_ids = [ws["id"] for ws in previous_deploy_file_workspaces]
     ws_paths = await find_ws_paths_for_dir(source_path)
     ws_choices = await prepare_choices(
         paths=[ws_path / "workspace.json" for ws_path in ws_paths],
@@ -224,18 +242,21 @@ async def get_workspaces_from_user(
             "Select WS:", choices=ws_choices
         ).ask_async()
 
-    return deploy_file_workspaces
+    return prepare_deploy_file_objects(
+        objects=deploy_file_workspaces,
+        objects_in_previous_file=previous_deploy_file_workspaces,
+    ), [ws["path"] for ws in deploy_file_workspaces]
 
 
 async def get_queues_from_user(
     deploy_ws_paths: list[dict],
     interactive: bool,
-    deploy_file_queues: list[dict] = None,
+    previous_deploy_file_queues: list[dict] = None,
 ):
-    if not deploy_file_queues:
-        deploy_file_queues = []
+    if not previous_deploy_file_queues:
+        previous_deploy_file_queues = []
     # TODO: let user select extra queues not in the WS already selected
-    selected_queue_ids = [queue["id"] for queue in deploy_file_queues]
+    selected_queue_ids = [queue["id"] for queue in previous_deploy_file_queues]
     queue_paths = await find_queue_paths_for_workspaces(deploy_ws_paths)
     if not queue_paths:
         display_error("No queues in the selected workspaces.")
@@ -252,21 +273,26 @@ async def get_queues_from_user(
         deploy_file_queues = await questionary.checkbox(
             "Modify selection of the queues or just continue:", choices=queue_choices
         ).ask_async()
-    return deploy_file_queues
+
+    return prepare_deploy_file_objects(
+        deploy_file_queues,
+        include_path=True,
+        objects_in_previous_file=previous_deploy_file_queues,
+    ), deploy_file_queues
 
 
 async def get_hooks_from_user(
     source_path: Path,
     queues: list[dict],
     interactive: bool,
-    deploy_file_hooks: list[dict] = None,
+    previous_deploy_file_hooks: list[dict] = None,
     unselected_hook_ids: list[int] = None,
 ):
-    if not deploy_file_hooks:
-        deploy_file_hooks = []
+    if not previous_deploy_file_hooks:
+        previous_deploy_file_hooks = []
     if not unselected_hook_ids:
         unselected_hook_ids = []
-    selected_hook_ids = [hook["id"] for hook in deploy_file_hooks]
+    selected_hook_ids = [hook["id"] for hook in previous_deploy_file_hooks]
     hook_ids_for_selected_queues = [
         hook["id"] for hook in await find_hooks_for_queues(source_path, queues)
     ]
@@ -283,16 +309,83 @@ async def get_hooks_from_user(
         paths=[hook_path for hook_path in hook_paths],
         preselected_ids=list(preselected_hook_ids),
     )
-    hooks = [hook.value for hook in hook_choices if hook.checked]
+    deploy_file_hooks = [hook.value for hook in hook_choices if hook.checked]
     if interactive or not selected_hook_ids:
-        hooks = await questionary.checkbox(
+        deploy_file_hooks = await questionary.checkbox(
             "Modify selection of the hooks:", choices=hook_choices
         ).ask_async()
-    selected_hooks = prepare_deploy_file_objects([hook for hook in hooks if hook["id"]])
+    selected_hooks = prepare_deploy_file_objects(
+        objects=deploy_file_hooks, objects_in_previous_file=previous_deploy_file_hooks
+    )
     # Automatically unselected all hooks that belonged to selected queues, but the user did not select them
     unselected_hooks = list(
         set(hook_ids_for_selected_queues)
         .union(unselected_hook_ids)
-        .difference([hook["id"] for hook in hooks])
+        .difference([hook["id"] for hook in deploy_file_hooks])
     )
     return selected_hooks, unselected_hooks
+
+
+class AttributeOverride(BaseModel):
+    object_types: list[str]
+    attribute: str
+    value: str
+
+
+async def get_attribute_overrides_from_user():
+    override_options = ["workspaces", "queues", "schemas", "hooks"]
+    overrides = []
+    while await questionary.confirm(
+        "Do you want to add a regex attribute override?", default=True
+    ).ask_async():
+        override_objects = await questionary.checkbox(
+            "Select objects:",
+            choices=[questionary.Choice(title=option) for option in override_options],
+        ).ask_async()
+        override_attribute = await questionary.text(
+            "Input attribute/JMESPath:"
+        ).ask_async()
+        # TODO: escaping test
+        override_source_regex = await questionary.text(
+            "Input regex to override (empty value will be understood as 'replace everything'):"
+        ).ask_async()
+        override_target = await questionary.text(
+            "Input new string (e.g., 'PROD'):"
+        ).ask_async()
+
+        overrides.append(
+            AttributeOverride(
+                object_types=override_objects,
+                attribute=override_attribute,
+                value=create_regex_override_syntax(
+                    override_source_regex, override_target
+                )
+                if override_source_regex
+                else override_target,
+            )
+        )
+    return overrides
+
+
+def add_override_to_deploy_file_objects(
+    override: AttributeOverride, root_deploy_file_object: dict
+):
+    for object_type in override.object_types:
+        if object_type not in root_deploy_file_object:
+            display_warning(
+                f'Could not find object type "{object_type}" in the deploy file'
+            )
+            continue
+
+        for object in root_deploy_file_object[object_type]:
+            add_override_to_deploy_file_object(override=override, object=object)
+
+
+def add_override_to_deploy_file_object(override: AttributeOverride, object: dict):
+    for target in object.get(settings.DEPLOY_KEY_TARGETS, []):
+        object_overrides = target.get(settings.DEPLOY_KEY_OVERRIDES, {})
+
+        object_overrides[override.attribute] = override.value
+
+        if settings.DEPLOY_KEY_OVERRIDES not in target:
+            target[settings.DEPLOY_KEY_OVERRIDES] = object_overrides

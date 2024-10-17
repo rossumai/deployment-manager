@@ -54,7 +54,7 @@ class HookRelease(ObjectRelease):
                     object=hook_copy, attribute_overrides=target.attribute_override
                 )
 
-                request = self.upload(object=hook_copy, target=target)
+                request = self.upload(target_object=hook_copy, target=target)
                 release_requests.append(request)
 
             results = await asyncio.gather(*release_requests)
@@ -72,22 +72,24 @@ class HookRelease(ObjectRelease):
                 e,
             )
 
-    async def create_remote(self, object: dict, target: Target):
+    async def create_remote(
+        self, source_object: dict, target_object: dict, target: Target
+    ):
         try:
-            result = await self.create_hook_based_on_template(hook=object)
+            result = await self.create_hook_based_on_template(hook=target_object)
             if not result:
                 # TODO: include a missing private hook url in the plan as a warning
                 result = await self.create_hook_without_template(
-                    hook=object,
+                    hook=target_object,
                     target=target,
                 )
             print(
-                f'Released (created) {self.display_type} "{object['name']} ({object['id']})" -> "{result['id']}".'
+                f'Released (created) {self.display_type} "{source_object['name']} ({source_object['id']})" -> "{result['id']}".'
             )
             return result
         except Exception as e:
             display_error(
-                f'Error while creating {self.display_type} "{object['name']} ({object['id']})":',
+                f'Error while creating {self.display_type} "{source_object['name']} ({source_object['id']})":',
                 e,
             )
             return {}

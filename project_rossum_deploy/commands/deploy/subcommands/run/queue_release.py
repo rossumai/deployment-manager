@@ -62,7 +62,10 @@ class InboxRelease(ObjectRelease):
                     )
                     return
 
-                await self.upload(object=inbox_copy, target=target_inbox)
+                await self.upload(
+                    target_object=inbox_copy,
+                    target=target_inbox,
+                )
 
         except Exception as e:
             display_error(
@@ -170,7 +173,7 @@ class QueueRelease(ObjectRelease):
                     object=queue_copy, attribute_overrides=target.attribute_override
                 )
 
-                request = self.upload(object=queue_copy, target=target)
+                request = self.upload(target_object=queue_copy, target=target)
                 release_requests.append(request)
 
             results = await asyncio.gather(*release_requests)

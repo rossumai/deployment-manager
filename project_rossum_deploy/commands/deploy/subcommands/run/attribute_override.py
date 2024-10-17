@@ -1,30 +1,50 @@
+import re
 import jmespath
 
+from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.utils.functions import (
     flatten,
 )
+
+
+def create_regex_override_syntax(source: str, target: str):
+    return f"{source}{settings.DEPLOY_OVERRIDE_REGEX_SEPARATOR}{target}"
+
+
+def parse_regex_attribute_override(value: str):
+    split_values = value.split(settings.DEPLOY_OVERRIDE_REGEX_SEPARATOR)
+    if len(split_values) == 1:
+        return ["", value]
+    else:
+        return split_values
+
+
+def override_attribute_v2(
+    object: dict,
+    key_query: str,
+    new_value: str,
+):
+    parent, key = parse_parent_and_key(key_query)
+
+    search = perform_search(parent, object)
+
+    for override_parent in search:
+        # The attribute (key) might not be on all parent objects (e.g., configurations[*].queue_ids)
+        if key not in override_parent:
+            continue
+
+        source_regex, new_value = parse_regex_attribute_override(new_value)
+        if not source_regex:
+            override_parent[key] = new_value
+        else:
+            pattern = re.compile(source_regex)
+            override_parent[key] = re.sub(pattern, new_value, override_parent[key])
 
 
 def override_attributes_v2(
     object: dict,
     attribute_overrides: dict,
 ) -> dict:
-    def override_attribute_v2(
-        key_query: str,
-        new_value: str,
-    ):
-        parent, key = parse_parent_and_key(key_query)
-
-        search = perform_search(parent, object)
-
-        for override_parent in search:
-            # The attribute (key) might not be on all parent objects (e.g., configurations[*].queue_ids)
-            if key not in override_parent:
-                continue
-
-            # value_to_override = override_parent[key]
-            override_parent[key] = new_value
-
     if not object:
         raise Exception(
             f'Cannot perform attribute_override on None object (target name: {object.get("name", "")} | target id: {object.get("id", "")}).'
@@ -32,6 +52,7 @@ def override_attributes_v2(
 
     for key, value in attribute_overrides.items():
         override_attribute_v2(
+            object=object,
             key_query=key,
             new_value=value,
         )

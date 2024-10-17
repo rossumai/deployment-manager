@@ -184,8 +184,11 @@ class Settings:
 
     # Deploy consts
     DEPLOY_IGNORED_DIRS = [".git"]
+    DEPLOY_OVERRIDE_REGEX_SEPARATOR = "/#/"
     DEPLOY_DEFAULT_TARGET_URL = "https://my-org.rossum.app/api/v1"
     DEFAULT_DEPLOY_FILENAME = "prd_deploy.yaml"
+    DEPLOY_KEY_TARGETS = "targets"
+    DEPLOY_KEY_OVERRIDES = "attribute_override"
     DEPLOY_KEY_DEPLOYED_ORG_ID = "deployed_org_id"
     DEPLOY_KEY_TOKEN_OWNER = "token_owner_id"
     DEPLOY_KEY_SOURCE_DIR = "source_dir"
