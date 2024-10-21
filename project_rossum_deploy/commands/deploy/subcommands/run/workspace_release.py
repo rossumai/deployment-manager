@@ -19,8 +19,15 @@ class WorkspaceRelease(ObjectRelease):
     type: Resource = Resource.Workspace
     target_org_url: str = None
 
-    async def initialize(self, yaml, client, target_org_url, source_dir_path):
-        await super().initialize(yaml, client, source_dir_path)
+    async def initialize(
+        self, yaml, client, target_org_url, source_dir_path, plan_only
+    ):
+        await super().initialize(
+            yaml=yaml,
+            client=client,
+            source_dir_path=source_dir_path,
+            plan_only=plan_only,
+        )
         self.target_org_url = target_org_url
 
     @property
@@ -42,6 +49,8 @@ class WorkspaceRelease(ObjectRelease):
                 override_attributes_v2(
                     object=ws_copy, attribute_overrides=target.attribute_override
                 )
+                # if self.plan_only:
+                #     self.show_override_diff(self.data, ws_copy)
 
                 request = self.upload(target_object=ws_copy, target=target)
                 release_requests.append(request)
@@ -55,6 +64,6 @@ class WorkspaceRelease(ObjectRelease):
 
         except Exception as e:
             display_error(
-                f"Error while migrating {self.display_type} {self.name} ({self.id}): {e}",
+                f"Error while migrating {self.display_type} {self.name} ({self.id}) ^",
                 e,
             )

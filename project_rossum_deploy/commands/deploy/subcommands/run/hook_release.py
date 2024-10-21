@@ -11,7 +11,6 @@ from project_rossum_deploy.commands.deploy.subcommands.run.object_release import
 from project_rossum_deploy.commands.migrate.hooks import update_hook_code
 from project_rossum_deploy.common.client import create_and_validate_client
 from project_rossum_deploy.utils.consts import (
-    PrdVersionException,
     display_error,
     display_warning,
     settings,
@@ -31,8 +30,15 @@ class HookRelease(ObjectRelease):
     type: Resource = Resource.Hook
     token_owner_id: int = None
 
-    async def initialize(self, yaml, client, token_owner_id, source_dir_path):
-        await super().initialize(yaml, client, source_dir_path)
+    async def initialize(
+        self, yaml, client, token_owner_id, source_dir_path, plan_only
+    ):
+        await super().initialize(
+            yaml=yaml,
+            client=client,
+            source_dir_path=source_dir_path,
+            plan_only=plan_only,
+        )
         await update_hook_code(self.path, self.data)
         self.token_owner_id = token_owner_id
 
@@ -53,6 +59,8 @@ class HookRelease(ObjectRelease):
                 override_attributes_v2(
                     object=hook_copy, attribute_overrides=target.attribute_override
                 )
+                # if self.plan_only:
+                #     self.show_override_diff(self.data, hook_copy)
 
                 request = self.upload(target_object=hook_copy, target=target)
                 release_requests.append(request)
@@ -63,12 +71,9 @@ class HookRelease(ObjectRelease):
                 target.id = result.get("id", None)
                 target.data = result
                 self.yaml_reference["targets"][index]["id"] = target.id
-
-        except PrdVersionException as e:
-            raise e
         except Exception as e:
             display_error(
-                f"Error while migrating {self.display_type} {self.name} ({self.id}): {e}",
+                f"Error while migrating {self.display_type} {self.name} ({self.id}) ^",
                 e,
             )
 

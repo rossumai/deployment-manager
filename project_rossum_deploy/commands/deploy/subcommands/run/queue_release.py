@@ -32,15 +32,33 @@ class InboxRelease(ObjectRelease):
     # Override parent object method
     async def initialize(self): ...
 
+    def prepare_object_copy_for_deploy(self, target: Target):
+        inbox_copy = deepcopy(self.data)
+        # Should either create a new one or it is already present
+        inbox_copy.pop("email", None)
+        # Name target inbox as its target queue (includes attribute override of the queue's name)
+        inbox_copy["name"] = target.data["name"]
+        return inbox_copy
+
+    async def prepare_inbox_target(self, queue_target: Target):
+        """Target needs to be created on the fly because it is not in the deploy file"""
+        target_inbox_url = queue_target.data.get("inbox", None)
+        # No URL when planning also happens when the queue is updated
+        # Check if there is an inbox and report it would be updated
+        plan_object_updated = not self.check_plan_object_id(queue_target.id)
+        if not target_inbox_url and self.plan_only and plan_object_updated:
+            target_queue_from_remote = await self.client.retrieve_queue(queue_target.id)
+            target_inbox_url = target_queue_from_remote.inbox
+
+        target_inbox_id = (
+            extract_id_from_url(target_inbox_url) if target_inbox_url else None
+        )
+        return Target(id=target_inbox_id)
+
     async def deploy(self):
         try:
             for target_index, queue_target in enumerate(self.queue_targets):
-                inbox_copy = deepcopy(self.data)
-                # Should either create a new one or it is already present
-                inbox_copy.pop("email", None)
-                # Name target inbox as its target queue (includes attribute override of the queue's name)
-                inbox_copy["name"] = queue_target.data["name"]
-
+                inbox_copy = self.prepare_object_copy_for_deploy(target=queue_target)
                 previous_queue_urls = inbox_copy.get("queues", [])
                 replace_dependency_url(
                     object=inbox_copy,
@@ -52,10 +70,7 @@ class InboxRelease(ObjectRelease):
                     },
                 )
 
-                target_inbox_url = queue_target.data["inbox"]
-                target_inbox_id = extract_id_from_url(target_inbox_url)
-                # Target needs to be created on the fly because it is not in the deploy file
-                target_inbox = Target(id=target_inbox_id)
+                target_inbox = await self.prepare_inbox_target(queue_target)
                 if previous_queue_urls == inbox_copy["queues"] and not target_inbox.id:
                     display_error(
                         f'Cannot create target for {self.display_type} "{inbox_copy['name']} ({inbox_copy['id']})" - there is no target queue to associate it with.'
@@ -69,7 +84,7 @@ class InboxRelease(ObjectRelease):
 
         except Exception as e:
             display_error(
-                f"Error while migrating {self.display_type} {self.name} ({self.id}): {e}",
+                f"Error while migrating {self.display_type} {self.name} ({self.id}): ^",
                 e,
             )
 
@@ -88,11 +103,17 @@ class QueueRelease(ObjectRelease):
         yaml,
         client,
         source_dir_path,
+        plan_only,
         workspace_targets: dict[int, list],
         schema_targets: dict[int, list],
         hook_targets: dict[int, list],
     ):
-        await super().initialize(yaml, client, source_dir_path)
+        await super().initialize(
+            yaml=yaml,
+            client=client,
+            source_dir_path=source_dir_path,
+            plan_only=plan_only,
+        )
         self.workspace_targets = workspace_targets
         self.schema_targets = schema_targets
         self.hook_targets = hook_targets
@@ -172,6 +193,8 @@ class QueueRelease(ObjectRelease):
                 override_attributes_v2(
                     object=queue_copy, attribute_overrides=target.attribute_override
                 )
+                # if self.plan_only:
+                #     self.show_override_diff(self.data, queue_copy)
 
                 request = self.upload(target_object=queue_copy, target=target)
                 release_requests.append(request)
@@ -188,6 +211,7 @@ class QueueRelease(ObjectRelease):
 
             inbox_data = await read_json(self.inbox_path)
             self.inbox = InboxRelease(
+                plan_only=self.plan_only,
                 id=inbox_data["id"],
                 name=inbox_data["name"],
                 data=inbox_data,

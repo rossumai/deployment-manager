@@ -1,7 +1,10 @@
+from copy import deepcopy
+import subprocess
+import tempfile
 from typing import Annotated
 from project_rossum_deploy.commands.deploy.subcommands.run.helpers import DeployYaml
 from project_rossum_deploy.common.read_write import read_json
-from rich import print
+from rich import print as pprint
 import json
 import re
 from rich.panel import Panel
@@ -14,6 +17,10 @@ from rossum_api.api_client import Resource
 
 from project_rossum_deploy.utils.consts import display_error
 from project_rossum_deploy.utils.functions import templatize_name_id
+
+
+class PathNotFoundException(Exception): ...
+
 
 type LookupTable = dict[int, list[int]]
 IMPLICIT_OVERRIDE_KEYS = ["settings", "metadata"]
@@ -38,6 +45,7 @@ TargetWithDefault = Annotated[
 ]
 
 
+# TODO: split some of the functionality into smaller classes (e.g., attr override)
 class ObjectRelease(BaseModel):
     class Config:
         arbitrary_types_allowed = True
@@ -49,20 +57,38 @@ class ObjectRelease(BaseModel):
     yaml_reference: dict = None
     data: dict = None
     client: ElisAPIClient = None
+    plan_only: bool = False
 
     targets: list[TargetWithDefault] = []
 
+    UPDATE_PRINT_STR: str = "[blue]UPDATE[/blue]"
+    CREATE_PRINT_STR: str = "[red]CREATE[/red]"
+    PLAN_PRINT_STR: str = "[bold]PLAN:[/bold]"
+    PLAN_CREATE_TBD_ID_STR: str = "->to_be_created"
+
     async def initialize(
-        self, yaml: DeployYaml, client: ElisAPIClient, source_dir_path: Path
+        self,
+        yaml: DeployYaml,
+        client: ElisAPIClient,
+        source_dir_path: Path,
+        plan_only: bool = False,
     ):
         if not self.base_path:
             self.base_path = source_dir_path
         self.yaml_reference = yaml.get_object_in_yaml(self.type.value, self.id)
-        # TODO: error handling of missing objects
-        self.data = await read_json(self.path)
+
+        self.plan_only = plan_only
+
+        try:
+            self.data = await read_json(self.path)
+        except Exception:
+            raise PathNotFoundException(
+                f"Error while initializing object with path: {self.path}"
+            )
         self.client = client
 
-    async def plan(self): ...
+    async def plan(self, target_object: dict, target: Target):
+        print()
 
     async def deploy(self): ...
 
@@ -77,10 +103,27 @@ class ObjectRelease(BaseModel):
     @property
     def display_type(self):
         # Remove the plural 's'
-        if self.type in [Resource.Inbox]:
-            return self.type.value[:-2]
-        return self.type.value[:-1]
+        return f"[yellow]{self.type.value[:-2 if self.type in [Resource.Inbox] else -1]}[/yellow]"
 
+    def prepare_object_copy_for_deploy(self, target: Target): ...
+
+    def create_source_to_target_string(self, target: dict):
+        return f'"{self.name} ({self.id})" -> "{target['name']} ({target['id']})"'
+
+    def create_plan_target_object_id(self, source_id: int):
+        return f"{str(source_id)}{self.PLAN_CREATE_TBD_ID_STR}"
+
+    def check_plan_object_id(self, object_id: any):
+        return self.PLAN_CREATE_TBD_ID_STR in str(object_id)
+
+    def update_targets(self, results):
+        # asyncio.gather returns results in the same order as they were put in
+        for index, (result, target) in enumerate(zip(results, self.targets)):
+            target.id = result.get("id", None)
+            target.data = result
+            self.yaml_reference["targets"][index]["id"] = target.id
+
+    # TODO: rename target_object (misleading)
     async def upload(self, target_object: dict, target: Target):
         if target.id:
             return await self.update_remote(target_object=target_object, target=target)
@@ -90,95 +133,191 @@ class ObjectRelease(BaseModel):
     # Target is provided so that subclasses can use it (even if this basic method does not)
     async def create_remote(self, target_object: dict, target: Target = None):
         try:
-            result = await self.client._http_client.create(self.type, target_object)
-            print(
-                f'Released (created) {self.display_type} "{self.data['name']} ({self.data['id']})" -> "{result['name']} ({result['id']})".'
+            if self.plan_only:
+                result = deepcopy(target_object)
+                # result_id = f"{target_object['id']}->{id(target)}"
+                result_id = self.create_plan_target_object_id(target_object["id"])
+                result["url"] = result["url"].replace(str(result["id"]), str(result_id))
+                result["id"] = result_id
+            else:
+                result = await self.client._http_client.create(self.type, target_object)
+
+            pprint(
+                f'{self.PLAN_PRINT_STR if self.plan_only else ''} {self.CREATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}.'
             )
             return result
         except Exception as e:
             display_error(
-                f'Error while creating {self.display_type}  "{self.data['name']} ({self.data['id']})" ^',
+                f'Error while creating {self.display_type}  "{self.name} ({self.id})" ^',
                 e,
             )
             return {}
 
     async def update_remote(self, target_object: dict, target: Target):
         try:
-            result = await self.client._http_client.update(
-                self.type, id_=target.id, data=target_object
-            )
-            print(
-                f'Released (updated) {self.display_type} "{self.data['name']} ({self.data['id']})" -> "{result['name']} ({result['id']})".'
+            if self.plan_only:
+                result = deepcopy(target_object)
+                result["url"] = result["url"].replace(str(result["id"]), str(target.id))
+                result["id"] = target.id
+            else:
+                result = await self.client._http_client.update(
+                    self.type, id_=target.id, data=target_object
+                )
+
+            pprint(
+                f'{self.PLAN_PRINT_STR if self.plan_only else ''} {self.UPDATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}.'
             )
             return result
         except Exception as e:
             display_error(
-                f'Error while updating {self.display_type} "{self.data['name']} ({self.data['id']})" -> "{target.id} ^',
+                f'Error while updating {self.display_type}: "{self.name} ({self.id})" -> "{target.id} ^',
                 e,
             )
             return {}
 
-    def implicit_override(self, lookup_table: LookupTable):
+    async def implicit_override_targets(self, lookup_table: LookupTable):
         for target_index, target in enumerate(self.targets):
-            for key in IMPLICIT_OVERRIDE_KEYS:
-                if key not in target:
-                    continue
+            override_source_data_copy = deepcopy(self.data)
+            override_target_copy = deepcopy(target)
 
-                self.replace_ids_in_target_subobject(
-                    target_id=target.id,
-                    subobject=target.data[key],
-                    lookup_table=lookup_table,
-                    target_index=target_index,
-                    num_targets=len(self.targets),
+            self.remove_override_irrelevant_props(override_source_data_copy)
+            self.remove_override_irrelevant_props(override_target_copy.data)
+
+            self.replace_ids_in_target_object(
+                target=override_target_copy,
+                lookup_table=lookup_table,
+                target_object_index=target_index,
+                num_targets=len(self.targets),
+            )
+
+            # Update only objects where there was a difference after override
+            if self.show_override_diff(
+                override_source_data_copy, override_target_copy.data
+            ):
+                await self.update_remote(
+                    target_object=override_target_copy.data, target=target
                 )
 
-    def replace_ids_in_target_subobject(
+    # TODO: compile lists for each object?
+    # TODO: add more attributes (e.g., modified_by, modified_at)
+    def remove_override_irrelevant_props(self, data):
+        match self.type:
+            case Resource.Schema:
+                data.pop("queues", None)
+            case Resource.Hook:
+                data.pop("run_after", None)
+                data.pop("queues", None)
+            case Resource.Workspace:
+                data.pop("queues", None)
+                data.pop("organization", None)
+            case Resource.Queue:
+                data.pop("workspace", None)
+                data.pop("inbox", None)
+                data.pop("schema", None)
+                data.pop("hooks", None)
+                data.pop("webhooks", None)
+
+    def show_override_diff(self, before_object: dict, after_object: dict):
+        """Displays both implicit and explicit overrides (the explicit applied already when uploading the file itself)"""
+        # Do not display diffs in ID, but the ID must be retained for later reference
+        after_object_id = after_object.pop("id", None)
+        after_object_url = after_object.pop("url", None)
+        before_object.pop("id", None)
+        before_object.pop("url", None)
+
+        with tempfile.NamedTemporaryFile() as tf1, tempfile.NamedTemporaryFile() as tf2:
+            tf1.write(bytes(json.dumps(before_object, indent=2), "UTF-8"))
+            tf2.write(bytes(json.dumps(after_object, indent=2), "UTF-8"))
+            # Has to be manually seeked back to start
+            tf1.seek(0)
+            tf2.seek(0)
+
+            diff = subprocess.run(
+                ["diff", tf1.name, tf2.name, "-U" "3"],
+                capture_output=True,
+                text=True,
+            )
+            after_object["id"] = after_object_id
+            after_object["url"] = after_object_url
+
+            if diff.stdout:
+                colorized_diff = self.parse_diff(diff.stdout)
+                message = f"Attribute override: {self.display_type} {self.create_source_to_target_string(after_object)}:\n{colorized_diff}"
+                pprint(Panel(message))
+                return True
+
+            return False
+
+    def parse_diff(self, diff: str):
+        colorized_lines = []
+        split_lines = diff.splitlines()
+        del split_lines[0:3]
+
+        for index, line in enumerate(split_lines):
+            if line.startswith("-"):
+                colorized_line = f"[red]{line}[/red]"
+            elif line.startswith("+"):
+                colorized_line = f"[green]{line}[/green]"
+            # The second is a CRLF issue related to diff
+            elif line.startswith("@@") or "newline at end of file" in line:
+                del split_lines[index]
+            else:
+                colorized_line = line
+            colorized_lines.append(colorized_line)
+        return "\n".join(colorized_lines)
+
+    def replace_ids_in_target_object(
         self,
-        target_id: int,
-        subobject: dict,
+        target: Target,
         lookup_table: dict,
-        object_index: int,
+        target_object_index: int,
         num_targets: int,
     ):
-        stringified_dict = json.dumps(subobject)
-        for source_id, target_ids in lookup_table.items():
-            source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
-            # This ID from source was not found in the subobject
-            if not re.search(source_id_regex, stringified_dict):
+        for key in IMPLICIT_OVERRIDE_KEYS:
+            if key not in target.data:
                 continue
 
-            basic_error_message = f"Could not override source_id '{source_id}' to its target equivalent in {self.type.value} '{target_id}'."
-            if not target_ids:
-                print(
-                    Panel(
-                        f"{basic_error_message} No target IDs found.",
-                        style="yellow",
-                    ),
-                )
-                continue
-            # Using lambdas for sub() because of quotes inside strings
-            # N:N objects -> objects are referenced in pairs
-            elif num_targets == len(target_ids):
-                stringified_dict = re.sub(
-                    source_id_regex,
-                    lambda m: str(target_ids[object_index])
-                    if m[0] == str(source_id)
-                    else m[0],
-                    stringified_dict,
-                )
-            # N:1 objects -> everything should be mapped to the first target ID
-            else:
-                stringified_dict = re.sub(
-                    source_id_regex,
-                    lambda m: str(target_ids[0]) if m[0] == str(source_id) else m[0],
-                    stringified_dict,
-                )
-                if len(target_ids) != 1:
-                    print(
+            stringified_dict = json.dumps(target.data[key])
+            for source_id, targets in lookup_table.items():
+                source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
+                # This ID from source was not found in the subobject
+                if not re.search(source_id_regex, stringified_dict):
+                    continue
+
+                basic_error_message = f"Could not override source_id '{source_id}' to its target equivalent in {self.type.value} '{target.id}'."
+                if not targets:
+                    pprint(
                         Panel(
-                            f"For overriding source_id '{source_id}' in {self.type.value} '{target_id}', There are multiple target IDs that could be assigned. The first one was used.",
+                            f"{basic_error_message} No target IDs found.",
                             style="yellow",
                         ),
                     )
+                    continue
+                # Using lambdas for sub() because of quotes inside strings
+                # N:N objects -> objects are referenced in pairs
+                elif num_targets == len(targets):
+                    stringified_dict = re.sub(
+                        source_id_regex,
+                        lambda m: str(targets[target_object_index]["id"])
+                        if m[0] == str(source_id)
+                        else m[0],
+                        stringified_dict,
+                    )
+                # N:1 objects -> everything should be mapped to the first target ID
+                else:
+                    stringified_dict = re.sub(
+                        source_id_regex,
+                        lambda m: str(target[0]["id"])
+                        if m[0] == str(source_id)
+                        else m[0],
+                        stringified_dict,
+                    )
+                    if len(target) != 1:
+                        pprint(
+                            Panel(
+                                f"For overriding source_id '{source_id}' in {self.type.value} '{target.id}', There are multiple target IDs that could be assigned. The first one was used.",
+                                style="yellow",
+                            ),
+                        )
 
-        return json.loads(stringified_dict)
+                target.data[key] = json.loads(stringified_dict)

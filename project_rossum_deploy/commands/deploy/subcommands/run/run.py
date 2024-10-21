@@ -1,11 +1,10 @@
-import asyncio
 from anyio import Path
 import questionary
 from rossum_api import APIClientError, ElisAPIClient
 
 
-from project_rossum_deploy.commands.deploy.subcommands.run.organization_release import (
-    OrganizationRelease,
+from project_rossum_deploy.commands.deploy.subcommands.run.object_release import (
+    PathNotFoundException,
 )
 from project_rossum_deploy.commands.deploy.subcommands.run.release_file import (
     ReleaseFile,
@@ -23,6 +22,7 @@ from project_rossum_deploy.utils.consts import (
 )
 
 
+# TODO: yes flag to skip the question after plan
 async def deploy_release_file(
     deploy_file_path: Path,
     org_path: Path = None,
@@ -46,8 +46,6 @@ async def deploy_release_file(
     # TODO: cross-org release test
     source_org = await read_json(source_dir_path / "organization.json")
 
-    # TODO: parallelize release API requests
-
     if not target_client:
         target_url = yaml.data[settings.DEPLOY_KEY_TARGET_URL]
         target_credentials = await get_target_credentials(
@@ -60,7 +58,32 @@ async def deploy_release_file(
             base_url=target_url, token=target_credentials.token
         )
 
-    release = ReleaseFile(**yaml.data, client=target_client)
+    target_org_choices = []
+    async for org in target_client.list_all_organizations():
+        target_org_choices.append(questionary.Choice(title=org.name, value=org))
+    if len(target_org_choices) > 1:
+        target_org = await questionary.select(
+            "Select target organization:", choices=target_org_choices
+        ).ask_async()
+    else:
+        target_org = target_org_choices[0].value
+
+    release = ReleaseFile(
+        **yaml.data,
+        client=target_client,
+        source_dir_path=source_dir_path,
+        yaml=yaml,
+        source_org=source_org,
+        target_org=target_org,
+    )
+    planned_release = ReleaseFile(
+        **yaml.data,
+        client=target_client,
+        source_dir_path=source_dir_path,
+        yaml=yaml,
+        source_org=source_org,
+        target_org=target_org,
+    )
 
     if release.deployed_org_id:
         first_deploy = False
@@ -73,100 +96,42 @@ async def deploy_release_file(
                 )
                 return
 
-    organization_choices = []
-    async for org in target_client.list_all_organizations():
-        organization_choices.append(questionary.Choice(title=org.name, value=org))
-    if len(organization_choices) > 1:
-        target_org = await questionary.select(
-            "Select target organization:", choices=organization_choices
+    try:
+        await planned_release.deploy_organization(plan_only=True)
+
+        await planned_release.deploy_schemas(plan_only=True)
+
+        await planned_release.deploy_hooks(plan_only=True)
+        await planned_release.migrate_hook_dependency_graph(plan_only=True)
+
+        await planned_release.deploy_workspaces(plan_only=True)
+
+        await planned_release.deploy_queues(plan_only=True)
+
+        await planned_release.apply_implicit_id_override()
+    except PathNotFoundException as e:
+        display_error(f"{e}")
+        return
+
+    if not (
+        await questionary.confirm(
+            "Do you wish to apply the plan?", default=True
         ).ask_async()
-    else:
-        target_org = organization_choices[0].value
+    ):
+        return
 
-    ### Organization
-    if release.patch_target_org and target_org.id != source_org["id"]:
-        organization_release = OrganizationRelease(
-            client=target_client, data=source_org, target_org=target_org
-        )
-        await organization_release.deploy()
+    await release.deploy_organization()
 
-    ### Schemas
-    await asyncio.gather(
-        *[
-            schema_release.initialize(
-                yaml=yaml,
-                client=target_client,
-                source_dir_path=source_dir_path,
-            )
-            for schema_release in release.schemas
-        ]
-    )
-    schema_targets = {}
-    for schema_release in release.schemas:
-        await schema_release.deploy()
-        schema_targets[schema_release.id] = [
-            target.data for target in schema_release.targets if target.data
-        ]
+    await release.deploy_schemas()
 
-    ### Hooks
-    await asyncio.gather(
-        *[
-            hook_release.initialize(
-                source_dir_path=source_dir_path,
-                yaml=yaml,
-                client=target_client,
-                token_owner_id=release.token_owner_id,
-            )
-            for hook_release in release.hooks
-        ]
-    )
-    hook_targets = {}
-    for hook_release in release.hooks:
-        await hook_release.deploy()
-        hook_targets[hook_release.id] = [
-            target.data for target in hook_release.targets if target.data
-        ]
-    await release.migrate_hook_dependency_graph(hook_targets=hook_targets)
+    await release.deploy_hooks()
+    await release.migrate_hook_dependency_graph()
 
-    ### Workspaces
-    await asyncio.gather(
-        *[
-            workspace_release.initialize(
-                yaml=yaml,
-                client=target_client,
-                target_org_url=target_org.url,
-                source_dir_path=source_dir_path,
-            )
-            for workspace_release in release.workspaces
-        ]
-    )
-    workspace_targets = {}
-    for workspace_release in release.workspaces:
-        await workspace_release.deploy()
-        workspace_targets[workspace_release.id] = [
-            target.data for target in workspace_release.targets if target.data
-        ]
+    await release.deploy_workspaces()
 
-    ### Queues
-    await asyncio.gather(
-        *[
-            queue_release.initialize(
-                yaml=yaml,
-                client=target_client,
-                source_dir_path=source_dir_path,
-                workspace_targets=workspace_targets,
-                hook_targets=hook_targets,
-                schema_targets=schema_targets,
-            )
-            for queue_release in release.queues
-        ]
-    )
-    queue_targets = {}
-    for queue_release in release.queues:
-        await queue_release.deploy()
-        queue_targets[queue_release.id] = [
-            target.data for target in queue_release.targets if target.data
-        ]
+    await release.deploy_queues()
+
+    await release.apply_implicit_id_override()
 
     yaml.data[settings.DEPLOY_KEY_DEPLOYED_ORG_ID] = target_org.id
 
@@ -179,35 +144,14 @@ async def deploy_release_file(
 
     yaml.save_to_file(deployed_deploy_file_path)
 
-    lookup_table = {
-        **schema_targets,
-        **hook_targets,
-        **workspace_targets,
-        **queue_targets,
-    }
-
-    for release_object in [
-        *release.schemas,
-        *release.hooks,
-        *release.workspaces,
-        *release.queues,
-    ]:
-        release_object.implicit_override(lookup_table)
-
     return
 
     # TODO: check if remote was not modified when updating?
 
-    # TODO: Show plan first, then ask for confirmation
-    # Plan should include org names
-    # Plan should check the files exist locally...
     # check if queue has its WS being deployed or it is a queue with an existing target_id
-
-    # TODO: better representation of the deploy process
 
     # TODO: ??? How to solve name changes? (path and name will be different and won't locate the object)
     # During planning, show error that it cannot be found
-    # Eventually, create utility to update a release file (template --update or whatever)
 
     # TODO: log all messages to stdout and into a separate file as well
 

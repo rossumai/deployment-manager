@@ -1,9 +1,8 @@
 from project_rossum_deploy.commands.deploy.subcommands.run.object_release import (
     ObjectRelease,
+    Target,
 )
 from project_rossum_deploy.utils.consts import display_error
-from rich import print
-
 
 from rossum_api.models.organization import Organization
 from rossum_api.api_client import Resource
@@ -14,25 +13,25 @@ class OrganizationRelease(ObjectRelease):
     type: Resource = Resource.Organization
     target_org: Organization
 
+    plan_only: bool = False
+    patch_org: bool = False
+
     # Override parent object method
     async def initialize(self): ...
 
     async def deploy(self):
-        if self.data["id"] == self.target_org.id:
+        if self.target_org.id == self.data["id"]:
             return
 
         try:
             org_copy = deepcopy(self.data)
             org_copy["name"] = self.target_org.name
 
-            await self.client._http_client.update(
-                self.type, id=self.target_org.id, data=org_copy
-            )
-            print(
-                f'Released (updated) {self.display_type} "{self.data['name']} ({self.data['id']})" -> "{self.target_org.name} ({self.target_org.id})".'
+            await self.update_remote(
+                target_object=org_copy, target=Target(id=self.target_org.id)
             )
         except Exception as e:
             display_error(
-                f'Error while updating {self.display_type} "{self.name} ({self.id})"  -> "{self.target_org.name} ({self.target_org.id})"',
+                f'Error while migrating {self.display_type} "{self.name} ({self.id})"  -> "{self.target_org.name} ({self.target_org.id}) ^"',
                 e,
             )

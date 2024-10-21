@@ -62,6 +62,7 @@ async def create_deploy_template(
 
     # TODO: sort choices better
     # TODO: consts keys for all object names (workspaces, queues, ...)
+    # TODO: allow queues without WS if they have an ID
 
     # Workspaces
     workspaces = deploy_file_object.get("workspaces", [])
