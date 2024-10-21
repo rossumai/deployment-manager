@@ -34,8 +34,7 @@ class SchemaRelease(ObjectRelease):
         override_attributes_v2(
             object=schema_copy, attribute_overrides=target.attribute_override
         )
-        # if self.plan_only:
-        #     self.show_override_diff(self.data, schema_copy)
+
         return schema_copy
 
     async def deploy(self):

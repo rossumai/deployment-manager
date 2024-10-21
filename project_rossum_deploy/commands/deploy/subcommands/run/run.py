@@ -1,3 +1,4 @@
+import datetime
 from anyio import Path
 import questionary
 from rossum_api import APIClientError, ElisAPIClient
@@ -43,7 +44,6 @@ async def deploy_release_file(
     source_dir_path = org_path / yaml.data[settings.DEPLOY_KEY_SOURCE_DIR]
 
     # TODO: enable other non-target destinations
-    # TODO: cross-org release test
     source_org = await read_json(source_dir_path / "organization.json")
 
     if not target_client:
@@ -133,6 +133,9 @@ async def deploy_release_file(
 
     await release.apply_implicit_id_override()
 
+    yaml.data[settings.DEPLOY_KEY_LAST_DEPLOYED_AT] = (
+        datetime.datetime.now().isoformat()
+    )
     yaml.data[settings.DEPLOY_KEY_DEPLOYED_ORG_ID] = target_org.id
 
     if first_deploy:
@@ -146,15 +149,16 @@ async def deploy_release_file(
 
     return
 
-    # TODO: check if remote was not modified when updating?
 
-    # check if queue has its WS being deployed or it is a queue with an existing target_id
+# TODO: remember private hook url for the non-plan deploy or choose a different method
+# Make plan non-parallel to allow good STDOUT experience, then parallelize
 
-    # TODO: ??? How to solve name changes? (path and name will be different and won't locate the object)
-    # During planning, show error that it cannot be found
+# TODO: check if remote was not modified when updating?
 
-    # TODO: log all messages to stdout and into a separate file as well
+# check if queue has its WS being deployed or it is a queue with an existing target_id
 
-    # TODO: make purge work with deploy files as well
+# TODO: log all messages to stdout and into a separate file as well
 
-    # TODO: download changes into proper dir (based on the deploy file)
+# TODO: make purge work with deploy files as well
+
+# TODO: download changes into proper dir (based on the deploy file)

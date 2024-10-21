@@ -108,13 +108,21 @@ class ObjectRelease(BaseModel):
     def prepare_object_copy_for_deploy(self, target: Target): ...
 
     def create_source_to_target_string(self, target: dict):
-        return f'"{self.name} ({self.id})" -> "{target['name']} ({target['id']})"'
+        return f'"{self.name} ([purple]{self.id}[/purple])" -> "{target['name']} ([purple]{target['id']}[/purple])"'
 
     def create_plan_target_object_id(self, source_id: int):
         return f"{str(source_id)}{self.PLAN_CREATE_TBD_ID_STR}"
 
     def check_plan_object_id(self, object_id: any):
         return self.PLAN_CREATE_TBD_ID_STR in str(object_id)
+
+    async def check_modified_timestamps_equal(
+        self, last_deploy_timestamp, remote_object_id: int
+    ):
+        remote_object = await self.client._http_client.fetch_one(
+            self.type, remote_object_id
+        )
+        return remote_object.get("modified_at", "") == last_deploy_timestamp
 
     def update_targets(self, results):
         # asyncio.gather returns results in the same order as they were put in
@@ -135,7 +143,6 @@ class ObjectRelease(BaseModel):
         try:
             if self.plan_only:
                 result = deepcopy(target_object)
-                # result_id = f"{target_object['id']}->{id(target)}"
                 result_id = self.create_plan_target_object_id(target_object["id"])
                 result["url"] = result["url"].replace(str(result["id"]), str(result_id))
                 result["id"] = result_id
@@ -159,7 +166,17 @@ class ObjectRelease(BaseModel):
                 result = deepcopy(target_object)
                 result["url"] = result["url"].replace(str(result["id"]), str(target.id))
                 result["id"] = target.id
+
+                # TODO: timestamp checking
+                # if not await self.check_modified_timestamps_equal(
+                #     last_deploy_timestamp, target.id
+                # ):
+                #     display_warning(f"Remote timestamp of ")
+                # If timestamps differ, show warning and let the user end the plan (to go review/sync changes)
             else:
+                # TODO: check again to eliminate race conditions
+                # Should remember if the user said "overwrite" in the step above
+
                 result = await self.client._http_client.update(
                     self.type, id_=target.id, data=target_object
                 )
@@ -190,10 +207,18 @@ class ObjectRelease(BaseModel):
                 num_targets=len(self.targets),
             )
 
-            # Update only objects where there was a difference after override
-            if self.show_override_diff(
+            diff = self.create_override_diff(
                 override_source_data_copy, override_target_copy.data
-            ):
+            )
+            if not diff:
+                return
+
+            if self.plan_only:
+                colorized_diff = self.parse_diff(diff)
+                message = f"Attribute override: {self.display_type} {self.create_source_to_target_string(override_target_copy.data)}:\n{colorized_diff}"
+                pprint(Panel(message))
+            else:
+                # Update only objects where there was a difference after override
                 await self.update_remote(
                     target_object=override_target_copy.data, target=target
                 )
@@ -201,23 +226,29 @@ class ObjectRelease(BaseModel):
     # TODO: compile lists for each object?
     # TODO: add more attributes (e.g., modified_by, modified_at)
     def remove_override_irrelevant_props(self, data):
+        data.pop("modified_by", None)
+        data.pop("modified_at", None)
         match self.type:
             case Resource.Schema:
                 data.pop("queues", None)
             case Resource.Hook:
+                data.pop("guide", None)
                 data.pop("run_after", None)
                 data.pop("queues", None)
             case Resource.Workspace:
                 data.pop("queues", None)
                 data.pop("organization", None)
             case Resource.Queue:
+                data.pop("users", None)
+                data.pop("workflows", None)
+                data.pop("counts", None)
                 data.pop("workspace", None)
                 data.pop("inbox", None)
                 data.pop("schema", None)
                 data.pop("hooks", None)
                 data.pop("webhooks", None)
 
-    def show_override_diff(self, before_object: dict, after_object: dict):
+    def create_override_diff(self, before_object: dict, after_object: dict):
         """Displays both implicit and explicit overrides (the explicit applied already when uploading the file itself)"""
         # Do not display diffs in ID, but the ID must be retained for later reference
         after_object_id = after_object.pop("id", None)
@@ -240,13 +271,7 @@ class ObjectRelease(BaseModel):
             after_object["id"] = after_object_id
             after_object["url"] = after_object_url
 
-            if diff.stdout:
-                colorized_diff = self.parse_diff(diff.stdout)
-                message = f"Attribute override: {self.display_type} {self.create_source_to_target_string(after_object)}:\n{colorized_diff}"
-                pprint(Panel(message))
-                return True
-
-            return False
+            return diff.stdout
 
     def parse_diff(self, diff: str):
         colorized_lines = []

@@ -91,7 +91,7 @@ async def create_deploy_template(
         previous_deploy_file_hooks=hooks,
         unselected_hook_ids=unselected_hook_ids,
         source_path=source_path,
-        queues=deploy_file_queues,
+        queues=selected_queues,
         interactive=interactive,
     )
     deploy_file_object["hooks"] = selected_hooks
@@ -99,7 +99,11 @@ async def create_deploy_template(
 
     # Schemas
     # No point letting the user select a schema, each queue should just get its schema
+
+    # The schemas can be an 'explicit' None in the YAML and the default [] would not get used
     previous_schemas = deploy_file_object.get("schemas", [])
+    if previous_schemas is None:
+        previous_schemas = []
     new_schemas = await find_schemas_for_queues(
         source_path=source_path, queues=selected_queues
     )
@@ -108,13 +112,17 @@ async def create_deploy_template(
     )
     deploy_file_object["schemas"] = deploy_schema_objects
 
-    overrides = await get_attribute_overrides_from_user()
-    for override in overrides:
-        add_override_to_deploy_file_objects(override, deploy_file_object)
+    if interactive:
+        overrides = await get_attribute_overrides_from_user()
+        for override in overrides:
+            add_override_to_deploy_file_objects(override, deploy_file_object)
 
-    deploy_filepath = await get_filename_from_user(
-        org_path,
-        default=str(input_file) if input_file else settings.DEFAULT_DEPLOY_FILENAME,
-    )
+    if interactive:
+        deploy_filepath = await get_filename_from_user(
+            org_path,
+            default=str(input_file) if input_file else settings.DEFAULT_DEPLOY_FILENAME,
+        )
+    else:
+        deploy_filepath = input_file
 
     yaml.save_to_file(deploy_filepath)

@@ -193,8 +193,6 @@ class QueueRelease(ObjectRelease):
                 override_attributes_v2(
                     object=queue_copy, attribute_overrides=target.attribute_override
                 )
-                # if self.plan_only:
-                #     self.show_override_diff(self.data, queue_copy)
 
                 request = self.upload(target_object=queue_copy, target=target)
                 release_requests.append(request)

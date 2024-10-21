@@ -190,6 +190,7 @@ class Settings:
     DEPLOY_KEY_TARGETS = "targets"
     DEPLOY_KEY_OVERRIDES = "attribute_override"
     DEPLOY_KEY_DEPLOYED_ORG_ID = "deployed_org_id"
+    DEPLOY_KEY_LAST_DEPLOYED_AT = "last_deployed_at"
     DEPLOY_KEY_TOKEN_OWNER = "token_owner_id"
     DEPLOY_KEY_SOURCE_DIR = "source_dir"
     DEPLOY_KEY_TARGET_DIR = "target_dir"

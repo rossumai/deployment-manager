@@ -2,7 +2,7 @@ import questionary
 from project_rossum_deploy.commands.deploy.subcommands.run.attribute_override import (
     override_attributes_v2,
 )
-from rich import print
+from rich import print as pprint
 from project_rossum_deploy.commands.deploy.subcommands.run.object_release import (
     ObjectRelease,
     Target,
@@ -59,8 +59,6 @@ class HookRelease(ObjectRelease):
                 override_attributes_v2(
                     object=hook_copy, attribute_overrides=target.attribute_override
                 )
-                # if self.plan_only:
-                #     self.show_override_diff(self.data, hook_copy)
 
                 request = self.upload(target_object=hook_copy, target=target)
                 release_requests.append(request)
@@ -77,24 +75,29 @@ class HookRelease(ObjectRelease):
                 e,
             )
 
-    async def create_remote(
-        self, source_object: dict, target_object: dict, target: Target
-    ):
+    async def create_remote(self, target_object: dict, target: Target):
         try:
-            result = await self.create_hook_based_on_template(hook=target_object)
-            if not result:
-                # TODO: include a missing private hook url in the plan as a warning
-                result = await self.create_hook_without_template(
-                    hook=target_object,
-                    target=target,
-                )
-            print(
-                f'Released (created) {self.display_type} "{source_object['name']} ({source_object['id']})" -> "{result['id']}".'
+            if self.plan_only:
+                result = deepcopy(target_object)
+                result_id = self.create_plan_target_object_id(target_object["id"])
+                result["url"] = result["url"].replace(str(result["id"]), str(result_id))
+                result["id"] = result_id
+            else:
+                result = await self.create_hook_based_on_template(hook=target_object)
+                if not result:
+                    # TODO: include a missing private hook url in the plan as a warning
+                    result = await self.create_hook_without_template(
+                        hook=target_object,
+                        target=target,
+                    )
+
+            pprint(
+                f'{self.PLAN_PRINT_STR if self.plan_only else ''} {self.CREATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}.'
             )
             return result
         except Exception as e:
             display_error(
-                f'Error while creating {self.display_type} "{source_object['name']} ({source_object['id']})":',
+                f'Error while creating {self.display_type} "{self.name} ({self.id})" ^',
                 e,
             )
             return {}
@@ -109,7 +112,7 @@ class HookRelease(ObjectRelease):
         ):
             private_hook_url = await questionary.text(
                 f"Please provide hook url (target base_url is '{self.client._http_client.base_url}') for '{hook['name']}':"
-            ).ask_async()
+            ).ask_async(patch_stdout=True)
             hook["config"]["url"] = (
                 private_hook_url
                 if private_hook_url

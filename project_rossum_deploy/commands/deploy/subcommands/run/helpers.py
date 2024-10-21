@@ -57,9 +57,9 @@ async def get_target_credentials(org_path: Path, yaml_data: dict):
     target_url = yaml_data[settings.DEPLOY_KEY_TARGET_URL]
 
     if target_dir:
-        target_credentials_path = org_path / target_dir / "credentials.yaml"
+        target_credentials_path: Path = org_path / target_dir / "credentials.yaml"
         if await target_credentials_path.exists():
-            data = await YAML.load(await target_credentials_path.get_text())
+            data = YAML().load(await target_credentials_path.read_text())
         else:
             target_credentials_path = org_path / target_dir / "credentials.json"
             data = await read_json(target_credentials_path)

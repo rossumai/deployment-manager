@@ -1,3 +1,4 @@
+from copy import deepcopy
 from project_rossum_deploy.commands.deploy.subcommands.run.attribute_override import (
     create_regex_override_syntax,
 )
@@ -77,10 +78,11 @@ async def prepare_choices(
 
 
 async def get_target_url_from_user(default: str = ""):
-    if not default:
-        default = settings.DEPLOY_DEFAULT_TARGET_URL
+    # YAML can have an explicit None, overwrite
+    if default is None:
+        default = ""
     target_url = await questionary.text(
-        "What is the target API URL:",
+        f"What is the target API URL (e.g., {settings.DEPLOY_DEFAULT_TARGET_URL}):",
         default=default,
     ).ask_async()
 
@@ -113,7 +115,7 @@ async def get_source_dir_from_user(org_path: Path, default: str = None):
     return source_dir
 
 
-async def get_filename_from_user(org_path: Path, default: str = None):
+async def get_filename_from_user(org_path: Path, default: str = ""):
     deploy_filename: str = await questionary.text(
         "Name for the deploy file:",
         default=default,
@@ -215,7 +217,7 @@ def prepare_deploy_file_objects(
             settings.DEPLOY_KEY_BASE_PATH: str(object["path"].parent.parent.parent),
             settings.DEPLOY_KEY_TARGETS: previous_objects_by_id.get(
                 object["id"], {}
-            ).get(settings.DEPLOY_KEY_TARGETS, DEFAULT_TARGETS),
+            ).get(settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)),
         }
         if not include_path:
             deploy_representation.pop(settings.DEPLOY_KEY_BASE_PATH)

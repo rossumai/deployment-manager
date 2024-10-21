@@ -41,8 +41,9 @@ class ReleaseFile(BaseModel):
         arbitrary_types_allowed = True
 
     patch_target_org: bool = True
-    token_owner_id: str = ""
-    deployed_org_id: int = None
+    token_owner_id: str | None = ""
+    deployed_org_id: int | None = ""
+    last_deployed_at: str | None = ""
 
     client: ElisAPIClient
     source_dir_path: Path

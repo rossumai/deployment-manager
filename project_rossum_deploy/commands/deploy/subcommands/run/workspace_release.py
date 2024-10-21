@@ -49,8 +49,6 @@ class WorkspaceRelease(ObjectRelease):
                 override_attributes_v2(
                     object=ws_copy, attribute_overrides=target.attribute_override
                 )
-                # if self.plan_only:
-                #     self.show_override_diff(self.data, ws_copy)
 
                 request = self.upload(target_object=ws_copy, target=target)
                 release_requests.append(request)
