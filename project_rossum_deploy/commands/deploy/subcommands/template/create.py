@@ -1,14 +1,18 @@
+from project_rossum_deploy.commands.deploy.common.helpers import (
+    get_api_url_from_config,
+    get_api_url_from_user,
+    get_filename_from_user,
+)
 from project_rossum_deploy.commands.deploy.subcommands.run.helpers import DeployYaml
 from project_rossum_deploy.commands.deploy.subcommands.template.helpers import (
     add_override_to_deploy_file_objects,
     create_deploy_file_template,
     find_schemas_for_queues,
     get_attribute_overrides_from_user,
-    get_filename_from_user,
     get_hooks_from_user,
     get_queues_from_user,
-    get_source_dir_from_user,
-    get_target_url_from_user,
+    get_dir_from_user,
+    get_token_owner_from_user,
     get_workspaces_from_user,
     prepare_deploy_file_objects,
 )
@@ -39,30 +43,57 @@ async def create_deploy_template(
     if not org_path:
         org_path = Path("./")
 
+    # Target dir
+    target_dir = deploy_file_object.get(settings.DEPLOY_KEY_TARGET_DIR, None)
+    if interactive or not target_dir:
+        target_dir = await get_dir_from_user(
+            org_path=org_path, type=settings.TARGET_DIRNAME, default=target_dir
+        )
+    deploy_file_object[settings.DEPLOY_KEY_TARGET_DIR] = target_dir
+
+    # Target URL
+    # Target URL can be in the deploy file already, in a config file, or inputted by the user
+    target_url = deploy_file_object.get(settings.DEPLOY_KEY_TARGET_URL, "")
+    if not target_url:
+        target_url = await get_api_url_from_config(org_path / target_dir)
+    if interactive or not target_url:
+        target_url = await get_api_url_from_user(
+            type=settings.TARGET_DIRNAME, default=target_url
+        )
+    deploy_file_object[settings.DEPLOY_KEY_TARGET_URL] = target_url
+
+    # Hook token owner
+    token_owner = deploy_file_object.get(settings.DEPLOY_KEY_TOKEN_OWNER, "")
+    if interactive or not token_owner:
+        token_owner = await get_token_owner_from_user(default=token_owner)
+    deploy_file_object[settings.DEPLOY_KEY_TOKEN_OWNER] = token_owner
+
     # Source dir
     source_dir = deploy_file_object.get(settings.DEPLOY_KEY_SOURCE_DIR, None)
     if interactive or not source_dir:
-        source_dir = await get_source_dir_from_user(
-            org_path=org_path, default=source_dir
+        source_dir = await get_dir_from_user(
+            org_path=org_path, type=settings.SOURCE_DIRNAME, default=source_dir
         )
     deploy_file_object[settings.DEPLOY_KEY_SOURCE_DIR] = source_dir
 
-    source_path = Path(source_dir)
+    source_path = org_path / source_dir
     if not (await (source_path / "workspaces").exists()):
         display_error(
             f'Did not find "workspaces" directory in the "{source_dir}" directory.'
         )
         return
 
-    # Target URL
-    target_url = deploy_file_object.get(settings.DEPLOY_KEY_TARGET_URL, "")
-    if interactive or not target_url:
-        target_url = await get_target_url_from_user(default=target_url)
-    deploy_file_object[settings.DEPLOY_KEY_TARGET_URL] = target_url
+    # Source URL
+    # Try to find it in the config, but do not require it from the user
+    source_url = deploy_file_object.get(settings.DEPLOY_KEY_SOURCE_URL, "")
+    if not source_url:
+        source_url = await get_api_url_from_config(org_path / source_dir)
+    deploy_file_object[settings.DEPLOY_KEY_SOURCE_URL] = source_url
 
-    # TODO: sort choices better
     # TODO: consts keys for all object names (workspaces, queues, ...)
     # TODO: allow queues without WS if they have an ID
+
+    # TODO: specify hook_template URL for hook in the deploy file
 
     # Workspaces
     workspaces = deploy_file_object.get("workspaces", [])

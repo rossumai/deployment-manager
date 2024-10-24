@@ -20,9 +20,6 @@ class OrganizationRelease(ObjectRelease):
     async def initialize(self): ...
 
     async def deploy(self):
-        if self.target_org.id == self.data["id"]:
-            return
-
         try:
             org_copy = deepcopy(self.data)
             org_copy["name"] = self.target_org.name
@@ -35,3 +32,4 @@ class OrganizationRelease(ObjectRelease):
                 f'Error while migrating {self.display_type} "{self.name} ({self.id})"  -> "{self.target_org.name} ({self.target_org.id}) ^"',
                 e,
             )
+            self.deploy_failed = True

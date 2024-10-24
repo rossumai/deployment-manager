@@ -10,6 +10,7 @@ from project_rossum_deploy.commands.deploy.subcommands.run.hook_release import (
 )
 from project_rossum_deploy.commands.deploy.subcommands.run.object_release import (
     ObjectRelease,
+    Target,
 )
 from project_rossum_deploy.commands.deploy.subcommands.run.organization_release import (
     OrganizationRelease,
@@ -26,13 +27,14 @@ from project_rossum_deploy.commands.deploy.subcommands.run.workspace_release imp
 from project_rossum_deploy.commands.migrate.helpers import get_token_owner
 from project_rossum_deploy.utils.consts import display_error
 from project_rossum_deploy.utils.functions import extract_id_from_url
-from project_rossum_deploy.utils.consts import settings
 
 
 from pydantic import BaseModel
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 from rossum_api.models.organization import Organization
+from rossum_api.models.user import User
+from rossum_api.models.group import Group
 
 
 # TODO: rename
@@ -40,12 +42,15 @@ class ReleaseFile(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
+    plan_only: bool = False
+
     patch_target_org: bool = True
-    token_owner_id: str | None = ""
+    token_owner_id: int | None = None
     deployed_org_id: int | None = ""
     last_deployed_at: str | None = ""
 
     client: ElisAPIClient
+    source_client: ElisAPIClient
     source_dir_path: Path
     yaml: DeployYaml
 
@@ -55,26 +60,18 @@ class ReleaseFile(BaseModel):
     workspaces: list[WorkspaceRelease] = []
     queues: list[QueueRelease] = []
     hooks: list[HookRelease] = []
+    hook_templates: dict = {}
     schemas: list[SchemaRelease] = []
 
-    # TODO: redo if too computationally-heavy
-    @property
-    def schema_targets(self):
-        return self.gather_targets(self.schemas)
+    schema_targets: list[Target] = []
+    hook_targets: list[Target] = []
+    workspace_targets: list[Target] = []
+    queue_targets: list[Target] = []
 
-    @property
-    def hook_targets(self):
-        return self.gather_targets(self.hooks)
+    async def apply_implicit_id_override(self):
+        if not self.plan_only:
+            pprint(Panel("Applying implicit ID override"))
 
-    @property
-    def workspace_targets(self):
-        return self.gather_targets(self.workspaces)
-
-    @property
-    def queue_targets(self):
-        return self.gather_targets(self.queues)
-
-    async def apply_implicit_id_override(self, plan_only: bool = False):
         lookup_table = {
             **self.schema_targets,
             **self.hook_targets,
@@ -98,33 +95,37 @@ class ReleaseFile(BaseModel):
             ]
         return targets
 
-    async def deploy_organization(self, plan_only: bool = False):
+    async def deploy_organization(self):
         organization_release = OrganizationRelease(
             id=self.source_org.id,
             name=self.source_org.name,
             data=dataclasses.asdict(self.source_org),
             target_org=self.target_org,
-            plan_only=plan_only,
+            plan_only=self.plan_only,
             client=self.client,
         )
 
-        if plan_only:
+        if self.plan_only:
             pprint(
                 Panel(
                     f"{organization_release.create_source_to_target_string(dataclasses.asdict(self.target_org))}"
                 )
             )
 
-        await organization_release.deploy()
+        if self.patch_target_org and self.source_org.id != self.target_org.id:
+            await organization_release.deploy()
+            if organization_release.deploy_failed:
+                raise Exception(f"Deploy of {organization_release.type} failed")
 
-    async def deploy_schemas(self, plan_only: bool = False):
+    async def deploy_schemas(self):
         await asyncio.gather(
             *[
                 schema_release.initialize(
                     yaml=self.yaml,
                     client=self.client,
                     source_dir_path=self.source_dir_path,
-                    plan_only=plan_only,
+                    is_same_org_deploy=self.target_org.id == self.source_org.id,
+                    plan_only=self.plan_only,
                 )
                 for schema_release in self.schemas
             ]
@@ -133,24 +134,46 @@ class ReleaseFile(BaseModel):
         await asyncio.gather(
             *[schema_release.deploy() for schema_release in self.schemas]
         )
+        for release in self.schemas:
+            if release.deploy_failed:
+                raise Exception(f"Deploy of {release.type} failed")
+        self.schema_targets = self.gather_targets(self.schemas)
 
-    async def deploy_hooks(self, plan_only: bool = False):
+    async def deploy_hooks(self):
+        await self.ensure_token_owner()
+
         await asyncio.gather(
             *[
                 hook_release.initialize(
                     yaml=self.yaml,
                     client=self.client,
+                    source_client=self.source_client,
                     source_dir_path=self.source_dir_path,
                     token_owner_id=self.token_owner_id,
-                    plan_only=plan_only,
+                    plan_only=self.plan_only,
+                    is_same_org_deploy=self.target_org.id == self.source_org.id,
+                    hook_template_url=self.hook_templates.get(hook_release.id, None),
                 )
                 for hook_release in self.hooks
             ]
         )
 
-        await asyncio.gather(*[hook_release.deploy() for hook_release in self.hooks])
+        # Run hooks sequentially when planning because user may have to input things in the CLI
+        if self.plan_only:
+            for hook_release in self.hooks:
+                await hook_release.deploy()
+                self.hook_templates[hook_release.id] = hook_release.hook_template_url
+        else:
+            await asyncio.gather(
+                *[hook_release.deploy() for hook_release in self.hooks]
+            )
 
-    async def deploy_workspaces(self, plan_only: bool = False):
+        for release in self.hooks:
+            if release.deploy_failed:
+                raise Exception(f"Deploy of {release.type} failed")
+        self.hook_targets = self.gather_targets(self.hooks)
+
+    async def deploy_workspaces(self):
         await asyncio.gather(
             *[
                 workspaces_release.initialize(
@@ -158,7 +181,8 @@ class ReleaseFile(BaseModel):
                     client=self.client,
                     source_dir_path=self.source_dir_path,
                     target_org_url=self.target_org.url,
-                    plan_only=plan_only,
+                    plan_only=self.plan_only,
+                    is_same_org_deploy=self.target_org.id == self.source_org.id,
                 )
                 for workspaces_release in self.workspaces
             ]
@@ -168,14 +192,20 @@ class ReleaseFile(BaseModel):
             *[workspace_release.deploy() for workspace_release in self.workspaces]
         )
 
-    async def deploy_queues(self, plan_only: bool = False):
+        for release in self.workspaces:
+            if release.deploy_failed:
+                raise Exception(f"Deploy of {release.type} failed")
+        self.workspace_targets = self.gather_targets(self.workspaces)
+
+    async def deploy_queues(self):
         await asyncio.gather(
             *[
                 queue_release.initialize(
                     yaml=self.yaml,
                     client=self.client,
                     source_dir_path=self.source_dir_path,
-                    plan_only=plan_only,
+                    plan_only=self.plan_only,
+                    is_same_org_deploy=self.target_org.id == self.source_org.id,
                     schema_targets=self.schema_targets,
                     hook_targets=self.hook_targets,
                     workspace_targets=self.workspace_targets,
@@ -186,18 +216,44 @@ class ReleaseFile(BaseModel):
 
         await asyncio.gather(*[queue_release.deploy() for queue_release in self.queues])
 
-    async def ensure_token_owner(self):
-        if not settings.IS_PROJECT_IN_SAME_ORG:
-            if not self.token_owner_id:
-                token_owner_from_remote = await get_token_owner(self.client)
-                if token_owner_from_remote:
-                    self.token_owner_id = token_owner_from_remote.id
-                else:
-                    self.token_owner_id = await questionary.text(
-                        "Please input user ID of the hook token owner (e.g., 938382):"
-                    ).ask_async()
+        for release in self.queues:
+            if release.deploy_failed:
+                raise Exception(f"Deploy of {release.type} failed")
+        self.queue_targets = self.gather_targets(self.queues)
 
-    async def migrate_hook_dependency_graph(self, plan_only: bool = False):
+    async def ensure_token_owner(self):
+        if self.source_org.id == self.target_org.id:
+            return
+
+        if not self.token_owner_id:
+            target_token_owner_from_remote = await get_token_owner(self.client)
+            if target_token_owner_from_remote:
+                self.token_owner_id = target_token_owner_from_remote.id
+            else:
+                users = [user async for user in self.client.list_all_users()]
+                user_roles = [role async for role in self.client.list_all_user_roles()]
+                user_choices = [
+                    questionary.Choice(title=user.username, value=user.id)
+                    for user in users
+                    if self.is_user_admin(user=user, user_roles=user_roles)
+                ]
+                self.token_owner_id = await questionary.select(
+                    "Please choose target hook token owner:", choices=user_choices
+                ).ask_async()
+
+    def is_user_admin(self, user: User, user_roles: list[Group]):
+        admin_urls = [
+            role.url
+            for role in user_roles
+            if role.name in ["admin", "organization_group_admin"]
+        ]
+        for user_role_url in user.groups:
+            if user_role_url in admin_urls:
+                return True
+        return False
+
+    async def migrate_hook_dependency_graph(self):
+        pprint(Panel("Updating hook dependency graph..."))
         for hook_release in self.hooks:
             try:
                 for target_hook_index, target_hook in enumerate(hook_release.targets):
@@ -207,7 +263,7 @@ class ReleaseFile(BaseModel):
                         source_run_after=hook_release.data.get("run_after", []),
                         hook_targets=self.hook_targets,
                     )
-                    if plan_only:
+                    if self.plan_only:
                         # TODO: visualize deps graphically
                         ...
                     else:
@@ -221,6 +277,7 @@ class ReleaseFile(BaseModel):
                     f"Error while migrating dependency graph for hook '{hook_release.name} ({hook_release.id})' ^",
                     e,
                 )
+        pprint(Panel("Hook dependency graph updated..."))
 
     async def migrate_target_hook_run_after(
         self,
@@ -262,7 +319,6 @@ class ReleaseFile(BaseModel):
     async def find_missing_hook_run_after(
         self,
         predecessor_id: int,
-        source_run_after: dict,
         target_hook_index: int,
         target_hook_count: int,
         hook_targets: dict[int, list],

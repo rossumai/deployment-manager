@@ -19,12 +19,15 @@ from copy import deepcopy
 class SchemaRelease(ObjectRelease):
     type: Resource = Resource.Schema
 
-    async def initialize(self, yaml, client, source_dir_path, plan_only):
+    async def initialize(
+        self, yaml, client, source_dir_path, plan_only, is_same_org_deploy
+    ):
         await super().initialize(
             yaml=yaml,
             client=client,
             source_dir_path=source_dir_path,
             plan_only=plan_only,
+            is_same_org_deploy=is_same_org_deploy,
         )
         await update_formula_fields_code(self.path, self.data)
 
@@ -54,3 +57,4 @@ class SchemaRelease(ObjectRelease):
                 f"Error while migrating {self.display_type} {self.name} ({self.id}) ^",
                 e,
             )
+            self.deploy_failed = True

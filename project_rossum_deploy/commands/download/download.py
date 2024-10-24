@@ -33,6 +33,14 @@ from project_rossum_deploy.utils.functions import (
 )
 
 
+# TODO: pull for any number of dirs with any name
+# With different orgs, this is already working, only mapping.yaml should be simplified (no need for RHS)
+# For same-org source and targets created via release, you could keep them in a single dir too
+# For deploying, you have a deploy file with the pairs specified, for pushing you would push only what changed, the same for pulling
+# TODO: one config file including object IDs (instead of mapping)
+# TODO: one credentials file (optional)
+
+
 @click.command(
     name=settings.DOWNLOAD_COMMAND_NAME,
     help="""

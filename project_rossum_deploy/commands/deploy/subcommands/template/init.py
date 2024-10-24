@@ -1,7 +1,7 @@
+from project_rossum_deploy.commands.deploy.common.helpers import get_filename_from_user
 from project_rossum_deploy.commands.deploy.subcommands.run.helpers import DeployYaml
 from project_rossum_deploy.commands.deploy.subcommands.template.helpers import (
     create_deploy_file_template,
-    get_filename_from_user,
 )
 from project_rossum_deploy.utils.consts import settings
 

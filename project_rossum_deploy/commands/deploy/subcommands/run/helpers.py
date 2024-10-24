@@ -1,11 +1,17 @@
 import re
 from anyio import Path
-from pydantic import BaseModel, ValidationError
-import questionary
-from rossum_api import ElisAPIClient, APIClientError
 from ruamel.yaml import YAML
 
-from project_rossum_deploy.common.read_write import read_json
+from project_rossum_deploy.commands.deploy.common.helpers import (
+    get_api_url_from_config,
+    get_token_from_cred_file,
+    validate_credentials,
+)
+from project_rossum_deploy.commands.deploy.common.helpers import get_api_url_from_user
+from project_rossum_deploy.commands.deploy.common.helpers import get_token_from_user
+from project_rossum_deploy.commands.deploy.subcommands.run.upload_helpers import (
+    Credentials,
+)
 from project_rossum_deploy.utils.consts import display_error, settings
 
 
@@ -46,41 +52,31 @@ def check_required_keys(release: dict):
         return True
 
 
-# TODO: username + password support
-class Credentials(BaseModel):
-    token: str
-
-
 # TODO: more robust (all scenarios)
-async def get_target_credentials(org_path: Path, yaml_data: dict):
-    target_dir = yaml_data.get(settings.DEPLOY_KEY_TARGET_DIR, None)
-    target_url = yaml_data[settings.DEPLOY_KEY_TARGET_URL]
+# TODO: prompt user for new token and store it
+# TODO: username + password support
+async def get_url_and_credentials(org_path: Path, type: str, yaml_data: dict):
+    if type == settings.TARGET_DIRNAME:
+        dir = yaml_data.get(settings.DEPLOY_KEY_TARGET_DIR, None)
+        api_url = yaml_data.get(settings.DEPLOY_KEY_TARGET_URL, None)
+    else:
+        dir = yaml_data.get(settings.DEPLOY_KEY_SOURCE_DIR, None)
+        api_url = yaml_data.get(settings.DEPLOY_KEY_SOURCE_URL, None)
 
-    if target_dir:
-        target_credentials_path: Path = org_path / target_dir / "credentials.yaml"
-        if await target_credentials_path.exists():
-            data = YAML().load(await target_credentials_path.read_text())
-        else:
-            target_credentials_path = org_path / target_dir / "credentials.json"
-            data = await read_json(target_credentials_path)
+    if not api_url:
+        api_url = await get_api_url_from_config(org_path / dir)
+    if not api_url:
+        api_url = await get_api_url_from_user(type=type)
 
-        try:
-            return Credentials(**data)
-        except ValidationError:
-            display_error(f"Invalid token in {target_credentials_path} try again.")
-            return await get_token_from_user(target_url)
+    token = await get_token_from_cred_file(org_path / dir)
+    if not token:
+        token = await get_token_from_user(type=type)
 
-    return await get_token_from_user(target_url)
-
-
-async def get_token_from_user(target_url: str):
     try:
-        token = await questionary.text("Enter token for the target API:").ask_async()
-        await ElisAPIClient(base_url=target_url, token=token).request(
-            "get", "auth/user"
-        )
-        return Credentials(token=token)
-    except APIClientError as e:
-        if e.status_code == 401:
-            display_error(f'Invalid target API token "{token}" try again.')
-            return await get_token_from_user(target_url)
+        credentials = Credentials(token=token, url=api_url)
+        await validate_credentials(credentials)
+        return credentials
+    except Exception as e:
+        display_error(f"Error while getting credentials for {type}: {str(e)}")
+
+    return None

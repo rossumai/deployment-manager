@@ -182,6 +182,12 @@ class Settings:
     DEPLOY_TEMPLATE_COMMAND_NAME: str = "template"
     DEPLOY_TEMPLATE_INIT_COMMAND_NAME: str = "init"
 
+    DIR_CONFIG_FILENAME = "config"
+    DIR_CREDENTIALS_FILENAME = "credentials"
+
+    CONFIG_KEY_API_BASE_URL = "api_base_url"
+    CONFIG_KEY_TOKEN = "token"
+
     # Deploy consts
     DEPLOY_IGNORED_DIRS = [".git"]
     DEPLOY_OVERRIDE_REGEX_SEPARATOR = "/#/"
@@ -194,6 +200,7 @@ class Settings:
     DEPLOY_KEY_TOKEN_OWNER = "token_owner_id"
     DEPLOY_KEY_SOURCE_DIR = "source_dir"
     DEPLOY_KEY_TARGET_DIR = "target_dir"
+    DEPLOY_KEY_SOURCE_URL = "source_url"
     DEPLOY_KEY_TARGET_URL = "target_url"
     DEPLOY_KEY_BASE_PATH = "base_path"
     DEPLOY_KEY_UNSELECTED_HOOK_IDS = "unselected_hooks"

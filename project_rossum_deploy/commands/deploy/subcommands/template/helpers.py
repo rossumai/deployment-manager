@@ -3,7 +3,7 @@ from project_rossum_deploy.commands.deploy.subcommands.run.attribute_override im
     create_regex_override_syntax,
 )
 from project_rossum_deploy.common.read_write import read_json
-from pydantic import BaseModel, HttpUrl, ValidationError
+from pydantic import BaseModel
 import questionary
 from anyio import Path
 
@@ -25,8 +25,10 @@ def create_deploy_file_template():
 # Which local folder is considered to be the source (takes JSON objects from there)
 {settings.DEPLOY_KEY_SOURCE_DIR}:
 
-# [Optional] Which local folder is considered to be the target (takes credentials if found)
+# [Optional] Which local folder is considered to be the target (takes URL and credentials if found)
 {settings.DEPLOY_KEY_TARGET_DIR}:
+# [Optional] API URL for the source organization (otherwise taken from the source dir config.yaml)
+{settings.DEPLOY_KEY_SOURCE_DIR}:
 
 # User ID to use as the hook owner (unnecessary if using username+password credentials for target)
 {settings.DEPLOY_KEY_TOKEN_OWNER}:
@@ -74,62 +76,46 @@ async def prepare_choices(
         )
         choices.append(choice)
 
-    return choices
+    return sorted(choices, key=lambda choice: choice.value["id"])
 
 
-async def get_target_url_from_user(default: str = ""):
+async def get_token_owner_from_user(default: str = ""):
     # YAML can have an explicit None, overwrite
     if default is None:
         default = ""
-    target_url = await questionary.text(
-        f"What is the target API URL (e.g., {settings.DEPLOY_DEFAULT_TARGET_URL}):",
+    token_owner = await questionary.text(
+        "What is the token owner user ID (can be empty for same-org target):",
         default=default,
     ).ask_async()
 
     try:
-        HttpUrl(target_url)
-    except ValidationError:
-        display_error(f"Invalid URL provided: {target_url}. Please retry.")
-        return await get_target_url_from_user(default=default)
+        if not token_owner:
+            return token_owner
+        return int(token_owner)
+    except Exception:
+        display_error("Invalid ID (not an int, please try again).")
+        return await get_token_owner_from_user(default=default)
 
-    return target_url
 
-
-async def get_source_dir_from_user(org_path: Path, default: str = None):
-    source_candidates = [
+async def get_dir_from_user(org_path: Path, type: str, default: str = None):
+    candidates = [
         dir_path
         async for dir_path in org_path.iterdir()
         if await dir_path.is_dir() and str(dir_path) not in settings.DEPLOY_IGNORED_DIRS
     ]
-    source_choices = [
-        questionary.Choice(title=str(source_path)) for source_path in source_candidates
-    ]
+    choices = [questionary.Choice(title=str(source_path)) for source_path in candidates]
+    # Target dirname is not required (it might not exist unlike the source one)
+    if type == settings.TARGET_DIRNAME:
+        choices.append(questionary.Choice(title="N/A", value=""))
 
     # Reset default if it is not found in the current options
-    if default not in [choice.title for choice in source_choices]:
+    if default not in [choice.title for choice in choices]:
         default = None
 
-    source_dir = await questionary.select(
-        "Which folder is the source?", choices=source_choices, default=default
+    selected_dir = await questionary.select(
+        f"Which folder is the {type}?", choices=choices, default=default
     ).ask_async()
-    return source_dir
-
-
-async def get_filename_from_user(org_path: Path, default: str = ""):
-    deploy_filename: str = await questionary.text(
-        "Name for the deploy file:",
-        default=default,
-    ).ask_async()
-    deploy_filepath = org_path / deploy_filename
-
-    if await deploy_filepath.exists():
-        overwrite = await questionary.confirm(
-            f'File "{deploy_filepath}" already exists. Overwrite?', default=False
-        ).ask_async()
-        if not overwrite:
-            return await get_filename_from_user(org_path)
-
-    return deploy_filepath
+    return selected_dir
 
 
 async def find_schemas_for_queues(source_path: Path, queues: list[dict]):

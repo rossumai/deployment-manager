@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 from rich import print
@@ -87,3 +88,9 @@ async def upload_inbox(
         result = await client._http_client.create(Resource.Inbox, inbox)
         print(f'Released (created) inbox "{inbox['id']}" -> "{result['id']}".')
         return result
+
+
+class Credentials(BaseModel):
+    # TODO: username + password support
+    token: str
+    url: str

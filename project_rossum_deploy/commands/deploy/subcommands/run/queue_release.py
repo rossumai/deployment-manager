@@ -104,6 +104,7 @@ class QueueRelease(ObjectRelease):
         client,
         source_dir_path,
         plan_only,
+        is_same_org_deploy,
         workspace_targets: dict[int, list],
         schema_targets: dict[int, list],
         hook_targets: dict[int, list],
@@ -113,6 +114,7 @@ class QueueRelease(ObjectRelease):
             client=client,
             source_dir_path=source_dir_path,
             plan_only=plan_only,
+            is_same_org_deploy=is_same_org_deploy,
         )
         self.workspace_targets = workspace_targets
         self.schema_targets = schema_targets

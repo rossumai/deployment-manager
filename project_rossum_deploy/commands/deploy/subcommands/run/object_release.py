@@ -58,13 +58,16 @@ class ObjectRelease(BaseModel):
     data: dict = None
     client: ElisAPIClient = None
     plan_only: bool = False
+    is_same_org_deploy: bool = False
+    deploy_failed: bool = False
 
     targets: list[TargetWithDefault] = []
 
     UPDATE_PRINT_STR: str = "[blue]UPDATE[/blue]"
     CREATE_PRINT_STR: str = "[red]CREATE[/red]"
     PLAN_PRINT_STR: str = "[bold]PLAN:[/bold]"
-    PLAN_CREATE_TBD_ID_STR: str = "->to_be_created"
+    # TODO: better parsing -> better dummy ID
+    PLAN_CREATE_TBD_ID_STR: str = "0000000"
 
     async def initialize(
         self,
@@ -72,12 +75,14 @@ class ObjectRelease(BaseModel):
         client: ElisAPIClient,
         source_dir_path: Path,
         plan_only: bool = False,
+        is_same_org_deploy=False,
     ):
         if not self.base_path:
             self.base_path = source_dir_path
         self.yaml_reference = yaml.get_object_in_yaml(self.type.value, self.id)
 
         self.plan_only = plan_only
+        self.is_same_org_deploy = is_same_org_deploy
 
         try:
             self.data = await read_json(self.path)
@@ -104,6 +109,13 @@ class ObjectRelease(BaseModel):
     def display_type(self):
         # Remove the plural 's'
         return f"[yellow]{self.type.value[:-2 if self.type in [Resource.Inbox] else -1]}[/yellow]"
+
+    @property
+    def is_creating_targets(self):
+        for target in self.targets:
+            if not target.id:
+                return True
+        return False
 
     def prepare_object_copy_for_deploy(self, target: Target): ...
 
@@ -158,6 +170,7 @@ class ObjectRelease(BaseModel):
                 f'Error while creating {self.display_type}  "{self.name} ({self.id})" ^',
                 e,
             )
+            self.deploy_failed = True
             return {}
 
     async def update_remote(self, target_object: dict, target: Target):
@@ -190,6 +203,7 @@ class ObjectRelease(BaseModel):
                 f'Error while updating {self.display_type}: "{self.name} ({self.id})" -> "{target.id} ^',
                 e,
             )
+            self.deploy_failed = True
             return {}
 
     async def implicit_override_targets(self, lookup_table: LookupTable):
@@ -232,6 +246,7 @@ class ObjectRelease(BaseModel):
             case Resource.Schema:
                 data.pop("queues", None)
             case Resource.Hook:
+                data.pop("token_owner", None)
                 data.pop("guide", None)
                 data.pop("run_after", None)
                 data.pop("queues", None)

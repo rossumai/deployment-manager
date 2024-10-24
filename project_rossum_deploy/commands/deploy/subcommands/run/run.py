@@ -1,24 +1,24 @@
 import datetime
 from anyio import Path
+from pydantic import ValidationError
 import questionary
 from rossum_api import APIClientError, ElisAPIClient
 
 
-from project_rossum_deploy.commands.deploy.subcommands.run.object_release import (
-    PathNotFoundException,
-)
+from project_rossum_deploy.commands.deploy.common.helpers import get_filename_from_user
 from project_rossum_deploy.commands.deploy.subcommands.run.release_file import (
     ReleaseFile,
 )
 from project_rossum_deploy.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
     check_required_keys,
-    get_target_credentials,
+    get_url_and_credentials,
 )
 
 from project_rossum_deploy.common.read_write import read_json
 from project_rossum_deploy.utils.consts import (
     display_error,
+    display_warning,
     settings,
 )
 
@@ -27,6 +27,7 @@ from project_rossum_deploy.utils.consts import (
 async def deploy_release_file(
     deploy_file_path: Path,
     org_path: Path = None,
+    source_client: ElisAPIClient = None,
     target_client: ElisAPIClient = None,
     # force: bool = False,
     # commit: bool = False,
@@ -43,19 +44,26 @@ async def deploy_release_file(
         org_path = Path("./")
     source_dir_path = org_path / yaml.data[settings.DEPLOY_KEY_SOURCE_DIR]
 
-    # TODO: enable other non-target destinations
     source_org = await read_json(source_dir_path / "organization.json")
 
     if not target_client:
-        target_url = yaml.data[settings.DEPLOY_KEY_TARGET_URL]
-        target_credentials = await get_target_credentials(
-            org_path=org_path, yaml_data=yaml.data
+        target_credentials = await get_url_and_credentials(
+            org_path=org_path, type=settings.TARGET_DIRNAME, yaml_data=yaml.data
         )
         if not target_credentials:
-            display_error("Missing credentials for target API.")
             return
         target_client = ElisAPIClient(
-            base_url=target_url, token=target_credentials.token
+            base_url=target_credentials.url, token=target_credentials.token
+        )
+
+    if not source_client:
+        source_credentials = await get_url_and_credentials(
+            org_path=org_path, type=settings.SOURCE_DIRNAME, yaml_data=yaml.data
+        )
+        if not source_credentials:
+            return
+        source_client = ElisAPIClient(
+            base_url=source_credentials.url, token=source_credentials.token
         )
 
     target_org_choices = []
@@ -68,22 +76,30 @@ async def deploy_release_file(
     else:
         target_org = target_org_choices[0].value
 
-    release = ReleaseFile(
-        **yaml.data,
-        client=target_client,
-        source_dir_path=source_dir_path,
-        yaml=yaml,
-        source_org=source_org,
-        target_org=target_org,
-    )
-    planned_release = ReleaseFile(
-        **yaml.data,
-        client=target_client,
-        source_dir_path=source_dir_path,
-        yaml=yaml,
-        source_org=source_org,
-        target_org=target_org,
-    )
+    try:
+        release = ReleaseFile(
+            **yaml.data,
+            client=target_client,
+            source_client=source_client,
+            source_dir_path=source_dir_path,
+            yaml=yaml,
+            source_org=source_org,
+            target_org=target_org,
+            plan_only=False,
+        )
+        planned_release = ReleaseFile(
+            **yaml.data,
+            client=target_client,
+            source_client=source_client,
+            source_dir_path=source_dir_path,
+            yaml=yaml,
+            source_org=source_org,
+            target_org=target_org,
+            plan_only=True,
+        )
+    except ValidationError as e:
+        display_error(f"Missing information in the deploy file: {e}")
+        return
 
     if release.deployed_org_id:
         first_deploy = False
@@ -97,20 +113,20 @@ async def deploy_release_file(
                 return
 
     try:
-        await planned_release.deploy_organization(plan_only=True)
+        await planned_release.deploy_organization()
 
-        await planned_release.deploy_schemas(plan_only=True)
+        await planned_release.deploy_schemas()
 
-        await planned_release.deploy_hooks(plan_only=True)
-        await planned_release.migrate_hook_dependency_graph(plan_only=True)
+        await planned_release.deploy_hooks()
+        await planned_release.migrate_hook_dependency_graph()
 
-        await planned_release.deploy_workspaces(plan_only=True)
+        await planned_release.deploy_workspaces()
 
-        await planned_release.deploy_queues(plan_only=True)
+        await planned_release.deploy_queues()
 
         await planned_release.apply_implicit_id_override()
-    except PathNotFoundException as e:
-        display_error(f"{e}")
+    except Exception as e:
+        display_error(f"Planning failed: {e}")
         return
 
     if not (
@@ -120,28 +136,46 @@ async def deploy_release_file(
     ):
         return
 
-    await release.deploy_organization()
+    # Take what the user inputted (or the same if user input not applicable)
+    yaml.data[settings.DEPLOY_KEY_TOKEN_OWNER] = planned_release.token_owner_id
+    release.token_owner_id = planned_release.token_owner_id
+    release.hook_templates = planned_release.hook_templates
 
-    await release.deploy_schemas()
+    try:
+        await release.deploy_organization()
 
-    await release.deploy_hooks()
-    await release.migrate_hook_dependency_graph()
+        await release.deploy_schemas()
 
-    await release.deploy_workspaces()
+        await release.deploy_hooks()
+        await release.migrate_hook_dependency_graph()
 
-    await release.deploy_queues()
+        await release.deploy_workspaces()
 
-    await release.apply_implicit_id_override()
+        await release.deploy_queues()
+
+        await release.apply_implicit_id_override()
+    except Exception:
+        display_warning(
+            "Encountered error during deploy, see logs above. Saving intermediary results."
+        )
 
     yaml.data[settings.DEPLOY_KEY_LAST_DEPLOYED_AT] = (
         datetime.datetime.now().isoformat()
     )
     yaml.data[settings.DEPLOY_KEY_DEPLOYED_ORG_ID] = target_org.id
 
+    # TODO: extract into function
     if first_deploy:
         deployed_deploy_file_path = deploy_file_path.with_stem(
             f"{deploy_file_path.stem}_deployed"
         )
+        if await deployed_deploy_file_path.exists():
+            overwrite = await questionary.confirm(
+                f'File "{deployed_deploy_file_path}" already exists. Overwrite?',
+                default=False,
+            ).ask_async()
+            if not overwrite:
+                deployed_deploy_file_path = await get_filename_from_user(org_path)
     else:
         deployed_deploy_file_path = deploy_file_path
 
@@ -150,10 +184,19 @@ async def deploy_release_file(
     return
 
 
-# TODO: remember private hook url for the non-plan deploy or choose a different method
-# Make plan non-parallel to allow good STDOUT experience, then parallelize
+# TODO: more granular error handling for hook dep graph and implicit attribute override
+
+# TODO: better message including the name of the object Could not override source_id...
+# TODO: remove the ID if it was not found (don't keep source queue ID in hook for instance)
+
+# TODO: diff could show ID and (name)
+
+# TODO: error handling for objects: pause execution? Continue with other objects? (currently 1 failed queue stops others, but other steps proceed)
+# Transactional releases could also be possible, but perhaps it is enough to save what has been done and start next time from that point on
 
 # TODO: check if remote was not modified when updating?
+
+# TODO: attribute override error without stacktrace and print at the end (or do not stop the rest at least)
 
 # check if queue has its WS being deployed or it is a queue with an existing target_id
 
@@ -161,4 +204,6 @@ async def deploy_release_file(
 
 # TODO: make purge work with deploy files as well
 
-# TODO: download changes into proper dir (based on the deploy file)
+# TODO: download changes into proper dir (based on the deploy file) (once pull is updated)
+
+# TODO: prod to UAT deploy and reverse the deploy file

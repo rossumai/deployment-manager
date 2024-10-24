@@ -20,13 +20,20 @@ class WorkspaceRelease(ObjectRelease):
     target_org_url: str = None
 
     async def initialize(
-        self, yaml, client, target_org_url, source_dir_path, plan_only
+        self,
+        yaml,
+        client,
+        target_org_url,
+        source_dir_path,
+        plan_only,
+        is_same_org_deploy,
     ):
         await super().initialize(
             yaml=yaml,
             client=client,
             source_dir_path=source_dir_path,
             plan_only=plan_only,
+            is_same_org_deploy=is_same_org_deploy,
         )
         self.target_org_url = target_org_url
 
