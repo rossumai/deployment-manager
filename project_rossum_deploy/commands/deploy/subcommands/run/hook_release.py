@@ -1,6 +1,7 @@
 import questionary
 from rossum_api import ElisAPIClient
 from project_rossum_deploy.commands.deploy.subcommands.run.attribute_override import (
+    AttributeOverrideException,
     override_attributes_v2,
 )
 from rich import print as pprint
@@ -85,6 +86,11 @@ class HookRelease(ObjectRelease):
                 target.id = result.get("id", None)
                 target.data = result
                 self.yaml_reference["targets"][index]["id"] = target.id
+        except AttributeOverrideException as e:
+            display_error(
+                f"Error while migrating {self.display_type} {self.display_label}: {e}",
+            )
+            self.deploy_failed = True
         except Exception as e:
             display_error(
                 f"Error while migrating {self.display_type} {self.name} ({self.id}) ^",

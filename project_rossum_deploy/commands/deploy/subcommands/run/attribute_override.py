@@ -7,6 +7,9 @@ from project_rossum_deploy.utils.functions import (
 )
 
 
+class AttributeOverrideException(Exception): ...
+
+
 def create_regex_override_syntax(source: str, target: str):
     return f"{source}{settings.DEPLOY_OVERRIDE_REGEX_SEPARATOR}{target}"
 
@@ -62,8 +65,8 @@ def parse_parent_and_key(key_query: str):
     try:
         parent, key = ".".join(key_query.split(".")[:-1]), key_query.split(".")[-1]
     except Exception:
-        raise Exception(
-            f'Invalid query "{key_query}" - the last part must be a single object key.'
+        raise AttributeOverrideException(
+            f'Invalid attribute override query "{key_query}" - the last part must be a single object key.'
         )
     return parent, key
 
@@ -80,6 +83,8 @@ def perform_search(parent: str, object: dict):
         search = [search]
 
     if not len(search) or not search[0]:
-        raise Exception(f'Query "{parent}" returned no result.')
+        raise AttributeOverrideException(
+            f'JMESPath query "{parent}" returned no result.'
+        )
 
     return search

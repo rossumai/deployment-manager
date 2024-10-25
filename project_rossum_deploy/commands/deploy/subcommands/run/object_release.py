@@ -1,12 +1,11 @@
 from copy import deepcopy
 import subprocess
 import tempfile
-from typing import Annotated
+from typing import Annotated, Any
 from project_rossum_deploy.commands.deploy.subcommands.run.helpers import DeployYaml
 from project_rossum_deploy.common.read_write import read_json
 from rich import print as pprint
 import json
-import re
 from rich.panel import Panel
 
 
@@ -15,7 +14,7 @@ from pydantic import AliasChoices, BaseModel, BeforeValidator, Field
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
-from project_rossum_deploy.utils.consts import display_error
+from project_rossum_deploy.utils.consts import display_error, display_warning
 from project_rossum_deploy.utils.functions import templatize_name_id
 
 
@@ -109,6 +108,10 @@ class ObjectRelease(BaseModel):
     def display_type(self):
         # Remove the plural 's'
         return f"[yellow]{self.type.value[:-2 if self.type in [Resource.Inbox] else -1]}[/yellow]"
+
+    @property
+    def display_label(self):
+        return f'"[green]{self.name}[/green] ([purple]{self.id}[/purple])"'
 
     @property
     def is_creating_targets(self):
@@ -317,47 +320,127 @@ class ObjectRelease(BaseModel):
             if key not in target.data:
                 continue
 
-            stringified_dict = json.dumps(target.data[key])
-            for source_id, targets in lookup_table.items():
-                source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
-                # This ID from source was not found in the subobject
-                if not re.search(source_id_regex, stringified_dict):
-                    continue
+            for parent, key_in_parent, value in ObjectRelease.traverse_object(
+                target.data, key, target.data[key]
+            ):
+                for source_id, targets in lookup_table.items():
+                    # source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
+                    # if not re.search(source_id_regex, str(value)):
+                    # continue
+                    if str(source_id) not in str(value):
+                        continue
 
-                basic_error_message = f"Could not override source_id '{source_id}' to its target equivalent in {self.type.value} '{target.id}'."
-                if not targets:
-                    pprint(
-                        Panel(
-                            f"{basic_error_message} No target IDs found.",
-                            style="yellow",
-                        ),
-                    )
-                    continue
-                # Using lambdas for sub() because of quotes inside strings
-                # N:N objects -> objects are referenced in pairs
-                elif num_targets == len(targets):
-                    stringified_dict = re.sub(
-                        source_id_regex,
-                        lambda m: str(targets[target_object_index]["id"])
-                        if m[0] == str(source_id)
-                        else m[0],
-                        stringified_dict,
-                    )
-                # N:1 objects -> everything should be mapped to the first target ID
-                else:
-                    stringified_dict = re.sub(
-                        source_id_regex,
-                        lambda m: str(target[0]["id"])
-                        if m[0] == str(source_id)
-                        else m[0],
-                        stringified_dict,
-                    )
-                    if len(target) != 1:
-                        pprint(
-                            Panel(
-                                f"For overriding source_id '{source_id}' in {self.type.value} '{target.id}', There are multiple target IDs that could be assigned. The first one was used.",
-                                style="yellow",
-                            ),
+                    if not targets:
+                        display_warning(
+                            f'Could not override source_id "{source_id}" to its target equivalent in {self.type.value} "{target.id}". No target IDs found.',
+                        )
+                        self.remove_id_from_boject(
+                            object=parent, key=key_in_parent, value=value
+                        )
+                        continue
+                    # N:N objects -> objects are referenced in pairs
+                    elif num_targets == len(targets):
+                        target_id = targets[target_object_index]["id"]
+                        self.replace_id_in_object(
+                            object=parent,
+                            key=key_in_parent,
+                            value=value,
+                            source_id=source_id,
+                            target_id=target_id,
+                        )
+                    # N:1 objects -> everything should be mapped to the first target ID
+                    else:
+                        target_id = targets[0]["id"]
+                        self.replace_id_in_object(
+                            object=parent,
+                            key=key_in_parent,
+                            value=value,
+                            source_id=source_id,
+                            target_id=target_id,
                         )
 
-                target.data[key] = json.loads(stringified_dict)
+                        if len(targets) != 1:
+                            display_warning(
+                                f"For overriding source_id '{source_id}' in {self.type.value} '{target.id}', There are multiple target IDs that could be assigned. The first one was used.",
+                            )
+
+            # stringified_dict = json.dumps(target.data[key])
+            # for source_id, targets in lookup_table.items():
+            #     source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
+            #     # This ID from source was not found in the subobject
+            #     if not re.search(source_id_regex, stringified_dict):
+            #         continue
+
+            #     if not targets:
+            #         display_warning(
+            #             f'Could not override source_id "{source_id}" to its target equivalent in {self.type.value} "{target.id}". No target IDs found.',
+            #         )
+            #         continue
+            #     # N:N objects -> objects are referenced in pairs
+            #     elif num_targets == len(targets):
+            #         target_id = targets[target_object_index]["id"]
+            #         stringified_dict = self.replace_id_in_stringified_object(
+            #             object_str=stringified_dict,
+            #             regex=source_id_regex,
+            #             source_id=source_id,
+            #             target_id=target_id,
+            #         )
+            #     # N:1 objects -> everything should be mapped to the first target ID
+            #     else:
+            #         target_id = targets[0]["id"]
+            #         stringified_dict = self.replace_id_in_stringified_object(
+            #             object_str=stringified_dict,
+            #             regex=source_id_regex,
+            #             source_id=source_id,
+            #             target_id=target_id,
+            #         )
+
+            #         if len(targets) != 1:
+            #             display_warning(
+            #                 f"For overriding source_id '{source_id}' in {self.type.value} '{target.id}', There are multiple target IDs that could be assigned. The first one was used.",
+            #             )
+
+            #     target.data[key] = json.loads(stringified_dict)
+
+    def replace_id_in_object(
+        self, object: dict, key: str, value: str | int, source_id: int, target_id: int
+    ):
+        if isinstance(object[key], list):
+            value_index = object[key].index(value)
+            if value_index > -1:
+                new_value = str(value).replace(str(source_id), str(target_id))
+                # Convert value back to int if applicable
+                if isinstance(value, int):
+                    new_value = int(new_value)
+                object[key][value_index] = new_value
+        else:
+            new_value = str(value).replace(str(source_id), str(target_id))
+            # Convert value back to int if applicable
+            if isinstance(value, int):
+                new_value = int(new_value)
+            object[key] = new_value
+        # Using lambdas for sub() because of quotes inside strings
+        # return re.sub(
+        #     regex,
+        #     lambda m: str(target_id) if m[0] == str(source_id) else m[0],
+        #     object_str,
+        # )
+
+    def remove_id_from_boject(self, object: dict, key: str, value: str | int):
+        if isinstance(object[key], list):
+            value_index = object[key].index(value)
+            if value_index > -1:
+                del object[key][value_index]
+        else:
+            del object[key]
+
+    @staticmethod
+    def traverse_object(parent_object: dict | None, parent_key: str, value: Any):
+        if isinstance(value, list):
+            for i in value:
+                yield from ObjectRelease.traverse_object(parent_object, parent_key, i)
+        elif isinstance(value, dict):
+            for k, v in value.items():
+                yield from ObjectRelease.traverse_object(value, k, v)
+        elif isinstance(value, str) or isinstance(value, int):
+            yield parent_object, parent_key, value

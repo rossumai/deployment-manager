@@ -128,6 +128,9 @@ async def deploy_release_file(
     except Exception as e:
         display_error(f"Planning failed: {e}")
         return
+    except Exception as e:
+        display_error(f"Planning failed: {e}", e)
+        return
 
     if not (
         await questionary.confirm(
@@ -186,23 +189,19 @@ async def deploy_release_file(
 
 # TODO: more granular error handling for hook dep graph and implicit attribute override
 
-# TODO: better message including the name of the object Could not override source_id...
-# TODO: remove the ID if it was not found (don't keep source queue ID in hook for instance)
-
 # TODO: diff could show ID and (name)
 
-# TODO: error handling for objects: pause execution? Continue with other objects? (currently 1 failed queue stops others, but other steps proceed)
-# Transactional releases could also be possible, but perhaps it is enough to save what has been done and start next time from that point on
 
 # TODO: check if remote was not modified when updating?
 
-# TODO: attribute override error without stacktrace and print at the end (or do not stop the rest at least)
 
 # check if queue has its WS being deployed or it is a queue with an existing target_id
 
 # TODO: log all messages to stdout and into a separate file as well
 
 # TODO: make purge work with deploy files as well
+# Just specify the deploy file. It will look at the target URL/dir
+# If the dir was found locally, the files will be deleted as well
 
 # TODO: download changes into proper dir (based on the deploy file) (once pull is updated)
 

@@ -37,6 +37,9 @@ from rossum_api.models.user import User
 from rossum_api.models.group import Group
 
 
+class DeployException(Exception): ...
+
+
 # TODO: rename
 class ReleaseFile(BaseModel):
     class Config:
@@ -114,8 +117,7 @@ class ReleaseFile(BaseModel):
 
         if self.patch_target_org and self.source_org.id != self.target_org.id:
             await organization_release.deploy()
-            if organization_release.deploy_failed:
-                raise Exception(f"Deploy of {organization_release.type} failed")
+            self.detect_exceptions([organization_release])
 
     async def deploy_schemas(self):
         await asyncio.gather(
@@ -134,9 +136,7 @@ class ReleaseFile(BaseModel):
         await asyncio.gather(
             *[schema_release.deploy() for schema_release in self.schemas]
         )
-        for release in self.schemas:
-            if release.deploy_failed:
-                raise Exception(f"Deploy of {release.type} failed")
+        self.detect_exceptions(self.schemas)
         self.schema_targets = self.gather_targets(self.schemas)
 
     async def deploy_hooks(self):
@@ -167,10 +167,7 @@ class ReleaseFile(BaseModel):
             await asyncio.gather(
                 *[hook_release.deploy() for hook_release in self.hooks]
             )
-
-        for release in self.hooks:
-            if release.deploy_failed:
-                raise Exception(f"Deploy of {release.type} failed")
+        self.detect_exceptions(self.hooks)
         self.hook_targets = self.gather_targets(self.hooks)
 
     async def deploy_workspaces(self):
@@ -191,10 +188,7 @@ class ReleaseFile(BaseModel):
         await asyncio.gather(
             *[workspace_release.deploy() for workspace_release in self.workspaces]
         )
-
-        for release in self.workspaces:
-            if release.deploy_failed:
-                raise Exception(f"Deploy of {release.type} failed")
+        self.detect_exceptions(self.workspaces)
         self.workspace_targets = self.gather_targets(self.workspaces)
 
     async def deploy_queues(self):
@@ -215,10 +209,7 @@ class ReleaseFile(BaseModel):
         )
 
         await asyncio.gather(*[queue_release.deploy() for queue_release in self.queues])
-
-        for release in self.queues:
-            if release.deploy_failed:
-                raise Exception(f"Deploy of {release.type} failed")
+        self.detect_exceptions(self.queues)
         self.queue_targets = self.gather_targets(self.queues)
 
     async def ensure_token_owner(self):
@@ -251,6 +242,13 @@ class ReleaseFile(BaseModel):
             if user_role_url in admin_urls:
                 return True
         return False
+
+    def detect_exceptions(self, releases: list[ObjectRelease]):
+        for release in releases:
+            if release.deploy_failed:
+                raise DeployException(
+                    f"Deploy of {release.display_type} {release.display_label} failed, see error details above."
+                )
 
     async def migrate_hook_dependency_graph(self):
         pprint(Panel("Updating hook dependency graph..."))
