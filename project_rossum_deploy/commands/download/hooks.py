@@ -5,7 +5,6 @@ from rossum_api.api_client import Resource
 
 from project_rossum_deploy.commands.download.helpers import (
     create_custom_hook_code_path,
-    determine_object_destination,
     should_write_object,
 )
 
@@ -20,8 +19,6 @@ async def download_hooks(
     org_path: Path,
     mapping: dict = {},
     destination: str = "",
-    sources: dict = {},
-    targets: dict = {},
     changed_files: list = [],
     download_all: bool = False,
 ):
@@ -39,21 +36,9 @@ async def download_hooks(
     )
 
     for hook in full_hooks:
-        destination_local = (
-            destination
-            if destination
-            else await determine_object_destination(
-                object=hook,
-                object_type="hook",
-                org_path=org_path,
-                mapping=mapping,
-                sources=sources,
-                targets=targets,
-            )
-        )
         hook_config_path = (
             org_path
-            / destination_local
+            / destination
             / "hooks"
             / f"{templatize_name_id(hook['name'], hook['id'])}.json"
         )
@@ -74,6 +59,6 @@ async def download_hooks(
                     custom_hook_code_path, hook.get("config", {}).get("code", None)
                 )
 
-        hooks.append((destination_local, hook))
+        hooks.append((destination, hook))
 
     return hooks

@@ -7,7 +7,6 @@ from project_rossum_deploy.commands.download.email_templates import (
     download_email_templates_for_queue,
 )
 from project_rossum_deploy.commands.download.helpers import (
-    determine_object_destination,
     should_write_object,
 )
 
@@ -18,73 +17,39 @@ from project_rossum_deploy.utils.functions import (
 )
 
 
-async def download_workspaces(
-    client: ElisAPIClient,
-    org_path: Path,
-    mapping: dict = {},
-    destination: str = "",
-    sources: dict = {},
-    targets: dict = {},
-    changed_files: list = [],
-    download_all: bool = False,
-):
-    workspaces = []
+# async def save_downloaded_objects(self, objects: list[dict]):
+#      # TODO: unknown destination and regex
 
-    paginated_workspaces = [
-        workspace async for workspace in client.list_all_workspaces()
-    ]
+#      for workspace in objects:
+#          workspace_config_path = (
+#              org_path
+#              / destination
+#              / "workspaces"
+#              / templatize_name_id(workspace["name"], workspace["id"])
+#              / "workspace.json"
+#          )
 
-    # Refetch in case the paginated fields don't include everything
-    # Use raw dicts and not dataclasses in case of fields not defined in the Rossum API lib
-    full_workspaces = await asyncio.gather(
-        *[
-            client._http_client.fetch_one(Resource.Workspace, ws.id)
-            for ws in paginated_workspaces
-        ]
-    )
+#          if self.download_all or await should_write_object(
+#              workspace_config_path, workspace, self.changed_files
+#          ):
+#              await write_json(
+#                  workspace_config_path,
+#                  workspace,
+#                  Resource.Workspace,
+#                  log_message=f"Pulled {workspace_config_path}",
+#              )
 
-    for workspace in full_workspaces:
-        destination_local = (
-            destination
-            if destination
-            else await determine_object_destination(
-                object=workspace,
-                object_type="workspace",
-                org_path=org_path,
-                mapping=mapping,
-                sources=sources,
-                targets=targets,
-            )
-        )
+#          workspace["queues"] = await download_queues_for_workspace(
+#              client=client,
+#              parent_dir=workspace_config_path.parent,
+#              workspace_id=workspace["id"],
+#              changed_files=changed_files,
+#              download_all=download_all,
+#          )
+#          # TODO: return just the second value
+#          workspaces.append((destination, workspace))
 
-        workspace_config_path = (
-            org_path
-            / destination_local
-            / "workspaces"
-            / templatize_name_id(workspace["name"], workspace["id"])
-            / "workspace.json"
-        )
-
-        if download_all or await should_write_object(
-            workspace_config_path, workspace, changed_files
-        ):
-            await write_json(
-                workspace_config_path,
-                workspace,
-                Resource.Workspace,
-                log_message=f"Pulled {workspace_config_path}",
-            )
-
-        workspace["queues"] = await download_queues_for_workspace(
-            client=client,
-            parent_dir=workspace_config_path.parent,
-            workspace_id=workspace["id"],
-            changed_files=changed_files,
-            download_all=download_all,
-        )
-        workspaces.append((destination_local, workspace))
-
-    return workspaces
+#      return workspaces
 
 
 async def download_queues_for_workspace(

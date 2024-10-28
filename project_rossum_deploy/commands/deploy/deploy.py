@@ -43,7 +43,7 @@ async def init_deploy_template_wrapper():
     "--deploy-file",
     "-f",
     help="Previous deploy file to speed up deploy file creation",
-    type=click.Path(path_type=Path),
+    type=click.Path(path_type=Path, exists=True),
 )
 @click.option(
     "--interactive",
@@ -66,7 +66,7 @@ Applies selected changes onto other objects based on the provided deploy.yaml fi
 If these objects don't exist, they get created.
                """,
 )
-@click.argument("deploy_file", type=click.Path(path_type=Path))
+@click.argument("deploy_file", type=click.Path(path_type=Path, exists=True))
 # @click.option(
 #     "--force",
 #     "-f",

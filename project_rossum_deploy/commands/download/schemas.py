@@ -5,7 +5,6 @@ from rossum_api.api_client import Resource
 
 from project_rossum_deploy.commands.download.helpers import (
     create_formula_directory_path,
-    determine_object_destination,
     should_write_object,
 )
 
@@ -24,8 +23,6 @@ async def download_schemas(
     org_path: Path,
     mapping: dict = {},
     destination: str = "",
-    sources: dict = {},
-    targets: dict = {},
     changed_files: list = [],
     download_all: bool = False,
 ):
@@ -43,21 +40,9 @@ async def download_schemas(
     )
 
     for schema in full_schemas:
-        destination_local = (
-            destination
-            if destination
-            else await determine_object_destination(
-                object=schema,
-                object_type="schema",
-                org_path=org_path,
-                mapping=mapping,
-                sources=sources,
-                targets=targets,
-            )
-        )
         schema_config_path = (
             org_path
-            / destination_local
+            / destination
             / "schemas"
             / f"{templatize_name_id(schema['name'], schema['id'])}.json"
         )
@@ -82,6 +67,6 @@ async def download_schemas(
                         formula_directory_path / f"{field_id}.py", code
                     )
 
-        schemas.append((destination_local, schema))
+        schemas.append((destination, schema))
 
     return schemas

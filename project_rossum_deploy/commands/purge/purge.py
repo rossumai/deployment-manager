@@ -6,7 +6,7 @@ from rich.prompt import Confirm
 import click
 from rossum_api import ElisAPIClient
 
-from project_rossum_deploy.commands.download.download import download_project
+# from project_rossum_deploy.commands.download.download import download_project
 from project_rossum_deploy.commands.migrate_mapping import migrate_mapping
 from project_rossum_deploy.commands.purge.delete_objects import (
     delete_all_objects_with_ids,
@@ -59,11 +59,11 @@ async def purge_project(
         else:
             await purge_destination(destination=destination)
 
-        await download_project(
-            destination=destination
-            if destination != settings.UNUSED_SCHEMAS
-            else settings.BOTH_DESTINATIONS,
-        )
+        # await download_project(
+        #     destination=destination
+        #     if destination != settings.UNUSED_SCHEMAS
+        #     else settings.BOTH_DESTINATIONS,
+        # )
 
         print(
             Panel(

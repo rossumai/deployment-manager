@@ -7,7 +7,7 @@ from rich.progress import Progress
 import click
 from rossum_api import ElisAPIClient
 
-from project_rossum_deploy.commands.download.download import download_project
+# from project_rossum_deploy.commands.download.download import download_project
 from project_rossum_deploy.commands.upload.dependencies import (
     evaluate_create_dependencies,
     merge_formula_changes,
@@ -186,7 +186,7 @@ async def upload_project(
             )
             return
         else:
-            await download_project(destination=destination, client=client)
+            # await download_project(destination=destination, client=client)
             if commit:
                 subprocess.run(["git", "add", "."])
                 subprocess.run(["git", "commit", "-m", commit_message])

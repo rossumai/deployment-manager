@@ -18,7 +18,7 @@ Also initializes it as a git repository.
 The user is then expected to provide .env credentials and download Rossum objects.
                """,
 )
-@click.argument("name", default=".", type=click.Path(path_type=Path))
+@click.argument("name", default=".", type=click.Path(path_type=Path, exists=False))
 def init_project(name: Path):
     if not os.path.exists(name) and name != ".":
         os.mkdir(name)

@@ -4,9 +4,6 @@ from rich import print
 from rich.panel import Panel
 import click
 from rossum_api import ElisAPIClient
-from project_rossum_deploy.commands.download.download import (
-    download_project,
-)
 from project_rossum_deploy.commands.migrate.checks import (
     check_ids_exclusively_source_or_target,
 )
@@ -271,13 +268,13 @@ async def migrate_project(
             )
             return
         else:
-            await download_project(
-                destination=settings.TARGET_DIRNAME,
-                client=client,
-                org_path=org_path,
-                commit=commit,
-                commit_message=commit_message,
-            )
+            # await download_project(
+            #     destination=settings.TARGET_DIRNAME,
+            #     client=client,
+            #     org_path=org_path,
+            #     commit=commit,
+            #     commit_message=commit_message,
+            # )
 
             hints = """
             ! attention !

@@ -7,6 +7,7 @@ from rossum_api import APIClientError, ElisAPIClient
 
 from project_rossum_deploy.commands.deploy.common.helpers import get_filename_from_user
 from project_rossum_deploy.commands.deploy.subcommands.run.release_file import (
+    DeployException,
     ReleaseFile,
 )
 from project_rossum_deploy.commands.deploy.subcommands.run.helpers import (
@@ -125,7 +126,7 @@ async def deploy_release_file(
         await planned_release.deploy_queues()
 
         await planned_release.apply_implicit_id_override()
-    except Exception as e:
+    except DeployException as e:
         display_error(f"Planning failed: {e}")
         return
     except Exception as e:
@@ -204,5 +205,11 @@ async def deploy_release_file(
 # If the dir was found locally, the files will be deleted as well
 
 # TODO: download changes into proper dir (based on the deploy file) (once pull is updated)
+# TODO: if the objects existed in some other dir, remove it from there (the pull command will not be built for that anymore)
 
 # TODO: prod to UAT deploy and reverse the deploy file
+
+
+# TODO: if there is not target dir, ask the user for a name. Then offer to download all new objects into that dir
+
+# TODO: support for secrets
