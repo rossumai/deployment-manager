@@ -1,12 +1,13 @@
 import os
 from pathlib import Path
-import shutil
 import subprocess
+import questionary
 from rich import print
 from rich.panel import Panel
 
 import click
 
+from project_rossum_deploy.commands.deploy.subcommands.run.helpers import DeployYaml
 from project_rossum_deploy.utils.consts import settings
 
 
@@ -15,7 +16,6 @@ from project_rossum_deploy.utils.consts import settings
     help="""
 Creates a new project directory with the specified name with basic files.
 Also initializes it as a git repository.
-The user is then expected to provide .env credentials and download Rossum objects.
                """,
 )
 @click.argument("name", default=".", type=click.Path(path_type=Path, exists=False))
@@ -38,24 +38,46 @@ def init_project(name: Path):
             if ignore_line not in git_ignore_contents:
                 wf.write(ignore_line)
 
-    credentials_path = name / "credentials.template.json"
-    copy_dummy_credentials_file(credentials_path)
-
     config_path = name / "prd_config.yaml"
-    copy_dummy_config_file(config_path)
+    if config_path.exists():
+        previous_config = config_path.read_text()
+    else:
+        previous_config = "{}"
+    config = DeployYaml(previous_config)
+    credentials = {}
+
+    while questionary.confirm(
+        "Would you like to specify a(nother) org-level directory?"
+    ).ask():
+        org_dir_name = questionary.text("org-level directory name:").ask()
+        org_id = questionary.text("ORG ID:").ask()
+        api_base_url = questionary.text(
+            f"Base API URL: (e.g., {settings.DEPLOY_DEFAULT_TARGET_URL})"
+        ).ask()
+        token = questionary.text("API token:").ask()
+        config.data[org_dir_name] = {
+            settings.DOWNLOAD_KEY_ORG_ID: org_id,
+            settings.CONFIG_KEY_API_BASE_URL: api_base_url,
+            "subdirectories": {},
+        }
+        credentials[org_dir_name] = token
+        while questionary.confirm(
+            f"Would you like to specify a(nother) subdirectory inside {org_dir_name}?"
+        ).ask():
+            subdir_name = questionary.text("subdir name:").ask()
+            subdir_regex = questionary.text("subdir regex:").ask()
+            config.data[org_dir_name]["subdirectories"][subdir_name] = {
+                settings.DOWNLOAD_KEY_REGEX: subdir_regex
+            }
+
+    config.save_to_file(config_path)
+
+    for org_dir, token in credentials.items():
+        os.mkdir(name / org_dir)
+        credentials_yaml = DeployYaml("{}")
+        credentials_yaml.data = {settings.CONFIG_KEY_TOKEN: token}
+        credentials_yaml.save_to_file(
+            name / org_dir / settings.CREDENTIALS_YAML_FILENAME
+        )
 
     print(Panel(f'Initialized a new PRD directory in "{name}" .'))
-
-
-def copy_dummy_credentials_file(destination: Path):
-    if not os.path.exists(destination):
-        example_credentials_path = (
-            Path(__file__).parent.parent / "dummy_credentials.json"
-        )
-        shutil.copyfile(example_credentials_path, destination)
-
-
-def copy_dummy_config_file(destination: Path):
-    if not os.path.exists(destination):
-        example_config_path = Path(__file__).parent.parent / "dummy_config.yaml"
-        shutil.copyfile(example_config_path, destination)

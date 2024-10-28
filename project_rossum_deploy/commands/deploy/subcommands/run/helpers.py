@@ -32,7 +32,7 @@ class DeployYaml:
                 return object
         return None
 
-    def save_to_file(self, file_path: str):
+    def save_to_file(self, file_path: str | Path):
         with open(file_path, "wb") as wf:
             self._yaml.dump(self.data, wf)
 

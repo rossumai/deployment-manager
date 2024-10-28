@@ -146,6 +146,7 @@ class Settings:
     MAPPING_FILENAME: str = "mapping.yaml"
     CONFIG_FILENAME: str = "prd_config.yaml"
     CREDENTIALS_FILENAME: str = "credentials.json"
+    CREDENTIALS_YAML_FILENAME: str = "credentials.yaml"
     MAPPING_KEYS_ORDER: list = ["comment", "id", "name", "ignore", "targets"]
 
     TARGET_API_BASE: str = ""
@@ -187,6 +188,10 @@ class Settings:
 
     CONFIG_KEY_API_BASE_URL = "api_base_url"
     CONFIG_KEY_TOKEN = "token"
+
+    # Pull consts
+    DOWNLOAD_KEY_ORG_ID = "org_id"
+    DOWNLOAD_KEY_REGEX = "regex"
 
     # Deploy consts
     DEPLOY_IGNORED_DIRS = [".git"]

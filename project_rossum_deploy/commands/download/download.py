@@ -14,33 +14,11 @@ from project_rossum_deploy.utils.functions import (
 
 # TODO: update purge and push commands
 
-# TODO: pull for any number of dirs with any name
-# With different orgs, this is already working, only mapping.yaml should be simplified (no need for RHS)
-# For same-org source and targets created via release, you could keep them in a single dir too
-# For deploying, you have a deploy file with the pairs specified, for pushing you would push only what changed, the same for pulling
-# TODO: one config file including object IDs (instead of mapping)
-# TODO: one credentials file (optional)
-
-# TODO: root project config file specifying folders
-# Each folder has a URL specified + the org ID
-# In the folder, there are credentials (this differentiates different orgs)
-# ??? In case of the same org, it will be enough to have credentials in the default folder
-# Each folder can have multiple regexes, one folder is default
-# Based on this, objects are sorted into this or that folder
-# ?? How to recognize if the org has all objects or just some (based on the regex naively?)
-# TODO: check org ID unique for each main directory
-# TODO: optional subdirectories (sandbox/uat, sandbox/dev)
 
 # TODO: migration of mapping into deploy file and config file
 # Cross-org will create 2 directories (named after orgs)
 # Same org will have 1 directory merged together
 # Do not delete any folders automatically though
-
-# TODO: handling of just root dir destination specification (sandbox/ -> sandbox/uat and sandbox/dev)
-
-# TODO: init command will create basic directory structure based on a few questions
-
-# TODO: allow a non-existent path: create it and let user input credentials
 
 
 @click.command(
