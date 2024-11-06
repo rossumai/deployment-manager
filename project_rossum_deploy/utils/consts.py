@@ -186,8 +186,10 @@ class Settings:
     DIR_CONFIG_FILENAME = "config"
     DIR_CREDENTIALS_FILENAME = "credentials"
 
-    CONFIG_KEY_API_BASE_URL = "api_base_url"
+    CONFIG_KEY_API_BASE_URL = "api_base"
     CONFIG_KEY_TOKEN = "token"
+    CONFIG_KEY_DIRECTORIES = "directories"
+    CONFIG_KEY_SUBDIRECTORIES = "subdirectories"
 
     # Pull consts
     DOWNLOAD_KEY_ORG_ID = "org_id"

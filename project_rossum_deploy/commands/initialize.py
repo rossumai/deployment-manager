@@ -44,6 +44,9 @@ def init_project(name: Path):
     else:
         previous_config = "{}"
     config = DeployYaml(previous_config)
+    if settings.CONFIG_KEY_DIRECTORIES not in config.data:
+        config.data[settings.CONFIG_KEY_DIRECTORIES] = {}
+    directories = config.data[settings.CONFIG_KEY_DIRECTORIES]
     credentials = {}
 
     while questionary.confirm(
@@ -55,10 +58,10 @@ def init_project(name: Path):
             f"Base API URL: (e.g., {settings.DEPLOY_DEFAULT_TARGET_URL})"
         ).ask()
         token = questionary.text("API token:").ask()
-        config.data[org_dir_name] = {
+        directories[org_dir_name] = {
             settings.DOWNLOAD_KEY_ORG_ID: org_id,
             settings.CONFIG_KEY_API_BASE_URL: api_base_url,
-            "subdirectories": {},
+            settings.CONFIG_KEY_SUBDIRECTORIES: {},
         }
         credentials[org_dir_name] = token
         while questionary.confirm(
@@ -66,14 +69,18 @@ def init_project(name: Path):
         ).ask():
             subdir_name = questionary.text("subdir name:").ask()
             subdir_regex = questionary.text("subdir regex:").ask()
-            config.data[org_dir_name]["subdirectories"][subdir_name] = {
-                settings.DOWNLOAD_KEY_REGEX: subdir_regex
-            }
+            directories[org_dir_name][settings.CONFIG_KEY_SUBDIRECTORIES][
+                subdir_name
+            ] = {settings.DOWNLOAD_KEY_REGEX: subdir_regex}
 
     config.save_to_file(config_path)
 
-    for org_dir, token in credentials.items():
+    for org_dir in directories.keys():
         os.mkdir(name / org_dir)
+        for subdir in directories[org_dir][settings.CONFIG_KEY_SUBDIRECTORIES].keys():
+            os.mkdir(name / org_dir / subdir)
+
+    for org_dir, token in credentials.items():
         credentials_yaml = DeployYaml("{}")
         credentials_yaml.data = {settings.CONFIG_KEY_TOKEN: token}
         credentials_yaml.save_to_file(

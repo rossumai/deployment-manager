@@ -14,6 +14,7 @@ from project_rossum_deploy.utils.functions import (
 
 # TODO: update purge and push commands
 
+# TODO: fix foreign JSONs in the subdir (mongo.json...)
 
 # TODO: migration of mapping into deploy file and config file
 # Cross-org will create 2 directories (named after orgs)
