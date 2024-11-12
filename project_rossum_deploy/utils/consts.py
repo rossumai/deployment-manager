@@ -200,6 +200,7 @@ class Settings:
     DEPLOY_OVERRIDE_REGEX_SEPARATOR = "/#/"
     DEPLOY_DEFAULT_TARGET_URL = "https://my-org.rossum.app/api/v1"
     DEFAULT_DEPLOY_FILENAME = "prd_deploy.yaml"
+    DEPLOY_KEY_TARGET = "target"
     DEPLOY_KEY_TARGETS = "targets"
     DEPLOY_KEY_OVERRIDES = "attribute_override"
     DEPLOY_KEY_DEPLOYED_ORG_ID = "deployed_org_id"
@@ -218,7 +219,7 @@ class Settings:
         Resource.Hook: ["status"],
     }
 
-    FORMULA_DIR_PREFIX: str = "formulas:"
+    FORMULA_DIR_NAME: str = "formulas"
 
     @property
     def SOURCE_API_URL(self):

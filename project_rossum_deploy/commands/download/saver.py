@@ -13,6 +13,7 @@ from project_rossum_deploy.common.read_write import (
     write_json,
     write_str,
 )
+from project_rossum_deploy.utils.consts import display_warning
 from project_rossum_deploy.utils.functions import (
     templatize_name_id,
 )
@@ -51,6 +52,9 @@ class Saver(BaseModel):
                 continue
             await self.save_downloaded_object(object, subdir)
 
+        await self.handle_objects_without_subdir()
+
+    async def handle_objects_without_subdir(self):
         if self.objects_without_subdir:
             object_name_ids = [
                 templatize_name_id(object["name"], object["id"])
@@ -177,24 +181,33 @@ class InboxSaver(QueueSaver):
         if subdir:
             return subdir
 
-        queue = self.find_queue_for_inbox(object)
+        queue = self.find_queue(object)
         if queue:
             # If you know the parent's subdir, you can use its subdir
             return super().find_subdir_of_object(queue)
 
         return None
 
+    def find_queue(self, inbox: dict):
+        for queue in self.queues:
+            if queue["url"] == inbox.get("queues", [None])[0]:
+                return queue
+        return None
+
     async def save_downloaded_object(self, inbox: dict, subdir: Subdirectory):
         if not inbox.get("queues", []):
             return
 
-        queue_for_inbox = self.find_queue_for_inbox(inbox)
+        queue_for_inbox = self.find_queue(inbox)
         if not queue_for_inbox:
-            raise Exception(f'Could not find queue for inbox {inbox['name']}.')
+            display_warning(
+                f'Could not find queue for {self.display_type} {inbox['name']} ({inbox['id']}). The object will not be saved locally.'
+            )
+            return
         workspace_for_queue = self.find_workspace_for_queue(queue_for_inbox)
         if not workspace_for_queue:
             raise Exception(
-                f'Could not find workspace for queue {queue_for_inbox['name']}.'
+                f'Could not find workspace for queue {queue_for_inbox['name']} ({queue_for_inbox['id']}).'
             )
 
         object_path = (
@@ -217,22 +230,66 @@ class InboxSaver(QueueSaver):
                 log_message=f"Pulled {self.display_type} {object_path}",
             )
 
-    def find_queue_for_inbox(self, inbox: dict):
+
+class SchemaSaver(QueueSaver):
+    type: Resource = Resource.Schema
+    queues: list[dict]
+
+    async def save_downloaded_objects(self):
+        for object in self.objects:
+            subdir = self.find_subdir_of_object(object)
+            if not subdir:
+                self.objects_without_subdir.append(object)
+                continue
+            # The subdir should not be pulled, disregard the current object
+            elif not subdir.download:
+                continue
+            await self.save_downloaded_object(object, subdir)
+
+    def find_subdir_of_object(self, object: dict):
+        subdir = super().find_subdir_of_object(object)
+        if subdir:
+            return subdir
+
+        queue = self.find_queue(object)
+        if queue:
+            # If you know the parent's subdir, you can use its subdir
+            return super().find_subdir_of_object(queue)
+
+        return None
+
+    def find_queue(self, schema: dict):
+        schema_queues = schema.get("queues", [None])
+        # The schema might not have any queues assigned ([])
+        if not schema_queues:
+            return None
+
         for queue in self.queues:
-            if queue["url"] == inbox.get("queues", [None])[0]:
+            if queue["url"] == schema_queues[0]:
                 return queue
         return None
 
-
-class SchemaSaver(Saver):
-    type: Resource = Resource.Schema
-
     async def save_downloaded_object(self, schema: dict, subdir: Subdirectory):
+        queue_for_schema = self.find_queue(schema)
+        if not queue_for_schema:
+            display_warning(
+                f'Could not find queue for {self.display_type} {schema['name']} ({schema['id']}). The object will not be saved locally.'
+            )
+            return
+        workspace_for_queue = self.find_workspace_for_queue(queue_for_schema)
+        if not workspace_for_queue:
+            raise Exception(
+                f'Could not find workspace for queue {queue_for_schema['name']} ({queue_for_schema['id']}).'
+            )
+
         object_path = (
             self.base_path
             / subdir.name
-            / "schemas"
-            / f'{templatize_name_id(schema["name"], schema["id"])}.json'
+            / "workspaces"
+            / templatize_name_id(workspace_for_queue["name"], workspace_for_queue["id"])
+            / "queues"
+            / templatize_name_id(queue_for_schema["name"], queue_for_schema["id"])
+            / "schema.json"
         )
 
         if self.download_all or await should_write_object(
@@ -247,9 +304,7 @@ class SchemaSaver(Saver):
 
             formula_fields = find_formula_fields_in_schema(schema["content"])
             if formula_fields:
-                formula_directory_path = create_formula_directory_path(
-                    object_path, schema.get("name", ""), schema.get("id", "")
-                )
+                formula_directory_path = create_formula_directory_path(object_path)
                 for field_id, code in formula_fields:
                     await create_formula_file(
                         formula_directory_path / f"{field_id}.py", code

@@ -45,7 +45,7 @@ async def merge_formula_changes(changes: list[tuple[str, Path]]):
             formula_name = path.stem
 
             schema_file_name = str(path.parent.stem).removeprefix(
-                settings.FORMULA_DIR_PREFIX
+                settings.FORMULA_DIR_NAME
             )
             schema_path = path.parent.parent / f"{schema_file_name}.json"
             schema = await read_json(schema_path)

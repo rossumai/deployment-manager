@@ -8,9 +8,6 @@ import yaml
 
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.common.determine_path import determine_object_type_from_path
-from project_rossum_deploy.utils.functions import (
-    templatize_name_id,
-)
 
 
 async def write_json(
@@ -88,11 +85,8 @@ def create_custom_hook_code_path(hook_path: Path, hook: object):
     return None
 
 
-def create_formula_directory_path(schema_path: Path, schema_name: str, schema_id: int):
-    return (
-        schema_path.parent
-        / f"{settings.FORMULA_DIR_PREFIX}{templatize_name_id(schema_name, schema_id)}"
-    )
+def create_formula_directory_path(schema_path: Path):
+    return schema_path.parent / f"{settings.FORMULA_DIR_NAME}"
 
 
 async def create_formula_file(path: Path, code: str):

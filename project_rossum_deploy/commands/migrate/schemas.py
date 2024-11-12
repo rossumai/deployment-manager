@@ -139,7 +139,7 @@ async def update_formula_fields_code(schema_path: Path, schema: dict):
     """
     formula_directory = (
         schema_path.parent
-        / f"{settings.FORMULA_DIR_PREFIX}{templatize_name_id(schema['name'], schema['id'])}"
+        / f"{settings.FORMULA_DIR_NAME}{templatize_name_id(schema['name'], schema['id'])}"
     )
     if not await formula_directory.exists():
         return

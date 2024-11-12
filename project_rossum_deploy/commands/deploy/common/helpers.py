@@ -43,7 +43,7 @@ async def get_api_url_from_user(type: str, default: str = ""):
         HttpUrl(api_url)
     except ValidationError:
         display_error(f"Invalid {type} URL provided: {api_url}. Please retry.")
-        return await get_api_url_from_user(default=default)
+        return await get_api_url_from_user(type=type, default=default)
 
     return api_url
 

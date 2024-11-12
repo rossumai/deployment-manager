@@ -70,6 +70,8 @@ class OrganizationDirectory(BaseModel):
         if not self.org_path:
             self.org_path = Path(".")
 
+    # TODO: check token
+
     # TODO: catch errors on org-dir or subdir level?
     async def download_organization(self):
         await self.initialize()
@@ -107,54 +109,59 @@ class OrganizationDirectory(BaseModel):
 
         subdir_list = list(self.subdirectories.values())
 
-        workspace_saver = WorkspaceSaver(
-            base_path=self.org_path / self.name,
-            objects=workspaces_for_mapping,
-            changed_files=self.changed_files,
-            download_all=self.download_all,
-        )
-        workspace_saver.subdirs = subdir_list
-        await workspace_saver.save_downloaded_objects()
+        try:
+            workspace_saver = WorkspaceSaver(
+                base_path=self.org_path / self.name,
+                objects=workspaces_for_mapping,
+                changed_files=self.changed_files,
+                download_all=self.download_all,
+            )
+            workspace_saver.subdirs = subdir_list
+            await workspace_saver.save_downloaded_objects()
 
-        queue_saver = QueueSaver(
-            base_path=self.org_path / self.name,
-            objects=queues_for_mapping,
-            workspaces=workspaces_for_mapping,
-            changed_files=self.changed_files,
-            download_all=self.download_all,
-        )
-        queue_saver.subdirs = subdir_list
-        await queue_saver.save_downloaded_objects()
+            queue_saver = QueueSaver(
+                base_path=self.org_path / self.name,
+                objects=queues_for_mapping,
+                workspaces=workspaces_for_mapping,
+                changed_files=self.changed_files,
+                download_all=self.download_all,
+            )
+            queue_saver.subdirs = subdir_list
+            await queue_saver.save_downloaded_objects()
 
-        # TODO: test inbox without any queue
-        inbox_saver = InboxSaver(
-            base_path=self.org_path / self.name,
-            objects=inboxes_for_mapping,
-            workspaces=workspaces_for_mapping,
-            queues=queues_for_mapping,
-            changed_files=self.changed_files,
-            download_all=self.download_all,
-        )
-        inbox_saver.subdirs = subdir_list
-        await inbox_saver.save_downloaded_objects()
+            # TODO: test inbox without any queue
+            inbox_saver = InboxSaver(
+                base_path=self.org_path / self.name,
+                objects=inboxes_for_mapping,
+                workspaces=workspaces_for_mapping,
+                queues=queues_for_mapping,
+                changed_files=self.changed_files,
+                download_all=self.download_all,
+            )
+            inbox_saver.subdirs = subdir_list
+            await inbox_saver.save_downloaded_objects()
 
-        schema_saver = SchemaSaver(
-            base_path=self.org_path / self.name,
-            objects=schemas_for_mapping,
-            changed_files=self.changed_files,
-            download_all=self.download_all,
-        )
-        schema_saver.subdirs = subdir_list
-        await schema_saver.save_downloaded_objects()
+            schema_saver = SchemaSaver(
+                base_path=self.org_path / self.name,
+                objects=schemas_for_mapping,
+                workspaces=workspaces_for_mapping,
+                queues=queues_for_mapping,
+                changed_files=self.changed_files,
+                download_all=self.download_all,
+            )
+            schema_saver.subdirs = subdir_list
+            await schema_saver.save_downloaded_objects()
 
-        hook_saver = HookSaver(
-            base_path=self.org_path / self.name,
-            objects=hooks_for_mapping,
-            changed_files=self.changed_files,
-            download_all=self.download_all,
-        )
-        hook_saver.subdirs = subdir_list
-        await hook_saver.save_downloaded_objects()
+            hook_saver = HookSaver(
+                base_path=self.org_path / self.name,
+                objects=hooks_for_mapping,
+                changed_files=self.changed_files,
+                download_all=self.download_all,
+            )
+            hook_saver.subdirs = subdir_list
+            await hook_saver.save_downloaded_objects()
+        except Exception as e:
+            display_error("Error while saving objects ^", e)
 
         # 2. Find preexisting objects in download:true subdirs and update them
         # 3. For new objects from remote, apply the subdir regex if it is there.
@@ -194,6 +201,10 @@ class OrganizationDirectory(BaseModel):
             if e.status_code == 404:
                 raise DownloadException(
                     f'Organization with ID "{self.org_id}" not found with the specified token in {self.api_base}. Please make sure you have to correct token and target URL.'
+                )
+            elif e.status_code == 401:
+                raise DownloadException(
+                    f'Invalid token "{self.client._http_client.token}" for organization with ID "{self.org_id}" and URL "{self.api_base}". Please make sure you have to correct token.'
                 )
 
     async def find_object_ids_for_subdirs(self):
@@ -245,12 +256,12 @@ class OrganizationDirectory(BaseModel):
             remote_object.get("name", ""), remote_object.get("id", "")
         )
         cleaned_name, _ = detemplatize_name_id(path_from_remote)
-        # Inboxes are in the queue folder, but can have a different name than their queue
+        # Inboxes and schemas are in the queue folder, but can have a different name than their queue
         # The names are lowercased because some OS's (mainly MacOS) are case-insensitive in their paths
-        if (
-            cleaned_name.casefold() != previous_name.casefold()
-            and object_type != Resource.Inbox
-        ):
+        if cleaned_name.casefold() != previous_name.casefold() and object_type not in [
+            Resource.Inbox,
+            Resource.Schema,
+        ]:
             return True
 
         return False

@@ -191,7 +191,7 @@ class HookRelease(ObjectRelease):
         if self.data.get("hook_template", None) and self.is_same_org_deploy:
             return self.data["hook_template"]
 
-        target_hook_template_match = None
+        target_hook_template_match_url = None
         target_hook_templates = [
             item
             async for item in self.client._http_client.fetch_all_by_url(
@@ -210,13 +210,13 @@ class HookRelease(ObjectRelease):
 
             for target_template in target_hook_templates:
                 if target_template["name"] == source_hook_template["name"]:
-                    target_hook_template_match = target_template
+                    target_hook_template_match_url = target_template["url"]
                     break
 
         # TODO: artifical test of hook template names not matching (letting user choose)
-        if not target_hook_template_match:
-            target_hook_template_match = await self.get_hook_template_from_user(
+        if not target_hook_template_match_url:
+            target_hook_template_match_url = await self.get_hook_template_from_user(
                 hook_templates=target_hook_templates
             )
 
-        return target_hook_template_match
+        return target_hook_template_match_url

@@ -16,6 +16,9 @@ from project_rossum_deploy.utils.functions import (
 
 # TODO: fix foreign JSONs in the subdir (mongo.json...)
 
+# TODO: handle case of 1 schema being assigned to multiple queues:
+# Assign it to the first one, the others should get robust checks during deploy etc.
+
 # TODO: migration of mapping into deploy file and config file
 # Cross-org will create 2 directories (named after orgs)
 # Same org will have 1 directory merged together
@@ -78,6 +81,10 @@ async def download_destinations(
     commit_message: str = "",
     download_all: bool = False,
 ):
+    if not destinations:
+        display_warning("No destinations specified to pull.")
+        return
+
     if not org_path:
         org_path = Path("./")
 

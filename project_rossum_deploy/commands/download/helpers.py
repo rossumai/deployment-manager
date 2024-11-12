@@ -61,9 +61,8 @@ def replace_code_paths(file_paths: list[Path]):
         if path.suffix in [".py", ".js"]:
             if path.parent.name == "hooks":
                 path = path.with_suffix(".json")
-            elif settings.FORMULA_DIR_PREFIX in path.parent.name:
-                only_schema_name = path.parent.name.split(":")[1]
-                path = path.parent.with_name(only_schema_name).with_suffix(".json")
+            elif path.parent.name == settings.FORMULA_DIR_NAME:
+                path = path.parent.parent / "schema.json"
         replaced_paths.append(path)
 
     return replaced_paths
