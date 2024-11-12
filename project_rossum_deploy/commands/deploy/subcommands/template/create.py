@@ -7,20 +7,28 @@ from project_rossum_deploy.commands.deploy.subcommands.run.helpers import Deploy
 from project_rossum_deploy.commands.deploy.subcommands.template.helpers import (
     add_override_to_deploy_file_objects,
     create_deploy_file_template,
-    find_schemas_for_queues,
     get_attribute_overrides_from_user,
     get_hooks_from_user,
     get_queues_from_user,
     get_dir_from_user,
     get_token_owner_from_user,
     get_workspaces_from_user,
-    prepare_deploy_file_objects,
 )
 from project_rossum_deploy.utils.consts import display_error, settings
 
 
 from anyio import Path
 from rossum_api import ElisAPIClient
+
+# TODO: source-org/subdir compatibility
+# Ask if the org-dir already exists (show options to select)
+# If yes, take the URL from the config
+# If yes, ask for subdir, unless there is only one (e.g., prod-org/prod)
+# The user can also select a new subdir (create that)
+# ! Here the user has no choice, same org needs the second subdir and then deploy with download
+# ! Otherwse, the org would get absolutely messy
+# If no, ask the user if he wants to create a new org-dir + ask for a subdir (must create one)
+# Keep going as usual
 
 
 async def create_deploy_template(
@@ -127,21 +135,6 @@ async def create_deploy_template(
     )
     deploy_file_object["hooks"] = selected_hooks
     deploy_file_object[settings.DEPLOY_KEY_UNSELECTED_HOOK_IDS] = unselected_hooks
-
-    # Schemas
-    # No point letting the user select a schema, each queue should just get its schema
-
-    # The schemas can be an 'explicit' None in the YAML and the default [] would not get used
-    previous_schemas = deploy_file_object.get("schemas", [])
-    if previous_schemas is None:
-        previous_schemas = []
-    new_schemas = await find_schemas_for_queues(
-        source_path=source_path, queues=selected_queues
-    )
-    deploy_schema_objects = prepare_deploy_file_objects(
-        objects=new_schemas, objects_in_previous_file=previous_schemas
-    )
-    deploy_file_object["schemas"] = deploy_schema_objects
 
     if interactive:
         overrides = await get_attribute_overrides_from_user()

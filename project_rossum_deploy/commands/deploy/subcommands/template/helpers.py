@@ -11,8 +11,8 @@ from project_rossum_deploy.utils.consts import display_error, display_warning, s
 from project_rossum_deploy.utils.functions import (
     extract_id_from_url,
     find_all_hook_paths_in_destination,
-    find_all_schema_paths_in_destination,
     find_object_by_id,
+    templatize_name_id,
 )
 
 
@@ -28,7 +28,7 @@ def create_deploy_file_template():
 # [Optional] Which local folder is considered to be the target (takes URL and credentials if found)
 {settings.DEPLOY_KEY_TARGET_DIR}:
 # [Optional] API URL for the source organization (otherwise taken from the source dir config.yaml)
-{settings.DEPLOY_KEY_SOURCE_DIR}:
+{settings.DEPLOY_KEY_SOURCE_URL}:
 
 # User ID to use as the hook owner (unnecessary if using username+password credentials for target)
 {settings.DEPLOY_KEY_TOKEN_OWNER}:
@@ -118,27 +118,6 @@ async def get_dir_from_user(org_path: Path, type: str, default: str = None):
     return selected_dir
 
 
-async def find_schemas_for_queues(source_path: Path, queues: list[dict]):
-    schema_paths = await find_all_schema_paths_in_destination(source_path)
-    all_schemas = [
-        {**await read_json(schema_path), "path": schema_path}
-        for schema_path in schema_paths
-    ]
-
-    found_schema_ids = set()
-    found_schemas = []
-
-    for queue in queues:
-        schema_url = queue.get("schema", None)
-        schema_id = extract_id_from_url(schema_url)
-        schema = find_object_by_id(schema_id, all_schemas)
-        if schema and schema["id"] not in found_schema_ids:
-            found_schema_ids.add(schema["id"])
-            found_schemas.append(schema)
-
-    return found_schemas
-
-
 async def find_hooks_for_queues(source_path: Path, queues: list[dict]):
     hook_paths = await find_all_hook_paths_in_destination(source_path)
     all_hooks = [
@@ -184,6 +163,7 @@ async def find_ws_paths_for_dir(base_dir: Path):
 
 
 DEFAULT_TARGETS = [{"id": None}]
+DEFAULT_TARGET = {"id": None}
 
 
 def prepare_deploy_file_objects(
@@ -209,6 +189,20 @@ def prepare_deploy_file_objects(
             deploy_representation.pop(settings.DEPLOY_KEY_BASE_PATH)
         deploy_objects.append(deploy_representation)
     return deploy_objects
+
+
+def prepare_subqueue_deploy_file_object(
+    object: dict,
+    previous_object: dict = {},
+):
+    deploy_representation = {
+        "id": object["id"],
+        "name": object["name"],
+        settings.DEPLOY_KEY_TARGET: previous_object.get(
+            settings.DEPLOY_KEY_TARGET, deepcopy(DEFAULT_TARGET)
+        ),
+    }
+    return deploy_representation
 
 
 async def get_workspaces_from_user(
@@ -262,11 +256,54 @@ async def get_queues_from_user(
             "Modify selection of the queues or just continue:", choices=queue_choices
         ).ask_async()
 
-    return prepare_deploy_file_objects(
+    deploy_file_queues = (
+        prepare_deploy_file_objects(
+            deploy_file_queues,
+            include_path=True,
+            objects_in_previous_file=previous_deploy_file_queues,
+        ),
         deploy_file_queues,
-        include_path=True,
-        objects_in_previous_file=previous_deploy_file_queues,
-    ), deploy_file_queues
+    )
+
+    # TODO: functions for paths for schemas and inboxes
+    previous_queues_by_id = {
+        object["id"]: object for object in previous_deploy_file_queues
+    }
+    for queue in deploy_file_queues:
+        # No point letting the user select a schema or inbox, each queue should just get its schema
+        schema_path = (
+            Path(queue[settings.DEPLOY_KEY_BASE_PATH])
+            / "queues"
+            / templatize_name_id(queue["name"], queue["id"])
+            / "schema.json"
+        )
+        if not (await schema_path.exists()):
+            continue
+        schema_object = await read_json(schema_path)
+
+        previous_schema = previous_queues_by_id.get(queue["id"], {}).get("schema")
+
+        deploy_schema_object = prepare_subqueue_deploy_file_object(
+            object=schema_object, previous_object=previous_schema
+        )
+        queue["schema"] = deploy_schema_object
+
+        inbox_path = (
+            Path(queue[settings.DEPLOY_KEY_BASE_PATH])
+            / "queues"
+            / templatize_name_id(queue["name"], queue["id"])
+            / "inbox.json"
+        )
+        if not (await inbox_path.exists()):
+            continue
+        inbox_object = await read_json(inbox_path)
+
+        previous_inbox = previous_queues_by_id.get(queue["id"], {}).get("inbox")
+
+        deploy_inbox_object = prepare_subqueue_deploy_file_object(
+            object=inbox_object, previous_object=previous_inbox
+        )
+        queue["inbox"] = deploy_inbox_object
 
 
 async def get_hooks_from_user(

@@ -23,6 +23,8 @@ from project_rossum_deploy.utils.consts import (
     settings,
 )
 
+# TODO: make work with org-dir/subdir
+
 
 # TODO: yes flag to skip the question after plan
 async def deploy_release_file(
@@ -66,6 +68,8 @@ async def deploy_release_file(
         source_client = ElisAPIClient(
             base_url=source_credentials.url, token=source_credentials.token
         )
+
+    # TODO: check tokens
 
     target_org_choices = []
     async for org in target_client.list_all_organizations():
