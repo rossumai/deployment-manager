@@ -28,7 +28,7 @@ def create_deploy_file_template():
 # [Optional] Which local folder is considered to be the target (takes URL and credentials if found)
 {settings.DEPLOY_KEY_TARGET_DIR}:
 # [Optional] API URL for the source organization (otherwise taken from the source dir config.yaml)
-{settings.DEPLOY_KEY_SOURCE_DIR}:
+{settings.DEPLOY_KEY_SOURCE_URL}:
 
 # User ID to use as the hook owner (unnecessary if using username+password credentials for target)
 {settings.DEPLOY_KEY_TOKEN_OWNER}:
