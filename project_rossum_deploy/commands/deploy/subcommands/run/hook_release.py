@@ -210,7 +210,7 @@ class HookRelease(ObjectRelease):
 
             for target_template in target_hook_templates:
                 if target_template["name"] == source_hook_template["name"]:
-                    target_hook_template_match = target_template
+                    target_hook_template_match = target_template["url"]
                     break
 
         # TODO: artifical test of hook template names not matching (letting user choose)
