@@ -34,6 +34,8 @@ async def get_token_from_cred_file(path: Path):
 
 
 async def get_api_url_from_user(type: str, default: str = ""):
+    if default is None:
+        default = ""
     api_url = await questionary.text(
         f"What is the {type} API URL (e.g., {settings.DEPLOY_DEFAULT_TARGET_URL}):",
         default=default,

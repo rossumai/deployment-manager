@@ -214,6 +214,6 @@ async def deploy_release_file(
 # TODO: prod to UAT deploy and reverse the deploy file
 
 
-# TODO: if there is not target dir, ask the user for a name. Then offer to download all new objects into that dir
+# ! TODO: if there is not target dir, ask the user for a name. Then offer to download all new objects into that dir
 
 # TODO: support for secrets

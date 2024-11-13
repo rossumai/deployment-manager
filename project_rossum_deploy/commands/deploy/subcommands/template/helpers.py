@@ -51,8 +51,6 @@ queues:
 
 hooks:
 
-schemas:
-
 unselected_hooks: # List hook IDs that should not be deployed, even if they belong to selected queues
 """
 
@@ -97,25 +95,46 @@ async def get_token_owner_from_user(default: str = ""):
         return await get_token_owner_from_user(default=default)
 
 
-async def get_dir_from_user(org_path: Path, type: str, default: str = None):
-    candidates = [
+async def get_dir_and_subdir_from_user(org_path: Path, type: str, default: str = None):
+    dir_candidates = [
         dir_path
         async for dir_path in org_path.iterdir()
         if await dir_path.is_dir() and str(dir_path) not in settings.DEPLOY_IGNORED_DIRS
     ]
-    choices = [questionary.Choice(title=str(source_path)) for source_path in candidates]
+    dir_choices = [questionary.Choice(title=str(path)) for path in dir_candidates]
     # Target dirname is not required (it might not exist unlike the source one)
     if type == settings.TARGET_DIRNAME:
-        choices.append(questionary.Choice(title="N/A", value=""))
+        dir_choices.append(questionary.Choice(title="N/A", value=""))
 
     # Reset default if it is not found in the current options
-    if default not in [choice.title for choice in choices]:
+    if default not in [choice.title for choice in dir_choices]:
         default = None
 
     selected_dir = await questionary.select(
-        f"Which folder is the {type}?", choices=choices, default=default
+        f"Which folder is the {type}?", choices=dir_choices, default=default
     ).ask_async()
-    return selected_dir
+
+    if not selected_dir:
+        return ""
+
+    subdir_candidates = [
+        subdir_path
+        async for subdir_path in (org_path / selected_dir).iterdir()
+        if await subdir_path.is_dir()
+    ]
+    subdir_choices = [questionary.Choice(title=str(path)) for path in subdir_candidates]
+
+    # Reset default if it is not found in the current options
+    if default not in [choice.title for choice in subdir_choices]:
+        default = None
+
+    selected_subdir = await questionary.select(
+        f"Which subfolder is the {type}?",
+        choices=subdir_choices,
+        default=default,
+    ).ask_async()
+
+    return selected_subdir
 
 
 async def find_hooks_for_queues(source_path: Path, queues: list[dict]):
@@ -163,7 +182,7 @@ async def find_ws_paths_for_dir(base_dir: Path):
 
 
 DEFAULT_TARGETS = [{"id": None}]
-DEFAULT_TARGET = {"id": None}
+DEFAULT_TARGET = {"id": None, settings.DEPLOY_KEY_OVERRIDES: None}
 
 
 def prepare_deploy_file_objects(
@@ -197,7 +216,6 @@ def prepare_subqueue_deploy_file_object(
 ):
     deploy_representation = {
         "id": object["id"],
-        "name": object["name"],
         settings.DEPLOY_KEY_TARGET: previous_object.get(
             settings.DEPLOY_KEY_TARGET, deepcopy(DEFAULT_TARGET)
         ),
@@ -256,13 +274,11 @@ async def get_queues_from_user(
             "Modify selection of the queues or just continue:", choices=queue_choices
         ).ask_async()
 
-    deploy_file_queues = (
-        prepare_deploy_file_objects(
-            deploy_file_queues,
-            include_path=True,
-            objects_in_previous_file=previous_deploy_file_queues,
-        ),
+    selected_queues = deploy_file_queues
+    deploy_file_queues = prepare_deploy_file_objects(
         deploy_file_queues,
+        include_path=True,
+        objects_in_previous_file=previous_deploy_file_queues,
     )
 
     # TODO: functions for paths for schemas and inboxes
@@ -281,7 +297,7 @@ async def get_queues_from_user(
             continue
         schema_object = await read_json(schema_path)
 
-        previous_schema = previous_queues_by_id.get(queue["id"], {}).get("schema")
+        previous_schema = previous_queues_by_id.get(queue["id"], {}).get("schema", {})
 
         deploy_schema_object = prepare_subqueue_deploy_file_object(
             object=schema_object, previous_object=previous_schema
@@ -298,12 +314,14 @@ async def get_queues_from_user(
             continue
         inbox_object = await read_json(inbox_path)
 
-        previous_inbox = previous_queues_by_id.get(queue["id"], {}).get("inbox")
+        previous_inbox = previous_queues_by_id.get(queue["id"], {}).get("inbox", {})
 
         deploy_inbox_object = prepare_subqueue_deploy_file_object(
             object=inbox_object, previous_object=previous_inbox
         )
         queue["inbox"] = deploy_inbox_object
+
+    return deploy_file_queues, selected_queues
 
 
 async def get_hooks_from_user(
@@ -358,7 +376,7 @@ class AttributeOverride(BaseModel):
 
 
 async def get_attribute_overrides_from_user():
-    override_options = ["workspaces", "queues", "schemas", "hooks"]
+    override_options = ["workspaces", "queues", "hooks"]
     overrides = []
     while await questionary.confirm(
         "Do you want to add a regex attribute override?", default=True
