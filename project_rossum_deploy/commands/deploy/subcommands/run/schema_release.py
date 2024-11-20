@@ -37,14 +37,16 @@ class SchemaRelease(ObjectRelease):
             plan_only=plan_only,
             is_same_org_deploy=is_same_org_deploy,
         )
-        parent_yaml_reference = self.parent_queue.yaml_reference
-        self.yaml_reference = parent_yaml_reference.get("schema", {})
 
         await update_formula_fields_code(self.path, self.data)
 
     @property
     def path(self) -> Path:
         return self.parent_queue.path.parent / "schema.json"
+
+    def get_object_in_yaml(self):
+        parent_yaml_reference = self.parent_queue.yaml_reference
+        return parent_yaml_reference.get("schema", {})
 
     def prepare_object_copy_for_deploy(self, target: Target):
         schema_copy = deepcopy(self.data)

@@ -78,10 +78,11 @@ class ObjectRelease(BaseModel):
         plan_only: bool = False,
         is_same_org_deploy=False,
     ):
+        # Base path is defined in the config itself for some objects (queues), for others, it needs to be added
         if not self.base_path:
             self.base_path = source_dir_path
         self.yaml = yaml
-        self.yaml_reference = yaml.get_object_in_yaml(self.type.value, self.id)
+        self.yaml_reference = self.get_object_in_yaml()
 
         self.plan_only = plan_only
         self.is_same_org_deploy = is_same_org_deploy
@@ -122,6 +123,13 @@ class ObjectRelease(BaseModel):
             if not target.id:
                 return True
         return False
+
+    def get_object_in_yaml(self):
+        objects = self.yaml.data.get(self.type.value, [])
+        for object in objects:
+            if object.get("id", None) == self.id:
+                return object
+        return None
 
     def prepare_object_copy_for_deploy(self, target: Target): ...
 

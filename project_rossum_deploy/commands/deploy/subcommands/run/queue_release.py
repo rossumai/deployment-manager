@@ -60,15 +60,6 @@ class QueueRelease(ObjectRelease):
             is_same_org_deploy=is_same_org_deploy,
         )
 
-        await self.schema_release.initialize(
-            yaml=yaml,
-            client=client,
-            source_dir_path=source_dir_path,
-            plan_only=plan_only,
-            is_same_org_deploy=is_same_org_deploy,
-            parent_queue=self,
-        )
-
         self.workspace_targets = workspace_targets
         self.hook_targets = hook_targets
 
@@ -83,6 +74,14 @@ class QueueRelease(ObjectRelease):
 
     async def deploy(self):
         try:
+            await self.schema_release.initialize(
+                yaml=self.yaml,
+                client=self.client,
+                source_dir_path=self.base_path,
+                plan_only=self.plan_only,
+                is_same_org_deploy=self.is_same_org_deploy,
+                parent_queue=self,
+            )
             await self.schema_release.deploy()
             self.schema_targets = {
                 self.schema_release.id: [

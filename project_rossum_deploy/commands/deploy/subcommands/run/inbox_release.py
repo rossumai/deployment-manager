@@ -46,12 +46,14 @@ class InboxRelease(ObjectRelease):
             plan_only=plan_only,
             is_same_org_deploy=is_same_org_deploy,
         )
-        parent_yaml_reference = self.parent_queue.yaml_reference
-        self.yaml_reference = parent_yaml_reference.get("inbox", {})
 
     @property
     def path(self) -> Path:
         return self.parent_queue.path.parent / "inbox.json"
+
+    def get_object_in_yaml(self):
+        parent_yaml_reference = self.parent_queue.yaml_reference
+        return parent_yaml_reference.get("schema", {})
 
     # async def prepare_inbox_target(self, queue_target: Target):
     #     target_inbox_url = queue_target.data.get("inbox", None)
