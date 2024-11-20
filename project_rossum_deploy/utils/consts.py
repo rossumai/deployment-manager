@@ -145,8 +145,7 @@ class Settings:
 
     MAPPING_FILENAME: str = "mapping.yaml"
     CONFIG_FILENAME: str = "prd_config.yaml"
-    CREDENTIALS_FILENAME: str = "credentials.json"
-    CREDENTIALS_YAML_FILENAME: str = "credentials.yaml"
+    CREDENTIALS_FILENAME = "credentials.yaml"
     MAPPING_KEYS_ORDER: list = ["comment", "id", "name", "ignore", "targets"]
 
     TARGET_API_BASE: str = ""
@@ -183,9 +182,6 @@ class Settings:
     DEPLOY_TEMPLATE_COMMAND_NAME: str = "template"
     DEPLOY_TEMPLATE_INIT_COMMAND_NAME: str = "init"
 
-    DIR_CONFIG_FILENAME = "config"
-    DIR_CREDENTIALS_FILENAME = "credentials"
-
     CONFIG_KEY_API_BASE_URL = "api_base"
     CONFIG_KEY_TOKEN = "token"
     CONFIG_KEY_DIRECTORIES = "directories"
@@ -200,7 +196,6 @@ class Settings:
     DEPLOY_OVERRIDE_REGEX_SEPARATOR = "/#/"
     DEPLOY_DEFAULT_TARGET_URL = "https://my-org.rossum.app/api/v1"
     DEFAULT_DEPLOY_FILENAME = "prd_deploy.yaml"
-    DEPLOY_KEY_TARGET = "target"
     DEPLOY_KEY_TARGETS = "targets"
     DEPLOY_KEY_OVERRIDES = "attribute_override"
     DEPLOY_KEY_DEPLOYED_ORG_ID = "deployed_org_id"

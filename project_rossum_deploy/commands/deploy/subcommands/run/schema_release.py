@@ -1,3 +1,4 @@
+from anyio import Path
 from project_rossum_deploy.commands.deploy.subcommands.run.attribute_override import (
     override_attributes_v2,
 )
@@ -18,10 +19,17 @@ from copy import deepcopy
 
 class SchemaRelease(ObjectRelease):
     type: Resource = Resource.Schema
+    name: str = ""
+
+    parent_queue: ObjectRelease = None
 
     async def initialize(
-        self, yaml, client, source_dir_path, plan_only, is_same_org_deploy
+        self, yaml, client, source_dir_path, plan_only, is_same_org_deploy, parent_queue
     ):
+        self.parent_queue = parent_queue
+        # dynamic property caused issues in some function calls
+        self.name = f"schema:{self.parent_queue.name}"
+
         await super().initialize(
             yaml=yaml,
             client=client,
@@ -29,7 +37,14 @@ class SchemaRelease(ObjectRelease):
             plan_only=plan_only,
             is_same_org_deploy=is_same_org_deploy,
         )
+        parent_yaml_reference = self.parent_queue.yaml_reference
+        self.yaml_reference = parent_yaml_reference.get("schema", {})
+
         await update_formula_fields_code(self.path, self.data)
+
+    @property
+    def path(self) -> Path:
+        return self.parent_queue.path.parent / "schema.json"
 
     def prepare_object_copy_for_deploy(self, target: Target):
         schema_copy = deepcopy(self.data)

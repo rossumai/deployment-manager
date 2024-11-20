@@ -2,8 +2,9 @@ import datetime
 from anyio import Path
 from pydantic import ValidationError
 import questionary
+from dataclasses import fields
 from rossum_api import APIClientError, ElisAPIClient
-
+from rossum_api.models.organization import Organization
 
 from project_rossum_deploy.commands.deploy.common.helpers import get_filename_from_user
 from project_rossum_deploy.commands.deploy.subcommands.run.release_file import (
@@ -29,7 +30,7 @@ from project_rossum_deploy.utils.consts import (
 # TODO: yes flag to skip the question after plan
 async def deploy_release_file(
     deploy_file_path: Path,
-    org_path: Path = None,
+    base_path: Path = None,
     source_client: ElisAPIClient = None,
     target_client: ElisAPIClient = None,
     # force: bool = False,
@@ -43,25 +44,19 @@ async def deploy_release_file(
     if not check_required_keys(yaml.data):
         return
 
-    if not org_path:
-        org_path = Path("./")
-    source_dir_path = org_path / yaml.data[settings.DEPLOY_KEY_SOURCE_DIR]
+    if not base_path:
+        base_path = Path("./")
 
-    source_org = await read_json(source_dir_path / "organization.json")
+    source_dir_subdir = yaml.data[settings.DEPLOY_KEY_SOURCE_DIR]
 
-    if not target_client:
-        target_credentials = await get_url_and_credentials(
-            org_path=org_path, type=settings.TARGET_DIRNAME, yaml_data=yaml.data
-        )
-        if not target_credentials:
-            return
-        target_client = ElisAPIClient(
-            base_url=target_credentials.url, token=target_credentials.token
-        )
+    source_org_name = source_dir_subdir.split("/")[0]
 
     if not source_client:
         source_credentials = await get_url_and_credentials(
-            org_path=org_path, type=settings.SOURCE_DIRNAME, yaml_data=yaml.data
+            base_path=base_path,
+            org_name=source_org_name,
+            type=settings.SOURCE_DIRNAME,
+            yaml_data=yaml.data,
         )
         if not source_credentials:
             return
@@ -69,18 +64,59 @@ async def deploy_release_file(
             base_url=source_credentials.url, token=source_credentials.token
         )
 
+    source_org_path = base_path / source_org_name / "organization.json"
+    if not await source_org_path.exists():
+        display_error(f'Could not find organization.json under "{source_org_path}"')
+        return
+    source_org_dict = await read_json(source_org_path)
+    source_org = Organization(
+        **{
+            k: v
+            for k, v in source_org_dict.items()
+            if k in {f.name for f in fields(Organization)}
+        }
+    )
+
+    target_dir_subdir = yaml.data.get(settings.DEPLOY_KEY_TARGET_DIR, "")
+    target_org_name = target_dir_subdir.split("/")[0]
+
+    if not target_client:
+        target_credentials = await get_url_and_credentials(
+            base_path=base_path,
+            org_name=target_org_name if target_dir_subdir else "",
+            type=settings.TARGET_DIRNAME,
+            yaml_data=yaml.data,
+        )
+        if not target_credentials:
+            return
+        target_client = ElisAPIClient(
+            base_url=target_credentials.url, token=target_credentials.token
+        )
+
     # TODO: check tokens
+    target_org_path: Path = base_path / target_org_name / "organization.json"
+    if await target_org_path.exists():
+        target_org_dict = await read_json(target_org_path)
+        target_org = Organization(
+            **{
+                k: v
+                for k, v in target_org_dict.items()
+                if k in {f.name for f in fields(Organization)}
+            }
+        )
 
-    target_org_choices = []
-    async for org in target_client.list_all_organizations():
-        target_org_choices.append(questionary.Choice(title=org.name, value=org))
-    if len(target_org_choices) > 1:
-        target_org = await questionary.select(
-            "Select target organization:", choices=target_org_choices
-        ).ask_async()
     else:
-        target_org = target_org_choices[0].value
+        target_org_choices = []
+        async for org in target_client.list_all_organizations():
+            target_org_choices.append(questionary.Choice(title=org.name, value=org))
+        if len(target_org_choices) > 1:
+            target_org = await questionary.select(
+                "Select target organization:", choices=target_org_choices
+            ).ask_async()
+        else:
+            target_org = target_org_choices[0].value
 
+    source_dir_path = base_path / Path(source_dir_subdir)
     try:
         release = ReleaseFile(
             **yaml.data,
@@ -120,8 +156,6 @@ async def deploy_release_file(
     try:
         await planned_release.deploy_organization()
 
-        await planned_release.deploy_schemas()
-
         await planned_release.deploy_hooks()
         await planned_release.migrate_hook_dependency_graph()
 
@@ -152,8 +186,6 @@ async def deploy_release_file(
     try:
         await release.deploy_organization()
 
-        await release.deploy_schemas()
-
         await release.deploy_hooks()
         await release.migrate_hook_dependency_graph()
 
@@ -183,7 +215,7 @@ async def deploy_release_file(
                 default=False,
             ).ask_async()
             if not overwrite:
-                deployed_deploy_file_path = await get_filename_from_user(org_path)
+                deployed_deploy_file_path = await get_filename_from_user(base_path)
     else:
         deployed_deploy_file_path = deploy_file_path
 

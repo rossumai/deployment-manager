@@ -22,6 +22,7 @@ class PathNotFoundException(Exception): ...
 
 
 type LookupTable = dict[int, list[int]]
+
 IMPLICIT_OVERRIDE_KEYS = ["settings", "metadata"]
 
 
@@ -53,6 +54,7 @@ class ObjectRelease(BaseModel):
     name: str
     type: Resource
     base_path: str = None
+    yaml: DeployYaml = None
     yaml_reference: dict = None
     data: dict = None
     client: ElisAPIClient = None
@@ -78,6 +80,7 @@ class ObjectRelease(BaseModel):
     ):
         if not self.base_path:
             self.base_path = source_dir_path
+        self.yaml = yaml
         self.yaml_reference = yaml.get_object_in_yaml(self.type.value, self.id)
 
         self.plan_only = plan_only
@@ -444,3 +447,17 @@ class ObjectRelease(BaseModel):
                 yield from ObjectRelease.traverse_object(value, k, v)
         elif isinstance(value, str) or isinstance(value, int):
             yield parent_object, parent_key, value
+
+
+class EmptyObjectRelease(BaseModel):
+    class Config:
+        arbitrary_types_allowed = True
+
+    id: int = None
+    name: str = ""
+    type: Resource = "no-type"
+    base_path: Path = None
+
+    async def initialize(**kwargs): ...
+
+    async def deploy(): ...

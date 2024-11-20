@@ -55,20 +55,20 @@ def check_required_keys(release: dict):
 # TODO: more robust (all scenarios)
 # TODO: prompt user for new token and store it
 # TODO: username + password support
-async def get_url_and_credentials(org_path: Path, type: str, yaml_data: dict):
+async def get_url_and_credentials(
+    base_path: Path, org_name: str, type: str, yaml_data: dict
+):
     if type == settings.TARGET_DIRNAME:
-        dir = yaml_data.get(settings.DEPLOY_KEY_TARGET_DIR, None)
         api_url = yaml_data.get(settings.DEPLOY_KEY_TARGET_URL, None)
     else:
-        dir = yaml_data.get(settings.DEPLOY_KEY_SOURCE_DIR, None)
         api_url = yaml_data.get(settings.DEPLOY_KEY_SOURCE_URL, None)
 
-    if not api_url:
-        api_url = await get_api_url_from_config(org_path / dir)
+    if not api_url and org_name:
+        api_url = await get_api_url_from_config(base_path=base_path, org_name=org_name)
     if not api_url:
         api_url = await get_api_url_from_user(type=type)
 
-    token = await get_token_from_cred_file(org_path / dir)
+    token = await get_token_from_cred_file(base_path / org_name)
     if not token:
         token = await get_token_from_user(type=type)
 

@@ -38,7 +38,7 @@ def init_project(name: Path):
             if ignore_line not in git_ignore_contents:
                 wf.write(ignore_line)
 
-    config_path = name / "prd_config.yaml"
+    config_path = name / settings.CONFIG_FILENAME
     if config_path.exists():
         previous_config = config_path.read_text()
     else:
@@ -83,8 +83,6 @@ def init_project(name: Path):
     for org_dir, token in credentials.items():
         credentials_yaml = DeployYaml("{}")
         credentials_yaml.data = {settings.CONFIG_KEY_TOKEN: token}
-        credentials_yaml.save_to_file(
-            name / org_dir / settings.CREDENTIALS_YAML_FILENAME
-        )
+        credentials_yaml.save_to_file(name / org_dir / settings.CREDENTIALS_FILENAME)
 
     print(Panel(f'Initialized a new PRD directory in "{name}" .'))

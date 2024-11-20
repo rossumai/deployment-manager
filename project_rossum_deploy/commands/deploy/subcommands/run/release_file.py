@@ -18,9 +18,6 @@ from project_rossum_deploy.commands.deploy.subcommands.run.organization_release 
 from project_rossum_deploy.commands.deploy.subcommands.run.queue_release import (
     QueueRelease,
 )
-from project_rossum_deploy.commands.deploy.subcommands.run.schema_release import (
-    SchemaRelease,
-)
 from project_rossum_deploy.commands.deploy.subcommands.run.workspace_release import (
     WorkspaceRelease,
 )
@@ -64,9 +61,7 @@ class ReleaseFile(BaseModel):
     queues: list[QueueRelease] = []
     hooks: list[HookRelease] = []
     hook_templates: dict = {}
-    schemas: list[SchemaRelease] = []
 
-    schema_targets: list[Target] = []
     hook_targets: list[Target] = []
     workspace_targets: list[Target] = []
     queue_targets: list[Target] = []
@@ -76,14 +71,12 @@ class ReleaseFile(BaseModel):
             pprint(Panel("Applying implicit ID override"))
 
         lookup_table = {
-            **self.schema_targets,
             **self.hook_targets,
             **self.workspace_targets,
             **self.queue_targets,
         }
 
         for release_object in [
-            *self.schemas,
             *self.hooks,
             *self.workspaces,
             *self.queues,
@@ -119,25 +112,25 @@ class ReleaseFile(BaseModel):
             await organization_release.deploy()
             self.detect_exceptions([organization_release])
 
-    async def deploy_schemas(self):
-        await asyncio.gather(
-            *[
-                schema_release.initialize(
-                    yaml=self.yaml,
-                    client=self.client,
-                    source_dir_path=self.source_dir_path,
-                    is_same_org_deploy=self.target_org.id == self.source_org.id,
-                    plan_only=self.plan_only,
-                )
-                for schema_release in self.schemas
-            ]
-        )
+    # async def deploy_schemas(self):
+    # await asyncio.gather(
+    #     *[
+    #         schema_release.initialize(
+    #             yaml=self.yaml,
+    #             client=self.client,
+    #             source_dir_path=self.source_dir_path,
+    #             is_same_org_deploy=self.target_org.id == self.source_org.id,
+    #             plan_only=self.plan_only,
+    #         )
+    #         for schema_release in self.schemas
+    #     ]
+    # )
 
-        await asyncio.gather(
-            *[schema_release.deploy() for schema_release in self.schemas]
-        )
-        self.detect_exceptions(self.schemas)
-        self.schema_targets = self.gather_targets(self.schemas)
+    # await asyncio.gather(
+    #     *[schema_release.deploy() for schema_release in self.schemas]
+    # )
+    # self.detect_exceptions(self.schemas)
+    # self.schema_targets = self.gather_targets(self.schemas)
 
     async def deploy_hooks(self):
         await self.ensure_token_owner()
@@ -200,7 +193,6 @@ class ReleaseFile(BaseModel):
                     source_dir_path=self.source_dir_path,
                     plan_only=self.plan_only,
                     is_same_org_deploy=self.target_org.id == self.source_org.id,
-                    schema_targets=self.schema_targets,
                     hook_targets=self.hook_targets,
                     workspace_targets=self.workspace_targets,
                 )

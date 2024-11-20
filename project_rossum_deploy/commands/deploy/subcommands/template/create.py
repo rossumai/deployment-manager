@@ -82,7 +82,9 @@ async def create_deploy_template(
     # Try to find it in the config, but do not require it from the user
     source_url = deploy_file_object.get(settings.DEPLOY_KEY_SOURCE_URL, "")
     if not source_url:
-        source_url = await get_api_url_from_config(org_path / source_dir_and_subdir)
+        source_url = await get_api_url_from_config(
+            base_path=org_path, org_name=source_dir_and_subdir.split("/")[0]
+        )
     deploy_file_object[settings.DEPLOY_KEY_SOURCE_URL] = source_url
 
     # TODO: consts keys for all object names (workspaces, queues, ...)
@@ -94,7 +96,9 @@ async def create_deploy_template(
     # Target URL can be in the deploy file already, in a config file, or inputted by the user
     target_url = deploy_file_object.get(settings.DEPLOY_KEY_TARGET_URL, "")
     if not target_url and target_dir_and_subdir:
-        target_url = await get_api_url_from_config(org_path / target_dir_and_subdir)
+        target_url = await get_api_url_from_config(
+            base_path=org_path, org_name=target_dir_and_subdir.split("/")[0]
+        )
     if interactive or not target_url:
         target_url = await get_api_url_from_user(
             type=settings.TARGET_DIRNAME, default=target_url

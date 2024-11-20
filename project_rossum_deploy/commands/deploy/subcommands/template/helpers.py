@@ -182,7 +182,6 @@ async def find_ws_paths_for_dir(base_dir: Path):
 
 
 DEFAULT_TARGETS = [{"id": None}]
-DEFAULT_TARGET = {"id": None, settings.DEPLOY_KEY_OVERRIDES: None}
 
 
 def prepare_deploy_file_objects(
@@ -216,8 +215,8 @@ def prepare_subqueue_deploy_file_object(
 ):
     deploy_representation = {
         "id": object["id"],
-        settings.DEPLOY_KEY_TARGET: previous_object.get(
-            settings.DEPLOY_KEY_TARGET, deepcopy(DEFAULT_TARGET)
+        settings.DEPLOY_KEY_TARGETS: previous_object.get(
+            settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)
         ),
     }
     return deploy_representation
