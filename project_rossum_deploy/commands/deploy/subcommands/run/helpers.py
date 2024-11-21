@@ -1,4 +1,5 @@
 import re
+from typing import Any
 from anyio import Path
 from ruamel.yaml import YAML
 
@@ -73,3 +74,14 @@ async def get_url_and_credentials(
         display_error(f"Error while getting credentials for {type}: {str(e)}")
 
     return None
+
+
+def traverse_object(parent_object: dict | None, parent_key: str, value: Any):
+    if isinstance(value, list):
+        for i in value:
+            yield from traverse_object(parent_object, parent_key, i)
+    elif isinstance(value, dict):
+        for k, v in value.items():
+            yield from traverse_object(value, k, v)
+    elif isinstance(value, str) or isinstance(value, int):
+        yield parent_object, parent_key, value

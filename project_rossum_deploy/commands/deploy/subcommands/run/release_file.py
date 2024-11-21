@@ -76,11 +76,12 @@ class ReleaseFile(BaseModel):
             **self.queue_targets,
         }
 
-        for release_object in [
+        release_objects: list[ObjectRelease] = [
             *self.hooks,
             *self.workspaces,
             *self.queues,
-        ]:
+        ]
+        for release_object in release_objects:
             await release_object.implicit_override_targets(lookup_table)
 
     def gather_targets(self, release_objects: list[ObjectRelease]):
