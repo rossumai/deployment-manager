@@ -52,6 +52,7 @@ def replace_dependency_url(
     dependency: str,
     source_id_target_pairs: dict[int, list],
     target_object: dict = None,
+    keep_hook_dependencies_without_equivalent: bool = False,
 ):
     if isinstance(object[dependency], list):
         replace_list_of_dependency_urls(
@@ -61,6 +62,7 @@ def replace_dependency_url(
             dependency=dependency,
             source_id_target_pairs=source_id_target_pairs,
             target_object=target_object,
+            keep_dependencies_without_equivalent=keep_hook_dependencies_without_equivalent,
         )
     else:
         source_dependency_url = object[dependency]
@@ -85,7 +87,9 @@ def replace_dependency_url(
         object[dependency] = new_url
 
         if source_id_str == target_id_str:
-            if settings.IS_PROJECT_IN_SAME_ORG and dependency == "organization":
+            if keep_hook_dependencies_without_equivalent:
+                return
+            elif settings.IS_PROJECT_IN_SAME_ORG and dependency == "organization":
                 return
 
             display_warning(
@@ -101,8 +105,14 @@ def replace_list_of_dependency_urls(
     dependency: str,
     source_id_target_pairs: dict[int, list],
     target_object: dict = None,
+    keep_dependencies_without_equivalent: bool = False,
 ):
-    new_urls = []
+    # The list is either copied and URLs are replaced, or they are simply added
+    new_urls = (
+        copy.deepcopy(object[dependency])
+        if keep_dependencies_without_equivalent
+        else []
+    )
     for source_index, source_dependency_url in enumerate(object[dependency]):
         source_id = extract_id_from_url(source_dependency_url)
         target_dependency_objects = source_id_target_pairs.get(source_id, [])
@@ -120,12 +130,14 @@ def replace_list_of_dependency_urls(
         source_id_str = str(source_id)
         new_url = source_dependency_url.replace(source_id_str, target_id_str)
 
-        if source_id_str == target_id_str:
+        if keep_dependencies_without_equivalent:
+            new_urls[source_index] = new_url
+        elif source_id_str != target_id_str:
+            new_urls.append(new_url)
+        else:
             display_warning(
                 f'Dependency "{dependency}"[{source_index}] for object "{object.get('id', 'no-ID')}" was not changed to a target counterpart because none was found.'
             )
-        else:
-            new_urls.append(new_url)
 
     # Target queues can have 'dangling' hooks that exist only on target, these should not be overwritten.
     if target_object:

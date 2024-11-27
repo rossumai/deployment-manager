@@ -30,6 +30,7 @@ from project_rossum_deploy.utils.functions import (
 
 class QueueRelease(ObjectRelease):
     type: Resource = Resource.Queue
+    keep_hook_dependencies_without_equivalent: bool = False
 
     schema_release: SchemaRelease = Field(alias="schema")
     inbox_release: Union[InboxRelease, EmptyObjectRelease] = Field(
@@ -134,6 +135,7 @@ class QueueRelease(ObjectRelease):
                     target_objects_count=target_objects_count,
                     dependency="hooks",
                     source_id_target_pairs=self.hook_targets,
+                    keep_hook_dependencies_without_equivalent=self.keep_hook_dependencies_without_equivalent,
                 )
                 replace_dependency_url(
                     object=queue_copy,
@@ -141,6 +143,7 @@ class QueueRelease(ObjectRelease):
                     target_objects_count=target_objects_count,
                     dependency="webhooks",
                     source_id_target_pairs=self.hook_targets,
+                    keep_hook_dependencies_without_equivalent=self.keep_hook_dependencies_without_equivalent,
                 )
 
                 override_attributes_v2(

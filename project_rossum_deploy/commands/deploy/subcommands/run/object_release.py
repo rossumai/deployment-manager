@@ -255,7 +255,7 @@ class ObjectRelease(BaseModel):
                 data.pop("workspace", None)
                 data.pop("inbox", None)
                 data.pop("schema", None)
-                data.pop("hooks", None)
+                # data.pop("hooks", None)
                 data.pop("webhooks", None)
 
 
