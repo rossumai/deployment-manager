@@ -53,7 +53,7 @@ class InboxRelease(ObjectRelease):
 
     def get_object_in_yaml(self):
         parent_yaml_reference = self.parent_queue.yaml_reference
-        return parent_yaml_reference.get("schema", {})
+        return parent_yaml_reference.get("inbox", {})
 
     # async def prepare_inbox_target(self, queue_target: Target):
     #     target_inbox_url = queue_target.data.get("inbox", None)

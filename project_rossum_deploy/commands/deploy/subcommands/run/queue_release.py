@@ -151,11 +151,8 @@ class QueueRelease(ObjectRelease):
                 release_requests.append(request)
 
             results = await asyncio.gather(*release_requests)
-            # asyncio.gather returns results in the same order as they were put in
-            for index, (result, target) in enumerate(zip(results, self.targets)):
-                target.id = result.get("id", None)
-                target.data = result
-                self.yaml_reference["targets"][index]["id"] = target.id
+
+            self.update_targets(results)
 
             await self.inbox_release.initialize(
                 yaml=self.yaml,

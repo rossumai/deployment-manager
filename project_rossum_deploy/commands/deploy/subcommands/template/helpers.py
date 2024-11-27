@@ -259,7 +259,7 @@ async def get_queues_from_user(
     queue_paths = await find_queue_paths_for_workspaces(deploy_ws_paths)
     if not queue_paths:
         display_error("No queues in the selected workspaces.")
-        return []
+        return [], []
 
     # If there are no preselected queues, assume the file is being created and preselect everything
     queue_choices = await prepare_choices(

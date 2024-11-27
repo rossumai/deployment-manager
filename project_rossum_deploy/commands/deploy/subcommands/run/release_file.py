@@ -22,7 +22,7 @@ from project_rossum_deploy.commands.deploy.subcommands.run.workspace_release imp
     WorkspaceRelease,
 )
 from project_rossum_deploy.commands.migrate.helpers import get_token_owner
-from project_rossum_deploy.utils.consts import display_error
+from project_rossum_deploy.utils.consts import display_error, settings
 from project_rossum_deploy.utils.functions import extract_id_from_url
 
 
@@ -244,7 +244,7 @@ class ReleaseFile(BaseModel):
                 )
 
     async def migrate_hook_dependency_graph(self):
-        pprint(Panel("Updating hook dependency graph..."))
+        pprint(Panel(f"{settings.PLAN_PRINT_STR} Updating hook dependency graph..."))
         for hook_release in self.hooks:
             try:
                 for target_hook_index, target_hook in enumerate(hook_release.targets):
@@ -268,7 +268,7 @@ class ReleaseFile(BaseModel):
                     f"Error while migrating dependency graph for hook '{hook_release.name} ({hook_release.id})' ^",
                     e,
                 )
-        pprint(Panel("Hook dependency graph updated..."))
+        pprint(Panel(f"{settings.PLAN_PRINT_STR} Hook dependency graph updated..."))
 
     async def migrate_target_hook_run_after(
         self,

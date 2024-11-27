@@ -212,6 +212,7 @@ class Settings:
     UPDATE_PRINT_STR: str = "[blue]UPDATE[/blue]"
     CREATE_PRINT_STR: str = "[green]CREATE[/green]"
     DELETE_PRINT_STR: str = "[red]DELETE[/red]"
+    PLAN_PRINT_STR: str = "[bold]PLAN:[/bold]"
 
     IGNORED_KEYS: dict = {
         Resource.Queue: ["counts", "users", "workflows"],

@@ -61,12 +61,8 @@ class WorkspaceRelease(ObjectRelease):
                 release_requests.append(request)
 
             results = await asyncio.gather(*release_requests)
-            # asyncio.gather returns results in the same order as they were put in
-            for index, (result, target) in enumerate(zip(results, self.targets)):
-                target.id = result.get("id", None)
-                target.data = result
-                self.yaml_reference["targets"][index]["id"] = target.id
 
+            self.update_targets(results)
         except Exception as e:
             display_error(
                 f"Error while migrating {self.display_type} {self.name} ({self.id}) ^",

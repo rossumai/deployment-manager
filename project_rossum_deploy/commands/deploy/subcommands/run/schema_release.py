@@ -68,7 +68,6 @@ class SchemaRelease(ObjectRelease):
 
             results = await asyncio.gather(*release_requests)
             self.update_targets(results)
-
         except Exception as e:
             display_error(
                 f"Error while migrating {self.display_type} {self.name} ({self.id}) ^",

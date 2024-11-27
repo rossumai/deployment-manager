@@ -45,7 +45,6 @@ class ObjectRelease(BaseModel):
 
     targets: list[TargetWithDefault] = []
 
-    PLAN_PRINT_STR: str = "[bold]PLAN:[/bold]"
     # TODO: better parsing -> better dummy ID
     PLAN_CREATE_TBD_ID_STR: str = "0000000"
 
@@ -158,7 +157,7 @@ class ObjectRelease(BaseModel):
                 result = await self.client._http_client.create(self.type, target_object)
 
             pprint(
-                f"{self.PLAN_PRINT_STR if self.plan_only else ''} {settings.CREATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}."
+                f"{settings.PLAN_PRINT_STR if self.plan_only else ''} {settings.CREATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}."
             )
             return result
         except Exception as e:
@@ -191,7 +190,7 @@ class ObjectRelease(BaseModel):
                 )
 
             pprint(
-                f"{self.PLAN_PRINT_STR if self.plan_only else ''} {settings.UPDATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}."
+                f"{settings.PLAN_PRINT_STR if self.plan_only else ''} {settings.UPDATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}."
             )
             return result
         except Exception as e:
