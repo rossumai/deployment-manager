@@ -44,31 +44,61 @@ class OrganizationDirectory(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
+    # Present in the config YAML
     name: str
     org_id: int
     api_base: str
     subdirectories: SubdirectoriesDict = {}
 
+    # Added later
+    client: ElisAPIClient = None
+    project_path: Path = None
+
+    @property
+    def org_path(self):
+        return self.project_path / self.name
+
+    @property
+    def display_label(self):
+        return f'"[blue]{self.org_path}[/blue] ([purple]{self.org_id}[/purple])"'
+
+    async def find_object_ids_for_subdirs(self):
+        for subdir in self.subdirectories.values():
+            subdir_path = self.project_path / self.name / subdir.name
+            object_paths = await find_all_object_paths(subdir_path)
+
+            object_ids = set()
+            for object_path in object_paths:
+                object = await read_json(object_path)
+                object_id = object.get("id", None)
+                if object_id:
+                    object_ids.add(object_id)
+            subdir.object_ids = object_ids
+
+
+# TODO: use display label
+
+
+class DownloadOrganizationDirectory(OrganizationDirectory):
     id_object_map: dict = {}
     changed_files: list = []
+
     download_all: bool = False
-    client: ElisAPIClient = None
-    org_path: Path = None
 
     async def initialize(self):
-        changed_files = get_changed_file_paths(self.org_path / self.name)
+        if not self.project_path:
+            self.project_path = Path(".")
+
+        changed_files = get_changed_file_paths(self.org_path)
         changed_files = list(map(lambda x: x[1], changed_files))
         changed_files = replace_code_paths(changed_files)
         self.changed_files = changed_files
 
         if not self.client:
-            token = await get_token_from_cred_file(self.org_path / self.name)
+            token = await get_token_from_cred_file(self.org_path)
             if not token:
                 token = await get_token_from_user(type=self.name)
             self.client = ElisAPIClient(base_url=self.api_base, token=token)
-
-        if not self.org_path:
-            self.org_path = Path(".")
 
     # TODO: check token
 
@@ -76,7 +106,7 @@ class OrganizationDirectory(BaseModel):
     async def download_organization(self):
         await self.initialize()
 
-        pprint(Panel(f"Scanning for remote changes in {self.org_path / self.name}..."))
+        pprint(Panel(f"Scanning for remote changes in {self.org_path}..."))
 
         try:
             await self.download_and_save_organization_object()
@@ -111,7 +141,7 @@ class OrganizationDirectory(BaseModel):
 
         try:
             workspace_saver = WorkspaceSaver(
-                base_path=self.org_path / self.name,
+                base_path=self.project_path / self.name,
                 objects=workspaces_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
@@ -120,7 +150,7 @@ class OrganizationDirectory(BaseModel):
             await workspace_saver.save_downloaded_objects()
 
             queue_saver = QueueSaver(
-                base_path=self.org_path / self.name,
+                base_path=self.project_path / self.name,
                 objects=queues_for_mapping,
                 workspaces=workspaces_for_mapping,
                 changed_files=self.changed_files,
@@ -131,7 +161,7 @@ class OrganizationDirectory(BaseModel):
 
             # TODO: test inbox without any queue
             inbox_saver = InboxSaver(
-                base_path=self.org_path / self.name,
+                base_path=self.project_path / self.name,
                 objects=inboxes_for_mapping,
                 workspaces=workspaces_for_mapping,
                 queues=queues_for_mapping,
@@ -142,7 +172,7 @@ class OrganizationDirectory(BaseModel):
             await inbox_saver.save_downloaded_objects()
 
             schema_saver = SchemaSaver(
-                base_path=self.org_path / self.name,
+                base_path=self.project_path / self.name,
                 objects=schemas_for_mapping,
                 workspaces=workspaces_for_mapping,
                 queues=queues_for_mapping,
@@ -153,7 +183,7 @@ class OrganizationDirectory(BaseModel):
             await schema_saver.save_downloaded_objects()
 
             hook_saver = HookSaver(
-                base_path=self.org_path / self.name,
+                base_path=self.project_path / self.name,
                 objects=hooks_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
@@ -187,7 +217,7 @@ class OrganizationDirectory(BaseModel):
             organization = await self.client._http_client.fetch_one(
                 Resource.Organization, self.org_id
             )
-            org_file_path = self.org_path / self.name / "organization.json"
+            org_file_path = self.project_path / self.name / "organization.json"
             if self.download_all or await should_write_object(
                 org_file_path, organization, self.changed_files
             ):
@@ -207,19 +237,6 @@ class OrganizationDirectory(BaseModel):
                     f'Invalid token "{self.client._http_client.token}" for organization with ID "{self.org_id}" and URL "{self.api_base}". Please make sure you have to correct token.'
                 )
 
-    async def find_object_ids_for_subdirs(self):
-        for subdir in self.subdirectories.values():
-            subdir_path = self.org_path / self.name / subdir.name
-            object_paths = await find_all_object_paths(subdir_path)
-
-            object_ids = set()
-            for object_path in object_paths:
-                object = await read_json(object_path)
-                object_id = object.get("id", None)
-                if object_id:
-                    object_ids.add(object_id)
-            subdir.object_ids = object_ids
-
     def create_id_object_map(self, objects: list[dict]):
         map = {}
         for object in objects:
@@ -227,7 +244,7 @@ class OrganizationDirectory(BaseModel):
         return map
 
     async def remove_objects_without_remote(self):
-        object_paths = await find_all_object_paths(self.org_path / self.name)
+        object_paths = await find_all_object_paths(self.project_path / self.name)
         for object_path in object_paths:
             if object_path.name == "organization.json":
                 continue

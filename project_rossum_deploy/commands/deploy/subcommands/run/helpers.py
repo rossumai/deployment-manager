@@ -50,7 +50,7 @@ def check_required_keys(release: dict):
 # TODO: prompt user for new token and store it
 # TODO: username + password support
 async def get_url_and_credentials(
-    base_path: Path, org_name: str, type: str, yaml_data: dict
+    project_path: Path, org_name: str, type: str, yaml_data: dict
 ):
     if type == settings.TARGET_DIRNAME:
         api_url = yaml_data.get(settings.DEPLOY_KEY_TARGET_URL, None)
@@ -58,13 +58,13 @@ async def get_url_and_credentials(
         api_url = yaml_data.get(settings.DEPLOY_KEY_SOURCE_URL, None)
 
     if not api_url and org_name:
-        api_url = await get_api_url_from_config(base_path=base_path, org_name=org_name)
+        api_url = await get_api_url_from_config(
+            base_path=project_path, org_name=org_name
+        )
     if not api_url:
         api_url = await get_api_url_from_user(type=type)
 
-    token = await get_token_from_cred_file(base_path / org_name)
-    if not token:
-        token = await get_token_from_user(type=type)
+    token = await get_token(project_path=project_path, org_name=org_name)
 
     try:
         credentials = Credentials(token=token, url=api_url)
@@ -74,6 +74,13 @@ async def get_url_and_credentials(
         display_error(f"Error while getting credentials for {type}: {str(e)}")
 
     return None
+
+
+async def get_token(project_path: Path, org_name: str):
+    token = await get_token_from_cred_file(project_path / org_name)
+    if not token:
+        token = await get_token_from_user(type=type)
+    return token
 
 
 def traverse_object(parent_object: dict | None, parent_key: str, value: Any):

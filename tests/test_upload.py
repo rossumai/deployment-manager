@@ -13,7 +13,7 @@ from project_rossum_deploy.commands.download.download import (
     download_organization_combined_source_target,
 )
 from project_rossum_deploy.common.mapping import read_mapping, write_mapping
-from project_rossum_deploy.commands.upload.upload import upload_project
+from project_rossum_deploy.commands.upload.upload import upload_destinations
 from project_rossum_deploy.common.read_write import (
     create_custom_hook_code_path,
     read_json,
@@ -77,7 +77,7 @@ async def test_push_updated_file(
 ):
     tmp_path, updated_file_path, updated_file = updated_file_tuple
 
-    await upload_project(destination=settings.SOURCE_DIRNAME, client=client)
+    await upload_destinations(destination=settings.SOURCE_DIRNAME, client=client)
 
     redownloaded_file = await read_json(updated_file_path)
 
@@ -91,7 +91,7 @@ async def test_push_ignored_non_staged_file(
 ):
     tmp_path, updated_file_path, updated_file = updated_file_tuple
 
-    await upload_project(
+    await upload_destinations(
         destination=settings.SOURCE_DIRNAME, client=client, indexed_only=True
     )
 
@@ -132,7 +132,7 @@ async def test_push_updated_file_name_changed(
 ):
     tmp_path, previous_file_path, updated_file = updated_file_name_tuple
 
-    await upload_project(destination=settings.SOURCE_DIRNAME, client=client)
+    await upload_destinations(destination=settings.SOURCE_DIRNAME, client=client)
 
     redownloaded_file = await read_json(
         previous_file_path.with_stem(
@@ -208,7 +208,7 @@ async def test_push_ignores_file_from_target(
     updated_target_schema["metadata"] = {"key": "value"}
     await write_json(target_schema_path, updated_target_schema)
 
-    await upload_project(destination=settings.SOURCE_DIRNAME, client=client)
+    await upload_destinations(destination=settings.SOURCE_DIRNAME, client=client)
 
     redownloaded_source_schema = await read_json(source_schema_path)
     redownloaded_target_schema = await client.retrieve_schema(target_schema.id)
@@ -245,7 +245,7 @@ async def test_push_ignores_file_from_source(
     updated_target_schema["metadata"] = {"key": "value"}
     await write_json(target_schema_path, updated_target_schema)
 
-    await upload_project(destination=settings.TARGET_DIRNAME, client=client)
+    await upload_destinations(destination=settings.TARGET_DIRNAME, client=client)
 
     redownloaded_source_schema = await client.retrieve_schema(source_schema.id)
     redownloaded_target_schema = await read_json(target_schema_path)
@@ -297,7 +297,7 @@ async def test_push_uses_change_in_code_file(
     NEW_CODE = 'print("The world has changed.")'
     await write_str(hook_code_path, NEW_CODE)
 
-    await upload_project(destination=settings.SOURCE_DIRNAME, client=client)
+    await upload_destinations(destination=settings.SOURCE_DIRNAME, client=client)
     redownloaded_hook = await read_json(hook_path)
     redownloaded_code = await hook_code_path.read_text()
 

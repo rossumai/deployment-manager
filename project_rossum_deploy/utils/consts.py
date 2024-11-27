@@ -209,6 +209,10 @@ class Settings:
     DEPLOY_KEY_UNSELECTED_HOOK_IDS = "unselected_hooks"
     DEPLOY_KEY_PATCH_TARGET_ORG = "patch_target_org"
 
+    UPDATE_PRINT_STR: str = "[blue]UPDATE[/blue]"
+    CREATE_PRINT_STR: str = "[green]CREATE[/green]"
+    DELETE_PRINT_STR: str = "[red]DELETE[/red]"
+
     IGNORED_KEYS: dict = {
         Resource.Queue: ["counts", "users", "workflows"],
         Resource.Hook: ["status"],
@@ -226,10 +230,6 @@ class Settings:
 
 
 class PrdVersionException(Exception): ...
-
-
-def create_mismatch_warning(resource, id):
-    return f'WARNING: Could not {settings.UPLOAD_COMMAND_NAME} {resource} with ID "{id}". Rossum has a version with a different timestamp.\n This means that the object was updated without PRD. Please stash your changes for these objects and run {settings.DOWNLOAD_COMMAND_NAME} first or use the --force option.'
 
 
 def migrate_config():

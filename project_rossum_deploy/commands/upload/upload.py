@@ -1,34 +1,26 @@
 import subprocess
 from anyio import Path
-from rich import print
-from rich.panel import Panel
-from rich.progress import Progress
 
 import click
-from rossum_api import ElisAPIClient
+from rich import print as pprint
+from rich.panel import Panel
 
 # from project_rossum_deploy.commands.download.download import download_project
-from project_rossum_deploy.commands.upload.dependencies import (
-    evaluate_create_dependencies,
-    merge_formula_changes,
-    merge_hook_changes,
+from project_rossum_deploy.commands.download.download import download_destinations
+from project_rossum_deploy.commands.upload.directory import UploadOrganizationDirectory
+from project_rossum_deploy.common.read_write import read_prd_project_config
+from project_rossum_deploy.common.upload_download_setup import (
+    check_unique_org_ids,
+    expand_destinations,
+    mark_subdirectories_to_include,
 )
-from project_rossum_deploy.commands.upload.operations import (
-    create_object,
-    update_object,
-)
-from project_rossum_deploy.common.client import create_and_validate_client
-from project_rossum_deploy.common.git import get_changed_file_paths
 from project_rossum_deploy.utils.consts import (
-    GIT_CHARACTERS,
     display_error,
+    display_warning,
     settings,
 )
 from project_rossum_deploy.utils.functions import (
     coro,
-    find_all_object_paths,
-    gather_with_concurrency,
-    make_request_with_progress,
 )
 
 
@@ -40,9 +32,9 @@ Only source files are taken into account by default.
                """,
 )
 @click.argument(
-    "destination",
-    default=settings.SOURCE_DIRNAME,
-    type=click.Choice([settings.SOURCE_DIRNAME, settings.TARGET_DIRNAME]),
+    "destinations",
+    nargs=-1,
+    type=click.Path(path_type=Path, exists=True),
 )
 @click.option(
     "--all",
@@ -80,11 +72,11 @@ Only source files are taken into account by default.
 )
 @coro
 async def upload_project_wrapper(
-    destination, all, force, indexed_only, commit, message
+    destinations, all, force, indexed_only, commit, message
 ):
     # To be able to run the command progammatically without the CLI decorators
-    await upload_project(
-        destination=destination,
+    await upload_destinations(
+        destinations=destinations,
         upload_all=all,
         force=force,
         indexed_only=indexed_only,
@@ -93,127 +85,77 @@ async def upload_project_wrapper(
     )
 
 
-async def upload_project(
-    destination: str,
-    client: ElisAPIClient = None,
+async def upload_destinations(
+    destinations: tuple[Path],
+    project_path: Path = None,
     upload_all: bool = False,
     force: bool = False,
     indexed_only: bool = False,
     commit: bool = False,
     commit_message: str = "",
 ):
-    try:
-        org_path = Path("./")
+    if not destinations:
+        display_warning("No destinations specified to pull.")
+        return
 
-        if not client:
-            client = await create_and_validate_client(destination)
+    if not project_path:
+        project_path = Path("./")
 
-        changes = get_changed_file_paths(destination, indexed_only=indexed_only)
+    project_config = await read_prd_project_config(project_path)
 
-        if changes:
-            changes = await merge_hook_changes(changes, org_path)
-            # changes = await evaluate_delete_dependencies(changes, org_path)
-            changes = await merge_formula_changes(changes)
-            changes = await evaluate_create_dependencies(changes, org_path, client)
+    configured_directories = {
+        name: UploadOrganizationDirectory(
+            name=name,
+            project_path=project_path,
+            upload_all=upload_all,
+            force=force,
+            indexed_only=indexed_only,
+            **value,
+        )
+        for name, value in project_config.get("directories", {}).items()
+    }
 
-        if upload_all:
-            await include_unmodified_files(org_path / destination, changes)
+    if not check_unique_org_ids(configured_directories=configured_directories):
+        return
 
-        requests = []
-        errors = []
+    expanded_destinations = expand_destinations(
+        destinations=destinations,
+        project_path=project_path,
+        configured_directories=configured_directories,
+    )
 
-        if not changes:
-            print(Panel(f"No changes to {settings.UPLOAD_COMMAND_NAME}."))
-            return
+    mark_subdirectories_to_include(
+        configured_directories=configured_directories,
+        expanded_destinations=expanded_destinations,
+    )
 
-        for change in changes:
-            op, path = change
-            match op:
-                case GIT_CHARACTERS.CREATED:
-                    requests.append(
-                        create_object(
-                            path=org_path / path,
-                            client=client,
-                            errors=errors,
-                            force=force,
-                        )
-                    )
-                case GIT_CHARACTERS.CREATED_STAGED:
-                    requests.append(
-                        create_object(
-                            path=org_path / path,
-                            client=client,
-                            errors=errors,
-                            force=force,
-                        )
-                    )
-                # case GIT_CHARACTERS.DELETED:
-                #    requests.append(delete_object(org_path / path, client, errors))
-                case GIT_CHARACTERS.UPDATED | GIT_CHARACTERS.PARTIALLY_UPADTED:
-                    if upload_all:
-                        requests.append(
-                            update_create_object(
-                                client=client,
-                                path=org_path / path,
-                                errors=errors,
-                                force=force,
-                            )
-                        )
-                    else:
-                        requests.append(
-                            update_object(
-                                client=client,
-                                path=org_path / path,
-                                errors=errors,
-                                force=force,
-                            )
-                        )
-                case _:
-                    display_error(f'Unrecognized operation "{op}" for "{path}".')
-                    errors.append({"op": op, "path": path})
+    errors_encountered = False
+    for dir_config in configured_directories.values():
+        if all(not subdir.include for subdir in dir_config.subdirectories.values()):
+            continue
 
-        with Progress() as progress:
-            task = progress.add_task("Pushing changes to Rossum.", total=len(requests))
-            await gather_with_concurrency(
-                5,
-                *map(lambda r: make_request_with_progress(r, progress, task), requests),
-            )
-
-        if len(errors):
-            errors_listed = "\n".join(list(map(lambda x: str(x["path"]), errors)))
-            display_error(
-                f"Errors happened during {settings.UPLOAD_COMMAND_NAME} for the following paths. Do not run {settings.DOWNLOAD_COMMAND_NAME} or you might lose changes in these files:\n{errors_listed}",
-            )
-            return
-        else:
-            # await download_project(destination=destination, client=client)
-            if commit:
-                subprocess.run(["git", "add", "."])
-                subprocess.run(["git", "commit", "-m", commit_message])
-            print(
-                Panel(
-                    f"Finished {settings.UPLOAD_COMMAND_NAME}.{ ' Please commit the changes before running this command again.' if not commit else ''}"
+        try:
+            await dir_config.upload_organization()
+            if dir_config.request_errors:
+                errors_encountered = True
+                display_error(
+                    f'Error(s) while uploading {dir_config.display_label}:\n{'\n'.join(dir_config.request_errors)}'
                 )
+        except Exception as e:
+            display_error(
+                f"Error during the {settings.UPLOAD_COMMAND_NAME} of {dir_config.display_label}: {e}",
+                e,
             )
 
-    except Exception as e:
-        display_error(f"Error during project {settings.UPLOAD_COMMAND_NAME}: {e}", e)
+    if not errors_encountered:
+        await download_destinations(destinations=destinations)
 
+    if commit:
+        subprocess.run(["git", "add", "."])
+        subprocess.run(["git", "commit", "-m", commit_message])
 
-async def update_create_object(client, path, errors, force):
-    result = await update_object(client=client, path=path, errors=errors, force=force)
-
-    if not result:
-        print(f'Recreating object with path "{path}".')
-        await create_object(path=path, client=client, errors=errors, force=force)
-
-
-async def include_unmodified_files(
-    destination_path: Path, changes: list[tuple[str, Path]]
-):
-    all_files = await find_all_object_paths(destination_path)
-
-    changes_paths = set(map(lambda x: x[1], changes))
-    for file_path in all_files:
-        if file_path not in changes_paths:
-            changes.append((GIT_CHARACTERS.UPDATED.value, file_path))
+    pprint(
+        Panel(
+            f"Finished {settings.UPLOAD_COMMAND_NAME}.{ ' Please commit the changes before running this command again.' if not commit else ''}"
+        )
+    )

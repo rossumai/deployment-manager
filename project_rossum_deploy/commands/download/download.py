@@ -3,11 +3,18 @@ import subprocess
 from anyio import Path
 
 import click
-from project_rossum_deploy.commands.download.directory import OrganizationDirectory
+from project_rossum_deploy.commands.download.directory import (
+    DownloadOrganizationDirectory,
+)
 
 
-from project_rossum_deploy.common.read_write import read_yaml
-from project_rossum_deploy.utils.consts import display_warning, settings
+from project_rossum_deploy.common.read_write import read_prd_project_config
+from project_rossum_deploy.common.upload_download_setup import (
+    check_unique_org_ids,
+    expand_destinations,
+    mark_subdirectories_to_include,
+)
+from project_rossum_deploy.utils.consts import display_error, display_warning, settings
 from project_rossum_deploy.utils.functions import (
     coro,
 )
@@ -76,7 +83,7 @@ async def download_project_wrapper(
 
 async def download_destinations(
     destinations: tuple[Path],
-    org_path: Path = None,
+    project_path: Path = None,
     commit: bool = False,
     commit_message: str = "",
     download_all: bool = False,
@@ -85,71 +92,48 @@ async def download_destinations(
         display_warning("No destinations specified to pull.")
         return
 
-    if not org_path:
-        org_path = Path("./")
+    if not project_path:
+        project_path = Path("./")
 
-    project_config = read_yaml(org_path / settings.CONFIG_FILENAME)
+    project_config = await read_prd_project_config(project_path)
     # TODO: const keys for stuff like 'directories'
     configured_directories = {
-        name: OrganizationDirectory(
-            name=name, org_path=org_path, download_all=download_all, **value
+        name: DownloadOrganizationDirectory(
+            name=name, project_path=project_path, download_all=download_all, **value
         )
         for name, value in project_config.get("directories", {}).items()
     }
 
-    # TODO: extract into function
-    unique_org_ids = set(
-        dir_config.org_id for dir_config in configured_directories.values()
-    )
-    if len(unique_org_ids) != len(configured_directories.values()):
-        display_warning(
-            "Configured directories do not have unique org IDs. If you want to have multiple directories for the same organization, use subdirectories."
-        )
+    if not check_unique_org_ids(configured_directories=configured_directories):
         return
 
-    # TODO: extract into function
-    expanded_destinations = []
-    for destination in destinations:
-        dir_name = (
-            str(destination.name)
-            if destination.parent == org_path
-            else str(destination.parent)
-        )
-        if dir_name not in configured_directories:
-            display_warning(
-                f'Destination "{destination}" not configured in {settings.CONFIG_FILENAME}. Skipping.'
-            )
+    expanded_destinations = expand_destinations(
+        destinations=destinations,
+        project_path=project_path,
+        configured_directories=configured_directories,
+    )
+
+    mark_subdirectories_to_include(
+        configured_directories=configured_directories,
+        expanded_destinations=expanded_destinations,
+    )
+
+    for org_dir_name, org_dir_config in configured_directories.items():
+        if all(not subdir.include for subdir in org_dir_config.subdirectories.values()):
             continue
 
-        # Only the "org-level" destination was specified
-        # Go through configured subdirectories and add them as destinations
-        if destination.parent == org_path:
-            dir_config = configured_directories.get(destination.name, {})
-            expanded_destinations.extend(
-                [
-                    str(org_path / destination / subdir)
-                    for subdir in dir_config.subdirectories.keys()
-                ]
-            )
-
-        else:
-            expanded_destinations.append(str(destination))
-
-    # TODO: extract into function
-    for dir_name, dir_config in configured_directories.items():
-        for subdir_name, subdir_config in dir_config.subdirectories.items():
-            if f"{dir_name}/{subdir_name}" in expanded_destinations:
-                subdir_config.download = True
-            subdir_path = org_path / dir_name / subdir_name
+        for subdir_name in org_dir_config.subdirectories.keys():
+            subdir_path = project_path / org_dir_name / subdir_name
             if not await subdir_path.exists():
                 os.mkdir(subdir_path)
 
-    # TODO: better key/value naming
-    for org_dir in configured_directories.values():
-        if all(not subdir.download for subdir in org_dir.subdirectories.values()):
-            continue
-
-        await org_dir.download_organization()
+        try:
+            await org_dir_config.download_organization()
+        except Exception as e:
+            display_error(
+                f"Error during the {settings.DOWNLOAD_COMMAND_NAME} of {org_dir_config.display_label}: {e}",
+                e,
+            )
 
     # TODO: test if no subdirs were specified
     # TODO: test with deleting objects

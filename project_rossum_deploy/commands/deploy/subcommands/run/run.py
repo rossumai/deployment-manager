@@ -53,7 +53,7 @@ async def deploy_release_file(
 
     if not source_client:
         source_credentials = await get_url_and_credentials(
-            base_path=base_path,
+            project_path=base_path,
             org_name=source_org_name,
             type=settings.SOURCE_DIRNAME,
             yaml_data=yaml.data,
@@ -82,7 +82,7 @@ async def deploy_release_file(
 
     if not target_client:
         target_credentials = await get_url_and_credentials(
-            base_path=base_path,
+            project_path=base_path,
             org_name=target_org_name if target_dir_subdir else "",
             type=settings.TARGET_DIRNAME,
             yaml_data=yaml.data,

@@ -48,7 +48,7 @@ class Saver(BaseModel):
                 self.objects_without_subdir.append(object)
                 continue
             # The subdir should not be pulled, disregard the current object
-            elif not subdir.download:
+            elif not subdir.include:
                 continue
             await self.save_downloaded_object(object, subdir)
 
@@ -242,7 +242,7 @@ class SchemaSaver(QueueSaver):
                 self.objects_without_subdir.append(object)
                 continue
             # The subdir should not be pulled, disregard the current object
-            elif not subdir.download:
+            elif not subdir.include:
                 continue
             await self.save_downloaded_object(object, subdir)
 

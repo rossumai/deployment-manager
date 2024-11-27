@@ -4,25 +4,30 @@ from rossum_api import APIClientError, ElisAPIClient
 from project_rossum_deploy.commands.deploy.subcommands.run.upload_helpers import (
     Credentials,
 )
+from project_rossum_deploy.common.read_write import (
+    read_prd_cred_file,
+    read_prd_project_config,
+)
 from project_rossum_deploy.utils.consts import display_error, settings
 
 
 from anyio import Path
-from ruamel.yaml import YAML
 
 
 async def get_api_url_from_config(base_path: Path, org_name: str):
-    config_path: Path = base_path / settings.CONFIG_FILENAME
-    if await config_path.exists():
-        try:
-            config_data = YAML().load(await config_path.read_text())
-            return (
-                config_data.get(settings.CONFIG_KEY_DIRECTORIES, {})
-                .get(org_name, {})
-                .get(settings.CONFIG_KEY_API_BASE_URL, "")
-            )
-        except Exception:
-            ...
+    try:
+        config_data = await read_prd_project_config(base_path)
+        if not config_data:
+            return ""
+
+        return (
+            config_data.get(settings.CONFIG_KEY_DIRECTORIES, {})
+            .get(org_name, {})
+            .get(settings.CONFIG_KEY_API_BASE_URL, "")
+        )
+    except Exception:
+        ...
+
     return ""
 
 
@@ -30,7 +35,9 @@ async def get_token_from_cred_file(org_path: Path):
     credentials_path: Path = org_path / settings.CREDENTIALS_FILENAME
     if await credentials_path.exists():
         try:
-            cred_data = YAML().load(await credentials_path.read_text())
+            cred_data = await read_prd_cred_file(org_path)
+            if not cred_data:
+                return ""
             return cred_data.get(settings.CONFIG_KEY_TOKEN, "")
         except Exception:
             ...

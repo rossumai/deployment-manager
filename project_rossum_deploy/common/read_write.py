@@ -5,6 +5,8 @@ from anyio import Path
 from rich import print
 from rossum_api.api_client import Resource
 import yaml
+from ruamel.yaml import YAML
+
 
 from project_rossum_deploy.utils.consts import settings
 from project_rossum_deploy.common.determine_path import determine_object_type_from_path
@@ -76,9 +78,9 @@ def find_formula_fields_in_schema(node: Any) -> list[tuple[str, str]]:
 
 
 def create_custom_hook_code_path(hook_path: Path, hook: object):
-    if hook["extension_source"] != "rossum_store" and hook.get("config", {}).get(
-        "code", None
-    ):
+    if hook.get("extension_source", "") != "rossum_store" and hook.get(
+        "config", {}
+    ).get("code", None):
         hook_runtime = hook["config"].get("runtime")
         extension = ".py" if "python" in hook_runtime else ".js"
         return hook_path.with_suffix(extension)
@@ -112,3 +114,17 @@ def read_yaml(path: Path):
 
 async def read_formula_file(path: Path):
     return await path.read_text()
+
+
+async def read_prd_project_config(project_path: Path):
+    config_path = project_path / settings.CONFIG_FILENAME
+    if await config_path.exists():
+        return YAML().load(await config_path.read_text())
+    return None
+
+
+async def read_prd_cred_file(org_path: Path):
+    credentials_path: Path = org_path / settings.CREDENTIALS_FILENAME
+    if await credentials_path.exists():
+        return YAML().load(await credentials_path.read_text())
+    return None

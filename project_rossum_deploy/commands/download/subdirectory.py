@@ -2,10 +2,11 @@ from typing import Annotated
 from pydantic import BaseModel, BeforeValidator
 
 
+# TODO: reorganize for both upload/download
 class Subdirectory(BaseModel):
     name: str
     regex: str = None
-    download: bool = False
+    include: bool = False
     object_ids: set[int] = None
 
 

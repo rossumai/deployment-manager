@@ -11,9 +11,7 @@ from project_rossum_deploy.commands.deploy.subcommands.run.object_release import
 )
 
 from project_rossum_deploy.commands.migrate.hooks import update_hook_code
-from project_rossum_deploy.utils.consts import (
-    display_error,
-)
+from project_rossum_deploy.utils.consts import display_error, settings
 
 
 from rossum_api.api_client import Resource
@@ -113,7 +111,7 @@ class HookRelease(ObjectRelease):
                     )
 
             pprint(
-                f'{self.PLAN_PRINT_STR if self.plan_only else ''} {self.CREATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}.'
+                f"{self.PLAN_PRINT_STR if self.plan_only else ''} {settings.CREATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}."
             )
             return result
         except Exception as e:
