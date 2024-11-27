@@ -260,6 +260,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
     async def should_remove_object(self, object_path: Path):
         object = await read_json(object_path)
         url, id = object.get("url", ""), object.get("id", "")
+        # Clearly not a Rossum object, just ignore
+        if not url or not id:
+            return False
+
         object_type = determine_object_type_from_url(url)
 
         if id not in self.id_object_map:
