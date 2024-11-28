@@ -43,6 +43,9 @@ from rossum_api.api_client import Resource
 class DownloadException(Exception): ...
 
 
+# TODO: use ConfigDict instead of Config class (pydantic)
+
+
 class OrganizationDirectory(BaseModel):
     class Config:
         arbitrary_types_allowed = True
@@ -146,8 +149,8 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 objects=workspaces_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
+                subdirs=subdir_list,
             )
-            workspace_saver.subdirs = subdir_list
             await workspace_saver.save_downloaded_objects()
 
             queue_saver = QueueSaver(
@@ -156,8 +159,8 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 workspaces=workspaces_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
+                subdirs=subdir_list,
             )
-            queue_saver.subdirs = subdir_list
             await queue_saver.save_downloaded_objects()
 
             # TODO: test inbox without any queue
@@ -168,8 +171,8 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 queues=queues_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
+                subdirs=subdir_list,
             )
-            inbox_saver.subdirs = subdir_list
             await inbox_saver.save_downloaded_objects()
 
             schema_saver = SchemaSaver(
@@ -179,8 +182,8 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 queues=queues_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
+                subdirs=subdir_list,
             )
-            schema_saver.subdirs = subdir_list
             await schema_saver.save_downloaded_objects()
 
             hook_saver = HookSaver(
@@ -188,8 +191,8 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 objects=hooks_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
+                subdirs=subdir_list,
             )
-            hook_saver.subdirs = subdir_list
             await hook_saver.save_downloaded_objects()
         except Exception as e:
             display_error("Error while saving objects ^", e)

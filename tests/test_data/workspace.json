@@ -1,0 +1,11 @@
+{
+    "id": 521887,
+    "name": "WS1 DEV",
+    "url": "https://rdttest.rossum.app/api/v1/workspaces/521887",
+    "organization": "https://rdttest.rossum.app/api/v1/organizations/251437",
+    "queues": [
+        "https://rdttest.rossum.app/api/v1/queues/1230128"
+    ],
+    "metadata": {},
+    "autopilot": true
+}
