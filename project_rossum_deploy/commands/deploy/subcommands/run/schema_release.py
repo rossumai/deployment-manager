@@ -1,7 +1,4 @@
 from anyio import Path
-from project_rossum_deploy.commands.deploy.subcommands.run.attribute_override import (
-    override_attributes_v2,
-)
 from project_rossum_deploy.commands.deploy.subcommands.run.object_release import (
     ObjectRelease,
     Target,
@@ -51,7 +48,7 @@ class SchemaRelease(ObjectRelease):
     def prepare_object_copy_for_deploy(self, target: Target):
         schema_copy = deepcopy(self.data)
         schema_copy["queues"] = []
-        override_attributes_v2(
+        self.overrider.override_attributes_v2(
             object=schema_copy, attribute_overrides=target.attribute_override
         )
 

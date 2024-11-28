@@ -21,11 +21,13 @@ class AttributeOverrideException(Exception): ...
 
 class AttributeOverrider:
     type: Resource
+    plan_only: bool = False
 
     IMPLICIT_OVERRIDE_KEYS = ["settings", "metadata"]
 
-    def __init__(self, type: Resource):
+    def __init__(self, type: Resource, plan_only: bool):
         self.type = type
+        self.plan_only = plan_only
 
     def replace_ids_in_target_object(
         self,
@@ -81,44 +83,6 @@ class AttributeOverrider:
                             display_warning(
                                 f"For overriding source_id '{source_id}' in {self.type.value} '{target.id}', There are multiple target IDs that could be assigned. The first one was used.",
                             )
-
-            # stringified_dict = json.dumps(target.data[key])
-            # for source_id, targets in lookup_table.items():
-            #     source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
-            #     # This ID from source was not found in the subobject
-            #     if not re.search(source_id_regex, stringified_dict):
-            #         continue
-
-            #     if not targets:
-            #         display_warning(
-            #             f'Could not override source_id "{source_id}" to its target equivalent in {self.type.value} "{target.id}". No target IDs found.',
-            #         )
-            #         continue
-            #     # N:N objects -> objects are referenced in pairs
-            #     elif num_targets == len(targets):
-            #         target_id = targets[target_object_index]["id"]
-            #         stringified_dict = self.replace_id_in_stringified_object(
-            #             object_str=stringified_dict,
-            #             regex=source_id_regex,
-            #             source_id=source_id,
-            #             target_id=target_id,
-            #         )
-            #     # N:1 objects -> everything should be mapped to the first target ID
-            #     else:
-            #         target_id = targets[0]["id"]
-            #         stringified_dict = self.replace_id_in_stringified_object(
-            #             object_str=stringified_dict,
-            #             regex=source_id_regex,
-            #             source_id=source_id,
-            #             target_id=target_id,
-            #         )
-
-            #         if len(targets) != 1:
-            #             display_warning(
-            #                 f"For overriding source_id '{source_id}' in {self.type.value} '{target.id}', There are multiple target IDs that could be assigned. The first one was used.",
-            #             )
-
-            #     target.data[key] = json.loads(stringified_dict)
 
     def replace_id_in_object(
         self, object: dict, key: str, value: str | int, source_id: int, target_id: int
@@ -195,6 +159,55 @@ class AttributeOverrider:
             colorized_lines.append(colorized_line)
         return "\n".join(colorized_lines)
 
+    def override_attribute_v2(
+        self,
+        object: dict,
+        key_query: str,
+        new_value: str,
+    ):
+        parent, key = parse_parent_and_key(key_query)
+
+        search = perform_search(parent, object)
+
+        for override_parent in search:
+            # The attribute (key) might not be on all parent objects (e.g., configurations[*].queue_ids)
+            if key not in override_parent:
+                continue
+
+            if isinstance(new_value, str):
+                source_regex, new_value = parse_regex_attribute_override(new_value)
+
+                if not source_regex:
+                    override_parent[key] = new_value
+                else:
+                    pattern = re.compile(source_regex)
+                    override_parent[key] = re.sub(
+                        pattern, new_value, override_parent[key]
+                    )
+            # Overwriting dicts -> merge keys, overwrite only the provided ones
+            elif isinstance(new_value, dict):
+                override_parent[key] = {**override_parent[key], **new_value}
+            # Overwriting lists and any other values -> replace the whole list
+            else:
+                override_parent[key] = new_value
+
+    def override_attributes_v2(
+        self,
+        object: dict,
+        attribute_overrides: dict,
+    ) -> dict:
+        if not object:
+            raise Exception(
+                f'Cannot perform attribute_override on None object (target name: {object.get("name", "")} | target id: {object.get("id", "")}).'
+            )
+
+        for key, value in attribute_overrides.items():
+            self.override_attribute_v2(
+                object=object,
+                key_query=key,
+                new_value=value,
+            )
+
 
 def create_regex_override_syntax(source: str, target: str):
     return f"{source}{settings.DEPLOY_OVERRIDE_REGEX_SEPARATOR}{target}"
@@ -206,45 +219,6 @@ def parse_regex_attribute_override(value: str):
         return ["", value]
     else:
         return split_values
-
-
-def override_attribute_v2(
-    object: dict,
-    key_query: str,
-    new_value: str,
-):
-    parent, key = parse_parent_and_key(key_query)
-
-    search = perform_search(parent, object)
-
-    for override_parent in search:
-        # The attribute (key) might not be on all parent objects (e.g., configurations[*].queue_ids)
-        if key not in override_parent:
-            continue
-
-        source_regex, new_value = parse_regex_attribute_override(new_value)
-        if not source_regex:
-            override_parent[key] = new_value
-        else:
-            pattern = re.compile(source_regex)
-            override_parent[key] = re.sub(pattern, new_value, override_parent[key])
-
-
-def override_attributes_v2(
-    object: dict,
-    attribute_overrides: dict,
-) -> dict:
-    if not object:
-        raise Exception(
-            f'Cannot perform attribute_override on None object (target name: {object.get("name", "")} | target id: {object.get("id", "")}).'
-        )
-
-    for key, value in attribute_overrides.items():
-        override_attribute_v2(
-            object=object,
-            key_query=key,
-            new_value=value,
-        )
 
 
 def parse_parent_and_key(key_query: str):

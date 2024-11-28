@@ -7,9 +7,6 @@ from pydantic import Field
 from project_rossum_deploy.commands.deploy.subcommands.run.inbox_release import (
     InboxRelease,
 )
-from project_rossum_deploy.commands.deploy.subcommands.run.attribute_override import (
-    override_attributes_v2,
-)
 from project_rossum_deploy.commands.deploy.subcommands.run.object_release import (
     EmptyObjectRelease,
     ObjectRelease,
@@ -146,7 +143,7 @@ class QueueRelease(ObjectRelease):
                     keep_hook_dependencies_without_equivalent=self.keep_hook_dependencies_without_equivalent,
                 )
 
-                override_attributes_v2(
+                self.overrider.override_attributes_v2(
                     object=queue_copy, attribute_overrides=target.attribute_override
                 )
 

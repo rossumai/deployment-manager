@@ -2,7 +2,6 @@ import questionary
 from rossum_api import ElisAPIClient
 from project_rossum_deploy.commands.deploy.subcommands.run.attribute_override import (
     AttributeOverrideException,
-    override_attributes_v2,
 )
 from rich import print as pprint
 from project_rossum_deploy.commands.deploy.subcommands.run.object_release import (
@@ -71,7 +70,7 @@ class HookRelease(ObjectRelease):
                         + f"/users/{self.token_owner_id}"
                     )
 
-                override_attributes_v2(
+                self.overrider.override_attributes_v2(
                     object=hook_copy, attribute_overrides=target.attribute_override
                 )
 

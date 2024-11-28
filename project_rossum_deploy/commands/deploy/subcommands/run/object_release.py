@@ -67,7 +67,7 @@ class ObjectRelease(BaseModel):
         self.plan_only = plan_only
         self.is_same_org_deploy = is_same_org_deploy
 
-        self.overrider = AttributeOverrider(self.type)
+        self.overrider = AttributeOverrider(type=self.type, plan_only=self.plan_only)
 
         try:
             self.data = await read_json(self.path)

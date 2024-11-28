@@ -1,8 +1,5 @@
 import asyncio
 from anyio import Path
-from project_rossum_deploy.commands.deploy.subcommands.run.attribute_override import (
-    override_attributes_v2,
-)
 from project_rossum_deploy.commands.deploy.subcommands.run.object_release import (
     ObjectRelease,
     Target,
@@ -86,7 +83,7 @@ class InboxRelease(ObjectRelease):
                     source_id_target_pairs=self.queue_targets,
                 )
 
-                override_attributes_v2(
+                self.overrider.override_attributes_v2(
                     object=inbox_copy, attribute_overrides=target.attribute_override
                 )
 

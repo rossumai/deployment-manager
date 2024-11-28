@@ -3,9 +3,6 @@ from copy import deepcopy
 from anyio import Path
 from rossum_api.api_client import Resource
 
-from project_rossum_deploy.commands.deploy.subcommands.run.attribute_override import (
-    override_attributes_v2,
-)
 from project_rossum_deploy.commands.deploy.subcommands.run.object_release import (
     ObjectRelease,
 )
@@ -53,7 +50,7 @@ class WorkspaceRelease(ObjectRelease):
                 ws_copy = deepcopy(self.data)
                 ws_copy["queues"] = []
                 ws_copy["organization"] = self.target_org_url
-                override_attributes_v2(
+                self.overrider.override_attributes_v2(
                     object=ws_copy, attribute_overrides=target.attribute_override
                 )
 
