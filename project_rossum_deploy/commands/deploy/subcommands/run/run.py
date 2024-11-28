@@ -6,7 +6,6 @@ from dataclasses import fields
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.models.organization import Organization
 
-from project_rossum_deploy.commands.deploy.common.helpers import get_filename_from_user
 from project_rossum_deploy.commands.deploy.subcommands.run.release_file import (
     DeployException,
     ReleaseFile,
@@ -14,9 +13,12 @@ from project_rossum_deploy.commands.deploy.subcommands.run.release_file import (
 from project_rossum_deploy.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
     check_required_keys,
+    get_after_deploy_file_path,
     get_url_and_credentials,
+    reverse_source_target_in_yaml,
 )
 
+from project_rossum_deploy.commands.download.download import download_destinations
 from project_rossum_deploy.common.read_write import read_json
 from project_rossum_deploy.utils.consts import (
     display_error,
@@ -24,13 +26,11 @@ from project_rossum_deploy.utils.consts import (
     settings,
 )
 
-# TODO: make work with org-dir/subdir
-
 
 # TODO: yes flag to skip the question after plan
 async def deploy_release_file(
     deploy_file_path: Path,
-    base_path: Path = None,
+    project_path: Path = None,
     source_client: ElisAPIClient = None,
     target_client: ElisAPIClient = None,
     # force: bool = False,
@@ -44,8 +44,8 @@ async def deploy_release_file(
     if not check_required_keys(yaml.data):
         return
 
-    if not base_path:
-        base_path = Path("./")
+    if not project_path:
+        project_path = Path("./")
 
     source_dir_subdir = yaml.data[settings.DEPLOY_KEY_SOURCE_DIR]
 
@@ -53,7 +53,7 @@ async def deploy_release_file(
 
     if not source_client:
         source_credentials = await get_url_and_credentials(
-            project_path=base_path,
+            project_path=project_path,
             org_name=source_org_name,
             type=settings.SOURCE_DIRNAME,
             yaml_data=yaml.data,
@@ -64,7 +64,7 @@ async def deploy_release_file(
             base_url=source_credentials.url, token=source_credentials.token
         )
 
-    source_org_path = base_path / source_org_name / "organization.json"
+    source_org_path = project_path / source_org_name / "organization.json"
     if not await source_org_path.exists():
         display_error(f'Could not find organization.json under "{source_org_path}"')
         return
@@ -82,7 +82,7 @@ async def deploy_release_file(
 
     if not target_client:
         target_credentials = await get_url_and_credentials(
-            project_path=base_path,
+            project_path=project_path,
             org_name=target_org_name if target_dir_subdir else "",
             type=settings.TARGET_DIRNAME,
             yaml_data=yaml.data,
@@ -93,8 +93,7 @@ async def deploy_release_file(
             base_url=target_credentials.url, token=target_credentials.token
         )
 
-    # TODO: check tokens
-    target_org_path: Path = base_path / target_org_name / "organization.json"
+    target_org_path: Path = project_path / target_org_name / "organization.json"
     if await target_org_path.exists():
         target_org_dict = await read_json(target_org_path)
         target_org = Organization(
@@ -116,7 +115,7 @@ async def deploy_release_file(
         else:
             target_org = target_org_choices[0].value
 
-    source_dir_path = base_path / Path(source_dir_subdir)
+    source_dir_path = project_path / Path(source_dir_subdir)
     try:
         release = ReleaseFile(
             **yaml.data,
@@ -204,22 +203,34 @@ async def deploy_release_file(
     )
     yaml.data[settings.DEPLOY_KEY_DEPLOYED_ORG_ID] = target_org.id
 
-    # TODO: extract into function
-    if first_deploy:
-        deployed_deploy_file_path = deploy_file_path.with_stem(
-            f"{deploy_file_path.stem}_deployed"
-        )
-        if await deployed_deploy_file_path.exists():
-            overwrite = await questionary.confirm(
-                f'File "{deployed_deploy_file_path}" already exists. Overwrite?',
-                default=False,
-            ).ask_async()
-            if not overwrite:
-                deployed_deploy_file_path = await get_filename_from_user(base_path)
-    else:
-        deployed_deploy_file_path = deploy_file_path
+    after_deploy_file_path = await get_after_deploy_file_path(
+        deploy_file_path=deploy_file_path,
+        project_path=project_path,
+        first_deploy=first_deploy,
+    )
+    yaml.save_to_file(after_deploy_file_path)
 
-    yaml.save_to_file(deployed_deploy_file_path)
+    # TODO: remember what was deployed, if those IDs exist locally, they should be automatically moved (pulled) into the new (sub)dir <- important for same-org
+    # ! TODO: if there is not target dir, ask the user for a name. Then offer to download all new objects into that dir
+    if (
+        not target_dir_subdir
+        and await questionary.confirm(
+            f"Would you like to specify target directory and {settings.DOWNLOAD_COMMAND_NAME} the deployed objects?"
+        ).ask_async()
+    ):
+        # target_dir_subdir_path = project_path / Path(target_dir_subdir)
+        ...
+    else:
+        target_dir_subdir_path = project_path / Path(target_dir_subdir)
+        await download_destinations(
+            destinations=[target_dir_subdir_path], project_path=project_path
+        )
+
+    # TODO: prod to UAT deploy and reverse the deploy file
+    # Save new reversed file, do not override the after_deploy_file
+    reverse_mapping = yaml.data.get(settings.DEPLOY_KEY_REVERSE_MAPPING, False)
+    if reverse_mapping:
+        await reverse_source_target_in_yaml(yaml=yaml)
 
     return
 
@@ -228,24 +239,7 @@ async def deploy_release_file(
 
 # TODO: diff could show ID and (name)
 
-
 # TODO: check if remote was not modified when updating?
 
 
-# check if queue has its WS being deployed or it is a queue with an existing target_id
-
 # TODO: log all messages to stdout and into a separate file as well
-
-# TODO: make purge work with deploy files as well
-# Just specify the deploy file. It will look at the target URL/dir
-# If the dir was found locally, the files will be deleted as well
-
-# TODO: download changes into proper dir (based on the deploy file) (once pull is updated)
-# TODO: if the objects existed in some other dir, remove it from there (the pull command will not be built for that anymore)
-
-# TODO: prod to UAT deploy and reverse the deploy file
-
-
-# ! TODO: if there is not target dir, ask the user for a name. Then offer to download all new objects into that dir
-
-# TODO: support for secrets

@@ -22,6 +22,11 @@ from project_rossum_deploy.utils.functions import (
     coro,
 )
 
+# TODO: make purge work with deploy files as well
+# Just specify the deploy file. It will look at the target URL/dir
+# If the dir was found locally, the files will be deleted as well
+# ??? What about cases where you don't have the deploy file and want to clean up org? -> just look at the Elis API
+
 
 @click.command(
     name=settings.PURGE_COMMAND_NAME,
@@ -87,6 +92,7 @@ async def purge_unused_schemas(destination: str, client: ElisAPIClient = None):
             display_error(f'Error while purging schema "{schema.id}"', e)
 
 
+# !!! Mapping no longer applicable: IDs will have to be taken from remote or from local FS
 async def purge_destination(
     destination: str,
     client: ElisAPIClient = None,
