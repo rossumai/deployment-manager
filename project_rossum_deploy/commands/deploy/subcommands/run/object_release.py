@@ -235,6 +235,7 @@ class ObjectRelease(BaseModel):
     # TODO: compile lists for each object?
     # TODO: add more attributes (e.g., modified_by, modified_at)
     def remove_override_irrelevant_props(self, data):
+        # These attribute either should not be compared or were already replaced via replace_dependency_url()
         data.pop("modified_by", None)
         data.pop("modified_at", None)
         match self.type:
@@ -255,7 +256,7 @@ class ObjectRelease(BaseModel):
                 data.pop("workspace", None)
                 data.pop("inbox", None)
                 data.pop("schema", None)
-                # data.pop("hooks", None)
+                data.pop("hooks", None)
                 data.pop("webhooks", None)
 
 

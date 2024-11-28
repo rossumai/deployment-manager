@@ -6,8 +6,11 @@ from rich import print as pprint
 
 
 from project_rossum_deploy.commands.deploy.common.helpers import (
-    get_token_from_cred_file,
-    get_token_from_user,
+    validate_credentials,
+)
+from project_rossum_deploy.commands.deploy.subcommands.run.helpers import get_token
+from project_rossum_deploy.commands.deploy.subcommands.run.upload_helpers import (
+    Credentials,
 )
 from project_rossum_deploy.commands.download.downloader import Downloader
 from project_rossum_deploy.commands.download.helpers import (
@@ -95,12 +98,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
         self.changed_files = changed_files
 
         if not self.client:
-            token = await get_token_from_cred_file(self.org_path)
-            if not token:
-                token = await get_token_from_user(type=self.name)
+            token = await get_token(project_path=self.project_path, org_name=self.name)
+            credentials = Credentials(token=token, url=self.api_base)
+            await validate_credentials(credentials)
             self.client = ElisAPIClient(base_url=self.api_base, token=token)
-
-    # TODO: check token
 
     # TODO: catch errors on org-dir or subdir level?
     async def download_organization(self):
