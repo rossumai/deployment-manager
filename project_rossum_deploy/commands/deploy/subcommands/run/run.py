@@ -231,7 +231,6 @@ async def deploy_release_file(
     reverse_mapping = yaml.data.get(settings.DEPLOY_KEY_REVERSE_MAPPING, False)
     if reverse_mapping:
         reversed_yaml = await reverse_source_target_in_yaml(
-            deploy_file_path=deploy_file_path,
             yaml=yaml,
             source_org=source_org,
             target_org=target_org,

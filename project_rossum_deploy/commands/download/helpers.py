@@ -3,6 +3,7 @@ import os
 import shutil
 from typing import Any
 from anyio import Path
+import questionary
 from rich.prompt import Confirm
 from rich import print
 from rossum_api import APIClientError, ElisAPIClient
@@ -86,9 +87,12 @@ async def should_write_object(path: Path, remote_object: Any, changed_files: lis
             and local_file.get("hooks", []) != remote_object.get("hooks", [])
         ):
             if path in changed_files:
-                return Confirm.ask(
-                    f'File "{path}" has local unversioned changes (local: {local_timestamp} | remote: {remote_timestamp}). Should the remote version overwrite the local one?',
+                display_warning(
+                    f'File "{path}" has local unversioned changes (local: {local_timestamp} | remote: {remote_timestamp}).'
                 )
+                return await questionary.confirm(
+                    "Should the remote version overwrite the local one?",
+                ).ask_async()
             return True
 
     else:
