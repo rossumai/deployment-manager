@@ -13,11 +13,13 @@ from project_rossum_deploy.commands.deploy.subcommands.run.release_file import (
 from project_rossum_deploy.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
     check_required_keys,
-    get_after_deploy_file_path,
+    get_new_deploy_file_path,
     get_url_and_credentials,
-    reverse_source_target_in_yaml,
 )
 
+from project_rossum_deploy.commands.deploy.subcommands.run.reverse_override import (
+    reverse_source_target_in_yaml,
+)
 from project_rossum_deploy.commands.download.download import download_destinations
 from project_rossum_deploy.common.read_write import read_json
 from project_rossum_deploy.utils.consts import (
@@ -203,7 +205,7 @@ async def deploy_release_file(
     )
     yaml.data[settings.DEPLOY_KEY_DEPLOYED_ORG_ID] = target_org.id
 
-    after_deploy_file_path = await get_after_deploy_file_path(
+    after_deploy_file_path = await get_new_deploy_file_path(
         deploy_file_path=deploy_file_path,
         project_path=project_path,
         first_deploy=first_deploy,
@@ -226,11 +228,23 @@ async def deploy_release_file(
             destinations=[target_dir_subdir_path], project_path=project_path
         )
 
-    # TODO: prod to UAT deploy and reverse the deploy file
-    # Save new reversed file, do not override the after_deploy_file
     reverse_mapping = yaml.data.get(settings.DEPLOY_KEY_REVERSE_MAPPING, False)
     if reverse_mapping:
-        await reverse_source_target_in_yaml(yaml=yaml)
+        reversed_yaml = await reverse_source_target_in_yaml(
+            deploy_file_path=deploy_file_path,
+            yaml=yaml,
+            source_org=source_org,
+            target_org=target_org,
+            prev_source_client=source_client,
+            prev_target_client=target_client,
+        )
+        reverse_deploy_file_path = await get_new_deploy_file_path(
+            deploy_file_path=deploy_file_path,
+            project_path=project_path,
+            first_deploy=True,
+            suffix="_reversed",
+        )
+        reversed_yaml.save_to_file(reverse_deploy_file_path)
 
     return
 

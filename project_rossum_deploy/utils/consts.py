@@ -210,6 +210,12 @@ class Settings:
     DEPLOY_KEY_UNSELECTED_HOOK_IDS = "unselected_hooks"
     DEPLOY_KEY_PATCH_TARGET_ORG = "patch_target_org"
 
+    DEPLOY_KEY_WORKSPACES = "workspaces"
+    DEPLOY_KEY_QUEUES = "queues"
+    DEPLOY_KEY_SCHEMA = "schema"
+    DEPLOY_KEY_INBOX = "inbox"
+    DEPLOY_KEY_HOOKS = "hooks"
+
     UPDATE_PRINT_STR: str = "[blue]UPDATE[/blue]"
     CREATE_PRINT_STR: str = "[green]CREATE[/green]"
     DELETE_PRINT_STR: str = "[red]DELETE[/red]"

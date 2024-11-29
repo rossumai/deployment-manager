@@ -225,7 +225,8 @@ class ReleaseFile(BaseModel):
                     "Please choose target hook token owner:", choices=user_choices
                 ).ask_async()
 
-    def is_user_admin(self, user: User, user_roles: list[Group]):
+    @classmethod
+    def is_user_admin(cls, user: User, user_roles: list[Group]):
         admin_urls = [
             role.url
             for role in user_roles

@@ -96,12 +96,15 @@ def traverse_object(parent_object: dict | None, parent_key: str, value: Any):
         yield parent_object, parent_key, value
 
 
-async def get_after_deploy_file_path(
-    deploy_file_path: Path, project_path: Path, first_deploy: bool
+async def get_new_deploy_file_path(
+    deploy_file_path: Path,
+    project_path: Path,
+    first_deploy: bool,
+    suffix: str = "_deployed",
 ):
     if first_deploy:
         after_deploy_file_path = deploy_file_path.with_stem(
-            f"{deploy_file_path.stem}_deployed"
+            f"{deploy_file_path.stem}{suffix}"
         )
         if await after_deploy_file_path.exists():
             overwrite = await questionary.confirm(
@@ -114,20 +117,3 @@ async def get_after_deploy_file_path(
         after_deploy_file_path = deploy_file_path
 
     return after_deploy_file_path
-
-
-async def reverse_source_target_in_yaml(yaml: DeployYaml):
-    # Reverse dirs and urls
-
-    # Reverse token_owner_id
-
-    # Reverse IDs including org_id
-
-    # Reverse base_path for queues
-
-    # Reverse unselected hooks
-
-    # Reverse attribute override
-    # Go through objects with have override
-    # Find the key in the previous source (now target) object, use that value for the override
-    ...
