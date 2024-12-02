@@ -89,7 +89,9 @@ async def download_destinations(
     download_all: bool = False,
 ):
     if not destinations:
-        display_warning("No destinations specified to pull.")
+        display_warning(
+            f"No destinations specified to {settings.DOWNLOAD_COMMAND_NAME}."
+        )
         return
 
     if not project_path:

@@ -44,7 +44,7 @@ async def get_token_from_cred_file(org_path: Path):
     return ""
 
 
-async def get_api_url_from_user(type: str, default: str = ""):
+async def get_api_url_from_user(type: str = "Rossum", default: str = ""):
     if default is None:
         default = ""
     api_url = await questionary.text(
@@ -61,7 +61,7 @@ async def get_api_url_from_user(type: str, default: str = ""):
     return api_url
 
 
-async def get_token_from_user(type: str):
+async def get_token_from_user(type: str = "Rossum"):
     return await questionary.text(f"Enter token for the {type} API:").ask_async()
 
 

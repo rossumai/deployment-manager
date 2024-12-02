@@ -157,6 +157,7 @@ class Settings:
     SOURCE_DIRNAME: str = "source"
     TARGET_DIRNAME: str = "target"
     UNUSED_SCHEMAS: str = "unused_schemas"
+    ALL_OBJECTS: str = "all"
 
     ORGANIZATION_FIELDS: list[str] = ["ui_settings", "metadata"]
     PRIVATE_HOOK_DUMMY_URL: str = "https://example.com"
