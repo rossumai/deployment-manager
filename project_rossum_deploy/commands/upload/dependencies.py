@@ -1,7 +1,6 @@
 import os
 from rich.prompt import Confirm
 from rossum_api import ElisAPIClient
-from project_rossum_deploy.commands.migrate.schemas import find_schema_id
 from project_rossum_deploy.common.read_write import (
     create_custom_hook_code_path,
     create_formula_directory_path,
@@ -12,6 +11,7 @@ from project_rossum_deploy.common.read_write import (
     write_json,
     write_str,
 )
+from project_rossum_deploy.common.schema import find_schema_id
 from project_rossum_deploy.utils.consts import GIT_CHARACTERS, display_error, settings
 
 

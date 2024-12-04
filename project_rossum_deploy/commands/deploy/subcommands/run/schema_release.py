@@ -3,8 +3,9 @@ from project_rossum_deploy.commands.deploy.subcommands.run.object_release import
     ObjectRelease,
     Target,
 )
-from project_rossum_deploy.commands.migrate.schemas import update_formula_fields_code
-from project_rossum_deploy.utils.consts import display_error
+from project_rossum_deploy.common.read_write import read_formula_file
+from project_rossum_deploy.common.schema import find_schema_id
+from project_rossum_deploy.utils.consts import display_error, settings
 
 
 from rossum_api.api_client import Resource
@@ -12,6 +13,8 @@ from rossum_api.api_client import Resource
 
 import asyncio
 from copy import deepcopy
+
+from project_rossum_deploy.utils.functions import templatize_name_id
 
 
 class SchemaRelease(ObjectRelease):
@@ -35,7 +38,7 @@ class SchemaRelease(ObjectRelease):
             is_same_org_deploy=is_same_org_deploy,
         )
 
-        await update_formula_fields_code(self.path, self.data)
+        await self.update_formula_fields_code()
 
     @property
     def path(self) -> Path:
@@ -71,3 +74,24 @@ class SchemaRelease(ObjectRelease):
                 e,
             )
             self.deploy_failed = True
+
+    async def update_formula_fields_code(self):
+        """Checks if there is not newer code in the associated formula fields and uses that for release.
+        The original schema file is not modified.
+        """
+        formula_directory = (
+            self.path.parent
+            / f"{settings.FORMULA_DIR_NAME}{templatize_name_id(self.data['name'], self.data['id'])}"
+        )
+        if not await formula_directory.exists():
+            return
+
+        async for field_file_path in formula_directory.iterdir():
+            if not await field_file_path.is_file():
+                continue
+
+            formula_code = await read_formula_file(field_file_path)
+            formula_name = field_file_path.stem
+
+            schema_id = find_schema_id(self.data["content"], formula_name)
+            schema_id["formula"] = formula_code

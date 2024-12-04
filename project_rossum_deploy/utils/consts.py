@@ -269,10 +269,10 @@ def initialize_settings():
         migrate_config()
         settings = Settings()
 
-        if not settings.IS_PROJECT_IN_SAME_ORG:
-            settings.IGNORED_KEYS[Resource.Queue].extend(
-                ["dedicated_engine", "engine", "generic_engine"]
-            )
+        # if not settings.IS_PROJECT_IN_SAME_ORG:
+        #     settings.IGNORED_KEYS[Resource.Queue].extend(
+        #         ["dedicated_engine", "engine", "generic_engine"]
+        #     )
 
     except Exception as e:
         display_error(f"Error while initializing PRD settings: {str(e)}", e)

@@ -9,7 +9,6 @@ from project_rossum_deploy.commands.deploy.subcommands.run.object_release import
     Target,
 )
 
-from project_rossum_deploy.commands.migrate.hooks import update_hook_code
 from project_rossum_deploy.utils.consts import display_error, settings
 
 
@@ -50,7 +49,7 @@ class HookRelease(ObjectRelease):
         self.token_owner_id = token_owner_id
         if not self.hook_template_url:
             self.hook_template_url = hook_template_url
-        await update_hook_code(self.path, self.data)
+        await self.update_hook_code()
 
     async def deploy(self):
         try:
@@ -214,3 +213,15 @@ class HookRelease(ObjectRelease):
             )
 
         return target_hook_template_match_url
+
+    async def update_hook_code(self):
+        """Checks if there is not newer code in the associated file and uses that for release.
+        The original hook file is not modified.
+        """
+        if self.data.get("extension_source", "") != "rossum_store" and (
+            self.data.get("config", {}).get("code", None)
+        ):
+            suffix = ".py" if "python" in self.data["config"].get("runtime") else ".js"
+            code_path = self.path.with_suffix(suffix)
+            new_code = await code_path.read_text()
+            self.data["config"]["code"] = new_code
