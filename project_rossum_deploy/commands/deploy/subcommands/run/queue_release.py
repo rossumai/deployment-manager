@@ -4,6 +4,7 @@ from typing import Union
 
 from anyio import Path
 from pydantic import Field
+import questionary
 from project_rossum_deploy.commands.deploy.subcommands.run.inbox_release import (
     InboxRelease,
 )
@@ -19,7 +20,7 @@ from project_rossum_deploy.commands.deploy.subcommands.run.schema_release import
     SchemaRelease,
 )
 from project_rossum_deploy.commands.migrate.helpers import replace_dependency_url
-from project_rossum_deploy.utils.consts import display_error
+from project_rossum_deploy.utils.consts import display_error, display_warning
 from project_rossum_deploy.utils.functions import (
     templatize_name_id,
 )
@@ -28,6 +29,7 @@ from project_rossum_deploy.utils.functions import (
 class QueueRelease(ObjectRelease):
     type: Resource = Resource.Queue
     keep_hook_dependencies_without_equivalent: bool = False
+    ignore_workflow_warning: bool = False
 
     schema_release: SchemaRelease = Field(alias="schema")
     inbox_release: Union[InboxRelease, EmptyObjectRelease] = Field(
@@ -72,6 +74,18 @@ class QueueRelease(ObjectRelease):
 
     async def deploy(self):
         try:
+            if (
+                self.plan_only
+                and self.data.get("workflows", [])
+                and not self.ignore_workflow_warning
+            ):
+                display_warning(
+                    f"{self.display_type} {self.display_label} has workflows defined. Please make sure to create and assign them manually for the target."
+                )
+                await questionary.confirm(
+                    "Press ENTER to continue. You can disable this plan by adding 'ignore_workflow_warning: true' to the queue deploy object.",
+                ).ask_async()
+
             await self.schema_release.initialize(
                 yaml=self.yaml,
                 client=self.client,
@@ -94,6 +108,7 @@ class QueueRelease(ObjectRelease):
             for target_index, target in enumerate(self.targets):
                 queue_copy = deepcopy(self.data)
                 queue_copy.pop("inbox", None)
+                queue_copy.pop("workflows", None)
 
                 previous_workspace_url = queue_copy["workspace"]
                 replace_dependency_url(

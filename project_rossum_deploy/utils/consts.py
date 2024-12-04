@@ -223,7 +223,7 @@ class Settings:
     PLAN_PRINT_STR: str = "[bold]PLAN:[/bold]"
 
     IGNORED_KEYS: dict = {
-        Resource.Queue: ["counts", "users", "workflows"],
+        Resource.Queue: ["counts", "users"],
         Resource.Hook: ["status"],
     }
 
