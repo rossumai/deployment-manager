@@ -280,47 +280,65 @@ async def get_queues_from_user(
         objects_in_previous_file=previous_deploy_file_queues,
     )
 
-    # TODO: functions for paths for schemas and inboxes
     previous_queues_by_id = {
         object["id"]: object for object in previous_deploy_file_queues
     }
     for queue in deploy_file_queues:
         # No point letting the user select a schema or inbox, each queue should just get its schema
-        schema_path = (
-            Path(queue[settings.DEPLOY_KEY_BASE_PATH])
-            / "queues"
-            / templatize_name_id(queue["name"], queue["id"])
-            / "schema.json"
+        await get_schema_for_queue(
+            queue=queue, previous_queues_by_id=previous_queues_by_id
         )
-        if not (await schema_path.exists()):
-            continue
-        schema_object = await read_json(schema_path)
-
-        previous_schema = previous_queues_by_id.get(queue["id"], {}).get("schema", {})
-
-        deploy_schema_object = prepare_subqueue_deploy_file_object(
-            object=schema_object, previous_object=previous_schema
+        await get_inbox_for_queue(
+            queue=queue, previous_queues_by_id=previous_queues_by_id
         )
-        queue["schema"] = deploy_schema_object
-
-        inbox_path = (
-            Path(queue[settings.DEPLOY_KEY_BASE_PATH])
-            / "queues"
-            / templatize_name_id(queue["name"], queue["id"])
-            / "inbox.json"
-        )
-        if not (await inbox_path.exists()):
-            continue
-        inbox_object = await read_json(inbox_path)
-
-        previous_inbox = previous_queues_by_id.get(queue["id"], {}).get("inbox", {})
-
-        deploy_inbox_object = prepare_subqueue_deploy_file_object(
-            object=inbox_object, previous_object=previous_inbox
-        )
-        queue["inbox"] = deploy_inbox_object
 
     return deploy_file_queues, selected_queues
+
+
+async def get_schema_for_queue(queue: dict, previous_queues_by_id: dict):
+    schema_path = (
+        Path(queue[settings.DEPLOY_KEY_BASE_PATH])
+        / settings.DEPLOY_KEY_QUEUES
+        / templatize_name_id(queue["name"], queue["id"])
+        / "schema.json"
+    )
+
+    if not (await schema_path.exists()):
+        return
+
+    schema_object = await read_json(schema_path)
+
+    previous_schema = previous_queues_by_id.get(queue["id"], {}).get(
+        settings.DEPLOY_KEY_SCHEMA, {}
+    )
+
+    deploy_schema_object = prepare_subqueue_deploy_file_object(
+        object=schema_object, previous_object=previous_schema
+    )
+    queue[settings.DEPLOY_KEY_SCHEMA] = deploy_schema_object
+
+
+async def get_inbox_for_queue(queue: dict, previous_queues_by_id: dict):
+    inbox_path = (
+        Path(queue[settings.DEPLOY_KEY_BASE_PATH])
+        / settings.DEPLOY_KEY_QUEUES
+        / templatize_name_id(queue["name"], queue["id"])
+        / "inbox.json"
+    )
+
+    if not (await inbox_path.exists()):
+        return
+
+    inbox_object = await read_json(inbox_path)
+
+    previous_inbox = previous_queues_by_id.get(queue["id"], {}).get(
+        settings.DEPLOY_KEY_INBOX, {}
+    )
+
+    deploy_inbox_object = prepare_subqueue_deploy_file_object(
+        object=inbox_object, previous_object=previous_inbox
+    )
+    queue[settings.DEPLOY_KEY_INBOX] = deploy_inbox_object
 
 
 async def get_hooks_from_user(
@@ -399,11 +417,11 @@ async def get_attribute_overrides_from_user():
             AttributeOverride(
                 object_types=override_objects,
                 attribute=override_attribute,
-                value=create_regex_override_syntax(
-                    override_source_regex, override_target
-                )
-                if override_source_regex
-                else override_target,
+                value=(
+                    create_regex_override_syntax(override_source_regex, override_target)
+                    if override_source_regex
+                    else override_target
+                ),
             )
         )
     return overrides
