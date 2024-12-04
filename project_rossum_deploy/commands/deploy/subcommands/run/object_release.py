@@ -251,7 +251,6 @@ class ObjectRelease(BaseModel):
                 data.pop("organization", None)
             case Resource.Queue:
                 data.pop("users", None)
-                data.pop("workflows", None)
                 data.pop("counts", None)
                 data.pop("workspace", None)
                 data.pop("inbox", None)

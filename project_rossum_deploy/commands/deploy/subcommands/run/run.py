@@ -184,6 +184,7 @@ async def deploy_release_file(
     release.token_owner_id = planned_release.token_owner_id
     release.hook_templates = planned_release.hook_templates
 
+    deploy_error = False
     try:
         await release.deploy_organization()
 
@@ -196,6 +197,7 @@ async def deploy_release_file(
 
         await release.apply_implicit_id_override()
     except Exception:
+        deploy_error = True
         display_warning(
             "Encountered error during deploy, see logs above. Saving intermediary results."
         )
@@ -212,6 +214,36 @@ async def deploy_release_file(
     )
     yaml.save_to_file(after_deploy_file_path)
 
+    reverse_mapping = yaml.data.get(settings.DEPLOY_KEY_REVERSE_MAPPING, False)
+    if reverse_mapping:
+        try:
+            reversed_yaml = await reverse_source_target_in_yaml(
+                yaml=yaml,
+                source_org=source_org,
+                target_org=target_org,
+                prev_source_client=source_client,
+                prev_target_client=target_client,
+            )
+
+            reverse_deploy_file_path = await get_new_deploy_file_path(
+                deploy_file_path=deploy_file_path,
+                project_path=project_path,
+                first_deploy=True,
+                suffix="_reversed",
+            )
+            reversed_yaml.save_to_file(reverse_deploy_file_path)
+        except Exception as e:
+            display_error("Error while reversing mapipng in the deploy file. ^", e)
+
+    if (
+        deploy_error
+        and not await questionary.confirm(
+            f"There was an error during {settings.DEPLOY_COMMAND_NAME}. Do you want to {settings.DOWNLOAD_COMMAND_NAME} the changes?",
+            default=False,
+        ).ask_async()
+    ):
+        return
+
     # TODO: remember what was deployed, if those IDs exist locally, they should be automatically moved (pulled) into the new (sub)dir <- important for same-org
     # ! TODO: if there is not target dir, ask the user for a name. Then offer to download all new objects into that dir
     if (
@@ -227,25 +259,6 @@ async def deploy_release_file(
         await download_destinations(
             destinations=[target_dir_subdir_path], project_path=project_path
         )
-
-    reverse_mapping = yaml.data.get(settings.DEPLOY_KEY_REVERSE_MAPPING, False)
-    if reverse_mapping:
-        reversed_yaml = await reverse_source_target_in_yaml(
-            yaml=yaml,
-            source_org=source_org,
-            target_org=target_org,
-            prev_source_client=source_client,
-            prev_target_client=target_client,
-        )
-        reverse_deploy_file_path = await get_new_deploy_file_path(
-            deploy_file_path=deploy_file_path,
-            project_path=project_path,
-            first_deploy=True,
-            suffix="_reversed",
-        )
-        reversed_yaml.save_to_file(reverse_deploy_file_path)
-
-    return
 
 
 # TODO: more granular error handling for hook dep graph and implicit attribute override

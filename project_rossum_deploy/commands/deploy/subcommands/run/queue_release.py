@@ -20,7 +20,11 @@ from project_rossum_deploy.commands.deploy.subcommands.run.schema_release import
     SchemaRelease,
 )
 from project_rossum_deploy.commands.migrate.helpers import replace_dependency_url
-from project_rossum_deploy.utils.consts import display_error, display_warning
+from project_rossum_deploy.utils.consts import (
+    QUEUE_ENGINE_ATTRIBUTES,
+    display_error,
+    display_warning,
+)
 from project_rossum_deploy.utils.functions import (
     templatize_name_id,
 )
@@ -29,7 +33,7 @@ from project_rossum_deploy.utils.functions import (
 class QueueRelease(ObjectRelease):
     type: Resource = Resource.Queue
     keep_hook_dependencies_without_equivalent: bool = False
-    ignore_workflow_warning: bool = False
+    ignore_deploy_warnings: bool = False
 
     schema_release: SchemaRelease = Field(alias="schema")
     inbox_release: Union[InboxRelease, EmptyObjectRelease] = Field(
@@ -74,17 +78,14 @@ class QueueRelease(ObjectRelease):
 
     async def deploy(self):
         try:
-            if (
-                self.plan_only
-                and self.data.get("workflows", [])
-                and not self.ignore_workflow_warning
-            ):
-                display_warning(
-                    f"{self.display_type} {self.display_label} has workflows defined. Please make sure to create and assign them manually for the target."
-                )
-                await questionary.confirm(
-                    "Press ENTER to continue. You can disable this plan by adding 'ignore_workflow_warning: true' to the queue deploy object.",
-                ).ask_async()
+            if self.plan_only:
+                # Ignore warnings independently (ignore in first function would hide warning in second)
+                self.yaml_reference[
+                    "ignore_deploy_warnings"
+                ] = await self.evaluate_workflow_warning()
+                self.yaml_reference[
+                    "ignore_deploy_warnings"
+                ] = await self.evaluate_engine_warning()
 
             await self.schema_release.initialize(
                 yaml=self.yaml,
@@ -108,7 +109,8 @@ class QueueRelease(ObjectRelease):
             for target_index, target in enumerate(self.targets):
                 queue_copy = deepcopy(self.data)
                 queue_copy.pop("inbox", None)
-                queue_copy.pop("workflows", None)
+                if not self.is_same_org_deploy:
+                    self.remove_attributes_for_cross_org(queue_copy=queue_copy)
 
                 previous_workspace_url = queue_copy["workspace"]
                 replace_dependency_url(
@@ -185,3 +187,33 @@ class QueueRelease(ObjectRelease):
                 f"Error while migrating {self.display_type} {self.name} ({self.id}): {e}",
                 e,
             )
+
+    def remove_attributes_for_cross_org(self, queue_copy: dict):
+        queue_copy.pop("workflows", None)
+        for attr in QUEUE_ENGINE_ATTRIBUTES:
+            queue_copy.pop(attr)
+
+    async def evaluate_workflow_warning(self):
+        if self.ignore_deploy_warnings or self.is_same_org_deploy:
+            return
+
+        if self.data.get("workflows", []):
+            display_warning(
+                f"{self.display_type} {self.display_label} has 'workflows' defined. Please make sure to create and assign them manually for the target."
+            )
+            return await questionary.confirm(
+                "Do you want to disable warnings like this for this queue?",
+            ).ask_async()
+
+    async def evaluate_engine_warning(self):
+        for attr in QUEUE_ENGINE_ATTRIBUTES:
+            if self.ignore_deploy_warnings or self.is_same_org_deploy:
+                return
+
+            if self.data.get(attr, None):
+                display_warning(
+                    f"{self.display_type} {self.display_label} has '{attr}' defined. Please make sure to create and assign it manually for the target."
+                )
+                return await questionary.confirm(
+                    "Do you want to disable warnings like this for this queue?",
+                ).ask_async()

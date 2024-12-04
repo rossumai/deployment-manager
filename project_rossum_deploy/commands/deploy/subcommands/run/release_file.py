@@ -66,6 +66,10 @@ class ReleaseFile(BaseModel):
     workspace_targets: list[Target] = []
     queue_targets: list[Target] = []
 
+    @property
+    def is_same_org(self):
+        return self.source_org.id == self.target_org.id
+
     async def apply_implicit_id_override(self):
         if not self.plan_only:
             pprint(Panel("Applying implicit ID override"))
@@ -109,29 +113,9 @@ class ReleaseFile(BaseModel):
                 )
             )
 
-        if self.patch_target_org and self.source_org.id != self.target_org.id:
+        if self.patch_target_org and not self.is_same_org:
             await organization_release.deploy()
             self.detect_exceptions([organization_release])
-
-    # async def deploy_schemas(self):
-    # await asyncio.gather(
-    #     *[
-    #         schema_release.initialize(
-    #             yaml=self.yaml,
-    #             client=self.client,
-    #             source_dir_path=self.source_dir_path,
-    #             is_same_org_deploy=self.target_org.id == self.source_org.id,
-    #             plan_only=self.plan_only,
-    #         )
-    #         for schema_release in self.schemas
-    #     ]
-    # )
-
-    # await asyncio.gather(
-    #     *[schema_release.deploy() for schema_release in self.schemas]
-    # )
-    # self.detect_exceptions(self.schemas)
-    # self.schema_targets = self.gather_targets(self.schemas)
 
     async def deploy_hooks(self):
         await self.ensure_token_owner()
@@ -145,7 +129,7 @@ class ReleaseFile(BaseModel):
                     source_dir_path=self.source_dir_path,
                     token_owner_id=self.token_owner_id,
                     plan_only=self.plan_only,
-                    is_same_org_deploy=self.target_org.id == self.source_org.id,
+                    is_same_org_deploy=self.is_same_org,
                     hook_template_url=self.hook_templates.get(hook_release.id, None),
                 )
                 for hook_release in self.hooks
@@ -173,7 +157,7 @@ class ReleaseFile(BaseModel):
                     source_dir_path=self.source_dir_path,
                     target_org_url=self.target_org.url,
                     plan_only=self.plan_only,
-                    is_same_org_deploy=self.target_org.id == self.source_org.id,
+                    is_same_org_deploy=self.is_same_org,
                 )
                 for workspaces_release in self.workspaces
             ]
@@ -193,7 +177,7 @@ class ReleaseFile(BaseModel):
                     client=self.client,
                     source_dir_path=self.source_dir_path,
                     plan_only=self.plan_only,
-                    is_same_org_deploy=self.target_org.id == self.source_org.id,
+                    is_same_org_deploy=self.is_same_org,
                     hook_targets=self.hook_targets,
                     workspace_targets=self.workspace_targets,
                 )

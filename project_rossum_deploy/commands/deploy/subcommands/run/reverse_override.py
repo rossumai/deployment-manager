@@ -7,7 +7,7 @@ from project_rossum_deploy.commands.deploy.subcommands.run.release_file import (
     ReleaseFile,
 )
 from project_rossum_deploy.commands.migrate.helpers import get_token_owner
-from project_rossum_deploy.utils.consts import display_error, display_warning, settings
+from project_rossum_deploy.utils.consts import display_warning, settings
 
 
 import jmespath
@@ -153,69 +153,66 @@ async def reverse_source_target_in_yaml(
     prev_source_client: ElisAPIClient,
     prev_target_client: ElisAPIClient,
 ):
-    try:
-        yaml = deepcopy(yaml)
-        # Reverse dirs and urls
-        prev_source_dir, prev_target_dir = (
-            yaml.data[settings.DEPLOY_KEY_SOURCE_DIR],
-            yaml.data[settings.DEPLOY_KEY_TARGET_DIR],
-        )
-        yaml.data[settings.DEPLOY_KEY_SOURCE_DIR] = prev_target_dir
-        yaml.data[settings.DEPLOY_KEY_TARGET_DIR] = prev_source_dir
+    yaml = deepcopy(yaml)
+    # Reverse dirs and urls
+    prev_source_dir, prev_target_dir = (
+        yaml.data[settings.DEPLOY_KEY_SOURCE_DIR],
+        yaml.data[settings.DEPLOY_KEY_TARGET_DIR],
+    )
+    yaml.data[settings.DEPLOY_KEY_SOURCE_DIR] = prev_target_dir
+    yaml.data[settings.DEPLOY_KEY_TARGET_DIR] = prev_source_dir
 
-        prev_source_url, prev_target_url = (
-            yaml.data[settings.DEPLOY_KEY_SOURCE_URL],
-            yaml.data[settings.DEPLOY_KEY_TARGET_URL],
-        )
-        yaml.data[settings.DEPLOY_KEY_SOURCE_URL] = prev_target_url
-        yaml.data[settings.DEPLOY_KEY_TARGET_URL] = prev_source_url
+    prev_source_url, prev_target_url = (
+        yaml.data[settings.DEPLOY_KEY_SOURCE_URL],
+        yaml.data[settings.DEPLOY_KEY_TARGET_URL],
+    )
+    yaml.data[settings.DEPLOY_KEY_SOURCE_URL] = prev_target_url
+    yaml.data[settings.DEPLOY_KEY_TARGET_URL] = prev_source_url
 
-        yaml.data[settings.DEPLOY_KEY_DEPLOYED_ORG_ID] = source_org.id
+    yaml.data[settings.DEPLOY_KEY_DEPLOYED_ORG_ID] = source_org.id
 
-        if source_org.id == target_org.id:
-            token_owner_id = yaml.data[settings.DEPLOY_KEY_TOKEN_OWNER]
+    if source_org.id == target_org.id:
+        token_owner_id = yaml.data[settings.DEPLOY_KEY_TOKEN_OWNER]
+    else:
+        target_token_owner_from_remote = await get_token_owner(prev_target_client)
+        if target_token_owner_from_remote:
+            token_owner_id = target_token_owner_from_remote.id
         else:
-            target_token_owner_from_remote = await get_token_owner(prev_target_client)
-            if target_token_owner_from_remote:
-                token_owner_id = target_token_owner_from_remote.id
-            else:
-                users = [user async for user in prev_target_client.list_all_users()]
-                user_roles = [
-                    role async for role in prev_target_client.list_all_user_roles()
-                ]
-                user_choices = [
-                    questionary.Choice(title=user.username, value=user.id)
-                    for user in users
-                    if ReleaseFile.is_user_admin(user=user, user_roles=user_roles)
-                ]
-                token_owner_id = await questionary.select(
-                    "Please choose target hook token owner:", choices=user_choices
-                ).ask_async()
-        yaml.data[settings.DEPLOY_KEY_TOKEN_OWNER] = token_owner_id
+            users = [user async for user in prev_target_client.list_all_users()]
+            user_roles = [
+                role async for role in prev_target_client.list_all_user_roles()
+            ]
+            user_choices = [
+                questionary.Choice(title=user.username, value=user.id)
+                for user in users
+                if ReleaseFile.is_user_admin(user=user, user_roles=user_roles)
+            ]
+            token_owner_id = await questionary.select(
+                "Please choose target hook token owner:", choices=user_choices
+            ).ask_async()
+    yaml.data[settings.DEPLOY_KEY_TOKEN_OWNER] = token_owner_id
 
-        # Reverse objects
-        reverser = ObjectConfigReverser(
-            prev_source_client=prev_source_client, prev_target_client=prev_target_client
-        )
-        queue_reverser = QueueConfigReverse(
-            prev_source_client=prev_source_client,
-            prev_target_client=prev_target_client,
-            prev_source_dir=prev_source_dir,
-            prev_target_dir=prev_target_dir,
-        )
+    # Reverse objects
+    reverser = ObjectConfigReverser(
+        prev_source_client=prev_source_client, prev_target_client=prev_target_client
+    )
+    queue_reverser = QueueConfigReverse(
+        prev_source_client=prev_source_client,
+        prev_target_client=prev_target_client,
+        prev_source_dir=prev_source_dir,
+        prev_target_dir=prev_target_dir,
+    )
 
-        for workspace in yaml.data.get(settings.DEPLOY_KEY_WORKSPACES, []):
-            await reverser.reverse_config(object=workspace, type=Resource.Workspace)
-        for queue in yaml.data.get(settings.DEPLOY_KEY_QUEUES, []):
-            await queue_reverser.reverse_config(object=queue, type=Resource.Queue)
-        for hook in yaml.data.get(settings.DEPLOY_KEY_HOOKS, []):
-            await reverser.reverse_config(object=hook, type=Resource.Hook)
+    for workspace in yaml.data.get(settings.DEPLOY_KEY_WORKSPACES, []):
+        await reverser.reverse_config(object=workspace, type=Resource.Workspace)
+    for queue in yaml.data.get(settings.DEPLOY_KEY_QUEUES, []):
+        await queue_reverser.reverse_config(object=queue, type=Resource.Queue)
+    for hook in yaml.data.get(settings.DEPLOY_KEY_HOOKS, []):
+        await reverser.reverse_config(object=hook, type=Resource.Hook)
 
-        # Empty unselected hooks: there is no equivalent to reverse since they were not selected for deploy...
-        yaml.data[settings.DEPLOY_KEY_UNSELECTED_HOOK_IDS] = []
+    # Empty unselected hooks: there is no equivalent to reverse since they were not selected for deploy...
+    yaml.data[settings.DEPLOY_KEY_UNSELECTED_HOOK_IDS] = []
 
-        yaml.data[settings.DEPLOY_KEY_REVERSE_MAPPING] = False
+    yaml.data[settings.DEPLOY_KEY_REVERSE_MAPPING] = False
 
-        return yaml
-    except Exception as e:
-        display_error("Error while reversing mapipng in the deploy file. ^", e)
+    return yaml
