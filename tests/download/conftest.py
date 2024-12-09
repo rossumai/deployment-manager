@@ -1,6 +1,6 @@
 import pytest
 
-from project_rossum_deploy.commands.download.subdirectory import Subdirectory
+from deployment_manager.commands.download.subdirectory import Subdirectory
 
 
 @pytest.fixture

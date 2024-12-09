@@ -5,13 +5,13 @@ import pytest_asyncio
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
-from project_rossum_deploy.commands.download.download import (
+from deployment_manager.commands.download.download import (
     download_organization_combined_source_target,
 )
-from project_rossum_deploy.common.mapping import read_mapping, write_mapping
-from project_rossum_deploy.common.read_write import read_json
-from project_rossum_deploy.utils.consts import settings
-from project_rossum_deploy.utils.functions import templatize_name_id
+from deployment_manager.common.mapping import read_mapping, write_mapping
+from deployment_manager.common.read_write import read_json
+from deployment_manager.utils.consts import settings
+from deployment_manager.utils.functions import templatize_name_id
 from tests.utils.compare import ensure_downloaded_object, compare_projects
 from tests.utils.consts import REFERENCE_PROJECT_PATH, UPDATED_NAME
 from tests.utils.functions import create_self_targetting_org

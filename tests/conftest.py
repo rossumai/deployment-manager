@@ -3,8 +3,8 @@ from anyio import Path
 import pytest
 import pytest_asyncio
 from rossum_api import ElisAPIClient
-from project_rossum_deploy.common.read_write import read_json, write_json
-from project_rossum_deploy.utils.consts import settings
+from deployment_manager.common.read_write import read_json, write_json
+from deployment_manager.utils.consts import settings
 
 base_url = os.environ.get("SOURCE_API_BASE")
 username = os.environ.get("SOURCE_USERNAME")

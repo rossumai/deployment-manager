@@ -9,19 +9,19 @@ from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
 
-from project_rossum_deploy.commands.download.download import (
+from deployment_manager.commands.download.download import (
     download_organization_combined_source_target,
 )
-from project_rossum_deploy.common.mapping import read_mapping, write_mapping
-from project_rossum_deploy.commands.upload.upload import upload_destinations
-from project_rossum_deploy.common.read_write import (
+from deployment_manager.common.mapping import read_mapping, write_mapping
+from deployment_manager.commands.upload.upload import upload_destinations
+from deployment_manager.common.read_write import (
     create_custom_hook_code_path,
     read_json,
     write_json,
     write_str,
 )
-from project_rossum_deploy.utils.consts import settings
-from project_rossum_deploy.utils.functions import (
+from deployment_manager.utils.consts import settings
+from deployment_manager.utils.functions import (
     templatize_name_id,
 )
 from tests.utils.compare import is_object_equal

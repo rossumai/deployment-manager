@@ -5,8 +5,8 @@ from anyio import Path
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
-from project_rossum_deploy.common.mapping import read_mapping, write_mapping
-from project_rossum_deploy.utils.consts import settings
+from deployment_manager.common.mapping import read_mapping, write_mapping
+from deployment_manager.utils.consts import settings
 
 
 async def create_self_targetting_org(tmp_path: Path, undo=False):

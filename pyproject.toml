@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "project-rossum-deploy"
+name = "deployment-manager"
 version = "0.0.0"
 description = ""
 authors = [
@@ -24,7 +24,7 @@ pydantic = "^2.9.2"
 questionary = "^2.0.1"
 
 [tool.poetry.scripts]
-prd2 = "project_rossum_deploy.main:main"
+prd2 = "deployment_manager.main:main"
 
 [tool.poetry.group.dev.dependencies]
 pytest-asyncio = "^0.23.7"

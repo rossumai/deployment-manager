@@ -3,10 +3,10 @@ import pytest
 import io
 
 
-from project_rossum_deploy.commands.download.saver import WorkspaceSaver
-from project_rossum_deploy.commands.download.subdirectory import Subdirectory
-from project_rossum_deploy.common.read_write import read_json
-from project_rossum_deploy.utils.functions import templatize_name_id
+from deployment_manager.commands.download.saver import WorkspaceSaver
+from deployment_manager.commands.download.subdirectory import Subdirectory
+from deployment_manager.common.read_write import read_json
+from deployment_manager.utils.functions import templatize_name_id
 
 
 @pytest.mark.asyncio

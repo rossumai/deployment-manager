@@ -4,25 +4,25 @@ import pytest
 import pytest_asyncio
 from rossum_api import ElisAPIClient
 
-from project_rossum_deploy.commands.download.download import (
+from deployment_manager.commands.download.download import (
     download_organization_combined_source_target,
     download_organizations_separate,
 )
-from project_rossum_deploy.commands.migrate.helpers import traverse_mapping
-from project_rossum_deploy.common.mapping import (
+from deployment_manager.commands.migrate.helpers import traverse_mapping
+from deployment_manager.common.mapping import (
     extract_sources_targets,
     find_mapping_of_object,
     read_mapping,
     write_mapping,
 )
-from project_rossum_deploy.commands.migrate.migrate import migrate_project
-from project_rossum_deploy.common.read_write import read_json, write_json
-from project_rossum_deploy.utils.consts import (
+from deployment_manager.commands.migrate.migrate import migrate_project
+from deployment_manager.common.read_write import read_json, write_json
+from deployment_manager.utils.consts import (
     ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD,
     MAPPING_SELECTED_ATTRIBUTE,
     settings,
 )
-from project_rossum_deploy.utils.functions import templatize_name_id
+from deployment_manager.utils.functions import templatize_name_id
 from tests.utils.compare import (
     ensure_hooks_have_same_dependency_graph,
     ensure_source_objects_have_target_counter_part,

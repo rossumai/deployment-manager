@@ -1,15 +1,15 @@
 import jmespath
 import pytest
 import pytest_asyncio
-from project_rossum_deploy.common.attribute_override import override_attributes_v2
+from deployment_manager.common.attribute_override import override_attributes_v2
 
-from project_rossum_deploy.utils.consts import (
+from deployment_manager.utils.consts import (
     ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD,
     ATTRIBUTE_OVERRIDE_TARGET_REFERENCE_KEYWORD,
     settings,
 )
-from project_rossum_deploy.common.mapping import read_mapping
-from project_rossum_deploy.common.read_write import read_json
+from deployment_manager.common.mapping import read_mapping
+from deployment_manager.common.read_write import read_json
 from tests.utils.consts import REFERENCE_PROJECT_PATH
 
 
