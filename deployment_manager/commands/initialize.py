@@ -50,7 +50,7 @@ def init_project(name: Path):
     credentials = {}
 
     while questionary.confirm(
-        "Would you like to specify a(nother) org-level directory?"
+        "Would you like to specify **ORG-LEVEL** directory?"
     ).ask():
         org_dir_name = questionary.text("org-level directory name:").ask()
         org_id = questionary.text("ORG ID:").ask()
@@ -65,7 +65,7 @@ def init_project(name: Path):
         }
         credentials[org_dir_name] = token
         while questionary.confirm(
-            f"Would you like to specify a(nother) subdirectory inside {org_dir_name}?"
+            f"Would you like to specify **SUBDIRECTORY** inside {org_dir_name}?"
         ).ask():
             subdir_name = questionary.text("subdir name:").ask()
             subdir_regex = questionary.text("subdir regex:").ask()
@@ -76,9 +76,8 @@ def init_project(name: Path):
     config.save_to_file(config_path)
 
     for org_dir in directories.keys():
-        os.mkdir(name / org_dir)
         for subdir in directories[org_dir][settings.CONFIG_KEY_SUBDIRECTORIES].keys():
-            os.mkdir(name / org_dir / subdir)
+            os.makedirs(name / org_dir / subdir, exist_ok=True)
 
     for org_dir, token in credentials.items():
         credentials_yaml = DeployYaml("{}")

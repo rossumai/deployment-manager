@@ -1,19 +1,8 @@
-<h1><font color="#006FE8"> Deployment Manager </font></h1>
+# Deployment manager
 
-This command line tool is used to help users customizing and delivering projects on Rossum platform to easily track changes, deploy and release changes/entire project to different environments inside the same cluster.
+This CLI tool aims to help users configure and manage projects on the Rossum platform. It allows you to track changes made inside Rossum, apply locally made changes in Rossum, and deploy the entire project to different organisations.
 
-### Prerequisites ###
-**git** - any git based versioning tool  
-**rossum account** - *admin* role credentials to at least one organization
-
-### Terms ###
-**source** - in the context of this tool references to a dev/test organization and/or workspace(s) where Rossum project and all the associated objects (hooks, queues, ...) are created.  
-**target** - a "production" environment (organization and/or workspaces(s)) where the project is deployed for customer use. Eventually changes will be released here from the source environment.  
-**local** - file storage of the local machine where git repository of the project is cloned  
-**remote** - organization and all the objects owned by the organization in Rossum platform
-
-</br>
-<h2><font color="#004795"> Installation guide </font></h2>
+## Installation guide
 
 1. You can use this one-liner to download the installation script and let it execute the steps automatically:
 ```
@@ -30,17 +19,103 @@ pipx ensurepath
 pipx install .
 ```
 
-Restart the terminal.
+Make sure to restart the terminal before using the command.
 
-When updating, you can:
-1. Run `prd update`.
-2. Run `git pull` where you manually pulled the repository and then run `pipx install . --force`.
+You can then start using the tool in any directory by running:
+```
+prd2
+```
 
-</br>
-<h2><font color="#004795"> User guide </font></h2>
+### Updating to a new version
+This command will automatically pull the latest vesion from the GIT repo and install it locally:
+```
+prd2 update
+```
+You can also specify a branch to install:
+```
+prd2 update --branch=some-cool-early-feature
+```
 
-**Note that this tool is not designed to automatically do any git commits, rollbacks, merge requests and similar git actions. User is responsible to commit (or revert), switch to another branch, whatever is necessary when it is required (i.e., released new working version, at that point a manual commit is required). This has a reasoning - process of testing/releasing is usually iterative and doing automatic commits would simply flood git repository with meaningless commits and it may make it harder to return to a certain working snapshot of the project.**
+### Migration from v1
 
+Please note that the new version of the tool (`prd2`) is not backwards-compatible. If you would like to use it for an existing project, we recommend downloading the whole project again via the new version and going from there. You can keep using the old version under `prd`.
+
+Here are a few specific tips when migrating projects manually:
+- You need to make sure to pull the objects into the right directories that you create for them (e.g., `org/test` and `org/prod`).
+- If you had an existing mapping, you would then need to manually assing the target IDs after generating a deploy file via `prd2 deploy template`.
+- **The old version of the tool is still available under the name `prd`**, You can use it for older projects where the migration would not be worth it.
+
+## Quick Start Guide
+
+> ℹ️ Whenever in doubt, you can run `prd2 --help` to get guidance and overview of all parameters and options. `--help` is also available for all subcommands (e.g., `prd2 pull --help`).
+
+### 1. Create a new project
+Follow the CLI instructions to initialize a new project. **You must setup at least one org-level directory and one subdir**:
+```
+prd2 init <NAME-OF-PROJECT>
+```
+For each subdir, you can specify a regex for the name of objects. Once you `pull` objects from Rossum, these objects will automatically be placed into the respective subdir.
+> This only applies if the object does not have a local copy in a different subdir though!
+
+You can rerun this command later to add new directories into the project.
+
+This command creates the specified directories and puts the provided credentials into them. 
+
+This command also initializes an empty GIT repository.
+
+### 2. Get the objects from Rossum to the created repo
+Reference one of your (sub)dirs and download (`pull`) changes from Rossum.
+```
+cd <NAME-OF-PROJECT>
+prd2 pull <DIR-NAME>
+```
+You can reference the whole org-level dir (e.g., `sandbox-org`) or subdir(s) (e.g., `sandbox-org/dev sandbox-org/uat`) or any combination thereof. Org-level dirs are expanded into its subdirs.
+
+Before downloading, the command checks if the local objects have any uncommitted changes and warns you if there are any (so as not to override them).
+
+### 3. Get local changes back into Rossum
+After you make changes in the project, run:
+```
+prd2 push <DIR-NAME>
+```
+The `<DIR-NAME>` should correspond to the directory where you made the changes. You can specify more.
+
+Before uploading the changes, This command will check if the object `last_modified` timestamp on the remote is the same as the one for the local object. If not, the changes are not pushed unless you override this behaviour via the `--force` flag.
+
+> ℹ️ Note: you currently cannot delete objects using `prd2 push`. But you can do so explicitly via `prd2 purge`.
+
+### 4. Copy (deploy) configuration elsewhere
+If you want to create a copy of your configuration (typically move a test setup into production), you first need to create a deploy file specifying what should be copied (deployed):
+```
+prd2 deploy template
+```
+
+This command allows you to specify attribute override for all objects of a certain type. This is particularly useful for changing suffixes (e.g., `DEV` -> `PROD`).
+
+Once you go through the CLI guide, you can also make other changes manually in the deploy file (e.g., attribute_override of specific objects). Any object specified in the deploy file with an empty `targets` will have a new copy created. If there is an ID specified, this command will instead update the object with that ID.
+
+Then you can go ahead and run the deploy:
+```
+prd2 deploy run <DEPLOY-FILE-PATH>
+```
+You will first see a plan of the deploy (what will be deployed, what are the changes) and then you are asked for confirmation that those changes should be applied.
+
+Once the `deploy` is finished, you will get a new file with a `_deployed` suffix. If you created new objects, their IDs will be on the right hand side. This file is created in case you wanted to keep using the original deploy file as a template.
+
+You can update a previously existing deploy file via:
+```
+prd2 deploy template -f <PATH> --interactive
+```
+Without the `--interactive` flag, the update would fix names based on object IDs or add hooks assigned to the already specified queues, but it would not add/remove any of the specified objects in the deploy file.
+
+You can leave comments in the YAML, they will get preserved (bar a few exceptions).
+
+## User Guide
+
+> Note that this tool is not designed to automatically do any git commits, rollbacks, merge requests and similar git actions.User is responsible to commit (or revert), switch to another branch, whatever is necessary when it is required (i.e., released new working version, at that point a manual commit is required). This has a reasoning - process of testing/releasing is usually iterative and doing automatic commits would simply flood git repository with meaningless commits and it may make it harder to return to a certain working snapshot of the project.
+
+# TODO EXPLAIN ORG-LEVEL and SUBDIR-LEVEL (why always at least a single of each)
+# TODO interactions with GIT
 
 <span style="color:#004795"> **Initialize empty project and repository** </span>  
 
@@ -184,8 +259,7 @@ target
 
 Once the production release is successful, commit all the changes in the `target` folder so that you have a working snapshot prepared for when new changes are released in the future.
 
-</br>
-<h2><font color="#004795"> Available commands </font></h2>
+## Full(er) Command Reference
 
 You can see all parameters for each command by calling `<command> --help`
 
