@@ -1,7 +1,7 @@
+from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
 from deployment_manager.commands.deploy.common.helpers import (
     get_api_url_from_config,
     get_api_url_from_user,
-    get_filename_from_user,
 )
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
 from deployment_manager.commands.deploy.subcommands.template.helpers import (
@@ -150,11 +150,18 @@ async def create_deploy_template(
             add_override_to_deploy_file_objects(override, deploy_file_object)
 
     if interactive:
-        deploy_filepath = await get_filename_from_user(
+        source_subdir_name = source_dir_and_subdir.split("/")[1]
+        target_subdir_name = target_dir_and_subdir.split("/")
+        default_deploy_name = f"/{source_subdir_name}_{target_subdir_name[1] if len(target_subdir_name) > 1 else "NA"}.yaml"
+        deploy_filepath = await get_filepath_from_user(
             org_path,
-            default=str(input_file) if input_file else settings.DEFAULT_DEPLOY_FILENAME,
+            default=(
+                str(input_file)
+                if input_file
+                else settings.DEFAULT_DEPLOY_PARENT + default_deploy_name
+            ),
         )
     else:
         deploy_filepath = input_file
 
-    yaml.save_to_file(deploy_filepath)
+    await yaml.save_to_file(deploy_filepath)

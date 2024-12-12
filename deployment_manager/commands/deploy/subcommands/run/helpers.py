@@ -4,9 +4,9 @@ from anyio import Path
 import questionary
 from ruamel.yaml import YAML
 
+from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
 from deployment_manager.commands.deploy.common.helpers import (
     get_api_url_from_config,
-    get_filename_from_user,
     get_token_from_cred_file,
     validate_credentials,
 )
@@ -28,7 +28,9 @@ class DeployYaml:
         self._yaml.preserve_quotes = True
         self.data = self._yaml.load(file)
 
-    def save_to_file(self, file_path: str | Path):
+    async def save_to_file(self, file_path: str | Path):
+        if file_path.parent:
+            await file_path.parent.mkdir(parents=True, exist_ok=True)
         with open(file_path, "wb") as wf:
             self._yaml.dump(self.data, wf)
 
@@ -52,11 +54,12 @@ def check_required_keys(release: dict):
 # TODO: prompt user for new token and store it
 # TODO: username + password support
 async def get_url_and_credentials(
-    project_path: Path, org_name: str, type: str, yaml_data: dict
+    project_path: Path, org_name: str = "", type: str = "", yaml_data: dict = None
 ):
-    if type == settings.TARGET_DIRNAME:
+    api_url = ""
+    if type == settings.TARGET_DIRNAME and yaml_data:
         api_url = yaml_data.get(settings.DEPLOY_KEY_TARGET_URL, None)
-    else:
+    elif type == settings.SOURCE_DIRNAME and yaml_data:
         api_url = yaml_data.get(settings.DEPLOY_KEY_SOURCE_URL, None)
 
     if not api_url and org_name:
@@ -112,7 +115,7 @@ async def get_new_deploy_file_path(
                 default=False,
             ).ask_async()
             if not overwrite:
-                after_deploy_file_path = await get_filename_from_user(project_path)
+                after_deploy_file_path = await get_filepath_from_user(project_path)
     else:
         after_deploy_file_path = deploy_file_path
 

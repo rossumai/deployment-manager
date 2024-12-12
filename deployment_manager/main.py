@@ -1,6 +1,7 @@
 import click
 
 from deployment_manager.commands.deploy.deploy import deploy
+from deployment_manager.commands.hook.hook import hook
 from deployment_manager.commands.update import update_prd
 from deployment_manager.commands.download.download import (
     download_project_wrapper,
@@ -20,6 +21,7 @@ main.add_command(download_project_wrapper)
 main.add_command(init_project)
 main.add_command(migrate_mapping_wrapper)
 main.add_command(deploy)
+main.add_command(hook)
 main.add_command(purge_object_types_wrapper)
 main.add_command(upload_project_wrapper)
 main.add_command(update_prd)

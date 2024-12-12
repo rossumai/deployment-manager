@@ -9,6 +9,7 @@ import click
 
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
 from deployment_manager.utils.consts import settings
+from deployment_manager.utils.functions import coro
 
 
 @click.command(
@@ -19,7 +20,8 @@ Also initializes it as a git repository.
                """,
 )
 @click.argument("name", default=".", type=click.Path(path_type=Path, exists=False))
-def init_project(name: Path):
+@coro
+async def init_project(name: Path):
     if not os.path.exists(name) and name != ".":
         os.mkdir(name)
 
@@ -73,7 +75,7 @@ def init_project(name: Path):
                 subdir_name
             ] = {settings.DOWNLOAD_KEY_REGEX: subdir_regex}
 
-    config.save_to_file(config_path)
+    await config.save_to_file(config_path)
 
     for org_dir in directories.keys():
         for subdir in directories[org_dir][settings.CONFIG_KEY_SUBDIRECTORIES].keys():

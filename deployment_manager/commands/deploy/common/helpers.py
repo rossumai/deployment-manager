@@ -85,18 +85,3 @@ async def validate_credentials(credentials: Credentials):
 
 
 # TODO: likely duplicated in another file
-async def get_filename_from_user(org_path: Path, default: str = ""):
-    deploy_filename: str = await questionary.text(
-        "Name for the deploy file:",
-        default=default,
-    ).ask_async()
-    deploy_filepath = org_path / deploy_filename
-
-    if await deploy_filepath.exists():
-        overwrite = await questionary.confirm(
-            f'File "{deploy_filepath}" already exists. Overwrite?', default=False
-        ).ask_async()
-        if not overwrite:
-            return await get_filename_from_user(org_path)
-
-    return deploy_filepath

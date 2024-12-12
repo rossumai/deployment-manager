@@ -184,6 +184,9 @@ class Settings:
     DEPLOY_RUN_COMMAND_NAME: str = "run"
     DEPLOY_TEMPLATE_COMMAND_NAME: str = "template"
     DEPLOY_TEMPLATE_INIT_COMMAND_NAME: str = "init"
+    HOOK_COMMAND_NAME: str = "hook"
+    HOOK_PAYLOAD_COMMAND_NAME: str = "payload"
+    HOOK_TEST_COMMAND_NAME: str = "test"
 
     CONFIG_KEY_API_BASE_URL = "api_base"
     CONFIG_KEY_TOKEN = "token"
@@ -195,10 +198,10 @@ class Settings:
     DOWNLOAD_KEY_REGEX = "regex"
 
     # Deploy consts
-    DEPLOY_IGNORED_DIRS = [".git"]
+    DEPLOY_IGNORED_DIRS = [".git", "payloads", "deploy_files"]
     DEPLOY_OVERRIDE_REGEX_SEPARATOR = "/#/"
     DEPLOY_DEFAULT_TARGET_URL = "https://my-org.rossum.app/api/v1"
-    DEFAULT_DEPLOY_FILENAME = "prd_deploy.yaml"
+    DEFAULT_DEPLOY_PARENT = "deploy_files"
     DEPLOY_KEY_TARGETS = "targets"
     DEPLOY_KEY_OVERRIDES = "attribute_override"
     DEPLOY_KEY_DEPLOYED_ORG_ID = "deployed_org_id"

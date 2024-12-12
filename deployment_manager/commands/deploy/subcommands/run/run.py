@@ -212,7 +212,7 @@ async def deploy_release_file(
         project_path=project_path,
         first_deploy=first_deploy,
     )
-    yaml.save_to_file(after_deploy_file_path)
+    await yaml.save_to_file(after_deploy_file_path)
 
     reverse_mapping = yaml.data.get(settings.DEPLOY_KEY_REVERSE_MAPPING, False)
     if reverse_mapping:
@@ -231,7 +231,7 @@ async def deploy_release_file(
                 first_deploy=True,
                 suffix="_reversed",
             )
-            reversed_yaml.save_to_file(reverse_deploy_file_path)
+            await reversed_yaml.save_to_file(reverse_deploy_file_path)
         except Exception as e:
             display_error("Error while reversing mapipng in the deploy file. ^", e)
 

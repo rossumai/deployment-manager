@@ -1,4 +1,4 @@
-from deployment_manager.commands.deploy.common.helpers import get_filename_from_user
+from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
 from deployment_manager.commands.deploy.subcommands.template.helpers import (
     create_deploy_file_template,
@@ -19,8 +19,8 @@ async def init_deploy_template_file(
 
     yaml = DeployYaml(deploy_file_template)
 
-    deploy_filepath = await get_filename_from_user(
-        org_path, default=settings.DEFAULT_DEPLOY_FILENAME
+    deploy_filepath = await get_filepath_from_user(
+        org_path, default=settings.DEFAULT_DEPLOY_PARENT + "/deploy_file.yaml"
     )
 
-    yaml.save_to_file(deploy_filepath)
+    await yaml.save_to_file(deploy_filepath)
