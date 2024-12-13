@@ -1,3 +1,4 @@
+import copy
 import json
 import re
 import subprocess
@@ -147,7 +148,13 @@ def override_attributes_v2(
 
 def parse_parent_and_key(key_query: str):
     try:
-        parent, key = ".".join(key_query.split(".")[:-1]), key_query.split(".")[-1]
+        dot = [pos for pos, char in enumerate(key_query) if char == "."]
+        pipe = [pos for pos, char in enumerate(key_query) if char == "|"]
+        dot_idx = dot[-1] if dot else -1
+        pipe_idx = pipe[-1] if pipe else -1
+        idx = dot_idx if dot_idx>-1 else pipe_idx if pipe_idx>-1 else -1
+        parent = key_query[:idx].strip() if idx > -1 else None 
+        key = key_query[idx+1:].strip() if idx > -1 else key_query
     except Exception:
         raise Exception(
             f'Invalid query "{key_query}" - the last part must be a single object key.'
@@ -184,7 +191,6 @@ async def replace_ids_in_settings(
         source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
         if not re.search(source_id_regex, stringified_dict):
             continue
-
         if len(target_ids) != 1 and num_targets != len(target_ids):
             print(
                 Panel(
@@ -312,13 +318,14 @@ async def override_migrated_objects_attributes(
                                     object_type=object_type.value,
                                     source_object=source_object,
                                     target_object=target_object,
-                                    source_object_subset=diff.stdout,
+                                    source_object_subset=target_settings,
                                 )
                             )
                 else:
                     await client._http_client.update(
                         object_type, target_object["id"], {"settings": target_settings}
                     )
+            target_object["settings"] = target_settings
             # Explicit override for settings and anything else
             attribute_overrides = find_attribute_override_for_target(
                 targets_in_mapping, target_object["id"], target_index
@@ -327,7 +334,7 @@ async def override_migrated_objects_attributes(
                 continue
 
             source_object_subset = get_attributes_from_object(
-                source_object, attribute_overrides
+                target_object, attribute_overrides
             )
 
             source_object_subset["id"] = target_object["id"]
