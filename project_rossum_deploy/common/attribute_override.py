@@ -147,7 +147,13 @@ def override_attributes_v2(
 
 def parse_parent_and_key(key_query: str):
     try:
-        parent, key = ".".join(key_query.split(".")[:-1]), key_query.split(".")[-1]
+        dot = [pos for pos, char in enumerate(key_query) if char == "."]
+        pipe = [pos for pos, char in enumerate(key_query) if char == "|"]
+        dot_idx = dot[-1] if dot else -1
+        pipe_idx = pipe[-1] if pipe else -1
+        idx = dot_idx if dot_idx>-1 else pipe_idx if pipe_idx>-1 else -1
+        parent = key_query[:idx].strip() if idx > -1 else None 
+        key = key_query[idx+1:].strip() if idx > -1 else key_query
     except Exception:
         raise Exception(
             f'Invalid query "{key_query}" - the last part must be a single object key.'
