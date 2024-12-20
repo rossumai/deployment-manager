@@ -110,10 +110,13 @@ async def create_deploy_template(
     deploy_file_object[settings.DEPLOY_KEY_TARGET_URL] = target_url
 
     # Hook token owner
-    token_owner = deploy_file_object.get(settings.DEPLOY_KEY_TOKEN_OWNER, "")
+    token_owner = deploy_file_object.get(settings.DEPLOY_KEY_TOKEN_OWNER, None)
     if interactive or not token_owner:
         token_owner = await get_token_owner_from_user(default=token_owner)
-    deploy_file_object[settings.DEPLOY_KEY_TOKEN_OWNER] = token_owner
+    # Enforce None instead of empty string
+    deploy_file_object[settings.DEPLOY_KEY_TOKEN_OWNER] = (
+        token_owner if token_owner else None
+    )
 
     # Workspaces
     workspaces = deploy_file_object.get("workspaces", [])

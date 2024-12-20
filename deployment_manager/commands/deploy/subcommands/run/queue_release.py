@@ -220,7 +220,7 @@ class QueueRelease(ObjectRelease):
 
     async def evaluate_workflow_warning(self):
         if self.ignore_deploy_warnings or self.is_same_org_deploy:
-            return
+            return True
 
         if self.data.get("workflows", []):
             display_warning(
@@ -233,7 +233,7 @@ class QueueRelease(ObjectRelease):
     async def evaluate_engine_warning(self):
         for attr in QUEUE_ENGINE_ATTRIBUTES:
             if self.ignore_deploy_warnings or self.is_same_org_deploy:
-                return
+                return True
 
             if self.data.get(attr, None):
                 display_warning(

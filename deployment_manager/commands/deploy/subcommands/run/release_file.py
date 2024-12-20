@@ -22,12 +22,12 @@ from deployment_manager.commands.deploy.subcommands.run.workspace_release import
     WorkspaceRelease,
 )
 from deployment_manager.commands.migrate.helpers import get_token_owner
-from deployment_manager.utils.consts import display_error, settings
+from deployment_manager.utils.consts import display_error, display_warning, settings
 from deployment_manager.utils.functions import extract_id_from_url
 
 
 from pydantic import BaseModel
-from rossum_api import ElisAPIClient
+from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
 from rossum_api.models.organization import Organization
 from rossum_api.models.user import User
@@ -192,6 +192,13 @@ class ReleaseFile(BaseModel):
     async def ensure_token_owner(self):
         if self.source_org.id == self.target_org.id:
             return
+
+        if self.token_owner_id:
+            try:
+                await self.client.retrieve_user(self.token_owner_id)
+            except APIClientError:
+                display_warning("Invalid token owner in config.")
+                self.token_owner_id = None
 
         if not self.token_owner_id:
             target_token_owner_from_remote = await get_token_owner(self.client)
