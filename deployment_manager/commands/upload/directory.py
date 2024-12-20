@@ -101,7 +101,11 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             self.project_path = Path(".")
 
         if not self.client:
-            token = await get_token(project_path=self.project_path, org_name=self.name)
+            token = await get_token(
+                project_path=self.project_path,
+                org_name=self.name,
+                api_url=self.api_base,
+            )
             credentials = Credentials(token=token, url=self.api_base)
             await validate_credentials(credentials)
             self.client = ElisAPIClient(base_url=self.api_base, token=token)

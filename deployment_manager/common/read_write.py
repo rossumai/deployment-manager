@@ -128,3 +128,8 @@ async def read_prd_cred_file(org_path: Path):
     if await credentials_path.exists():
         return YAML().load(await credentials_path.read_text())
     return None
+
+
+async def write_prd_cred_file(org_path: Path, object: dict):
+    credentials_path: Path = org_path / settings.CREDENTIALS_FILENAME
+    await write_yaml(credentials_path, object)

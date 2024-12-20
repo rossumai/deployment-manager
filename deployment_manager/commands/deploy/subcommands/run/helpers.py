@@ -69,7 +69,9 @@ async def get_url_and_credentials(
     if not api_url:
         api_url = await get_api_url_from_user(type=type)
 
-    token = await get_token(project_path=project_path, org_name=org_name, type=type)
+    token = await get_token(
+        project_path=project_path, org_name=org_name, api_url=api_url, type=type
+    )
 
     try:
         credentials = Credentials(token=token, url=api_url)
@@ -81,10 +83,11 @@ async def get_url_and_credentials(
     return None
 
 
-async def get_token(project_path: Path, org_name: str, type: str = ""):
-    token = await get_token_from_cred_file(project_path / org_name)
+# TODO: move to a more common file
+async def get_token(project_path: Path, org_name: str, api_url: str, type: str = ""):
+    token = await get_token_from_cred_file(project_path / org_name, api_url=api_url)
     if not token:
-        token = await get_token_from_user(type=type)
+        token = await get_token_from_user(name=type if type else org_name)
     return token
 
 

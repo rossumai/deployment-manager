@@ -79,11 +79,15 @@ async def create_deploy_template(
     deploy_file_object[settings.DEPLOY_KEY_TARGET_DIR] = target_dir_and_subdir
 
     # Source URL
-    # Try to find it in the config, but do not require it from the user
+    # Target URL can be in the deploy file already, in a config file, or inputted by the user
     source_url = deploy_file_object.get(settings.DEPLOY_KEY_SOURCE_URL, "")
     if not source_url:
         source_url = await get_api_url_from_config(
             base_path=org_path, org_name=source_dir_and_subdir.split("/")[0]
+        )
+    if interactive or not source_url:
+        source_url = await get_api_url_from_user(
+            type=settings.SOURCE_DIRNAME, default=source_url
         )
     deploy_file_object[settings.DEPLOY_KEY_SOURCE_URL] = source_url
 

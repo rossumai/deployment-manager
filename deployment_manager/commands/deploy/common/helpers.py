@@ -7,11 +7,13 @@ from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
 from deployment_manager.common.read_write import (
     read_prd_cred_file,
     read_prd_project_config,
+    write_prd_cred_file,
 )
 from deployment_manager.utils.consts import display_error, settings
-
-
 from anyio import Path
+
+
+class InvalidCredentialsException(Exception): ...
 
 
 async def get_api_url_from_config(base_path: Path, org_name: str):
@@ -31,17 +33,27 @@ async def get_api_url_from_config(base_path: Path, org_name: str):
     return ""
 
 
-async def get_token_from_cred_file(org_path: Path):
+async def get_token_from_cred_file(org_path: Path, api_url: str):
     credentials_path: Path = org_path / settings.CREDENTIALS_FILENAME
-    if await credentials_path.exists():
-        try:
-            cred_data = await read_prd_cred_file(org_path)
-            if not cred_data:
-                return ""
-            return cred_data.get(settings.CONFIG_KEY_TOKEN, "")
-        except Exception:
-            ...
-    return ""
+    if not (await credentials_path.exists()):
+        return ""
+
+    try:
+        cred_data = await read_prd_cred_file(org_path)
+        if not cred_data:
+            return ""
+
+        token = cred_data.get(settings.CONFIG_KEY_TOKEN, "")
+        await validate_credentials(Credentials(token=token, url=api_url))
+        return token
+    except InvalidCredentialsException:
+        display_error(f"Token for {org_path} is invalid or expired.")
+        new_token = await get_token_from_user(name=org_path)
+        await validate_credentials(Credentials(token=new_token, url=api_url))
+        await write_prd_cred_file(org_path, {settings.CONFIG_KEY_TOKEN: new_token})
+        return new_token
+    except Exception:
+        return ""
 
 
 async def get_api_url_from_user(type: str = "Rossum", default: str = ""):
@@ -61,8 +73,8 @@ async def get_api_url_from_user(type: str = "Rossum", default: str = ""):
     return api_url
 
 
-async def get_token_from_user(type: str = "Rossum"):
-    return await questionary.text(f"Enter token for the {type} API:").ask_async()
+async def get_token_from_user(name: str = "Rossum"):
+    return await questionary.text(f"Enter token for the {name} API:").ask_async()
 
 
 async def validate_credentials(credentials: Credentials):
@@ -77,7 +89,7 @@ async def validate_credentials(credentials: Credentials):
         )
     except APIClientError as e:
         if e.status_code == 401:
-            raise Exception(
+            raise InvalidCredentialsException(
                 f'Invalid API token "{credentials.token}" for URL "{credentials.url}"'
             )
 
