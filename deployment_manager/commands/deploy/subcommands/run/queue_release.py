@@ -1,6 +1,6 @@
 import asyncio
 from copy import deepcopy
-from typing import Union
+from typing import Optional
 
 from anyio import Path
 from pydantic import Field
@@ -36,8 +36,8 @@ class QueueRelease(ObjectRelease):
     ignore_deploy_warnings: bool = False
 
     schema_release: SchemaRelease = Field(alias="schema")
-    inbox_release: Union[InboxRelease, EmptyObjectRelease] = Field(
-        alias="inbox", union_mode="left_to_right"
+    inbox_release: Optional[InboxRelease] = Field(
+        default_factory=lambda: EmptyObjectRelease(), alias="inbox"
     )
 
     schema_targets: dict[int, list] = []
@@ -202,13 +202,14 @@ class QueueRelease(ObjectRelease):
         queue_targets_len = len(self.targets)
         schema_targets_len = len(self.schema_release.targets)
         inbox_targets_len = len(self.inbox_release.targets)
+        queue_has_inbox = bool(self.data.get("inbox", ""))
 
         if queue_targets_len != schema_targets_len:
             display_warning(
                 f"{self.display_type} {self.display_label} has {queue_targets_len} targets while its schema has {schema_targets_len}. Please make the target counts are equal."
             )
             mismatch_found = True
-        if queue_targets_len != inbox_targets_len:
+        if queue_has_inbox and queue_targets_len != inbox_targets_len:
             display_warning(
                 f"{self.display_type} {self.display_label} has {queue_targets_len} targets while its inbox has {inbox_targets_len}. Please make the target counts are equal."
             )
