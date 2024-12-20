@@ -246,14 +246,12 @@ async def deploy_release_file(
 
     # TODO: remember what was deployed, if those IDs exist locally, they should be automatically moved (pulled) into the new (sub)dir <- important for same-org
     # ! TODO: if there is not target dir, ask the user for a name. Then offer to download all new objects into that dir
-    if (
-        not target_dir_subdir
-        and await questionary.confirm(
+    if not target_dir_subdir:
+        if await questionary.confirm(
             f"Would you like to specify target directory and {settings.DOWNLOAD_COMMAND_NAME} the deployed objects?"
-        ).ask_async()
-    ):
-        # target_dir_subdir_path = project_path / Path(target_dir_subdir)
-        ...
+        ).ask_async():
+            print("TBD")
+            # target_dir_subdir_path = project_path / Path(target_dir_subdir)
     else:
         target_dir_subdir_path = project_path / Path(target_dir_subdir)
         await download_destinations(
