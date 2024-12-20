@@ -147,12 +147,21 @@ def override_attributes_v2(
 
 def parse_parent_and_key(key_query: str):
     try:
-        parent, key = ".".join(key_query.split(".")[:-1]), key_query.split(".")[-1]
+        dot = [pos for pos, char in enumerate(key_query) if char == "."]
+        pipe = [pos for pos, char in enumerate(key_query) if char == "|"]
+
+        dot_idx = dot[-1] if dot else -1
+        pipe_idx = pipe[-1] if pipe else -1
+        idx = dot_idx if dot_idx > -1 else pipe_idx if pipe_idx > -1 else -1
+
+        parent = key_query[:idx].strip() if idx > -1 else None
+        key = key_query[idx + 1 :].strip() if idx > -1 else key_query
+
+        return parent, key
     except Exception:
         raise Exception(
             f'Invalid query "{key_query}" - the last part must be a single object key.'
         )
-    return parent, key
 
 
 def perform_search(parent: str, object: dict):
@@ -210,9 +219,9 @@ async def replace_ids_in_settings(
         elif num_targets == len(target_ids):
             stringified_dict = re.sub(
                 source_id_regex,
-                lambda m: str(target_ids[object_index])
-                if m[0] == str(source_id)
-                else m[0],
+                lambda m: (
+                    str(target_ids[object_index]) if m[0] == str(source_id) else m[0]
+                ),
                 stringified_dict,
             )
         # N:1 objects -> everything should be mapped to the first target ID
@@ -301,7 +310,10 @@ async def override_migrated_objects_attributes(
                     num_targets=len(target_objects),
                 )
                 if plan_only:
-                    with tempfile.NamedTemporaryFile() as tf1, tempfile.NamedTemporaryFile() as tf2:
+                    with (
+                        tempfile.NamedTemporaryFile() as tf1,
+                        tempfile.NamedTemporaryFile() as tf2,
+                    ):
                         tf1.write(
                             bytes(
                                 json.dumps(target_object["settings"], indent=2), "UTF-8"
@@ -379,7 +391,7 @@ def print_simulation_message(
     source_object_subset: dict,
 ):
     target_name = (
-        f'{target_object['id']} {target_object.get('name', 'no-name')}'
+        f"{target_object['id']} {target_object.get('name', 'no-name')}"
         if target_object["id"] != source_object["id"]
         else MIGRATE_PLANNING_MODE_OBJECT_PLACEHOLDER
     )
