@@ -62,6 +62,7 @@ class WorkspaceRelease(ObjectRelease):
             self.update_targets(results)
         except Exception as e:
             display_error(
-                f"Error while migrating {self.display_type} {self.name} ({self.id}) ^",
+                f"Error while creating {self.display_type} {self.display_label}: {e}",
                 e,
             )
+            self.deploy_failed = True

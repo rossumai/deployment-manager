@@ -111,7 +111,7 @@ class HookRelease(ObjectRelease):
             return result
         except Exception as e:
             display_error(
-                f'Error while creating {self.display_type} "{self.name} ({self.id})" ^',
+                f"Error while creating {self.display_type} {self.display_label}: {e}",
                 e,
             )
             self.deploy_failed = True

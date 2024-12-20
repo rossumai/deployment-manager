@@ -79,6 +79,8 @@ class QueueRelease(ObjectRelease):
     async def deploy(self):
         try:
             if self.plan_only:
+                await self.verify_subobjects_have_same_target_count()
+
                 # Ignore warnings independently (ignore in first function would hide warning in second)
                 self.yaml_reference[
                     "ignore_deploy_warnings"
@@ -184,14 +186,36 @@ class QueueRelease(ObjectRelease):
 
         except Exception as e:
             display_error(
-                f"Error while migrating {self.display_type} {self.name} ({self.id}): {e}",
+                f"Error while creating {self.display_type} {self.display_label}: {e}",
                 e,
             )
+            self.deploy_failed = True
 
     def remove_attributes_for_cross_org(self, queue_copy: dict):
         queue_copy.pop("workflows", None)
         for attr in QUEUE_ENGINE_ATTRIBUTES:
             queue_copy.pop(attr)
+
+    async def verify_subobjects_have_same_target_count(self):
+        mismatch_found = False
+
+        queue_targets_len = len(self.targets)
+        schema_targets_len = len(self.schema_release.targets)
+        inbox_targets_len = len(self.inbox_release.targets)
+
+        if queue_targets_len != schema_targets_len:
+            display_warning(
+                f"{self.display_type} {self.display_label} has {queue_targets_len} targets while its schema has {schema_targets_len}. Please make the target counts are equal."
+            )
+            mismatch_found = True
+        if queue_targets_len != inbox_targets_len:
+            display_warning(
+                f"{self.display_type} {self.display_label} has {queue_targets_len} targets while its inbox has {inbox_targets_len}. Please make the target counts are equal."
+            )
+            mismatch_found = True
+
+        if mismatch_found:
+            raise Exception("Incorrect inbox/schema target count vs queue target count")
 
     async def evaluate_workflow_warning(self):
         if self.ignore_deploy_warnings or self.is_same_org_deploy:
