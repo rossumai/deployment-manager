@@ -174,7 +174,7 @@ async def deploy_release_file(
 
     if not (
         await questionary.confirm(
-            "Do you wish to apply the plan?", default=True
+            "Do you wish to apply the plan?", default=False
         ).ask_async()
     ):
         return
