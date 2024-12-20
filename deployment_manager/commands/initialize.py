@@ -51,26 +51,28 @@ async def init_project(name: Path):
     directories = config.data[settings.CONFIG_KEY_DIRECTORIES]
     credentials = {}
 
-    while questionary.confirm(
+    while await questionary.confirm(
         "Would you like to specify **ORG-LEVEL** directory?"
-    ).ask():
-        org_dir_name = questionary.text("org-level directory name:").ask()
-        org_id = questionary.text("ORG ID:").ask()
-        api_base_url = questionary.text(
+    ).ask_async():
+        org_dir_name = await questionary.text("org-level directory name:").ask_async()
+        org_id = await questionary.text("ORG ID:").ask_async()
+        api_base_url = await questionary.text(
             f"Base API URL: (e.g., {settings.DEPLOY_DEFAULT_TARGET_URL})"
-        ).ask()
-        token = questionary.text("API token:").ask()
+        ).ask_async()
+        token = await questionary.text("API token:").ask_async()
         directories[org_dir_name] = {
             settings.DOWNLOAD_KEY_ORG_ID: org_id,
             settings.CONFIG_KEY_API_BASE_URL: api_base_url,
             settings.CONFIG_KEY_SUBDIRECTORIES: {},
         }
         credentials[org_dir_name] = token
-        while questionary.confirm(
+        while await questionary.confirm(
             f"Would you like to specify **SUBDIRECTORY** inside {org_dir_name}?"
-        ).ask():
-            subdir_name = questionary.text("subdir name:").ask()
-            subdir_regex = questionary.text("subdir regex:").ask()
+        ).ask_async():
+            subdir_name = await questionary.text("subdir name:").ask_async()
+            subdir_regex = await questionary.text(
+                "subdir regex (OPTIONAL):"
+            ).ask_async()
             directories[org_dir_name][settings.CONFIG_KEY_SUBDIRECTORIES][
                 subdir_name
             ] = {settings.DOWNLOAD_KEY_REGEX: subdir_regex}
@@ -84,6 +86,8 @@ async def init_project(name: Path):
     for org_dir, token in credentials.items():
         credentials_yaml = DeployYaml("{}")
         credentials_yaml.data = {settings.CONFIG_KEY_TOKEN: token}
-        credentials_yaml.save_to_file(name / org_dir / settings.CREDENTIALS_FILENAME)
+        await credentials_yaml.save_to_file(
+            name / org_dir / settings.CREDENTIALS_FILENAME
+        )
 
-    print(Panel(f'Initialized a new PRD directory in "{name}" .'))
+    print(Panel(f'Initialized a new PRD directory in "{name}"'))

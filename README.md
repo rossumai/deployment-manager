@@ -94,7 +94,7 @@ This command allows you to specify attribute override for all objects of a certa
 
 Once you go through the CLI guide, you can also make other changes manually in the deploy file (e.g., attribute_override of specific objects). Any object specified in the deploy file with an empty `targets` will have a new copy created. If there is an ID specified, this command will instead update the object with that ID.
 
-Then you can go ahead and run the deploy:
+Then you can go ahead and **run the deploy**:
 ```
 prd2 deploy run <DEPLOY-FILE-PATH>
 ```
@@ -102,7 +102,7 @@ You will first see a plan of the deploy (what will be deployed, what are the cha
 
 Once the `deploy` is finished, you will get a new file with a `_deployed` suffix. If you created new objects, their IDs will be on the right hand side. This file is created in case you wanted to keep using the original deploy file as a template.
 
-You can update a previously existing deploy file via:
+You can **update a previously existing deploy file** via:
 ```
 prd2 deploy template -f <PATH> --interactive
 ```
@@ -112,10 +112,104 @@ You can leave comments in the YAML, they will get preserved (bar a few exception
 
 ## User Guide
 
-> Note that this tool is not designed to automatically do any git commits, rollbacks, merge requests and similar git actions.User is responsible to commit (or revert), switch to another branch, whatever is necessary when it is required (i.e., released new working version, at that point a manual commit is required). This has a reasoning - process of testing/releasing is usually iterative and doing automatic commits would simply flood git repository with meaningless commits and it may make it harder to return to a certain working snapshot of the project.
+### Directory structure
+A single PRD project corresponds to a single GIT repository. Inside the project, there can be any number of directories, each corresponding to a single Rossum organization.
 
-# TODO EXPLAIN ORG-LEVEL and SUBDIR-LEVEL (why always at least a single of each)
-# TODO interactions with GIT
+These `org-level` directories are specified in `prd_config.yaml`. Example:
+```YAML
+directories:
+  sandbox-org:
+    org_id: '251437'
+    api_base: https://rdttest.rossum.app/api/v1
+    subdirectories:
+      dev:
+        regex: ''
+      uat:
+        regex: ''
+  prod-org:
+    org_id: '255590'
+    api_base: https://rdttest.rossum.app/api/v1
+    subdirectories:
+      prod:
+        regex: ''
+
+```
+The config specifies the URLs and org IDs for each org-level directory. There are also so called subdirectories.
+
+Inside an org-level directory, there is always at least a single subdirectory. This subdirectory corresponds to a grouping of Rossum objects (e.g., "DEV", "UAT", etc.).
+
+If the project has dedicated organizations for each part of the implementation lifecycle (TEST+PROD, DEV+TEST+PROD, etc.), then the subdirectory is usually only for compatibility reasons. But if there is a single organization for the whole project ("same-org"), subdirectories allow the segregation of testing and production objects.
+
+The directories and subdirectories are relevant in 2 ways:
+1. They are a part of the path to specific objects.
+2. They are used in PRD commands to specify which parts of the project are to be used.
+
+Commands like `pull` and `push` can take any combination of dirs and subdirs. Dirs are automatically expanded to include all of its subdirs.
+
+Inside the subdirectories, there is always one folder for `workspaces` and another for `hooks`. Under each workspace, there is a folder for `queues`. Each queue subfolder then has the configuration for the queue, its schema, and inbox. In this respect, PRD is opinionated and expects each queue to have its own schema. Inbox is optional.
+
+A full example of a project directory structure with 2 organizations and 2 subdirectories in the `sandbox-org` can be found below:
+
+```JSON
+├── prd_config.yaml
+├── prod-org
+│   ├── credentials.yaml
+│   ├── organization.json
+│   └── prod
+│       ├── hooks
+│       │   └── Master Data Hub 1 - DEV_[521877].json
+│       └── workspaces
+│           └── AP_[572556]
+│               ├── queues
+│               │   └── Invoices_[1509387]
+│               │       ├── formulas
+│               │       │   └── some_formula.py
+│               │       ├── inbox.json
+│               │       ├── queue.json
+│               │       └── schema.json
+│               └── workspace.json
+└── sandbox-org
+    ├── credentials.yaml
+    ├── dev
+    │   └── workspaces
+    │       └── AP_[521887]
+    │           ├── queues
+    │           │   └── Invoices_[1230128]
+    │           │       ├── inbox.json
+    │           │       ├── queue.json
+    │           │       └── schema.json
+    │           └── workspace.json
+    ├── organization.json
+    └── uat
+        └── workspaces
+            └── AP_[563305]
+                ├── queues
+                │   └── Invoices_[1462491]
+                │       ├── inbox.json
+                │       ├── queue.json
+                │       └── schema.json
+                └── workspace.json
+```
+
+
+### Interactions with GIT
+
+PRD has 2 mechanisms to keep track of changes when comparing local and remote Rossum objects:
+1. Checking the `modified_at` timestamp
+2. Checking changes tracked by GIT
+
+PRD does not create any commits for the user, but it expects the user to commit in the following situations:
+- Running `prd2 pull` and having a synced up version of local-remote
+- Running `prd2 push` and having a "working solution" in remote
+
+> **Rule of thumb**: The user should commit local changes after a series of the same PRD command, before a different command is use. Example:
+1. `push`ing changes made to an extension ->
+2.  debugging in the Rossum UI and seeing that one more change is needed ->
+3. `push`ing again -> commiting ->
+4. `pull`ing changes a day later made by someone else in the UI
+
+---
+Old guide
 
 <span style="color:#004795"> **Initialize empty project and repository** </span>  
 
