@@ -59,6 +59,8 @@ For each subdir, you can specify a regex for the name of objects. Once you `pull
 
 You can rerun this command later to add new directories into the project.
 
+> ℹ️ Note: all dirs and subdirs need to be added inside the configuration file (`prd_config.yaml`) to work properly with PRD commands.
+
 This command creates the specified directories and puts the provided credentials into them. 
 
 This command also initializes an empty GIT repository.
@@ -100,7 +102,7 @@ prd2 deploy run <DEPLOY-FILE-PATH>
 ```
 You will first see a plan of the deploy (what will be deployed, what are the changes) and then you are asked for confirmation that those changes should be applied.
 
-Once the `deploy` is finished, you will get a new file with a `_deployed` suffix. If you created new objects, their IDs will be on the right hand side. This file is created in case you wanted to keep using the original deploy file as a template.
+Once the `deploy` is finished, you will get a new file with a `_deployed` suffix. If you created new objects, their IDs will be on the right hand side. This file is created in case you wanted to keep using the original deploy file as a template. For future deploys, you should use the `_deployed` file since it will update the right objects, not create new ones again.
 
 You can **update a previously existing deploy file** via:
 ```
@@ -198,6 +200,30 @@ PRD has 2 mechanisms to keep track of changes when comparing local and remote Ro
 1. Checking the `modified_at` timestamp
 2. Checking changes tracked by GIT
 
+#### Checking timestamps
+
+##### Push
+
+`push` command by default analyzes the `modified_at` attribute on each API object in the remote and compares it to the one in the local JSON object. If the `modifed_at` timestamp in remote is different from the local one, `push` will skip this object to avoid overwriting changes to the object made on the remote, but not existing locally.
+
+You can override this and push such local objects with `--force` or `-f`. 
+
+##### Pull
+
+`pull` command also utilizes the `modified_at` timestamp to compare local and remote objects. In this case though, it does so to only download objects that really did change in the remote. `pull` assumes this is the case when the timestamps are not equal.
+
+You can override this and pull all objects with `--all` or `-a`.
+
+#### Checking GIT changes
+
+##### Push
+
+`push` uses GIT to know which objects were changed locally and should be pushed to remote. If you add `--all` or `-a`, PRD pushes all your local objects, irrespective if they were changed or not.
+
+##### Pull
+
+`pull` uses GIT to prevent overwriting local uncommitted changes. If the timestamps are not equal (see above), but the object is tracked in GIT as modified, PRD will ask the user to confirm overwriting the object. 
+
 PRD does not create any commits for the user, but it expects the user to commit in the following situations:
 - Running `prd2 pull` and having a synced up version of local-remote
 - Running `prd2 push` and having a "working solution" in remote
@@ -208,281 +234,146 @@ PRD does not create any commits for the user, but it expects the user to commit 
 3. `push`ing again -> commiting ->
 4. `pull`ing changes a day later made by someone else in the UI
 
----
-Old guide
 
-<span style="color:#004795"> **Initialize empty project and repository** </span>  
+### Working with credentials
 
-1. Run `prd init <project_name>` which will initialize an empty GIT repository. You can also use `.` for the project name and use the current directory.
-2. Copy `credentials.template.json` to `credentials.json`
-3. Fill in the required credentials in the `credentials.json` file that was created in the project folder - either `source.token` (retrieved using /auth endpoint) or `source.username` and `source.password`.
-4. Fill in `source_api_base` in the `prd_config.yaml` file.
-5. If you are going to deploy the code to a different Rossum organization configure `target_api_base` and `use_same_org_as_target: false` in `prd_config.yaml` and either `target.token` or `target.username` and `target.password` in `credentials.json`.
+PRD commands almost always need credentials (Rossum API URL + token / password & username) to work properly. PRD tries to find and use credentials in the following order:
+1. Use credentials from the org-level directory in `credentials.yaml` file.
+2. If the credentials are invalid (e.g., expired token), ask the user for a valid one and save it for future use.
+3. If there are no credentials in the file, ask the user for a token without saving it.
 
-> ℹ️ This command creates a local git repository. If you want to connect it to an existing remote repository, call `git remote add <reponame> <giturl>`. For existing remote repositories created with PRD, it might be easier to clone them from the remote and create a `credentials.json` file manually in the root folder.
+Some commands (e.g., `purge`) ask you for credentials every time because they can be used with any Rossum organization, not just the ones you have pulled locally.
 
-
-<span style="color:#004795">**Pull (download) configuration of existing project**</span>
-
-Run `pull` command inside the project's root folder. This will load all objects stored in the organization and create `mapping.yaml` file. If this project already contains test and production objects, you will need to modify created `mapping.yaml` file to link the test and production objects (in the context of this readme, these will be referred to as `source` and `target`)  
-  
-Sample `mapping.yaml` after `pull` of simple project. Notice how `target_object` is null, that's because there are no "production" versions of these objects yet. More about that later.
-```
-ORGANIZATION: # organization category, always top level
-  id: 123456 # id of the organization
-  name: Production # name of the organization
-  target_object: null # id of the couterpart object in the target environment
-  HOOKS: # hooks category
-    - id: 111
-      ignore: true # if true, object is not pushed to remote
-      name: Magic Items
-      targets
-        - target_id: null
-  SCHEMAS:
-    - id: 222
-      name: Purchase orders schema
-      targets
-        - target_id: null
-  WORKSPACES:
-    - QUEUES:
-        - INBOX:
-            id: 333
-            name: Incoming Purchase Orders
-            targets
-              - target_id: null
-          id: 4444
-          name: Incoming Purchase Orders
-          targets
-            - target_id: null
-      id: 321654
-      name: Dev & test
-      targets
-        - target_id: null
-          attribute_override:
-            name: Prod
-```
-And the source folder after pulling these objects:
-```
-source
- ┣ hooks
- ┃ ┗ Magic Items_[111].json
- ┣ schemas
- ┃ ┗ Purchase orders schema_[222].json
- ┣ workspaces
- ┃ ┗ Dev & Test_[321654]
- ┃ ┃ ┣ queues
- ┃ ┃ ┃ ┗ Incoming Purchase Orders_[4444]
- ┃ ┃ ┃ ┃ ┣ inbox.json
- ┃ ┃ ┃ ┃ ┗ queue.json
- ┃ ┃ ┗ workspace.json
- ┗ organization.json
-```
-
-<span style="color:#004795">**Push (upload) configuration for testing**</span>
-
-You've made your changes to the configuration - changed schema, hook settings etc in the `source` folder object's JSON definition . Run `push` command - this command calls git to see all changes in your local repository in `source` folder and pushes all changed objects to Rossum.  
-
-Push command by default analyzes `modified_at` attribute (can be overridden by `-f` parameter) on each API object in the `remote` and `local` and compares them - if the `modifed_at` timestamp in the `remote` is different to the one in the local repository, the push command will skip pushing this object to the `remote` to avoid overwriting changes to the object that haven't been versioned yet.  
-
-By adding `-a` the tool pushes all objects from your `local` to the `remote`, irrespective if they were changed or not.
-
-
-<span style="color:#004795">**Release tested configuration to production**</span>
-
-All changes have been tested and you are ready to push the configuration to production organization/workspace. At this point commit any changes in the `source` folder.  
-Next, prepare the `mapping.yaml` for release ([see mapping section] #mapping)  
-
-> 🛑 If you have referenced some existing objects as a target to be updated (meaning `target_id` was set in the mapping), make sure to call `pull` after modifying the `mapping.yaml` - this will move the objects referenced into target folder.
-
-Call `release` command - this will `push` all objects from the `source` and using `mapping.yaml` update existing objects or create new ones in the `target` (organization/workspace(s)). This command will also override attributes of the `source` objects as defined in the `mapping.yaml` (see description of `mapping.yaml` below). After the release a `pull` is automatically called and `source` and `target` folders are updated.  
-
-It is recommended to first run the command with `-p` parameter to see the overview of the changes that are going to be released. This should help validate `mapping.yaml` is configured correctly before releasing to avoid complicated rollback if the mapping is misconfigured.
-
-After the release the sample project mapping will be updated with target_object IDs.
-```
-ORGANIZATION: # organization category, always top level
-  id: 123456 # id of the organization
-  name: Production # name of the organization
-  targets:
-    - target_id: 123789 # id of the couterpart object in the target environment
-  HOOKS: # hooks category
-    - id: 111
-      ignore: true # if true, object is not pushed to remote
-      name: Magic Items
-      targets:
-        - target_id: null # this remains empty, because ignore flag prevented the release to create the counterpart object
-  SCHEMAS:
-    - id: 222
-      name: Purchase orders schema
-      targets:
-        - target_id: 2222
-  WORKSPACES:
-    - QUEUES:
-        - INBOX:
-            id: 333
-            name: Incoming Purchase Orders
-            targets:
-              - target_id: 3333
-          id: 4444
-          name: Incoming Purchase Orders
-          targets:
-            - target_id: 4444
-      id: 321654
-      name: Dev & test
-      targets:
-        - target_id: 321987
-          attribute_override:
-            name: Prod
-```
-
-And the `target` folder after the release is finished. Notice the name of the Workspace - this is due to the `attribute_override` defined in the mapping file. Hook Magic Items is missing because `ignore` flag was set to true.
-```
-target
- ┣ hooks
- ┣ schemas
- ┃ ┗ Purchase orders schema_[2222].json
- ┣ workspaces
- ┃ ┗ Prod_[321987]
- ┃ ┃ ┣ queues
- ┃ ┃ ┃ ┗ Incoming Purchase Orders_[4444]
- ┃ ┃ ┃ ┃ ┣ inbox.json
- ┃ ┃ ┃ ┃ ┗ queue.json
- ┃ ┃ ┗ workspace.json
- ┗ organization.json
-```
-
-Once the production release is successful, commit all the changes in the `target` folder so that you have a working snapshot prepared for when new changes are released in the future.
 
 ## Full(er) Command Reference
 
-You can see all parameters for each command by calling `<command> --help`
+### Pull
+
+When saving remote objects locally, `pull` tries to guess into what org-level dir and subdir to place the object . The org-level dir is clear based on the provided credentials. The subdir is evaluated/guessed in the following order:
+1. If there is a single subdir configured in the org-level dir, use that one.
+2. If a subdir has an object with the same ID, use that one.
+3. If configured, try matching the subdir's regex against the remote object's name.
+4. If there are any objects without a subdir left, ask the user if they want to manually assign them, otherwise do not save such objects.
+
+`-c` or `-cm` parameter can be added to automatically commit all changes with default or custom (`-m` parameter) commit message.
+
+The following object attributes are ignored - that means they are neither pulled nor pushed:
+  - Queue: ["counts", "users"]
+  - Hook: ["status"]
+
+### Push
+
+If you have many local changes and want to push only some of them to remote, you can run `git add <selected_paths>` and then use `push` with `-io` or `--indexed-only` parameter which will only register changes added to GIT index.
+
+`-c` or `-cm` parameter can be added to automatically commit all changes with default or custom (`-m` parameter) commit message.
+
+### Deploy
+
+**For cross-org deploys, some parts of the Rossum configuration are ignored because they are not writable via the API** (e.g., approval workflows, engines, etc.).
+
+IDs of dependencies (e.g., `queue.hooks`) are automatically replaced when deploying. PRD does a lookup of each source dependency to find its target equivalent.
+
+PRD handles the following edge cases:
+1. For a single ID, if there is no target equivalent, the dependency is kept the same (e.g., `queue.schema`) and a warning is shown.
+2. For a list of IDs, if one of the dependencies has no target equivalent, it is skipped (the rest of the list of IDs is applied). This can be overriden for queues and their hooks (see the deploy file reference below).
+3. For both cases, if there are multiple target equivalents, their count is compared to the count of "siblings" of the current object:
+    - If this count is equal (e.g., releasing 2 `queues`, each with its own version of `hooks), each sibiling object gets its own target equivalent (based on the index)
+    - If the count is not equal, all siblings get the first target equivalent as their dependency
+4. For queues, any dependencies that exist in target, but not in source (e.g., a production-only "dangling" hook) are kept in the list of dependencies.
+
+#### Multiple targets
+
+A single object can be deployed to multiple target objects by specifying an array of `targets`. The smallest viable configuration example is the following: 
+```YAML
+workspaces:
+  - id: 521887
+    name: WS1 DEV
+    targets:
+      - id:
+      - id:
 
 ```
-pull
-```   
-Pulls (downloads) all objects from the `source` & `target` environment and updates (or creates) folder & file structure in `source` and `target` folder in the project's local repository. Environment used is the organization of the user (determined from the credentials provided in credentials.json file).  
-
-If `mapping.yaml` file does not exist, file is created and populated with all pulled objects. In this case all objects are considered `source` (in the case of existing test/production deployment, the `mapping.yaml` file needs to be updated to link objects with their `target`). After this is done and `push` command is called, the `mapping.yaml` file is cleaned and only `source` objects remain while `target` objects remain referenced in the _target_ section of each object.
-
-If `mapping.yaml` is already existing, missing records for new objects are created and records for no longer existing objects are removed. If there are new objects found in the organization, an attempt is made to determine whether they belong to `source` or `target` (by analyzing existing `mapping.yaml` file and finding nearest parent object [workspace/organization]). If this cannot be determined, user is prompted to classify the new object(s).
-
-Just like `push` command, `pull` utilizes `modified_at` timestamp to avoid overwriting `local` objects that are ahead of the `remote` objects.
-
-A `-c` or `-cm` parameter can be added to automatically commit all changes with default or custom (`-m` parameter) commit message right after the pull finishes.
-```
-push
-```
-Pushes all eligible (see `mapping.yaml` definition) objects into the `source` organization in Rossum platform. 
+Attribute override is added for each target separately:
+```YAML
+workspaces:
+  - id: 521887
+    name: WS1 DEV
+    targets:
+      - id:
+        attribute_override:
+          name: WS1 UAT
+      - id:
+        attribute_override:
+          name: WS1 PROD
 
 ```
-push target
+
+#### Pull from production into dev
+
+In cases where the user has a configuration in Rossum production and wants to replicate it for development purposes and then deploy changes back into production, the user can use `reverse_mapping_after_deploy: true` in the deploy file.
+
+This flag will replicate `source_org` into `target_org` and then reverse the left and right hand sides for each object. The resulting deploy file thus has `source_org` and `target_org` reversed and is ready for a dev->prod release.
+
+## Deploy File Reference
+
+You can leave comments in the deploy file and they will be preserved (in almost all cases) even after running PRD commands (this is different from PRD v1).
+
+> ℹ️ Note: Unlike in PRD v1, there is no `ignore` option for objects. If you do not want to deploy something, just remove it from the deploy file. However, this does not work for objects like schemas since a queue always needs one.
+
+For queues, there are optional flags:
+
+#### `queue.keep_hook_dependencies_without_equivalent`
+
+By default, any hooks that did not have have a target equivalent found (the hook was not part of the deploy) will be removed from the list of the deployed (target) queue. If this flag is `true`, the specific queue will retain hook dependencies from source. **This only makes sense for same-org releasing**.
+
+#### `queue.ignore_deploy_warnings`
+
+If `true`, `deploy` does not display the warning that the queue has a workflow or dedicated engine defined. Note that this warning is shown only for cros-org releases.
+
+- Difference between:
+
+### Attribute override
+
+To override attributes in target objects, the user can specify key:value pairs. The keys are JMESPath queries. The values replace whatever is found with these queries during the `deploy` call.
+
+#### Using regex 
+
+Attribute override can also replace only a part of the value by using a regex:
+```YAML
+workspaces:
+  - id: 538437
+    name: Invoices US
+    targets:
+      - id:
+        attribute_override:
+          name: \bUS\b/#/EU
 ```
-Pushes all eligible objects from local `target` to remote `target`.
+There is a `/#/` separator of the regex on the left and the static value on the right.
 
-The push command also accepts `-a` parameter that will take everything in `source`/`target` and update the corresponding objects in Rossum. If these objects cannot be found, they are recreated.
-
-```
-release
-```
-Pushes all eligible objects from local `source` to remote `target`. This command replaces all variables and overriden attributes as defined in `mapping.yaml`
-
-A single API object can be released/synchronized to multiple target objects by specifying an array of `targets` in the `mapping.yaml`
-
-</br>
-<h2><font color="#004795"> Supported objects </font></h2>
-
-    organizations, workspaces, queues, inboxes, schemas, hooks
-
-<h2><font color="#004795"> Unsupported objects' attributes </font></h2>
-  The following object attributes are ignored - that means they are not pulled nor pushed.</br></br>
-  Queue: ["counts", "users", "workflows"]</br>
-  Hook: ["status"]</br>
-
-
-</br>
-<h2><font color="#004795"> Folder & file structure </font></h2>
-
-```
-├──source
-│   ├──organization.json
-│   │──workspaces
-│   │   ├──workspace.json
-│   │   └──queues
-│   │       ├──queue.json
-│   │       └──inboxes
-│   │           └──inbox.json
-│   ├──schemas
-│   │   └──schema.json
-│   └──hooks
-│       └──hook.json
-├──target
-│   ├──organization.json
-│   ├──workspaces
-│   │   ├──workspace.json
-│   │   └──queues
-│   │       ├──queue.json
-│   │       └──inboxes
-│   │           └──inbox.json
-│   ├──schemas
-│   │   └──schema.json
-│   └──hooks
-│      └──hook.json
-credentials.json
-mapping.yaml
+Do not forget to escape characters with special regex meaning like brackets:
+```YAML
+workspaces:
+  - id: 538437
+    name: Invoices (US)
+    targets:
+      - id:
+        attribute_override:
+          name: \(US\)/#/(EU)
 ```
 
-`credentials.json` - base configuration file of the tool - contains rossum username/credentials as well as other global parameters  
-`mapping.yaml` - file containing metadata of all indexed objects of the `source` environment and their respective couterparts in the `target` environment  
+#### Overriding objects
 
-<h3>credentials.json</h3>
+The JMESPath query for override can be used to replace non-primitive values (e.g., you can replace the whole `settings` object). However, careful if you want to override only a part of the object:
 
-```
-{
-    "source": {
-        "api_base": "...",
-        "username": "...",
-        "password": "..."
-    },
-    "use_same_org_as_target": true,
-    "target": {
-        "api_base": "...",
-        "username": "...",
-        "password": "..."
-    }
-}
-```
-`api_base` - base URL of Rossum API, ending with api version - ie https://elis.rossum.ai/api/v1  
-`token` - valid token generated for admin rossum account. Recommended is to use PASSWORD and USERNAME.
-`username` - Rossum admin account username that is used to generate auth token used for all Rossum API calls  
-`password` - password for Rossum admin account username  
-
-<a id="mapping"></a><h3>mapping.yaml</h3>
-Initialized when not existing or empty during `pull` command. Missing object records are automatically added to this file during `pull` command. Objects missing `target` attribute are copied to the `target` during the `release` and the file is then automatically updated with the `target` object IDs once completed.
-
-`ORGANIZATION | WORKSPACES | QUEUES | INBOX | SCHEMAS | HOOKS` - object type name, used primarily to define structure of the mapping file.  
-`id` - unique ID of the Rossum API object.  
-`name` - name of the Rossum API object instance.  
-`target` - ID of the counterpart object in the `target` environment.  
-`ignore` - attribute controlling whether object is pushed to remote during `release` command. Object with `ignore:true` are not pushed to `target` environment. `source` is unaffected and `push` command always releases all changes from the `source` folder.  
-`attribute_override` - includes key:value pairs. The jeys are JMESPath queries. The values replace whatever is found with these queries during `release` call. The values can also include special keywords:
-
-1. Implicit object reference override - it is always attempted to replace object references in any `object.settings` without having to explicitly define it using any option below. This implicit replacement uses `mapping.yaml` definition to determine relationships between `source` and `target` objects.
-2. `$prd_ref` - replaces the value or list of values in source (found with the [JMESPath](https://jmespath.org/tutorial.html) query) with their target counterparts. This can be only used for IDs. For example, `queue_ids` in hook configurations.
-3. `$source_value` - replaces the keyword with the original (source) attribute's value. Can be used in a string like `$source_value - PROD` (overriding name in this case).
- 
-
-```
+This overrides only the `som` attribute in the object's `metadata`:
+```YAML
 attribute_override:
-  name: "my production hook"
+  metadata.som: 'second'
 ```
-`source` hook's name "my test hook" is renamed to "my production hook" when deploying the hook to `target` environment.  
-
-```
+This overrides the object's whole `metadata` attribute with `{'som': 'second'}`:
+```YAML
 attribute_override:
-  settings.configurations[*].queue_ids: $prd_ref
+  metadata:
+	  som: 'second'
 ```
-When the `release` command is called, this query makes the tool look into all objects inside the array under `settings.configurations` and override their `queue_ids` attribute with a target ID counterpart.
 
-The JMESPath query for override can be used to replace non-primitive values (e.g., you can replace the whole `settings` object), but the value must be statically defined in attribute_override (no keywords).
-
-When using keywords, the JMESPath query should end with an attribute which is a single value or a list of such values (`3333` or [`333`, `13993`, `93`]).
