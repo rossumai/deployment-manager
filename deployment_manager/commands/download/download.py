@@ -19,8 +19,6 @@ from deployment_manager.utils.functions import (
     coro,
 )
 
-# TODO: update purge and push commands
-
 # TODO: fix foreign JSONs in the subdir (mongo.json...)
 
 # TODO: handle case of 1 schema being assigned to multiple queues:

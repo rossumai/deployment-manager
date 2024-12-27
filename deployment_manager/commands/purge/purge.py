@@ -26,22 +26,33 @@ from deployment_manager.utils.functions import (
     coro,
 )
 
+ALL_OBJECT_TYPES = [
+    Resource.Schema.value,
+    Resource.Hook.value,
+    Resource.Workspace.value,
+    Resource.Queue.value,
+]
 
 PURGE_OBJECT_TYPES = [
-    Resource.Schema,
-    Resource.Hook,
-    Resource.Workspace,
-    Resource.Queue,
+    *ALL_OBJECT_TYPES,
     settings.ALL_OBJECTS,
     settings.UNUSED_SCHEMAS,
 ]
 
+# Click can only work with strings, not enum objects, but RossumAPIClient expects the enums
+OBJECT_TYPE_MAPPING = {
+    Resource.Schema.value: Resource.Schema,
+    Resource.Hook.value: Resource.Hook,
+    Resource.Workspace.value: Resource.Workspace,
+    Resource.Queue.value: Resource.Queue,
+}
+
 # Queues should be deleted before (used) schemas and workspaces
 OBJECT_PRIORITIES = {
-    Resource.Queue: 0,
-    Resource.Schema: 1,
-    Resource.Workspace: 2,
-    Resource.Hook: 3,
+    Resource.Queue.value: 0,
+    Resource.Schema.value: 1,
+    Resource.Workspace.value: 2,
+    Resource.Hook.value: 3,
 }
 
 
@@ -54,7 +65,7 @@ Deletes all objects in Rossum based on IDs in the mappping file. This operation 
     "object_types",
     nargs=-1,
     type=click.Choice(
-        PURGE_OBJECT_TYPES,
+        choices=PURGE_OBJECT_TYPES,
     ),
 )
 @coro
@@ -89,12 +100,7 @@ async def purge_object_types(
         object_types_ids: list[tuple[Resource, int]] = []
 
         if settings.ALL_OBJECTS in object_types:
-            object_types = [
-                Resource.Queue,
-                Resource.Schema,
-                Resource.Hook,
-                Resource.Workspace,
-            ]
+            object_types = ALL_OBJECT_TYPES
 
         object_types = sorted(
             object_types, key=lambda x: OBJECT_PRIORITIES.get(x, float("inf"))
@@ -109,11 +115,12 @@ async def purge_object_types(
                     ]
                 )
             else:
+                object_type_as_enum = OBJECT_TYPE_MAPPING.get(object_type)
                 object_types_ids.extend(
                     [
-                        (object_type, id)
+                        (object_type_as_enum, id)
                         for id in await downloader.download_remote_object_ids(
-                            type=object_type
+                            type=object_type_as_enum
                         )
                     ]
                 )
@@ -135,14 +142,15 @@ async def purge_object_types(
         )
 
         if not await questionary.confirm(
-            "Are you sure you want to delete the objects above? This operation cannot be undone.",
+            f"Are you sure you want to delete {object_types} in the above organization? This operation cannot be undone.",
             default=False,
         ).ask_async():
             return
 
         for type, object_id in object_types_ids:
             try:
-                if type == Resource.Queue:
+                # Queues have a "cooldown" period for deletion which needs to be overriden
+                if type == Resource.Queue.value:
                     (
                         await client._http_client._request(
                             "DELETE",
@@ -152,6 +160,10 @@ async def purge_object_types(
                     )
                 else:
                     await client._http_client.delete(resource=type, id_=object_id)
+
+                pprint(
+                    f"Deleted [yellow]{type.value}[/yellow] [purple]{object_id}[/purple]"
+                )
             except Exception as e:
                 display_error(f"Error while deleting {type.value} {object_id}: {e}")
 
