@@ -1,3 +1,4 @@
+import os
 from typing import Any
 from anyio import Path
 import questionary
@@ -55,3 +56,20 @@ async def should_write_object(path: Path, remote_object: Any, changed_files: lis
 
     else:
         return True
+
+
+def delete_empty_folders(root: Path):
+    deleted = set()
+
+    for current_dir, subdirs, files in os.walk(root, topdown=False):
+        still_has_subdirs = False
+        for subdir in subdirs:
+            if os.path.join(current_dir, subdir) not in deleted:
+                still_has_subdirs = True
+                break
+
+        if not any(files) and not still_has_subdirs:
+            os.rmdir(current_dir)
+            deleted.add(current_dir)
+
+    return deleted

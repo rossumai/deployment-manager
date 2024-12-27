@@ -14,6 +14,7 @@ from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
 )
 from deployment_manager.commands.download.downloader import Downloader
 from deployment_manager.commands.download.helpers import (
+    delete_empty_folders,
     replace_code_paths,
     should_write_object,
 )
@@ -217,6 +218,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             ]
         )
         await self.remove_objects_without_remote()
+        self.remove_empty_ws_queue_dirs()
 
         pprint(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME} for {self.name}."))
 
@@ -252,7 +254,13 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
         return map
 
     async def remove_objects_without_remote(self):
-        object_paths = await find_all_object_paths(self.project_path / self.name)
+        object_paths = []
+        for subdir in self.subdirectories.values():
+            if not subdir.include:
+                continue
+            subdir_path = self.project_path / self.name / subdir.name
+            object_paths.extend(await find_all_object_paths(subdir_path))
+
         for object_path in object_paths:
             if object_path.name == "organization.json":
                 continue
@@ -264,6 +272,13 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 f"Deleting a local object that no longer exists in Rossum or was renamed: {object_path}"
             )
             os.remove(object_path)
+
+    def remove_empty_ws_queue_dirs(self):
+        for subdir in self.subdirectories.values():
+            if not subdir.include:
+                continue
+            subdir_ws_path = self.project_path / self.name / subdir.name / "workspaces"
+            delete_empty_folders(subdir_ws_path)
 
     async def should_remove_object(self, object_path: Path):
         object = await read_json(object_path)
