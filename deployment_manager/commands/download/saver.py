@@ -13,7 +13,7 @@ from deployment_manager.common.read_write import (
     write_json,
     write_str,
 )
-from deployment_manager.utils.consts import display_warning
+from deployment_manager.utils.consts import display_error, display_warning
 from deployment_manager.utils.functions import (
     templatize_name_id,
 )
@@ -40,6 +40,9 @@ class Saver(BaseModel):
     def display_type(self):
         # Remove the plural 's'
         return f"[yellow]{self.type.value[:-2 if self.type in [Resource.Inbox] else -1]}[/yellow]"
+
+    def display_label(self, name, id):
+        return f'"[green]{name}[/green] ([purple]{id}[/purple])"'
 
     async def save_downloaded_objects(self):
         for object in self.objects:
@@ -163,7 +166,10 @@ class QueueSaver(Saver):
     async def save_downloaded_object(self, queue: dict, subdir: Subdirectory):
         workspace_for_queue = self.find_workspace_for_queue(queue)
         if not workspace_for_queue:
-            raise Exception(f"Could not find workspace for queue {queue['name']}.")
+            display_error(
+                f"Could not find workspace for {self.display_type} {self.display_label(queue.get('name', "no-name"), queue.get('id', 'no-id'))}. Skipping."
+            )
+            return
 
         object_path = self.construct_object_path(
             subdir=subdir, queue=queue, workspace=workspace_for_queue
@@ -233,9 +239,10 @@ class InboxSaver(QueueSaver):
             return
         workspace_for_queue = self.find_workspace_for_queue(queue_for_inbox)
         if not workspace_for_queue:
-            raise Exception(
-                f"Could not find workspace for queue {queue_for_inbox['name']} ({queue_for_inbox['id']})."
+            display_error(
+                f"Could not find workspace for {self.display_type}'s queue {self.display_label(queue_for_inbox.get('name', "no-name"), queue_for_inbox.get('id', 'no-id'))}. Skipping."
             )
+            return
 
         object_path = self.construct_object_path(
             subdir=subdir, queue=queue_for_inbox, workspace=workspace_for_queue
@@ -312,9 +319,10 @@ class SchemaSaver(QueueSaver):
             return
         workspace_for_queue = self.find_workspace_for_queue(queue_for_schema)
         if not workspace_for_queue:
-            raise Exception(
-                f"Could not find workspace for queue {queue_for_schema['name']} ({queue_for_schema['id']})."
+            display_error(
+                f"Could not find workspace for {self.display_type}'s queue {self.display_label(queue_for_schema.get('name', "no-name"), queue_for_schema.get('id', 'no-id'))}. Skipping."
             )
+            return
 
         object_path = self.construct_object_path(
             subdir=subdir, queue=queue_for_schema, workspace=workspace_for_queue
