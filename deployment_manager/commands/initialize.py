@@ -1,5 +1,6 @@
+from copy import deepcopy
 import os
-from pathlib import Path
+from anyio import Path
 import subprocess
 import questionary
 from rich import print
@@ -22,7 +23,7 @@ Also initializes it as a git repository.
 @click.argument("name", default=".", type=click.Path(path_type=Path, exists=False))
 @coro
 async def init_project(name: Path):
-    if not os.path.exists(name) and name != ".":
+    if not await name.exists() and name != ".":
         os.mkdir(name)
 
     # (re)initialize GIT
@@ -32,7 +33,7 @@ async def init_project(name: Path):
     credentials_ignore_lines = ["\n**/credentials.json", "\n**/credentials.yaml"]
 
     git_ignore_contents = (
-        git_ignore_path.read_text() if git_ignore_path.exists() else ""
+        await git_ignore_path.read_text() if await git_ignore_path.exists() else ""
     )
 
     with open(name / ".gitignore", "a") as wf:
@@ -41,14 +42,15 @@ async def init_project(name: Path):
                 wf.write(ignore_line)
 
     config_path = name / settings.CONFIG_FILENAME
-    if config_path.exists():
-        previous_config = config_path.read_text()
+    if await config_path.exists():
+        previous_config = await config_path.read_text()
     else:
         previous_config = "{}"
     config = DeployYaml(previous_config)
     if settings.CONFIG_KEY_DIRECTORIES not in config.data:
         config.data[settings.CONFIG_KEY_DIRECTORIES] = {}
     directories = config.data[settings.CONFIG_KEY_DIRECTORIES]
+    previous_directories = deepcopy(directories)
     credentials = {}
 
     while await questionary.confirm(
@@ -66,16 +68,11 @@ async def init_project(name: Path):
             settings.CONFIG_KEY_SUBDIRECTORIES: {},
         }
         credentials[org_dir_name] = token
-        while await questionary.confirm(
-            f"Would you like to specify **SUBDIRECTORY** inside {org_dir_name}?"
-        ).ask_async():
-            subdir_name = await questionary.text("subdir name:").ask_async()
-            subdir_regex = await questionary.text(
-                "subdir regex (OPTIONAL):"
-            ).ask_async()
-            directories[org_dir_name][settings.CONFIG_KEY_SUBDIRECTORIES][
-                subdir_name
-            ] = {settings.DOWNLOAD_KEY_REGEX: subdir_regex}
+        await add_subdirs(directories=directories, org_dir_name=org_dir_name)
+
+    if previous_directories:
+        for org_dir_name in previous_directories.keys():
+            await add_subdirs(directories=directories, org_dir_name=org_dir_name)
 
     await config.save_to_file(config_path)
 
@@ -91,3 +88,14 @@ async def init_project(name: Path):
         )
 
     print(Panel(f'Initialized a new PRD directory in "{name}"'))
+
+
+async def add_subdirs(directories: dict, org_dir_name: str):
+    while await questionary.confirm(
+        f"Would you like to specify **SUBDIRECTORY** inside {org_dir_name}?"
+    ).ask_async():
+        subdir_name = await questionary.text("subdir name:").ask_async()
+        subdir_regex = await questionary.text("subdir regex (OPTIONAL):").ask_async()
+        directories[org_dir_name][settings.CONFIG_KEY_SUBDIRECTORIES][subdir_name] = {
+            settings.DOWNLOAD_KEY_REGEX: subdir_regex
+        }
