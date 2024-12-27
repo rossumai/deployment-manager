@@ -16,7 +16,7 @@ from rich.panel import Panel
 
 
 from anyio import Path
-from rossum_api import ElisAPIClient
+from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
 
 from deployment_manager.utils.consts import display_error, settings
@@ -203,10 +203,7 @@ class ObjectRelease(BaseModel):
 
     async def implicit_override_targets(self, lookup_table: LookupTable):
         for target_index, target in enumerate(self.targets):
-            override_source_data_copy = deepcopy(self.data)
             override_target_copy = deepcopy(target)
-
-            self.remove_override_irrelevant_props(override_source_data_copy)
             self.remove_override_irrelevant_props(override_target_copy.data)
 
             self.overrider.replace_ids_in_target_object(
@@ -216,13 +213,30 @@ class ObjectRelease(BaseModel):
                 num_targets=len(self.targets),
             )
 
-            diff = self.overrider.create_override_diff(
-                override_source_data_copy, override_target_copy.data
-            )
-            if not diff:
-                return
-
             if self.plan_only:
+                # When updating, take the real remote object
+                # The diff comparison will then show only overrides that are not on the remote already (not all overrides from source)
+                if target.id and not self.check_plan_object_id(target.id):
+                    try:
+                        override_source_data_copy = await self.client.request_json(
+                            method="GET", url=f"{self.type.value}/{target.id}"
+                        )
+                    except APIClientError as e:
+                        display_error(
+                            f"Error while diffing remote object ({target.id}) ^", e
+                        )
+                        override_source_data_copy = deepcopy(self.data)
+                else:
+                    override_source_data_copy = deepcopy(self.data)
+
+                self.remove_override_irrelevant_props(override_source_data_copy)
+
+                diff = self.overrider.create_override_diff(
+                    override_source_data_copy, override_target_copy.data
+                )
+                if not diff:
+                    return
+
                 colorized_diff = self.overrider.parse_diff(diff)
                 message = f"Attribute override: {self.display_type} {self.create_source_to_target_string(override_target_copy.data)}:\n{colorized_diff}"
                 pprint(Panel(message))
