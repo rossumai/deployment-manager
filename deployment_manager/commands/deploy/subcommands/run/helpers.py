@@ -30,7 +30,7 @@ class DeployYaml:
 
     async def save_to_file(self, file_path: str | Path):
         if file_path.parent:
-            file_path.parent.mkdir(parents=True, exist_ok=True)
+            await file_path.parent.mkdir(parents=True, exist_ok=True)
         with open(file_path, "wb") as wf:
             self._yaml.dump(self.data, wf)
 

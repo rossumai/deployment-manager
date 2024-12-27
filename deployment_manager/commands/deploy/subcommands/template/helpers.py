@@ -231,8 +231,17 @@ async def get_workspaces_from_user(
         previous_deploy_file_workspaces = []
     selected_ws_ids = [ws["id"] for ws in previous_deploy_file_workspaces]
     ws_paths = await find_ws_paths_for_dir(source_path)
+    ws_paths = [
+        ws_path / "workspace.json"
+        for ws_path in ws_paths
+        if await (ws_path / "workspace.json").exists()
+    ]
+    if not ws_paths:
+        display_warning("No workspaces in the selected subdir.")
+        return [], []
+
     ws_choices = await prepare_choices(
-        paths=[ws_path / "workspace.json" for ws_path in ws_paths],
+        paths=ws_paths,
         preselected_ids=selected_ws_ids,
     )
     deploy_file_workspaces = [ws.value for ws in ws_choices if ws.checked]
@@ -258,7 +267,7 @@ async def get_queues_from_user(
     selected_queue_ids = [queue["id"] for queue in previous_deploy_file_queues]
     queue_paths = await find_queue_paths_for_workspaces(deploy_ws_paths)
     if not queue_paths:
-        display_error("No queues in the selected workspaces.")
+        display_warning("No queues in the selected workspaces.")
         return [], []
 
     # If there are no preselected queues, assume the file is being created and preselect everything
@@ -364,6 +373,9 @@ async def get_hooks_from_user(
         .difference(unselected_hook_ids)
     )
     hook_paths = await find_all_hook_paths_in_destination(source_path)
+    if not hook_paths:
+        display_warning("No hooks in the selected subdir.")
+        return [], []
 
     hook_choices = await prepare_choices(
         paths=[hook_path for hook_path in hook_paths],
