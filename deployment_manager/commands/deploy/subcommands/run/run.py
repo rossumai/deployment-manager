@@ -1,3 +1,4 @@
+from copy import deepcopy
 import datetime
 from anyio import Path
 from pydantic import ValidationError
@@ -24,7 +25,6 @@ from deployment_manager.commands.download.download import download_destinations
 from deployment_manager.common.read_write import read_json
 from deployment_manager.utils.consts import (
     display_error,
-    display_warning,
     settings,
 )
 
@@ -130,11 +130,11 @@ async def deploy_release_file(
             plan_only=False,
         )
         planned_release = ReleaseFile(
-            **yaml.data,
+            **deepcopy(yaml.data),
             client=target_client,
             source_client=source_client,
             source_dir_path=source_dir_path,
-            yaml=yaml,
+            yaml=deepcopy(yaml),
             source_org=source_org,
             target_org=target_org,
             plan_only=True,
@@ -198,7 +198,7 @@ async def deploy_release_file(
         await release.apply_implicit_id_override()
     except Exception:
         deploy_error = True
-        display_warning(
+        display_error(
             "Encountered error during deploy, see logs above. Saving intermediary results."
         )
 
