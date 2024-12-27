@@ -41,7 +41,7 @@ In case the directory already exists, it first deletes its contents and then dow
 @click.argument(
     "destinations",
     nargs=-1,
-    type=click.Path(path_type=Path, exists=True),
+    type=click.Path(path_type=Path),
 )
 @click.option(
     "--commit",
@@ -125,7 +125,7 @@ async def download_destinations(
         for subdir_name in org_dir_config.subdirectories.keys():
             subdir_path = project_path / org_dir_name / subdir_name
             if not await subdir_path.exists():
-                os.mkdir(subdir_path)
+                os.makedirs(subdir_path, exist_ok=True)
 
         try:
             await org_dir_config.download_organization()
