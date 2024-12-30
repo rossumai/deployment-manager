@@ -38,6 +38,8 @@ class HookRelease(ObjectRelease):
         plan_only,
         is_same_org_deploy,
         hook_template_url,
+        last_deploy_timestamp,
+        ignore_timestamp_mismatch,
     ):
         try:
             await super().initialize(
@@ -46,6 +48,8 @@ class HookRelease(ObjectRelease):
                 source_dir_path=source_dir_path,
                 plan_only=plan_only,
                 is_same_org_deploy=is_same_org_deploy,
+                last_deploy_timestamp=last_deploy_timestamp,
+                ignore_timestamp_mismatch=ignore_timestamp_mismatch,
             )
             self.source_client = source_client
             self.token_owner_id = token_owner_id

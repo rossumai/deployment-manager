@@ -1,10 +1,15 @@
 from copy import deepcopy
+from datetime import datetime
 
 from pydantic import BaseModel
+import questionary
 from deployment_manager.commands.deploy.subcommands.run.attribute_override import (
     AttributeOverrider,
 )
-from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
+from deployment_manager.commands.deploy.subcommands.run.helpers import (
+    DeployYaml,
+    generate_deploy_timestamp,
+)
 from deployment_manager.commands.deploy.subcommands.run.models import (
     LookupTable,
     Target,
@@ -26,6 +31,15 @@ from deployment_manager.utils.functions import templatize_name_id
 class PathNotFoundException(Exception): ...
 
 
+class TimestampMismatchException(Exception): ...
+
+
+class NonExistentObjectException(Exception): ...
+
+
+class DeployException(Exception): ...
+
+
 # TODO: document methods
 class ObjectRelease(BaseModel):
     class Config:
@@ -45,6 +59,9 @@ class ObjectRelease(BaseModel):
     initialize_failed: bool = False
     deploy_failed: bool = False
 
+    last_deploy_timestamp: str = ""
+    ignore_timestamp_mismatch: bool = False
+
     targets: list[TargetWithDefault] = []
 
     # TODO: better parsing -> better dummy ID
@@ -54,11 +71,13 @@ class ObjectRelease(BaseModel):
 
     async def initialize(
         self,
-        yaml: DeployYaml,
-        client: ElisAPIClient,
-        source_dir_path: Path,
-        plan_only: bool = False,
+        yaml,
+        client,
+        source_dir_path,
+        plan_only=False,
         is_same_org_deploy=False,
+        ignore_timestamp_mismatch=False,
+        last_deploy_timestamp="",
     ):
         # Base path is defined in the config itself for some objects (queues), for others, it needs to be added
         if not self.base_path:
@@ -68,6 +87,9 @@ class ObjectRelease(BaseModel):
 
         self.plan_only = plan_only
         self.is_same_org_deploy = is_same_org_deploy
+
+        self.ignore_timestamp_mismatch = ignore_timestamp_mismatch
+        self.last_deploy_timestamp = last_deploy_timestamp
 
         self.overrider = AttributeOverrider(type=self.type, plan_only=self.plan_only)
 
@@ -128,10 +150,29 @@ class ObjectRelease(BaseModel):
     async def check_modified_timestamps_equal(
         self, last_deploy_timestamp, remote_object_id: int
     ):
-        remote_object = await self.client._http_client.fetch_one(
-            self.type, remote_object_id
-        )
-        return remote_object.get("modified_at", "") == last_deploy_timestamp
+        remote_object = await self.get_remote_object(remote_object_id)
+        try:
+            remote_modified_at = remote_object.get("modified_at", "")
+            remote_timestamp = datetime.fromisoformat(remote_modified_at)
+            deploy_timestamp = datetime.fromisoformat(last_deploy_timestamp)
+            if remote_timestamp > deploy_timestamp:
+                display_error(
+                    f"Timestamp of remote target {self.display_type} {remote_object.get('name', 'no-name')} [purple]({remote_object.get('id', 'no-id')})[/purple] is newer than last deploy ({remote_modified_at} vs {self.last_deploy_timestamp})"
+                )
+                return False
+            return True
+        except ValueError:
+            raise ValueError("One of the provided timestamps is not in ISO format")
+
+    async def get_remote_object(self, remote_object_id):
+        try:
+            return await self.client._http_client.fetch_one(self.type, remote_object_id)
+        except APIClientError as e:
+            if e.status_code == 404:
+                raise NonExistentObjectException(
+                    f"{self.display_type} [purple]{remote_object_id}[/purple] does not exist on remote."
+                ) from None
+            raise e
 
     def update_targets(self, results):
         # asyncio.gather returns results in the same order as they were put in
@@ -157,14 +198,15 @@ class ObjectRelease(BaseModel):
                 result["id"] = result_id
             else:
                 result = await self.client._http_client.create(self.type, target_object)
-
+                self.last_deploy_timestamp = generate_deploy_timestamp()
             pprint(
                 f"{settings.PLAN_PRINT_STR if self.plan_only else ''} {settings.CREATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}."
             )
+
             return result
         except Exception as e:
             display_error(
-                f'Error while creating {self.display_type}  "{self.name} ({self.id})" ^',
+                f"Error while creating {self.display_type} {self.display_label} ^",
                 e,
             )
             self.deploy_failed = True
@@ -177,76 +219,96 @@ class ObjectRelease(BaseModel):
                 result["url"] = result["url"].replace(str(result["id"]), str(target.id))
                 result["id"] = target.id
 
-                # TODO: timestamp checking
-                # if not await self.check_modified_timestamps_equal(
-                #     last_deploy_timestamp, target.id
-                # ):
-                #     display_warning(f"Remote timestamp of ")
-                # If timestamps differ, show warning and let the user end the plan (to go review/sync changes)
+                # TODO: force will always be evaluated as yes
+                if not await self.check_modified_timestamps_equal(
+                    self.last_deploy_timestamp, target.id
+                ):
+                    if await questionary.confirm(
+                        "Overwrite the remote target?", default=True
+                    ).ask_async():
+                        self.ignore_timestamp_mismatch = True
+                    else:
+                        raise TimestampMismatchException(
+                            "Unexpected timestamp mismatch"
+                        )
             else:
-                # TODO: check again to eliminate race conditions
-                # Should remember if the user said "overwrite" in the step above
+                if (
+                    not self.ignore_timestamp_mismatch
+                    and not await self.check_modified_timestamps_equal(
+                        self.last_deploy_timestamp, target.id
+                    )
+                ):
+                    raise TimestampMismatchException("Unexpected timestamp mismatch")
 
                 result = await self.client._http_client.update(
                     self.type, id_=target.id, data=target_object
                 )
-
+                # Important for the ID override phase (deploy file still the old one and the remote just got updated)
+                self.last_deploy_timestamp = generate_deploy_timestamp()
             pprint(
                 f"{settings.PLAN_PRINT_STR if self.plan_only else ''} {settings.UPDATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}."
             )
             return result
         except Exception as e:
             display_error(
-                f'Error while updating {self.display_type}: "{self.name} ({self.id})" -> "{target.id} ^',
-                e,
+                f'Error while updating {self.display_type} {self.display_label} -> "{target.id}: {e}',
+                (
+                    None
+                    if isinstance(e, NonExistentObjectException)
+                    or isinstance(e, TimestampMismatchException)
+                    else e
+                ),
             )
             self.deploy_failed = True
             return {}
 
     async def implicit_override_targets(self, lookup_table: LookupTable):
-        for target_index, target in enumerate(self.targets):
-            override_target_copy = deepcopy(target)
-            self.remove_override_irrelevant_props(override_target_copy.data)
+        try:
+            for target_index, target in enumerate(self.targets):
+                override_target_copy = deepcopy(target)
+                self.remove_override_irrelevant_props(override_target_copy.data)
 
-            self.overrider.replace_ids_in_target_object(
-                target=override_target_copy,
-                lookup_table=lookup_table,
-                target_object_index=target_index,
-                num_targets=len(self.targets),
-            )
+                self.overrider.replace_ids_in_target_object(
+                    target=override_target_copy,
+                    lookup_table=lookup_table,
+                    target_object_index=target_index,
+                    num_targets=len(self.targets),
+                )
 
-            if self.plan_only:
-                # When updating, take the real remote object
-                # The diff comparison will then show only overrides that are not on the remote already (not all overrides from source)
-                if target.id and not self.check_plan_object_id(target.id):
-                    try:
-                        override_source_data_copy = await self.client.request_json(
-                            method="GET", url=f"{self.type.value}/{target.id}"
+                if self.plan_only:
+                    # When updating, take the real remote object
+                    # The diff comparison will then show only overrides that are not on the remote already (not all overrides from source)
+                    if target.id and not self.check_plan_object_id(target.id):
+                        override_source_data_copy = await self.get_remote_object(
+                            target.id
                         )
-                    except APIClientError as e:
-                        display_error(
-                            f"Error while diffing remote object ({target.id}) ^", e
-                        )
+                    else:
                         override_source_data_copy = deepcopy(self.data)
+
+                    self.remove_override_irrelevant_props(override_source_data_copy)
+
+                    diff = self.overrider.create_override_diff(
+                        override_source_data_copy, override_target_copy.data
+                    )
+                    if not diff:
+                        return
+
+                    colorized_diff = self.overrider.parse_diff(diff)
+                    message = f"Attribute override: {self.display_type} {self.create_source_to_target_string(override_target_copy.data)}:\n{colorized_diff}"
+                    pprint(Panel(message))
                 else:
-                    override_source_data_copy = deepcopy(self.data)
-
-                self.remove_override_irrelevant_props(override_source_data_copy)
-
-                diff = self.overrider.create_override_diff(
-                    override_source_data_copy, override_target_copy.data
-                )
-                if not diff:
-                    return
-
-                colorized_diff = self.overrider.parse_diff(diff)
-                message = f"Attribute override: {self.display_type} {self.create_source_to_target_string(override_target_copy.data)}:\n{colorized_diff}"
-                pprint(Panel(message))
-            else:
-                # Update only objects where there was a difference after override
-                await self.update_remote(
-                    target_object=override_target_copy.data, target=target
-                )
+                    # Update only objects where there was a difference after override
+                    await self.update_remote(
+                        target_object=override_target_copy.data, target=target
+                    )
+        except Exception as e:
+            display_error(
+                f'Error while overriding IDs of {self.display_type} {self.display_label} -> "{target.id}: {e}',
+                e,
+            )
+            raise DeployException(
+                "ID override failed, see error details above."
+            ) from None
 
     # TODO: compile lists for each object?
     # TODO: add more attributes (e.g., modified_by, modified_at)

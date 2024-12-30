@@ -25,6 +25,8 @@ class WorkspaceRelease(ObjectRelease):
         source_dir_path,
         plan_only,
         is_same_org_deploy,
+        last_deploy_timestamp,
+        ignore_timestamp_mismatch,
     ):
         try:
             await super().initialize(
@@ -33,6 +35,8 @@ class WorkspaceRelease(ObjectRelease):
                 source_dir_path=source_dir_path,
                 plan_only=plan_only,
                 is_same_org_deploy=is_same_org_deploy,
+                last_deploy_timestamp=last_deploy_timestamp,
+                ignore_timestamp_mismatch=ignore_timestamp_mismatch,
             )
             self.target_org_url = target_org_url
         except Exception as e:

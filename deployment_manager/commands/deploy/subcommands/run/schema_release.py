@@ -25,7 +25,15 @@ class SchemaRelease(ObjectRelease):
     parent_queue: ObjectRelease = None
 
     async def initialize(
-        self, yaml, client, source_dir_path, plan_only, is_same_org_deploy, parent_queue
+        self,
+        yaml,
+        client,
+        source_dir_path,
+        plan_only,
+        is_same_org_deploy,
+        parent_queue,
+        last_deploy_timestamp,
+        ignore_timestamp_mismatch,
     ):
         try:
             self.parent_queue = parent_queue
@@ -38,6 +46,8 @@ class SchemaRelease(ObjectRelease):
                 source_dir_path=source_dir_path,
                 plan_only=plan_only,
                 is_same_org_deploy=is_same_org_deploy,
+                last_deploy_timestamp=last_deploy_timestamp,
+                ignore_timestamp_mismatch=ignore_timestamp_mismatch,
             )
 
             await self.update_formula_fields_code()

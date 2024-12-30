@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import re
 from typing import Any
 from anyio import Path
@@ -133,3 +134,11 @@ def update_ignore_flags_in_yaml(yaml_data: dict, ignore_warning_flags: dict):
         queue[settings.DEPLOY_KEY_IGNORE_DEPLOY_WARNINGS] = ignore_warning_flags.get(
             queue_id, False
         )
+
+
+def generate_deploy_timestamp():
+    return (
+        datetime.now(timezone.utc)
+        .isoformat(timespec="microseconds")
+        .replace("+00:00", "Z")
+    )

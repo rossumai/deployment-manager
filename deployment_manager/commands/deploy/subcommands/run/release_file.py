@@ -9,6 +9,7 @@ from deployment_manager.commands.deploy.subcommands.run.hook_release import (
     HookRelease,
 )
 from deployment_manager.commands.deploy.subcommands.run.object_release import (
+    DeployException,
     ObjectRelease,
     Target,
 )
@@ -34,9 +35,6 @@ from rossum_api.models.user import User
 from rossum_api.models.group import Group
 
 
-class DeployException(Exception): ...
-
-
 # TODO: rename
 class ReleaseFile(BaseModel):
     class Config:
@@ -60,8 +58,10 @@ class ReleaseFile(BaseModel):
     workspaces: list[WorkspaceRelease] = []
     queues: list[QueueRelease] = []
     hooks: list[HookRelease] = []
+
     hook_templates: dict = {}
     queue_ignore_warnings: dict = {}
+    ignore_timestamp_mismatches: dict = {}
 
     hook_targets: list[Target] = []
     workspace_targets: list[Target] = []
@@ -105,6 +105,7 @@ class ReleaseFile(BaseModel):
             target_org=self.target_org,
             plan_only=self.plan_only,
             client=self.client,
+            last_deploy_timestamp=self.last_deployed_at,
         )
 
         if self.plan_only:
@@ -116,6 +117,9 @@ class ReleaseFile(BaseModel):
 
         if self.patch_target_org and not self.is_same_org:
             await organization_release.deploy()
+            self.ignore_timestamp_mismatches[organization_release.id] = (
+                organization_release.ignore_timestamp_mismatch
+            )
             self.detect_deploy_phase_exceptions([organization_release])
 
     async def deploy_hooks(self):
@@ -132,16 +136,23 @@ class ReleaseFile(BaseModel):
                     plan_only=self.plan_only,
                     is_same_org_deploy=self.is_same_org,
                     hook_template_url=self.hook_templates.get(hook_release.id, None),
+                    last_deploy_timestamp=self.last_deployed_at,
+                    ignore_timestamp_mismatch=self.ignore_timestamp_mismatches.get(
+                        hook_release.id, None
+                    ),
                 )
                 for hook_release in self.hooks
             ]
         )
         self.detect_initialize_phase_exceptions(self.hooks)
 
-        # Run hooks sequentially when planning because user may have to input things in the CLI
+        # Run sequentially when planning because user may have to input things in the CLI
         if self.plan_only:
             for hook_release in self.hooks:
                 await hook_release.deploy()
+                self.ignore_timestamp_mismatches[hook_release.id] = (
+                    hook_release.ignore_timestamp_mismatch
+                )
                 self.hook_templates[hook_release.id] = hook_release.hook_template_url
         else:
             await asyncio.gather(
@@ -153,22 +164,35 @@ class ReleaseFile(BaseModel):
     async def deploy_workspaces(self):
         await asyncio.gather(
             *[
-                workspaces_release.initialize(
+                workspace_release.initialize(
                     yaml=self.yaml,
                     client=self.client,
                     source_dir_path=self.source_dir_path,
                     target_org_url=self.target_org.url,
                     plan_only=self.plan_only,
                     is_same_org_deploy=self.is_same_org,
+                    last_deploy_timestamp=self.last_deployed_at,
+                    ignore_timestamp_mismatch=self.ignore_timestamp_mismatches.get(
+                        workspace_release.id, None
+                    ),
                 )
-                for workspaces_release in self.workspaces
+                for workspace_release in self.workspaces
             ]
         )
         self.detect_initialize_phase_exceptions(self.workspaces)
 
-        await asyncio.gather(
-            *[workspace_release.deploy() for workspace_release in self.workspaces]
-        )
+        # Run sequentially when planning because user may have to input things in the CLI
+        if self.plan_only:
+            for workspace_release in self.workspaces:
+                await workspace_release.deploy()
+                self.ignore_timestamp_mismatches[workspace_release.id] = (
+                    workspace_release.ignore_timestamp_mismatch
+                )
+
+        else:
+            await asyncio.gather(
+                *[workspace_release.deploy() for workspace_release in self.workspaces]
+            )
         self.detect_deploy_phase_exceptions(self.workspaces)
         self.workspace_targets = self.gather_targets(self.workspaces)
 
@@ -183,18 +207,37 @@ class ReleaseFile(BaseModel):
                     is_same_org_deploy=self.is_same_org,
                     hook_targets=self.hook_targets,
                     workspace_targets=self.workspace_targets,
+                    last_deploy_timestamp=self.last_deployed_at,
+                    ignore_timestamp_mismatch=self.ignore_timestamp_mismatches.get(
+                        queue_release.id, None
+                    ),
+                    schema_ignore_timestamp_mismatch=self.ignore_timestamp_mismatches.get(
+                        queue_release.schema_release.id, None
+                    ),
+                    inbox_ignore_timestamp_mismatch=self.ignore_timestamp_mismatches.get(
+                        queue_release.inbox_release.id, None
+                    ),
                 )
                 for queue_release in self.queues
             ]
         )
         self.detect_initialize_phase_exceptions(self.queues)
 
-        # Run queues sequentially when planning because user may have to input things in the CLI
+        # Run sequentially when planning because user may have to input things in the CLI
         if self.plan_only:
             for queue_release in self.queues:
                 await queue_release.deploy()
                 self.queue_ignore_warnings[queue_release.id] = (
                     queue_release.ignore_deploy_warnings
+                )
+                self.ignore_timestamp_mismatches[queue_release.id] = (
+                    queue_release.ignore_timestamp_mismatch
+                )
+                self.ignore_timestamp_mismatches[queue_release.schema_release.id] = (
+                    queue_release.schema_release.ignore_timestamp_mismatch
+                )
+                self.ignore_timestamp_mismatches[queue_release.inbox_release.id] = (
+                    queue_release.inbox_release.ignore_timestamp_mismatch
                 )
         else:
             await asyncio.gather(

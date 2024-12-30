@@ -13,7 +13,6 @@ class OrganizationRelease(ObjectRelease):
     type: Resource = Resource.Organization
     target_org: Organization
 
-    plan_only: bool = False
     patch_org: bool = False
 
     # Override parent object method

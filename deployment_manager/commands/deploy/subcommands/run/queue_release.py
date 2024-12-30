@@ -39,6 +39,9 @@ class QueueRelease(ObjectRelease):
     keep_hook_dependencies_without_equivalent: bool = False
     ignore_deploy_warnings: bool = False
 
+    schema_ignore_timestamp_mismatch: bool = False
+    inbox_ignore_timestamp_mismatch: bool = False
+
     schema_release: SchemaRelease = Field(alias="schema")
     inbox_release: Optional[InboxRelease] = Field(
         default_factory=lambda: EmptyObjectRelease(), alias="inbox"
@@ -57,16 +60,26 @@ class QueueRelease(ObjectRelease):
         is_same_org_deploy,
         workspace_targets: dict[int, list],
         hook_targets: dict[int, list],
+        last_deploy_timestamp,
+        ignore_timestamp_mismatch,
+        schema_ignore_timestamp_mismatch,
+        inbox_ignore_timestamp_mismatch,
     ):
         try:
             self.schema_release.base_path = self.base_path
             self.inbox_release.base_path = self.base_path
+
+            self.schema_ignore_timestamp_mismatch = schema_ignore_timestamp_mismatch
+            self.inbox_ignore_timestamp_mismatch = inbox_ignore_timestamp_mismatch
+
             await super().initialize(
                 yaml=yaml,
                 client=client,
                 source_dir_path=source_dir_path,
                 plan_only=plan_only,
                 is_same_org_deploy=is_same_org_deploy,
+                last_deploy_timestamp=last_deploy_timestamp,
+                ignore_timestamp_mismatch=ignore_timestamp_mismatch,
             )
 
             self.workspace_targets = workspace_targets
@@ -103,6 +116,8 @@ class QueueRelease(ObjectRelease):
                 plan_only=self.plan_only,
                 is_same_org_deploy=self.is_same_org_deploy,
                 parent_queue=self,
+                last_deploy_timestamp=self.last_deploy_timestamp,
+                ignore_timestamp_mismatch=self.schema_ignore_timestamp_mismatch,
             )
             if self.schema_release.initialize_failed:
                 raise SubObjectException()
@@ -189,6 +204,8 @@ class QueueRelease(ObjectRelease):
                 is_same_org_deploy=self.is_same_org_deploy,
                 queue_targets={self.id: [target.data for target in self.targets]},
                 parent_queue=self,
+                last_deploy_timestamp=self.last_deploy_timestamp,
+                ignore_timestamp_mismatch=self.inbox_ignore_timestamp_mismatch,
             )
             if self.inbox_release.initialize_failed:
                 raise SubObjectException()

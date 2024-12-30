@@ -1,5 +1,4 @@
 from copy import deepcopy
-import datetime
 from anyio import Path
 from pydantic import ValidationError
 import questionary
@@ -7,13 +6,16 @@ from dataclasses import fields
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.models.organization import Organization
 
-from deployment_manager.commands.deploy.subcommands.run.release_file import (
+from deployment_manager.commands.deploy.subcommands.run.object_release import (
     DeployException,
+)
+from deployment_manager.commands.deploy.subcommands.run.release_file import (
     ReleaseFile,
 )
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
     check_required_keys,
+    generate_deploy_timestamp,
     get_new_deploy_file_path,
     get_url_and_credentials,
     update_ignore_flags_in_yaml,
@@ -186,6 +188,7 @@ async def deploy_release_file(
     update_ignore_flags_in_yaml(yaml.data, planned_release.queue_ignore_warnings)
     release.token_owner_id = planned_release.token_owner_id
     release.hook_templates = planned_release.hook_templates
+    release.ignore_timestamp_mismatches = planned_release.ignore_timestamp_mismatches
 
     deploy_error = False
     try:
@@ -205,9 +208,8 @@ async def deploy_release_file(
             "Encountered error during deploy, see logs above. Saving intermediary results."
         )
 
-    yaml.data[settings.DEPLOY_KEY_LAST_DEPLOYED_AT] = (
-        datetime.datetime.now().isoformat()
-    )
+    # To conform with the Elis API modified_at format
+    yaml.data[settings.DEPLOY_KEY_LAST_DEPLOYED_AT] = generate_deploy_timestamp()
     yaml.data[settings.DEPLOY_KEY_DEPLOYED_ORG_ID] = target_org.id
 
     after_deploy_file_path = await get_new_deploy_file_path(
