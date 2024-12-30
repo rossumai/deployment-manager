@@ -14,9 +14,9 @@ from deployment_manager.commands.deploy.subcommands.template.helpers import (
     get_token_owner_from_user,
     get_workspaces_from_user,
 )
-from deployment_manager.utils.consts import display_error, settings
+from deployment_manager.utils.consts import display_error, display_info, settings
 
-
+from rich import print as pprint
 from anyio import Path
 from rossum_api import ElisAPIClient
 
@@ -172,3 +172,10 @@ async def create_deploy_template(
         deploy_filepath = input_file
 
     await yaml.save_to_file(deploy_filepath)
+
+    display_info(
+        f"Deploy file saved to [green]{deploy_filepath}[/green]. Use it by running:"
+    )
+    pprint(
+        f"\n  {settings.NEW_COMMAND_NAME} {settings.DEPLOY_COMMAND_NAME} {settings.DEPLOY_RUN_COMMAND_NAME} {deploy_filepath}\n"
+    )

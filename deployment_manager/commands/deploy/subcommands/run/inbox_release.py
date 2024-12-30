@@ -34,7 +34,7 @@ class InboxRelease(ObjectRelease):
         self.queue_targets = queue_targets
         self.parent_queue = parent_queue
         # dynamic property caused issues in some function calls
-        self.name = f"inbox:{self.parent_queue.name}"
+        self.name = self.parent_queue.name
 
         await super().initialize(
             yaml=yaml,
@@ -52,46 +52,51 @@ class InboxRelease(ObjectRelease):
         parent_yaml_reference = self.parent_queue.yaml_reference
         return parent_yaml_reference.get("inbox", {})
 
-    # async def prepare_inbox_target(self, queue_target: Target):
-    #     target_inbox_url = queue_target.data.get("inbox", None)
-    #     # No URL when planning also happens when the queue is updated
-    #     # Check if there is an inbox and report it would be updated
-    #     plan_object_updated = not self.check_plan_object_id(queue_target.id)
-    #     if not target_inbox_url and self.plan_only and plan_object_updated:
-    #         target_queue_from_remote = await self.client.retrieve_queue(queue_target.id)
-    #         target_inbox_url = target_queue_from_remote.inbox
+    def prepare_object_copy_for_deploy(self, target: Target, target_index: int):
+        if len(self.parent_queue.targets) < target_index:
+            raise Exception(
+                f"Parent {self.parent_queue.display_type} {self.parent_queue.display_label} does not have target with index {target_index}"
+            )
 
-    #     target_inbox_id = (
-    #         extract_id_from_url(target_inbox_url) if target_inbox_url else None
-    #     )
-    #     return Target(id=target_inbox_id)
+        target_queue = self.parent_queue.targets[target_index]
+
+        inbox_copy = deepcopy(self.data)
+        override_copy = deepcopy(target.attribute_override)
+
+        # Use the target queue's name for the schema unless user specified explicit schema.name override
+        parent_name_override = target_queue.attribute_override.get("name", None)
+        if parent_name_override and "name" not in override_copy:
+            override_copy["name"] = parent_name_override
+
+        # Should either create a new one or it is already present
+        inbox_copy.pop("email", None)
+
+        previous_queue_urls = inbox_copy.get("queues", [])
+        replace_dependency_url(
+            object=inbox_copy,
+            dependency="queues",
+            target_index=target_index,
+            target_objects_count=len(self.targets),
+            source_id_target_pairs=self.queue_targets,
+        )
+        if previous_queue_urls == inbox_copy["queues"] and not target.id:
+            raise Exception(
+                f"Cannot create target for {self.display_type} {self.display_label} - there is no target queue to associate it with."
+            )
+
+        self.overrider.override_attributes_v2(
+            object=inbox_copy, attribute_overrides=override_copy
+        )
+
+        return inbox_copy
 
     async def deploy(self):
         try:
             release_requests = []
             for target_index, target in enumerate(self.targets):
-                inbox_copy = deepcopy(self.data)
-                # Should either create a new one or it is already present
-                inbox_copy.pop("email", None)
-
-                previous_queue_urls = inbox_copy.get("queues", [])
-                replace_dependency_url(
-                    object=inbox_copy,
-                    dependency="queues",
-                    target_index=target_index,
-                    target_objects_count=len(self.targets),
-                    source_id_target_pairs=self.queue_targets,
+                inbox_copy = self.prepare_object_copy_for_deploy(
+                    target=target, target_index=target_index
                 )
-
-                self.overrider.override_attributes_v2(
-                    object=inbox_copy, attribute_overrides=target.attribute_override
-                )
-
-                if previous_queue_urls == inbox_copy["queues"] and not target.id:
-                    display_error(
-                        f"Cannot create target for {self.display_type} {self.display_label} - there is no target queue to associate it with."
-                    )
-                    return
 
                 request = self.upload(
                     target_object=inbox_copy,
@@ -104,6 +109,7 @@ class InboxRelease(ObjectRelease):
 
         except Exception as e:
             display_error(
-                f"Error while migrating {self.display_type} {self.name} ({self.id}): ^",
+                f"Error while deploying {self.display_type} {self.name} ({self.id}): ^",
                 e,
             )
+            self.deploy_failed = True

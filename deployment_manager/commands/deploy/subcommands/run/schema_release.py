@@ -28,7 +28,7 @@ class SchemaRelease(ObjectRelease):
     ):
         self.parent_queue = parent_queue
         # dynamic property caused issues in some function calls
-        self.name = f"schema:{self.parent_queue.name}"
+        self.name = self.parent_queue.name
 
         await super().initialize(
             yaml=yaml,
@@ -48,11 +48,18 @@ class SchemaRelease(ObjectRelease):
         parent_yaml_reference = self.parent_queue.yaml_reference
         return parent_yaml_reference.get("schema", {})
 
-    def prepare_object_copy_for_deploy(self, target: Target):
+    def prepare_object_copy_for_deploy(self, target: Target, target_queue: Target):
         schema_copy = deepcopy(self.data)
+        override_copy = deepcopy(target.attribute_override)
+
+        # Use the target queue's name for the schema unless user specified explicit schema.name override
+        parent_name_override = target_queue.attribute_override.get("name", None)
+        if parent_name_override and "name" not in override_copy:
+            override_copy["name"] = parent_name_override
+
         schema_copy["queues"] = []
         self.overrider.override_attributes_v2(
-            object=schema_copy, attribute_overrides=target.attribute_override
+            object=schema_copy, attribute_overrides=override_copy
         )
 
         return schema_copy
@@ -60,8 +67,16 @@ class SchemaRelease(ObjectRelease):
     async def deploy(self):
         try:
             release_requests = []
-            for target in self.targets:
-                schema_copy = self.prepare_object_copy_for_deploy(target=target)
+            for target_index, target in enumerate(self.targets):
+                if len(self.parent_queue.targets) < target_index:
+                    raise Exception(
+                        f"Parent {self.parent_queue.display_type} {self.parent_queue.display_label} does not have target with index {target_index}"
+                    )
+
+                target_queue = self.parent_queue.targets[target_index]
+                schema_copy = self.prepare_object_copy_for_deploy(
+                    target=target, target_queue=target_queue
+                )
 
                 request = self.upload(target_object=schema_copy, target=target)
                 release_requests.append(request)
@@ -70,7 +85,7 @@ class SchemaRelease(ObjectRelease):
             self.update_targets(results)
         except Exception as e:
             display_error(
-                f"Error while creating {self.display_type} {self.display_label}: {e}",
+                f"Error while deploying {self.display_type} {self.display_label}: {e}",
                 e,
             )
             self.deploy_failed = True

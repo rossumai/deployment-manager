@@ -124,10 +124,9 @@ class QueueRelease(ObjectRelease):
                 )
 
                 if previous_workspace_url == queue_copy["workspace"] and not target.id:
-                    display_error(
+                    raise Exception(
                         f'Cannot create target for queue "{queue_copy['name']} ({queue_copy['id']})" - there is no target workspace to put it into.'
                     )
-                    return
 
                 previous_schema_url = queue_copy["schema"]
                 replace_dependency_url(
@@ -139,10 +138,9 @@ class QueueRelease(ObjectRelease):
                 )
 
                 if previous_schema_url == queue_copy["schema"] and not target.id:
-                    display_error(
+                    raise Exception(
                         f'Cannot create target for queue "{queue_copy['name']} ({queue_copy['id']})" - there is no target schema to use it with.'
                     )
-                    return
 
                 # Both should be updated, otherwise Elis API uses 'webhooks' in case of a mismatch even though it is deprecated
                 replace_dependency_url(

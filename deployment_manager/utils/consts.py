@@ -42,6 +42,11 @@ def display_warning(msg: str, exception: Exception = None):
     console.print(Panel(msg), style="bold yellow")
 
 
+def display_info(msg: str):
+    console = Console()
+    console.print(Panel(msg), style="bold")
+
+
 def validate_token(base_url: str, token: str, destination: str):
     req = httpx.get(
         url=base_url + "/auth/user",
@@ -172,6 +177,8 @@ class Settings:
         "hooks",
     ]
     MAPPING_TRAVERSE_IGNORE_FIELDS: list[str] = ["targets"]
+
+    NEW_COMMAND_NAME: str = "prd2"
 
     UPDATE_COMMAND_NAME: str = "update"
     MIGRATE_MAPPING_COMMAND_NAME: str = "migrate-mapping"

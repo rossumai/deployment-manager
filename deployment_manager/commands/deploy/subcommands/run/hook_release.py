@@ -81,12 +81,12 @@ class HookRelease(ObjectRelease):
             self.update_targets(results)
         except AttributeOverrideException as e:
             display_error(
-                f"Error while migrating {self.display_type} {self.display_label}: {e}",
+                f"Error while deploying {self.display_type} {self.display_label}: {e}",
             )
             self.deploy_failed = True
         except Exception as e:
             display_error(
-                f"Error while migrating {self.display_type} {self.name} ({self.id}) ^",
+                f"Error while deploying {self.display_type} {self.name} ({self.id}) ^",
                 e,
             )
             self.deploy_failed = True

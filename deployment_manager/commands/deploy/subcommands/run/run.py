@@ -25,6 +25,7 @@ from deployment_manager.commands.download.download import download_destinations
 from deployment_manager.common.read_write import read_json
 from deployment_manager.utils.consts import (
     display_error,
+    display_info,
     settings,
 )
 
@@ -213,6 +214,8 @@ async def deploy_release_file(
         first_deploy=first_deploy,
     )
     await yaml.save_to_file(after_deploy_file_path)
+
+    display_info(f"After-deploy file saved to [green]{after_deploy_file_path}[/green]")
 
     reverse_mapping = yaml.data.get(settings.DEPLOY_KEY_REVERSE_MAPPING, False)
     if reverse_mapping:
