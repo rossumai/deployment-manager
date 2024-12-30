@@ -157,7 +157,7 @@ class ObjectRelease(BaseModel):
             deploy_timestamp = datetime.fromisoformat(last_deploy_timestamp)
             if remote_timestamp > deploy_timestamp:
                 display_error(
-                    f"Timestamp of remote target {self.display_type} {remote_object.get('name', 'no-name')} [purple]({remote_object.get('id', 'no-id')})[/purple] is newer than last deploy ({remote_modified_at} vs {self.last_deploy_timestamp})"
+                    f"Timestamp of remote target {self.display_type} {remote_object.get('name', 'no-name')} [purple]({remote_object.get('id', 'no-id')})[/purple] is newer than last deploy [white](remote: {remote_modified_at} | deploy_file: {self.last_deploy_timestamp})[/white]"
                 )
                 return False
             return True

@@ -47,7 +47,7 @@ async def should_write_object(path: Path, remote_object: Any, changed_files: lis
         ):
             if path in changed_files:
                 display_warning(
-                    f'File "{path}" has local unversioned changes (local: {local_timestamp} | remote: {remote_timestamp}).'
+                    f"File [green]{path}[/green] has local unversioned changes [white](local: {local_timestamp} | remote: {remote_timestamp})[/white]."
                 )
                 return await questionary.confirm(
                     "Should the remote version overwrite the local one?",
