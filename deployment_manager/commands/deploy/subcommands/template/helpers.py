@@ -1,4 +1,5 @@
 from copy import deepcopy
+from typing import Any
 from deployment_manager.commands.deploy.subcommands.run.attribute_override import (
     create_regex_override_syntax,
 )
@@ -68,7 +69,7 @@ async def prepare_choices(
         if not id:
             continue
         choice = questionary.Choice(
-            title=f"{name} [{id}]" if name else id,
+            title=f"{name} ({id})" if name else id,
             value={**object, "path": path},
             checked=preselect_all or id in preselected_ids,
         )
@@ -398,6 +399,78 @@ async def get_hooks_from_user(
     return selected_hooks, unselected_hooks
 
 
+def check_input_integer(input: Any):
+    try:
+        if int(input):
+            return True
+    except Exception:
+        return "Invalid integer"
+
+
+async def get_multi_targets_from_user(deploy_file_object: dict):
+    if not await questionary.confirm(
+        "Do you want to specify more than one target for some of the objects?",
+        default=False,
+    ).ask_async():
+        return
+
+    multi_target_options = [
+        settings.DEPLOY_KEY_WORKSPACES,
+        settings.DEPLOY_KEY_QUEUES,
+        settings.DEPLOY_KEY_HOOKS,
+    ]
+
+    for object_type in multi_target_options:
+        objects = deploy_file_object.get(object_type, [])
+        if not len(objects):
+            continue
+        while await questionary.confirm(
+            f"Do you want to add multiple targets for {object_type.upper()}?",
+            default=False,
+        ).ask_async():
+            object_choices = [
+                questionary.Choice(
+                    title=f"{object.get('name', 'no-name')} ({object.get('id', 'no-id')})",
+                    value=object,
+                )
+                for object in objects
+            ]
+            selected_objects = await questionary.checkbox(
+                "Select objects:", choices=object_choices
+            ).ask_async()
+            target_count = await questionary.text(
+                "Specify number of targets:",
+                validate=lambda x: check_input_integer(x),
+            ).ask_async()
+
+            for selected_object in selected_objects:
+                add_multi_targets_to_object(selected_object, target_count)
+
+                # Automatically mirror target count for queue's inbox and schema
+                if object_type == settings.DEPLOY_KEY_QUEUES:
+                    schema = selected_object.get(settings.DEPLOY_KEY_SCHEMA, None)
+                    if not schema:
+                        continue
+                    add_multi_targets_to_object(schema, target_count)
+
+                    inbox = selected_object.get(settings.DEPLOY_KEY_INBOX, None)
+                    if not inbox:
+                        continue
+                    add_multi_targets_to_object(inbox, target_count)
+
+
+def add_multi_targets_to_object(object, target_count: int):
+    previous_targets = object.get(settings.DEPLOY_KEY_TARGETS, [])
+    new_multi_targets = []
+    for _ in range(int(target_count)):
+        # Copy explicitly to have different memory objects
+        new_multi_targets.extend(deepcopy(DEFAULT_TARGETS))
+    object[settings.DEPLOY_KEY_TARGETS] = [
+        *previous_targets,
+        *new_multi_targets,
+    ]
+
+
 class AttributeOverride(BaseModel):
     object_types: list[str]
     attribute: str
@@ -405,7 +478,11 @@ class AttributeOverride(BaseModel):
 
 
 async def get_attribute_overrides_from_user():
-    override_options = ["workspaces", "queues", "hooks"]
+    override_options = [
+        settings.DEPLOY_KEY_WORKSPACES,
+        settings.DEPLOY_KEY_QUEUES,
+        settings.DEPLOY_KEY_HOOKS,
+    ]
     overrides = []
     while await questionary.confirm(
         "Do you want to add a regex attribute override?", default=True
@@ -419,10 +496,10 @@ async def get_attribute_overrides_from_user():
         ).ask_async()
         # TODO: escaping test
         override_source_regex = await questionary.text(
-            "Input regex to override (empty value will be understood as 'replace everything'):"
+            "Input source REGEX to override (empty value will be understood as 'replace everything'):"
         ).ask_async()
         override_target = await questionary.text(
-            "Input new string (e.g., 'PROD'):"
+            "Input new STRING (e.g., 'PROD'):"
         ).ask_async()
 
         overrides.append(
@@ -445,7 +522,7 @@ def add_override_to_deploy_file_objects(
     for object_type in override.object_types:
         if object_type not in root_deploy_file_object:
             display_warning(
-                f'Could not find object type "{object_type}" in the deploy file'
+                f'Could not find object type "{object_type}" in the deploy file. Skipping.'
             )
             continue
 

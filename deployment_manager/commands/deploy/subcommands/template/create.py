@@ -9,6 +9,7 @@ from deployment_manager.commands.deploy.subcommands.template.helpers import (
     create_deploy_file_template,
     get_attribute_overrides_from_user,
     get_hooks_from_user,
+    get_multi_targets_from_user,
     get_queues_from_user,
     get_dir_and_subdir_from_user,
     get_token_owner_from_user,
@@ -119,25 +120,25 @@ async def create_deploy_template(
     )
 
     # Workspaces
-    workspaces = deploy_file_object.get("workspaces", [])
+    workspaces = deploy_file_object.get(settings.DEPLOY_KEY_WORKSPACES, [])
     deploy_file_workspaces, selected_ws_paths = await get_workspaces_from_user(
         previous_deploy_file_workspaces=workspaces,
         source_path=source_path,
         interactive=interactive,
     )
-    deploy_file_object["workspaces"] = deploy_file_workspaces
+    deploy_file_object[settings.DEPLOY_KEY_WORKSPACES] = deploy_file_workspaces
 
     # Queues
-    queues = deploy_file_object.get("queues", [])
+    queues = deploy_file_object.get(settings.DEPLOY_KEY_QUEUES, [])
     deploy_file_queues, selected_queues = await get_queues_from_user(
         previous_deploy_file_queues=queues,
         deploy_ws_paths=[ws.parent for ws in selected_ws_paths],
         interactive=interactive,
     )
-    deploy_file_object["queues"] = deploy_file_queues
+    deploy_file_object[settings.DEPLOY_KEY_QUEUES] = deploy_file_queues
 
     # Hooks
-    hooks = deploy_file_object.get("hooks", [])
+    hooks = deploy_file_object.get(settings.DEPLOY_KEY_HOOKS, [])
     unselected_hook_ids = deploy_file_object.get(
         settings.DEPLOY_KEY_UNSELECTED_HOOK_IDS, []
     )
@@ -148,10 +149,12 @@ async def create_deploy_template(
         queues=selected_queues,
         interactive=interactive,
     )
-    deploy_file_object["hooks"] = selected_hooks
+    deploy_file_object[settings.DEPLOY_KEY_HOOKS] = selected_hooks
     deploy_file_object[settings.DEPLOY_KEY_UNSELECTED_HOOK_IDS] = unselected_hooks
 
-    #
+    # Multi-target specification
+    if interactive:
+        await get_multi_targets_from_user(deploy_file_object)
 
     # Global attribute overrides
     if interactive:
