@@ -6,6 +6,7 @@ from deployment_manager.commands.deploy.subcommands.run.attribute_override impor
 from rich import print as pprint
 from deployment_manager.commands.deploy.subcommands.run.object_release import (
     ObjectRelease,
+    PathNotFoundException,
     Target,
 )
 
@@ -38,18 +39,25 @@ class HookRelease(ObjectRelease):
         is_same_org_deploy,
         hook_template_url,
     ):
-        await super().initialize(
-            yaml=yaml,
-            client=client,
-            source_dir_path=source_dir_path,
-            plan_only=plan_only,
-            is_same_org_deploy=is_same_org_deploy,
-        )
-        self.source_client = source_client
-        self.token_owner_id = token_owner_id
-        if not self.hook_template_url:
-            self.hook_template_url = hook_template_url
-        await self.update_hook_code()
+        try:
+            await super().initialize(
+                yaml=yaml,
+                client=client,
+                source_dir_path=source_dir_path,
+                plan_only=plan_only,
+                is_same_org_deploy=is_same_org_deploy,
+            )
+            self.source_client = source_client
+            self.token_owner_id = token_owner_id
+            if not self.hook_template_url:
+                self.hook_template_url = hook_template_url
+            await self.update_hook_code()
+        except Exception as e:
+            display_error(
+                f"Error while initializing {self.display_type} {self.display_label}: {e}",
+                None if isinstance(e, PathNotFoundException) else e,
+            )
+            self.initialize_failed = True
 
     async def deploy(self):
         try:

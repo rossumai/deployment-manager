@@ -11,6 +11,7 @@ from deployment_manager.commands.deploy.subcommands.run.inbox_release import (
 from deployment_manager.commands.deploy.subcommands.run.object_release import (
     EmptyObjectRelease,
     ObjectRelease,
+    PathNotFoundException,
 )
 
 
@@ -28,6 +29,9 @@ from deployment_manager.utils.consts import (
 from deployment_manager.utils.functions import (
     templatize_name_id,
 )
+
+
+class SubObjectException(Exception): ...
 
 
 class QueueRelease(ObjectRelease):
@@ -54,18 +58,25 @@ class QueueRelease(ObjectRelease):
         workspace_targets: dict[int, list],
         hook_targets: dict[int, list],
     ):
-        self.schema_release.base_path = self.base_path
-        self.inbox_release.base_path = self.base_path
-        await super().initialize(
-            yaml=yaml,
-            client=client,
-            source_dir_path=source_dir_path,
-            plan_only=plan_only,
-            is_same_org_deploy=is_same_org_deploy,
-        )
+        try:
+            self.schema_release.base_path = self.base_path
+            self.inbox_release.base_path = self.base_path
+            await super().initialize(
+                yaml=yaml,
+                client=client,
+                source_dir_path=source_dir_path,
+                plan_only=plan_only,
+                is_same_org_deploy=is_same_org_deploy,
+            )
 
-        self.workspace_targets = workspace_targets
-        self.hook_targets = hook_targets
+            self.workspace_targets = workspace_targets
+            self.hook_targets = hook_targets
+        except Exception as e:
+            display_error(
+                f"Error while initializing {self.display_type} {self.display_label}: {e}",
+                None if isinstance(e, PathNotFoundException) else e,
+            )
+            self.initialize_failed = True
 
     @property
     def path(self) -> Path:
@@ -93,6 +104,9 @@ class QueueRelease(ObjectRelease):
                 is_same_org_deploy=self.is_same_org_deploy,
                 parent_queue=self,
             )
+            if self.schema_release.initialize_failed:
+                raise SubObjectException()
+
             await self.schema_release.deploy()
             self.schema_targets = {
                 self.schema_release.id: [
@@ -100,7 +114,7 @@ class QueueRelease(ObjectRelease):
                 ]
             }
             if self.schema_release.deploy_failed:
-                raise Exception()
+                raise SubObjectException()
 
             release_requests = []
             target_objects_count = len(self.targets)
@@ -176,11 +190,19 @@ class QueueRelease(ObjectRelease):
                 queue_targets={self.id: [target.data for target in self.targets]},
                 parent_queue=self,
             )
+            if self.inbox_release.initialize_failed:
+                raise SubObjectException()
+
             await self.inbox_release.deploy()
 
+            if self.inbox_release.deploy_failed:
+                raise SubObjectException()
+
+        except SubObjectException:
+            self.deploy_failed = True
         except Exception as e:
             display_error(
-                f"Error while creating {self.display_type} {self.display_label}: {e}",
+                f"Error while deploying {self.display_type} {self.display_label}: {e}",
                 e,
             )
             self.deploy_failed = True

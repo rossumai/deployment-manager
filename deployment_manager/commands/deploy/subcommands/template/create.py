@@ -151,11 +151,15 @@ async def create_deploy_template(
     deploy_file_object["hooks"] = selected_hooks
     deploy_file_object[settings.DEPLOY_KEY_UNSELECTED_HOOK_IDS] = unselected_hooks
 
+    #
+
+    # Global attribute overrides
     if interactive:
         overrides = await get_attribute_overrides_from_user()
         for override in overrides:
             add_override_to_deploy_file_objects(override, deploy_file_object)
 
+    # Filename
     if interactive:
         source_subdir_name = source_dir_and_subdir.split("/")[1]
         target_subdir_name = target_dir_and_subdir.split("/")

@@ -5,6 +5,7 @@ from rossum_api.api_client import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.object_release import (
     ObjectRelease,
+    PathNotFoundException,
 )
 from deployment_manager.utils.consts import (
     display_error,
@@ -25,14 +26,21 @@ class WorkspaceRelease(ObjectRelease):
         plan_only,
         is_same_org_deploy,
     ):
-        await super().initialize(
-            yaml=yaml,
-            client=client,
-            source_dir_path=source_dir_path,
-            plan_only=plan_only,
-            is_same_org_deploy=is_same_org_deploy,
-        )
-        self.target_org_url = target_org_url
+        try:
+            await super().initialize(
+                yaml=yaml,
+                client=client,
+                source_dir_path=source_dir_path,
+                plan_only=plan_only,
+                is_same_org_deploy=is_same_org_deploy,
+            )
+            self.target_org_url = target_org_url
+        except Exception as e:
+            display_error(
+                f"Error while initializing {self.display_type} {self.display_label}: {e}",
+                None if isinstance(e, PathNotFoundException) else e,
+            )
+            self.initialize_failed = True
 
     @property
     def path(self) -> Path:
@@ -62,7 +70,7 @@ class WorkspaceRelease(ObjectRelease):
             self.update_targets(results)
         except Exception as e:
             display_error(
-                f"Error while creating {self.display_type} {self.display_label}: {e}",
+                f"Error while deploying {self.display_type} {self.display_label}: {e}",
                 e,
             )
             self.deploy_failed = True

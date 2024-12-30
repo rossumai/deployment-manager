@@ -116,7 +116,7 @@ class ReleaseFile(BaseModel):
 
         if self.patch_target_org and not self.is_same_org:
             await organization_release.deploy()
-            self.detect_exceptions([organization_release])
+            self.detect_deploy_phase_exceptions([organization_release])
 
     async def deploy_hooks(self):
         await self.ensure_token_owner()
@@ -136,6 +136,7 @@ class ReleaseFile(BaseModel):
                 for hook_release in self.hooks
             ]
         )
+        self.detect_initialize_phase_exceptions(self.hooks)
 
         # Run hooks sequentially when planning because user may have to input things in the CLI
         if self.plan_only:
@@ -146,7 +147,7 @@ class ReleaseFile(BaseModel):
             await asyncio.gather(
                 *[hook_release.deploy() for hook_release in self.hooks]
             )
-        self.detect_exceptions(self.hooks)
+        self.detect_deploy_phase_exceptions(self.hooks)
         self.hook_targets = self.gather_targets(self.hooks)
 
     async def deploy_workspaces(self):
@@ -163,11 +164,12 @@ class ReleaseFile(BaseModel):
                 for workspaces_release in self.workspaces
             ]
         )
+        self.detect_initialize_phase_exceptions(self.workspaces)
 
         await asyncio.gather(
             *[workspace_release.deploy() for workspace_release in self.workspaces]
         )
-        self.detect_exceptions(self.workspaces)
+        self.detect_deploy_phase_exceptions(self.workspaces)
         self.workspace_targets = self.gather_targets(self.workspaces)
 
     async def deploy_queues(self):
@@ -185,6 +187,7 @@ class ReleaseFile(BaseModel):
                 for queue_release in self.queues
             ]
         )
+        self.detect_initialize_phase_exceptions(self.queues)
 
         # Run queues sequentially when planning because user may have to input things in the CLI
         if self.plan_only:
@@ -197,7 +200,7 @@ class ReleaseFile(BaseModel):
             await asyncio.gather(
                 *[queue_release.deploy() for queue_release in self.queues]
             )
-        self.detect_exceptions(self.queues)
+        self.detect_deploy_phase_exceptions(self.queues)
         self.queue_targets = self.gather_targets(self.queues)
 
     async def ensure_token_owner(self):
@@ -239,7 +242,14 @@ class ReleaseFile(BaseModel):
                 return True
         return False
 
-    def detect_exceptions(self, releases: list[ObjectRelease]):
+    def detect_initialize_phase_exceptions(self, releases: list[ObjectRelease]):
+        for release in releases:
+            if release.initialize_failed:
+                raise DeployException(
+                    f"Initialize of {release.display_type} {release.display_label} failed, see error details above."
+                )
+
+    def detect_deploy_phase_exceptions(self, releases: list[ObjectRelease]):
         for release in releases:
             if release.deploy_failed:
                 raise DeployException(
@@ -247,6 +257,9 @@ class ReleaseFile(BaseModel):
                 )
 
     async def migrate_hook_dependency_graph(self):
+        if not len(self.hooks):
+            return
+
         pprint(
             Panel(
                 f"{settings.PLAN_PRINT_STR if self.plan_only else ""} Updating hook dependency graph..."

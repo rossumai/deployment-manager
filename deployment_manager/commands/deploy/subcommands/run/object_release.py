@@ -41,6 +41,8 @@ class ObjectRelease(BaseModel):
     client: ElisAPIClient = None
     plan_only: bool = False
     is_same_org_deploy: bool = False
+
+    initialize_failed: bool = False
     deploy_failed: bool = False
 
     targets: list[TargetWithDefault] = []
@@ -73,8 +75,8 @@ class ObjectRelease(BaseModel):
             self.data = await read_json(self.path)
         except Exception:
             raise PathNotFoundException(
-                f"Error while initializing object with path: {self.path}"
-            )
+                f"Could not load object data from: [green]{self.path}[/green]. Is the object name in deploy file in-sync with its local path?"
+            ) from None
         self.client = client
 
     async def deploy(self):

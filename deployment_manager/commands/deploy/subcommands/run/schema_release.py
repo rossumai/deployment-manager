@@ -1,6 +1,7 @@
 from anyio import Path
 from deployment_manager.commands.deploy.subcommands.run.object_release import (
     ObjectRelease,
+    PathNotFoundException,
     Target,
 )
 from deployment_manager.common.read_write import read_formula_file
@@ -26,19 +27,26 @@ class SchemaRelease(ObjectRelease):
     async def initialize(
         self, yaml, client, source_dir_path, plan_only, is_same_org_deploy, parent_queue
     ):
-        self.parent_queue = parent_queue
-        # dynamic property caused issues in some function calls
-        self.name = self.parent_queue.name
+        try:
+            self.parent_queue = parent_queue
+            # dynamic property caused issues in some function calls
+            self.name = self.parent_queue.name
 
-        await super().initialize(
-            yaml=yaml,
-            client=client,
-            source_dir_path=source_dir_path,
-            plan_only=plan_only,
-            is_same_org_deploy=is_same_org_deploy,
-        )
+            await super().initialize(
+                yaml=yaml,
+                client=client,
+                source_dir_path=source_dir_path,
+                plan_only=plan_only,
+                is_same_org_deploy=is_same_org_deploy,
+            )
 
-        await self.update_formula_fields_code()
+            await self.update_formula_fields_code()
+        except Exception as e:
+            display_error(
+                f"Error while initializing {self.display_type} {self.display_label}: {e}",
+                None if isinstance(e, PathNotFoundException) else e,
+            )
+            self.initialize_failed = True
 
     @property
     def path(self) -> Path:
