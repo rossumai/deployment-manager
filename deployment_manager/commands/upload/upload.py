@@ -68,7 +68,7 @@ Only source files are taken into account by default.
     "--message",
     "-m",
     default="Pushed changes to remote",
-    help="Commit message for pulling.",
+    help="Commit message after push.",
 )
 @coro
 async def upload_project_wrapper(

@@ -39,9 +39,9 @@ async def deploy_release_file(
     project_path: Path = None,
     source_client: ElisAPIClient = None,
     target_client: ElisAPIClient = None,
-    # force: bool = False,
-    # commit: bool = False,
-    # commit_message: str = "",
+    force: bool = False,
+    commit: bool = False,
+    commit_message: str = "",
 ):
     first_deploy = True
 
@@ -132,6 +132,7 @@ async def deploy_release_file(
             source_org=source_org,
             target_org=target_org,
             plan_only=False,
+            force_deploy=force,
         )
         planned_release = ReleaseFile(
             **deepcopy(yaml.data),
@@ -142,6 +143,7 @@ async def deploy_release_file(
             source_org=source_org,
             target_org=target_org,
             plan_only=True,
+            force_deploy=force,
         )
     except ValidationError as e:
         display_error(f"Missing information in the deploy file: {e}")
@@ -260,7 +262,10 @@ async def deploy_release_file(
     else:
         target_dir_subdir_path = project_path / Path(target_dir_subdir)
         await download_destinations(
-            destinations=[target_dir_subdir_path], project_path=project_path
+            destinations=[target_dir_subdir_path],
+            project_path=project_path,
+            commit=commit,
+            commit_message=commit_message,
         )
 
 

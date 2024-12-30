@@ -219,9 +219,11 @@ class ObjectRelease(BaseModel):
                 result["url"] = result["url"].replace(str(result["id"]), str(target.id))
                 result["id"] = target.id
 
-                # TODO: force will always be evaluated as yes
-                if not await self.check_modified_timestamps_equal(
-                    self.last_deploy_timestamp, target.id
+                if (
+                    not self.ignore_timestamp_mismatch
+                    and not await self.check_modified_timestamps_equal(
+                        self.last_deploy_timestamp, target.id
+                    )
                 ):
                     if await questionary.confirm(
                         "Overwrite the remote target?", default=True

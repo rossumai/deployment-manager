@@ -193,8 +193,10 @@ class QueueRelease(ObjectRelease):
                 release_requests.append(request)
 
             results = await asyncio.gather(*release_requests)
-
             self.update_targets(results)
+
+            if self.deploy_failed:
+                raise SubObjectException()
 
             await self.inbox_release.initialize(
                 yaml=self.yaml,

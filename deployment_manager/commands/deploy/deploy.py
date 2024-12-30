@@ -69,36 +69,36 @@ If these objects don't exist, they get created.
                """,
 )
 @click.argument("deploy_file", type=click.Path(path_type=Path, exists=True))
-# @click.option(
-#     "--force",
-#     "-f",
-#     default=False,
-#     is_flag=True,
-#     help="Ignores newer remote timestamps = overwrites remote with local version of objects.",
-# )
-# @click.option(
-#     "--commit",
-#     "-c",
-#     default=False,
-#     is_flag=True,
-#     help="Commits the pushed changes automatically.",
-# )
-# @click.option(
-#     "--message",
-#     "-m",
-#     default="Released changes to target organization",
-#     help="Commit message for pulling.",
-# )
+@click.option(
+    "--force",
+    "-f",
+    default=False,
+    is_flag=True,
+    help="Ignores newer remote timestamps = always overwrites remote with local version of objects.",
+)
+@click.option(
+    "--commit",
+    "-c",
+    default=False,
+    is_flag=True,
+    help="Commits the changes automatically.",
+)
+@click.option(
+    "--message",
+    "-m",
+    default="Released changes to target organization",
+    help="Commit message.",
+)
 @coro
 async def deploy_project_wrapper(
     deploy_file: Path,
-    # force: bool,
-    # commit: bool,
-    # message: str,
+    force: bool,
+    commit: bool,
+    message: str,
 ):
     await deploy_release_file(
         deploy_file_path=deploy_file,
-        # force=force,
-        # commit=commit,
-        # commit_message=message,
+        force=force,
+        commit=commit,
+        commit_message=message,
     )
