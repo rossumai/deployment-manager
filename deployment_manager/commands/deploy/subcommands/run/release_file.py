@@ -61,6 +61,7 @@ class ReleaseFile(BaseModel):
     queues: list[QueueRelease] = []
     hooks: list[HookRelease] = []
     hook_templates: dict = {}
+    queue_ignore_warnings: dict = {}
 
     hook_targets: list[Target] = []
     workspace_targets: list[Target] = []
@@ -185,7 +186,17 @@ class ReleaseFile(BaseModel):
             ]
         )
 
-        await asyncio.gather(*[queue_release.deploy() for queue_release in self.queues])
+        # Run queues sequentially when planning because user may have to input things in the CLI
+        if self.plan_only:
+            for queue_release in self.queues:
+                await queue_release.deploy()
+                self.queue_ignore_warnings[queue_release.id] = (
+                    queue_release.ignore_deploy_warnings
+                )
+        else:
+            await asyncio.gather(
+                *[queue_release.deploy() for queue_release in self.queues]
+            )
         self.detect_exceptions(self.queues)
         self.queue_targets = self.gather_targets(self.queues)
 

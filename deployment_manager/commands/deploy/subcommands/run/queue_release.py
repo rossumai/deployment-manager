@@ -82,12 +82,8 @@ class QueueRelease(ObjectRelease):
                 await self.verify_subobjects_have_same_target_count()
 
                 # Ignore warnings independently (ignore in first function would hide warning in second)
-                self.yaml_reference[
-                    "ignore_deploy_warnings"
-                ] = await self.evaluate_workflow_warning()
-                self.yaml_reference[
-                    "ignore_deploy_warnings"
-                ] = await self.evaluate_engine_warning()
+                self.ignore_deploy_warnings = await self.evaluate_workflow_warning()
+                self.ignore_deploy_warnings = await self.evaluate_engine_warning()
 
             await self.schema_release.initialize(
                 yaml=self.yaml,

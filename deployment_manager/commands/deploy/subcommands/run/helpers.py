@@ -104,7 +104,6 @@ def traverse_object(parent_object: dict | None, parent_key: str, value: Any):
 
 async def get_new_deploy_file_path(
     deploy_file_path: Path,
-    project_path: Path,
     first_deploy: bool,
     suffix: str = "_deployed",
 ):
@@ -118,8 +117,19 @@ async def get_new_deploy_file_path(
                 default=False,
             ).ask_async()
             if not overwrite:
-                after_deploy_file_path = await get_filepath_from_user(project_path)
+                after_deploy_file_path = await get_filepath_from_user(
+                    deploy_file_path.parent
+                )
     else:
         after_deploy_file_path = deploy_file_path
 
     return after_deploy_file_path
+
+
+def update_ignore_flags_in_yaml(yaml_data: dict, ignore_warning_flags: dict):
+    for queue in yaml_data[settings.DEPLOY_KEY_QUEUES]:
+        if (queue_id := queue.get("id", None)) not in ignore_warning_flags:
+            continue
+        queue[settings.DEPLOY_KEY_IGNORE_DEPLOY_WARNINGS] = ignore_warning_flags.get(
+            queue_id, False
+        )

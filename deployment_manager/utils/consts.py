@@ -220,6 +220,7 @@ class Settings:
     DEPLOY_KEY_TARGET_URL = "target_url"
     DEPLOY_KEY_BASE_PATH = "base_path"
     DEPLOY_KEY_REVERSE_MAPPING = "reverse_mapping_after_deploy"
+    DEPLOY_KEY_IGNORE_DEPLOY_WARNINGS = "ignore_deploy_warnings"
     DEPLOY_KEY_UNSELECTED_HOOK_IDS = "unselected_hooks"
     DEPLOY_KEY_PATCH_TARGET_ORG = "patch_target_org"
 

@@ -16,6 +16,7 @@ from deployment_manager.commands.deploy.subcommands.run.helpers import (
     check_required_keys,
     get_new_deploy_file_path,
     get_url_and_credentials,
+    update_ignore_flags_in_yaml,
 )
 
 from deployment_manager.commands.deploy.subcommands.run.reverse_override import (
@@ -182,6 +183,7 @@ async def deploy_release_file(
 
     # Take what the user inputted (or the same if user input not applicable)
     yaml.data[settings.DEPLOY_KEY_TOKEN_OWNER] = planned_release.token_owner_id
+    update_ignore_flags_in_yaml(yaml.data, planned_release.queue_ignore_warnings)
     release.token_owner_id = planned_release.token_owner_id
     release.hook_templates = planned_release.hook_templates
 
@@ -210,7 +212,6 @@ async def deploy_release_file(
 
     after_deploy_file_path = await get_new_deploy_file_path(
         deploy_file_path=deploy_file_path,
-        project_path=project_path,
         first_deploy=first_deploy,
     )
     await yaml.save_to_file(after_deploy_file_path)
@@ -230,7 +231,6 @@ async def deploy_release_file(
 
             reverse_deploy_file_path = await get_new_deploy_file_path(
                 deploy_file_path=deploy_file_path,
-                project_path=project_path,
                 first_deploy=True,
                 suffix="_reversed",
             )
