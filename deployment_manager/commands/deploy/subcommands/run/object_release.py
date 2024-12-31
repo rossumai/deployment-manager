@@ -62,7 +62,7 @@ class ObjectRelease(BaseModel):
     is_same_org_deploy: bool = False
 
     initialize_failed: bool = False
-    deploy_failed: bool = False
+    revert_failed: bool = False
 
     last_deploy_timestamp: str = ""
     ignore_timestamp_mismatch: bool = False
@@ -233,7 +233,7 @@ class ObjectRelease(BaseModel):
                 f"Error while creating {self.display_type} {self.display_label} ^",
                 e,
             )
-            self.deploy_failed = True
+            self.revert_failed = True
             return {}
 
     async def update_remote(self, target_object: dict, target: Target):
@@ -285,7 +285,7 @@ class ObjectRelease(BaseModel):
                     else e
                 ),
             )
-            self.deploy_failed = True
+            self.revert_failed = True
             return {}
 
     async def delete_remote(self, target: Target):
@@ -301,7 +301,7 @@ class ObjectRelease(BaseModel):
                 f'Error while deleting {self.display_type} {self.display_label} -> "{target.id}: {e}',
                 e,
             )
-            self.deploy_failed = True
+            self.revert_failed = True
 
     async def implicit_override_targets(self, lookup_table: LookupTable):
         try:

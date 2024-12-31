@@ -307,11 +307,12 @@ class ReleaseFile(BaseModel):
 
     def detect_deploy_phase_exceptions(self, releases: list[ObjectRelease]):
         for release in releases:
-            if release.deploy_failed:
+            if release.revert_failed:
                 raise DeployException(
                     f"Deploy of {release.display_type} {release.display_label} failed, see error details above."
                 )
 
+    # TODO: branch out into separate file
     async def migrate_hook_dependency_graph(self):
         if not len(self.hooks):
             return

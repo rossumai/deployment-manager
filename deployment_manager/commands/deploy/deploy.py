@@ -1,6 +1,9 @@
 import click
 from anyio import Path
 
+from deployment_manager.commands.deploy.subcommands.revert.revert import (
+    revert_release_file,
+)
 from deployment_manager.commands.deploy.subcommands.run.run import (
     deploy_release_file,
 )
@@ -17,8 +20,6 @@ from deployment_manager.utils.consts import (
 from deployment_manager.utils.functions import (
     coro,
 )
-
-# TODO: revisit commented options
 
 
 @click.group(
@@ -93,7 +94,7 @@ If these objects don't exist, they get created.
 @click.option(
     "--message",
     "-m",
-    default="Released changes to target organization",
+    default="Deployed changes to target organization",
     help="Commit message.",
 )
 @coro
@@ -108,6 +109,38 @@ async def deploy_project_wrapper(
         deploy_file_path=deploy_file,
         auto_delete=auto_delete,
         force=force,
+        commit=commit,
+        commit_message=message,
+    )
+
+
+@deploy.command(
+    name=settings.DEPLOY_REVERT_COMMAND_NAME,
+    help="""
+Reverts the deploy by deleting all target objects found in the provided deploy file               """,
+)
+@click.argument("deploy_file", type=click.Path(path_type=Path, exists=True))
+@click.option(
+    "--commit",
+    "-c",
+    default=False,
+    is_flag=True,
+    help="Commits the changes automatically.",
+)
+@click.option(
+    "--message",
+    "-m",
+    default="Reverted changes in target organization",
+    help="Commit message.",
+)
+@coro
+async def revert_project_wrapper(
+    deploy_file: Path,
+    commit: bool,
+    message: str,
+):
+    await revert_release_file(
+        deploy_file_path=deploy_file,
         commit=commit,
         commit_message=message,
     )

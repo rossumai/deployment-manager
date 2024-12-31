@@ -116,7 +116,7 @@ class QueueRelease(ObjectRelease):
                     target.data for target in self.schema_release.targets if target.data
                 ]
             }
-            if self.schema_release.deploy_failed:
+            if self.schema_release.revert_failed:
                 raise SubObjectException()
 
             release_requests = []
@@ -183,7 +183,7 @@ class QueueRelease(ObjectRelease):
             results = await asyncio.gather(*release_requests)
             self.update_targets(results)
 
-            if self.deploy_failed:
+            if self.revert_failed:
                 raise SubObjectException()
 
             await self.inbox_release.initialize(
@@ -203,17 +203,17 @@ class QueueRelease(ObjectRelease):
 
             await self.inbox_release.deploy()
 
-            if self.inbox_release.deploy_failed:
+            if self.inbox_release.revert_failed:
                 raise SubObjectException()
 
         except SubObjectException:
-            self.deploy_failed = True
+            self.revert_failed = True
         except Exception as e:
             display_error(
                 f"Error while deploying {self.display_type} {self.display_label}: {e}",
                 e,
             )
-            self.deploy_failed = True
+            self.revert_failed = True
 
     def remove_attributes_for_cross_org(self, queue_copy: dict):
         queue_copy.pop("workflows", None)

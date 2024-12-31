@@ -55,7 +55,6 @@ async def deploy_release_file(
         project_path = Path("./")
 
     source_dir_subdir = yaml.data[settings.DEPLOY_KEY_SOURCE_DIR]
-
     source_org_name = source_dir_subdir.split("/")[0]
 
     if not source_client:
@@ -153,8 +152,12 @@ async def deploy_release_file(
         return
 
     if release.deployed_org_id:
-        first_deploy = False
         try:
+            if release.deployed_org_id != target_org.id:
+                raise DeployException(
+                    f"Target org ID in deploy file ({release.deployed_org_id}) is not the same as the selected target org ({target_org.id}). Please check your configuration."
+                )
+            first_deploy = False
             await target_client.retrieve_organization(release.deployed_org_id)
         except APIClientError as e:
             if e.status_code == 404:
@@ -162,6 +165,11 @@ async def deploy_release_file(
                     f'Organization with ID "{release.deployed_org_id}" not found with the specified token in {target_client._http_client.base_url}. Please make sure you have to correct token and target URL.'
                 )
                 return
+            else:
+                raise e
+        except DeployException as e:
+            display_error(e)
+            return
 
     try:
         await planned_release.deploy_organization()

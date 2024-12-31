@@ -189,6 +189,7 @@ class Settings:
     MIGRATE_COMMAND_NAME: str = "release"
     DEPLOY_COMMAND_NAME: str = "deploy"
     DEPLOY_RUN_COMMAND_NAME: str = "run"
+    DEPLOY_REVERT_COMMAND_NAME: str = "revert"
     DEPLOY_TEMPLATE_COMMAND_NAME: str = "template"
     DEPLOY_TEMPLATE_INIT_COMMAND_NAME: str = "init"
     HOOK_COMMAND_NAME: str = "hook"

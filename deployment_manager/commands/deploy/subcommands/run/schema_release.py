@@ -90,7 +90,7 @@ class SchemaRelease(ObjectRelease):
                 f"Error while deploying {self.display_type} {self.display_label}: {e}",
                 e,
             )
-            self.deploy_failed = True
+            self.revert_failed = True
 
     async def update_formula_fields_code(self):
         """Checks if there is not newer code in the associated formula fields and uses that for release.

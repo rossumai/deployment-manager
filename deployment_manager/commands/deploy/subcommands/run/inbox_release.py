@@ -107,4 +107,4 @@ class InboxRelease(ObjectRelease):
                 f"Error while deploying {self.display_type} {self.name} ({self.id}): ^",
                 e,
             )
-            self.deploy_failed = True
+            self.revert_failed = True
