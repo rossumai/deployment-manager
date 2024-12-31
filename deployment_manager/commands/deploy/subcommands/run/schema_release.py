@@ -24,31 +24,13 @@ class SchemaRelease(ObjectRelease):
 
     parent_queue: ObjectRelease = None
 
-    async def initialize(
-        self,
-        yaml,
-        client,
-        source_dir_path,
-        plan_only,
-        is_same_org_deploy,
-        parent_queue,
-        last_deploy_timestamp,
-        ignore_timestamp_mismatch,
-    ):
+    async def initialize(self, parent_queue, **kwargs):
         try:
             self.parent_queue = parent_queue
             # dynamic property caused issues in some function calls
             self.name = self.parent_queue.name
 
-            await super().initialize(
-                yaml=yaml,
-                client=client,
-                source_dir_path=source_dir_path,
-                plan_only=plan_only,
-                is_same_org_deploy=is_same_org_deploy,
-                last_deploy_timestamp=last_deploy_timestamp,
-                ignore_timestamp_mismatch=ignore_timestamp_mismatch,
-            )
+            await super().initialize(**kwargs)
 
             await self.update_formula_fields_code()
         except Exception as e:
@@ -91,7 +73,9 @@ class SchemaRelease(ObjectRelease):
                         f"Parent {self.parent_queue.display_type} {self.parent_queue.display_label} does not have target with index {target_index}"
                     )
 
-                target_queue = self.parent_queue.targets[target_index]
+                target.index = target_index
+
+                target_queue = self.parent_queue.targets[target.index]
                 schema_copy = self.prepare_object_copy_for_deploy(
                     target=target, target_queue=target_queue
                 )

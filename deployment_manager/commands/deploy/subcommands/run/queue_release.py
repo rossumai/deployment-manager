@@ -5,6 +5,7 @@ from typing import Optional
 from anyio import Path
 from pydantic import Field
 import questionary
+from rossum_api import APIClientError
 from deployment_manager.commands.deploy.subcommands.run.inbox_release import (
     InboxRelease,
 )
@@ -53,17 +54,11 @@ class QueueRelease(ObjectRelease):
 
     async def initialize(
         self,
-        yaml,
-        client,
-        source_dir_path,
-        plan_only,
-        is_same_org_deploy,
-        workspace_targets: dict[int, list],
-        hook_targets: dict[int, list],
-        last_deploy_timestamp,
-        ignore_timestamp_mismatch,
         schema_ignore_timestamp_mismatch,
         inbox_ignore_timestamp_mismatch,
+        workspace_targets: dict[int, list],
+        hook_targets: dict[int, list],
+        **kwargs,
     ):
         try:
             self.schema_release.base_path = self.base_path
@@ -72,15 +67,7 @@ class QueueRelease(ObjectRelease):
             self.schema_ignore_timestamp_mismatch = schema_ignore_timestamp_mismatch
             self.inbox_ignore_timestamp_mismatch = inbox_ignore_timestamp_mismatch
 
-            await super().initialize(
-                yaml=yaml,
-                client=client,
-                source_dir_path=source_dir_path,
-                plan_only=plan_only,
-                is_same_org_deploy=is_same_org_deploy,
-                last_deploy_timestamp=last_deploy_timestamp,
-                ignore_timestamp_mismatch=ignore_timestamp_mismatch,
-            )
+            await super().initialize(**kwargs)
 
             self.workspace_targets = workspace_targets
             self.hook_targets = hook_targets
@@ -118,6 +105,7 @@ class QueueRelease(ObjectRelease):
                 parent_queue=self,
                 last_deploy_timestamp=self.last_deploy_timestamp,
                 ignore_timestamp_mismatch=self.schema_ignore_timestamp_mismatch,
+                source_client=self.source_client,
             )
             if self.schema_release.initialize_failed:
                 raise SubObjectException()
@@ -208,6 +196,7 @@ class QueueRelease(ObjectRelease):
                 parent_queue=self,
                 last_deploy_timestamp=self.last_deploy_timestamp,
                 ignore_timestamp_mismatch=self.inbox_ignore_timestamp_mismatch,
+                source_client=self.source_client,
             )
             if self.inbox_release.initialize_failed:
                 raise SubObjectException()
@@ -277,3 +266,15 @@ class QueueRelease(ObjectRelease):
                 return await questionary.confirm(
                     "Do you want to disable warnings like this for this queue?",
                 ).ask_async()
+
+    async def check_source_object(self):
+        try:
+            remote_queue = await self.source_client._http_client.fetch_one(
+                self.type, self.id
+            )
+            return remote_queue["status"] != "deletion_requested"
+        except APIClientError as e:
+            if e.status_code == 404:
+                return False
+            raise e
+        return True

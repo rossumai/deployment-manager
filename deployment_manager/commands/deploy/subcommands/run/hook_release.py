@@ -1,5 +1,4 @@
 import questionary
-from rossum_api import ElisAPIClient
 from deployment_manager.commands.deploy.subcommands.run.attribute_override import (
     AttributeOverrideException,
 )
@@ -25,33 +24,11 @@ from deployment_manager.utils.functions import extract_id_from_url
 class HookRelease(ObjectRelease):
     type: Resource = Resource.Hook
     token_owner_id: int = None
-    source_client: ElisAPIClient = None
     hook_template_url: str = None
 
-    async def initialize(
-        self,
-        yaml,
-        client,
-        source_client,
-        token_owner_id,
-        source_dir_path,
-        plan_only,
-        is_same_org_deploy,
-        hook_template_url,
-        last_deploy_timestamp,
-        ignore_timestamp_mismatch,
-    ):
+    async def initialize(self, hook_template_url, token_owner_id, **kwargs):
         try:
-            await super().initialize(
-                yaml=yaml,
-                client=client,
-                source_dir_path=source_dir_path,
-                plan_only=plan_only,
-                is_same_org_deploy=is_same_org_deploy,
-                last_deploy_timestamp=last_deploy_timestamp,
-                ignore_timestamp_mismatch=ignore_timestamp_mismatch,
-            )
-            self.source_client = source_client
+            await super().initialize(**kwargs)
             self.token_owner_id = token_owner_id
             if not self.hook_template_url:
                 self.hook_template_url = hook_template_url

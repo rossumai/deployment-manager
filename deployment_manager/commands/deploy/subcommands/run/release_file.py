@@ -42,6 +42,9 @@ class ReleaseFile(BaseModel):
 
     plan_only: bool = False
 
+    force_deploy: bool = False
+    auto_delete: bool = False
+
     patch_target_org: bool = True
     token_owner_id: int | None = None
     deployed_org_id: int | None = ""
@@ -61,7 +64,7 @@ class ReleaseFile(BaseModel):
 
     hook_templates: dict = {}
     queue_ignore_warnings: dict = {}
-    force_deploy: bool = False
+
     ignore_timestamp_mismatches: dict = {}
 
     hook_targets: list[Target] = []
@@ -106,6 +109,7 @@ class ReleaseFile(BaseModel):
             target_org=self.target_org,
             plan_only=self.plan_only,
             client=self.client,
+            source_client=self.source_client,
             last_deploy_timestamp=self.last_deployed_at,
             ignore_timestamp_mismatch=self.force_deploy
             or self.ignore_timestamp_mismatches.get(self.source_org.id, False),
@@ -131,6 +135,7 @@ class ReleaseFile(BaseModel):
         await asyncio.gather(
             *[
                 hook_release.initialize(
+                    auto_delete=self.auto_delete,
                     yaml=self.yaml,
                     client=self.client,
                     source_client=self.source_client,
@@ -167,8 +172,10 @@ class ReleaseFile(BaseModel):
         await asyncio.gather(
             *[
                 workspace_release.initialize(
+                    auto_delete=self.auto_delete,
                     yaml=self.yaml,
                     client=self.client,
+                    source_client=self.source_client,
                     source_dir_path=self.source_dir_path,
                     target_org_url=self.target_org.url,
                     plan_only=self.plan_only,
@@ -203,8 +210,10 @@ class ReleaseFile(BaseModel):
         await asyncio.gather(
             *[
                 queue_release.initialize(
+                    auto_delete=self.auto_delete,
                     yaml=self.yaml,
                     client=self.client,
+                    source_client=self.source_client,
                     source_dir_path=self.source_dir_path,
                     plan_only=self.plan_only,
                     is_same_org_deploy=self.is_same_org,

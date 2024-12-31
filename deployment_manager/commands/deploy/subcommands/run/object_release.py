@@ -49,11 +49,16 @@ class ObjectRelease(BaseModel):
     name: str
     type: Resource
     base_path: str = None
+
     yaml: DeployYaml = None
     yaml_reference: dict = None
     data: dict = None
+
     client: ElisAPIClient = None
+    source_client: ElisAPIClient = None
+
     plan_only: bool = False
+    auto_delete: bool = False
     is_same_org_deploy: bool = False
 
     initialize_failed: bool = False
@@ -73,7 +78,9 @@ class ObjectRelease(BaseModel):
         self,
         yaml,
         client,
+        source_client,
         source_dir_path,
+        auto_delete=False,
         plan_only=False,
         is_same_org_deploy=False,
         ignore_timestamp_mismatch=False,
@@ -85,6 +92,7 @@ class ObjectRelease(BaseModel):
         self.yaml = yaml
         self.yaml_reference = self.get_object_in_yaml()
 
+        self.auto_delete = auto_delete
         self.plan_only = plan_only
         self.is_same_org_deploy = is_same_org_deploy
 
@@ -100,6 +108,7 @@ class ObjectRelease(BaseModel):
                 f"Could not load object data from: [green]{self.path}[/green]. Is the object name in deploy file in-sync with its local path?"
             ) from None
         self.client = client
+        self.source_client = source_client
 
     async def deploy(self):
         """Creates/updates the object in the Elis API"""
@@ -188,6 +197,21 @@ class ObjectRelease(BaseModel):
         else:
             return await self.create_remote(target_object=target_object, target=target)
 
+    async def check_source_object(self):
+        try:
+            await self.source_client._http_client.fetch_one(self.type, self.id)
+        except APIClientError as e:
+            if e.status_code == 404:
+                return False
+            raise e
+        return True
+
+    def remove_object_from_yaml(self):
+        objects = self.yaml.data.get(self.type.value, [])
+        self.yaml.data[self.type.value] = [
+            obj for obj in objects if obj.get("id") != self.id
+        ]
+
     # Target is provided so that subclasses can use it (even if this basic method does not)
     async def create_remote(self, target_object: dict, target: Target = None):
         try:
@@ -263,6 +287,21 @@ class ObjectRelease(BaseModel):
             )
             self.deploy_failed = True
             return {}
+
+    async def delete_remote(self, target: Target):
+        try:
+            if not self.plan_only:
+                await self.client._http_client.delete(self.type, id_=target.id)
+
+            pprint(
+                f"{settings.PLAN_PRINT_STR if self.plan_only else ''} {settings.DELETE_PRINT_STR} {self.display_type}: [purple]({target.id})[/purple]."
+            )
+        except Exception as e:
+            display_error(
+                f'Error while deleting {self.display_type} {self.display_label} -> "{target.id}: {e}',
+                e,
+            )
+            self.deploy_failed = True
 
     async def implicit_override_targets(self, lookup_table: LookupTable):
         try:

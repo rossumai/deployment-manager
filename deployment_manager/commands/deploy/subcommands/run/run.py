@@ -40,6 +40,7 @@ async def deploy_release_file(
     source_client: ElisAPIClient = None,
     target_client: ElisAPIClient = None,
     force: bool = False,
+    auto_delete: bool = False,
     commit: bool = False,
     commit_message: str = "",
 ):
@@ -133,6 +134,7 @@ async def deploy_release_file(
             target_org=target_org,
             plan_only=False,
             force_deploy=force,
+            auto_delete=auto_delete,
         )
         planned_release = ReleaseFile(
             **deepcopy(yaml.data),
@@ -144,6 +146,7 @@ async def deploy_release_file(
             target_org=target_org,
             plan_only=True,
             force_deploy=force,
+            auto_delete=auto_delete,
         )
     except ValidationError as e:
         display_error(f"Missing information in the deploy file: {e}")
@@ -251,15 +254,7 @@ async def deploy_release_file(
     ):
         return
 
-    # TODO: remember what was deployed, if those IDs exist locally, they should be automatically moved (pulled) into the new (sub)dir <- important for same-org
-    # ! TODO: if there is not target dir, ask the user for a name. Then offer to download all new objects into that dir
-    if not target_dir_subdir:
-        if await questionary.confirm(
-            f"Would you like to specify target directory and {settings.DOWNLOAD_COMMAND_NAME} the deployed objects?"
-        ).ask_async():
-            print("TBD")
-            # target_dir_subdir_path = project_path / Path(target_dir_subdir)
-    else:
+    if target_dir_subdir:
         target_dir_subdir_path = project_path / Path(target_dir_subdir)
         await download_destinations(
             destinations=[target_dir_subdir_path],
@@ -272,8 +267,5 @@ async def deploy_release_file(
 # TODO: more granular error handling for hook dep graph and implicit attribute override
 
 # TODO: diff could show ID and (name)
-
-# TODO: check if remote was not modified when updating?
-
 
 # TODO: log all messages to stdout and into a separate file as well

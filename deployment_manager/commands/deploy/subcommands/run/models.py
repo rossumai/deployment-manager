@@ -11,6 +11,7 @@ class Target(BaseModel):
     )
     data: dict = {}
     attribute_override: dict = {}
+    index: int = 0
 
 
 def convert_int_id_to_class(model, val):

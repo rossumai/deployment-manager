@@ -77,6 +77,13 @@ If these objects don't exist, they get created.
     help="Ignores newer remote timestamps = always overwrites remote with local version of objects.",
 )
 @click.option(
+    "--auto-delete",
+    "-ad",
+    default=False,
+    is_flag=True,
+    help="Checks if source object exists and if not, deletes target + removes the object from deploy file.",
+)
+@click.option(
     "--commit",
     "-c",
     default=False,
@@ -93,11 +100,13 @@ If these objects don't exist, they get created.
 async def deploy_project_wrapper(
     deploy_file: Path,
     force: bool,
+    auto_delete: bool,
     commit: bool,
     message: str,
 ):
     await deploy_release_file(
         deploy_file_path=deploy_file,
+        auto_delete=auto_delete,
         force=force,
         commit=commit,
         commit_message=message,

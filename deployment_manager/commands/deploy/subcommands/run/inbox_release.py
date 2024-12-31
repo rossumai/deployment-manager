@@ -22,33 +22,14 @@ class InboxRelease(ObjectRelease):
     parent_queue: ObjectRelease = None
     queue_targets: list[Target] = []
 
-    async def initialize(
-        self,
-        yaml,
-        client,
-        source_dir_path,
-        plan_only,
-        is_same_org_deploy,
-        queue_targets,
-        parent_queue,
-        last_deploy_timestamp,
-        ignore_timestamp_mismatch,
-    ):
+    async def initialize(self, queue_targets, parent_queue, **kwargs):
         try:
             self.queue_targets = queue_targets
             self.parent_queue = parent_queue
             # dynamic property caused issues in some function calls
             self.name = self.parent_queue.name
 
-            await super().initialize(
-                yaml=yaml,
-                client=client,
-                source_dir_path=source_dir_path,
-                plan_only=plan_only,
-                is_same_org_deploy=is_same_org_deploy,
-                last_deploy_timestamp=last_deploy_timestamp,
-                ignore_timestamp_mismatch=ignore_timestamp_mismatch,
-            )
+            await super().initialize(**kwargs)
         except Exception as e:
             display_error(
                 f"Error while initializing {self.display_type} {self.display_label}: {e}",
@@ -106,6 +87,8 @@ class InboxRelease(ObjectRelease):
         try:
             release_requests = []
             for target_index, target in enumerate(self.targets):
+                target.index = target_index
+
                 inbox_copy = self.prepare_object_copy_for_deploy(
                     target=target, target_index=target_index
                 )
