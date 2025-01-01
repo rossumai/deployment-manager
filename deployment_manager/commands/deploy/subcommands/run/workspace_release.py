@@ -59,4 +59,4 @@ class WorkspaceRelease(ObjectRelease):
                 f"Error while deploying {self.display_type} {self.display_label}: {e}",
                 e,
             )
-            self.revert_failed = True
+            self.deploy_failed = True

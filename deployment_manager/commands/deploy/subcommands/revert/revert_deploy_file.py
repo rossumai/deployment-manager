@@ -3,13 +3,13 @@ from rich import print as pprint
 from rich.panel import Panel
 from deployment_manager.commands.deploy.subcommands.revert.revert_object_deploy import (
     RevertHookDeploy,
+    RevertObjectDeploy,
     RevertQueueDeploy,
     RevertWorkspaceDeploy,
 )
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
 from deployment_manager.commands.deploy.subcommands.run.object_release import (
     DeployException,
-    ObjectRelease,
 )
 from deployment_manager.utils.consts import display_error, settings
 
@@ -96,7 +96,7 @@ class RevertDeployFile(BaseModel):
         await asyncio.gather(*[queue_release.revert() for queue_release in self.queues])
         self.detect_revert_phase_exceptions(self.queues)
 
-    def detect_revert_phase_exceptions(self, releases: list[ObjectRelease]):
+    def detect_revert_phase_exceptions(self, releases: list[RevertObjectDeploy]):
         for release in releases:
             if release.revert_failed:
                 raise DeployException(

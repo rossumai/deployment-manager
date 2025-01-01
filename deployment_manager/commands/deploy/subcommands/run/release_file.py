@@ -307,7 +307,7 @@ class ReleaseFile(BaseModel):
 
     def detect_deploy_phase_exceptions(self, releases: list[ObjectRelease]):
         for release in releases:
-            if release.revert_failed:
+            if release.deploy_failed:
                 raise DeployException(
                     f"Deploy of {release.display_type} {release.display_label} failed, see error details above."
                 )

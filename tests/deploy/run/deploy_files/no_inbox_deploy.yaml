@@ -1,0 +1,43 @@
+# The API URL where changes should be deployed (e.g., https://my-org.rossum.app/api/v1)
+# The organization's ID is determined automatically based on the token / user credentials.
+target_url: https://rdttest.rossum.app/api/v1
+# Which local folder is considered to be the source (takes JSON objects from there)
+source_dir: prod-org/prod
+
+# [Optional] Which local folder is considered to be the target (takes URL and credentials if found)
+target_dir: prod-org/prod
+# [Optional] API URL for the source organization (otherwise taken from the source dir config.yaml)
+source_url: https://rdttest.rossum.app/api/v1
+
+# User ID to use as the hook owner (unnecessary if using username+password credentials for target)
+token_owner_id:
+
+# [Automatic] Marks the deploy file as used and validates that another deploy is into the same org
+deployed_org_id: 255590
+
+# Define anchors in the following way:
+# x_any_name: &anchor_name
+#     name: Name from Variable
+#     another_attr: 4
+# You can then use them in the objects by adding '<<: *anchor_name'
+
+# Update attributes of target organization with those from source organization
+patch_target_org: true
+
+workspaces: []
+
+queues: 
+  - id: 1530833
+    name: Q1
+    base_path: test-org/test/workspaces/some_ws_[1]
+    targets:
+      - id: 111
+    schema:
+        id: 1461103
+        targets:
+          - id: 222
+
+hooks: []
+
+unselected_hooks: [] # List hook IDs that should not be deployed, even if they belong to selected queues
+last_deployed_at: "2024-12-27T11:18:19.998544"

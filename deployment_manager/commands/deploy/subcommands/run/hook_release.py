@@ -72,13 +72,13 @@ class HookRelease(ObjectRelease):
             display_error(
                 f"Error while deploying {self.display_type} {self.display_label}: {e}",
             )
-            self.revert_failed = True
+            self.deploy_failed = True
         except Exception as e:
             display_error(
                 f"Error while deploying {self.display_type} {self.name} ({self.id}) ^",
                 e,
             )
-            self.revert_failed = True
+            self.deploy_failed = True
 
     async def create_remote(self, target_object: dict, target: Target):
         try:
@@ -103,7 +103,7 @@ class HookRelease(ObjectRelease):
                 f"Error while creating {self.display_type} {self.display_label}: {e}",
                 e,
             )
-            self.revert_failed = True
+            self.deploy_failed = True
             return {}
 
     async def create_hook_without_known_template(self, hook: dict):
