@@ -1,5 +1,7 @@
 from copy import deepcopy
+from itertools import zip_longest
 from typing import Any
+from deployment_manager.commands.deploy import deploy
 from deployment_manager.commands.deploy.subcommands.run.attribute_override import (
     create_regex_override_syntax,
 )
@@ -104,7 +106,7 @@ async def get_dir_and_subdir_from_user(org_path: Path, type: str, default: str =
     ]
     dir_choices = [questionary.Choice(title=str(path)) for path in dir_candidates]
     # Target dirname is not required (it might not exist unlike the source one)
-    if type == settings.TARGET_DIRNAME:
+    if type.casefold() == settings.TARGET_DIRNAME:
         dir_choices.append(questionary.Choice(title="N/A", value=""))
 
     # Reset default if it is not found in the current options
@@ -538,3 +540,97 @@ def add_override_to_deploy_file_object(override: AttributeOverride, object: dict
 
         if settings.DEPLOY_KEY_OVERRIDES not in target:
             target[settings.DEPLOY_KEY_OVERRIDES] = object_overrides
+
+
+def add_targets_from_mapping(mapping: dict, deploy_file: dict):
+    org_targets = mapping["organization"].get("targets", [])
+    if org_targets:
+        target_org_id = org_targets[0].get("target_id", None)
+        deploy_file[settings.DEPLOY_KEY_DEPLOYED_ORG_ID] = target_org_id
+
+    mapping_workspaces = mapping["organization"]["workspaces"]
+    deploy_workspaces = deploy_file.get(settings.DEPLOY_KEY_WORKSPACES, [])
+    add_targets_for_objects(
+        mapping_objects=mapping_workspaces,
+        deploy_objects=deploy_workspaces,
+        object_type=settings.DEPLOY_KEY_WORKSPACES,
+    )
+
+    mapping_queues = []
+    for mapping_ws in mapping_workspaces:
+        mapping_queues.extend(mapping_ws.get("queues", []))
+    deploy_queues = deploy_file.get(settings.DEPLOY_KEY_QUEUES, [])
+    add_targets_for_objects(
+        mapping_objects=mapping_queues,
+        deploy_objects=deploy_queues,
+        object_type=settings.DEPLOY_KEY_QUEUES,
+    )
+
+    mapping_hooks = mapping["organization"]["hooks"]
+    deploy_hooks = deploy_file.get(settings.DEPLOY_KEY_HOOKS, [])
+    add_targets_for_objects(
+        mapping_objects=mapping_hooks,
+        deploy_objects=deploy_hooks,
+        object_type=settings.DEPLOY_KEY_HOOKS,
+    )
+
+    mapping_inboxes = []
+    for mapping_queue in mapping_queues:
+        if mapping_inbox := mapping_queue.get("inbox", None):
+            mapping_inboxes.append(mapping_inbox)
+    deploy_inboxes = []
+    for deploy_queue in deploy_queues:
+        if deploy_inbox := deploy_queue.get(settings.DEPLOY_KEY_INBOX, None):
+            deploy_inboxes.append(deploy_inbox)
+    add_targets_for_objects(
+        mapping_objects=mapping_inboxes,
+        deploy_objects=deploy_inboxes,
+        object_type=settings.DEPLOY_KEY_INBOX,
+    )
+
+    mapping_schemas = mapping["organization"]["schemas"]
+    deploy_schemas = []
+    for deploy_queue in deploy_queues:
+        if deploy_schema := deploy_queue.get(settings.DEPLOY_KEY_SCHEMA, None):
+            deploy_schemas.append(deploy_schema)
+    add_targets_for_objects(
+        mapping_objects=mapping_schemas,
+        deploy_objects=deploy_schemas,
+        object_type=settings.DEPLOY_KEY_SCHEMA,
+    )
+
+
+def add_targets_for_objects(
+    mapping_objects: list, deploy_objects: list, object_type: str
+):
+    try:
+        mapping_objects_by_id = {ws["id"]: ws for ws in mapping_objects}
+        for deploy_object in deploy_objects:
+            if deploy_object["id"] not in mapping_objects_by_id:
+                continue
+
+            mapping_ws = mapping_objects_by_id[deploy_object["id"]]
+            deploy_targets = deploy_object.get(settings.DEPLOY_KEY_TARGETS, [])
+
+            new_deploy_targets = []
+            for deploy_target, mapping_target in zip_longest(
+                deploy_targets, mapping_ws.get("targets", [])
+            ):
+                deploy_target_id = deploy_target.get("id", None)
+                mapping_target_id = mapping_target.get("target_id", None)
+                deploy_attribute_override = deploy_target.get("attribute_override", {})
+                mapping_attribute_override = mapping_target.get(
+                    "attribute_override", {}
+                )
+                new_target = {
+                    "id": deploy_target_id if deploy_target_id else mapping_target_id,
+                    "attribute_override": {
+                        **mapping_attribute_override,
+                        **deploy_attribute_override,
+                    },
+                }
+                new_deploy_targets.append(new_target)
+
+            deploy_object[settings.DEPLOY_KEY_TARGETS] = new_deploy_targets
+    except Exception as e:
+        display_error(f"Error while adding targets to deploy file {object_type} ^", e)

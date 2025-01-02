@@ -6,6 +6,7 @@ from deployment_manager.commands.deploy.common.helpers import (
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
 from deployment_manager.commands.deploy.subcommands.template.helpers import (
     add_override_to_deploy_file_objects,
+    add_targets_from_mapping,
     create_deploy_file_template,
     get_attribute_overrides_from_user,
     get_hooks_from_user,
@@ -15,25 +16,17 @@ from deployment_manager.commands.deploy.subcommands.template.helpers import (
     get_token_owner_from_user,
     get_workspaces_from_user,
 )
+from deployment_manager.common.mapping import read_mapping
 from deployment_manager.utils.consts import display_error, display_info, settings
 
 from rich import print as pprint
 from anyio import Path
 from rossum_api import ElisAPIClient
 
-# TODO: source-org/subdir compatibility
-# Ask if the org-dir already exists (show options to select)
-# If yes, take the URL from the config
-# If yes, ask for subdir, unless there is only one (e.g., prod-org/prod)
-# The user can also select a new subdir (create that)
-# ! Here the user has no choice, same org needs the second subdir and then deploy with download
-# ! Otherwse, the org would get absolutely messy
-# If no, ask the user if he wants to create a new org-dir + ask for a subdir (must create one)
-# Keep going as usual
-
 
 async def create_deploy_template(
     input_file: Path = None,
+    mapping_file: Path = None,
     org_path: Path = None,
     interactive: bool = False,
     source_client: ElisAPIClient = None,
@@ -91,9 +84,6 @@ async def create_deploy_template(
             type=settings.SOURCE_DIRNAME, default=source_url
         )
     deploy_file_object[settings.DEPLOY_KEY_SOURCE_URL] = source_url
-
-    # TODO: consts keys for all object names (workspaces, queues, ...)
-    # TODO: allow queues without WS if they have an ID
 
     # TODO: specify hook_template URL for hook in the deploy file
 
@@ -177,6 +167,13 @@ async def create_deploy_template(
         )
     else:
         deploy_filepath = input_file
+
+    # Mapping reuse
+    try:
+        mapping = await read_mapping(mapping_path=mapping_file)
+        add_targets_from_mapping(mapping=mapping, deploy_file=yaml.data)
+    except Exception as e:
+        display_error(f"Error while applying mapping ^", e)
 
     await yaml.save_to_file(deploy_filepath)
 

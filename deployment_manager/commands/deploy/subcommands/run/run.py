@@ -168,7 +168,7 @@ async def deploy_release_file(
             else:
                 raise e
         except DeployException as e:
-            display_error(e)
+            display_error(str(e))
             return
 
     try:
