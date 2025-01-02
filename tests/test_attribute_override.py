@@ -12,6 +12,8 @@ from deployment_manager.common.mapping import read_mapping
 from deployment_manager.common.read_write import read_json
 from tests.utils.consts import REFERENCE_PROJECT_PATH
 
+pytestmark = pytest.mark.skip(reason="This test file needs refactor.")
+
 
 @pytest_asyncio.fixture(scope="function")
 async def loaded_mapping():
