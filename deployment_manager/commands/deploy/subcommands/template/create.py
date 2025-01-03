@@ -169,11 +169,12 @@ async def create_deploy_template(
         deploy_filepath = input_file
 
     # Mapping reuse
-    try:
-        mapping = await read_mapping(mapping_path=mapping_file)
-        add_targets_from_mapping(mapping=mapping, deploy_file=yaml.data)
-    except Exception as e:
-        display_error(f"Error while applying mapping ^", e)
+    if await mapping_file.exists():
+        try:
+            mapping = await read_mapping(mapping_path=mapping_file)
+            add_targets_from_mapping(mapping=mapping, deploy_file=yaml.data)
+        except Exception as e:
+            display_error(f"Error while applying mapping ^", e)
 
     await yaml.save_to_file(deploy_filepath)
 

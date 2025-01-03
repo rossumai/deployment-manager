@@ -389,6 +389,7 @@ class EmptyObjectRelease(BaseModel):
 
     initialize_failed: bool = False
     deploy_failed: bool = False
+    ignore_timestamp_mismatch: bool = False
 
     targets: list[TargetWithDefault] = []
 
