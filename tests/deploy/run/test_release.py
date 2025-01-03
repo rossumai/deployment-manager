@@ -647,3 +647,5 @@ async def test_ws_has_target_queues_and_queues_have_target_ws(
 
 
 # Test attribute override with pipes
+
+# Test no timestamp on object works

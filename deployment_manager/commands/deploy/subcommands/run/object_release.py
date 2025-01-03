@@ -162,6 +162,8 @@ class ObjectRelease(BaseModel):
         remote_object = await self.get_remote_object(remote_object_id)
         try:
             remote_modified_at = remote_object.get("modified_at", "")
+            if not remote_modified_at:
+                return True
             remote_timestamp = datetime.fromisoformat(remote_modified_at)
             deploy_timestamp = datetime.fromisoformat(last_deploy_timestamp)
             if remote_timestamp > deploy_timestamp:
@@ -170,7 +172,7 @@ class ObjectRelease(BaseModel):
                 )
                 return False
             return True
-        except ValueError:
+        except Exception:
             raise ValueError("One of the provided timestamps is not in ISO format")
 
     async def get_remote_object(self, remote_object_id):
