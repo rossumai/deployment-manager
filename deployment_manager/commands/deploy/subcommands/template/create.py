@@ -169,7 +169,7 @@ async def create_deploy_template(
         deploy_filepath = input_file
 
     # Mapping reuse
-    if await mapping_file.exists():
+    if mapping_file and await mapping_file.exists():
         try:
             mapping = await read_mapping(mapping_path=mapping_file)
             add_targets_from_mapping(mapping=mapping, deploy_file=yaml.data)

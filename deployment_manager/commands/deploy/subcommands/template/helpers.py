@@ -86,7 +86,7 @@ async def get_token_owner_from_user(default: str = ""):
         default = ""
     token_owner = await questionary.text(
         "What is the token owner user ID (can be empty for same-org target):",
-        default=default,
+        default=str(default),
     ).ask_async()
 
     try:

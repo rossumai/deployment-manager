@@ -272,7 +272,7 @@ class ObjectRelease(BaseModel):
                     self.type, id_=target.id, data=target_object
                 )
                 # Important for the ID override phase (deploy file still the old one and the remote just got updated)
-                self.last_deploy_timestamp = generate_deploy_timestamp()
+                self.last_deploy_timestamp = result.get('modified_at', generate_deploy_timestamp())
             pprint(
                 f"{settings.PLAN_PRINT_STR if self.plan_only else ''} {settings.UPDATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}."
             )
