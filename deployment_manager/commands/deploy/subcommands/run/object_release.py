@@ -9,6 +9,7 @@ from deployment_manager.commands.deploy.subcommands.run.attribute_override impor
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
     generate_deploy_timestamp,
+    remove_queue_attributes_for_cross_org,
 )
 from deployment_manager.commands.deploy.subcommands.run.models import (
     LookupTable,
@@ -300,11 +301,11 @@ class ObjectRelease(BaseModel):
     async def implicit_override_targets(self, lookup_table: LookupTable):
         try:
             for target_index, target in enumerate(self.targets):
-                override_target_copy = deepcopy(target)
-                self.remove_override_irrelevant_props(override_target_copy.data)
+                overriding_object = deepcopy(target)
+                self.remove_override_irrelevant_props(overriding_object.data)
 
                 self.overrider.replace_ids_in_target_object(
-                    target=override_target_copy,
+                    target=overriding_object,
                     lookup_table=lookup_table,
                     target_object_index=target_index,
                     num_targets=len(self.targets),
@@ -314,27 +315,27 @@ class ObjectRelease(BaseModel):
                     # When updating, take the real remote object
                     # The diff comparison will then show only overrides that are not on the remote already (not all overrides from source)
                     if target.id and not self.check_plan_object_id(target.id):
-                        override_source_data_copy = await self.get_remote_object(
+                        overriden_object_data = await self.get_remote_object(
                             target.id
                         )
                     else:
-                        override_source_data_copy = deepcopy(self.data)
+                        overriden_object_data = deepcopy(self.data)
 
-                    self.remove_override_irrelevant_props(override_source_data_copy)
+                    self.remove_override_irrelevant_props(overriden_object_data)
 
                     diff = self.overrider.create_override_diff(
-                        override_source_data_copy, override_target_copy.data
+                        overriden_object_data, overriding_object.data
                     )
                     if not diff:
                         return
 
                     colorized_diff = self.overrider.parse_diff(diff)
-                    message = f"Attribute override: {self.display_type} {self.create_source_to_target_string(override_target_copy.data)}:\n{colorized_diff}"
+                    message = f"Attribute override: {self.display_type} {self.create_source_to_target_string(overriding_object.data)}:\n{colorized_diff}"
                     pprint(Panel(message))
                 else:
                     # Update only objects where there was a difference after override
                     await self.update_remote(
-                        target_object=override_target_copy.data, target=target
+                        target_object=overriding_object.data, target=target
                     )
         except Exception as e:
             display_error(
@@ -345,8 +346,6 @@ class ObjectRelease(BaseModel):
                 "ID override failed, see error details above."
             ) from None
 
-    # TODO: compile lists for each object?
-    # TODO: add more attributes (e.g., modified_by, modified_at)
     def remove_override_irrelevant_props(self, data):
         # These attribute either should not be compared or were already replaced via replace_dependency_url()
         data.pop("modified_by", None)
@@ -370,6 +369,8 @@ class ObjectRelease(BaseModel):
                 data.pop("schema", None)
                 data.pop("hooks", None)
                 data.pop("webhooks", None)
+                if not self.is_same_org_deploy:
+                    remove_queue_attributes_for_cross_org(data)
 
 
 class EmptyObjectRelease(BaseModel):

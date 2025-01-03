@@ -16,7 +16,11 @@ from deployment_manager.commands.deploy.common.helpers import get_token_from_use
 from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
     Credentials,
 )
-from deployment_manager.utils.consts import display_error, settings
+from deployment_manager.utils.consts import (
+    QUEUE_ENGINE_ATTRIBUTES,
+    display_error,
+    settings,
+)
 
 
 class DeployYaml:
@@ -142,3 +146,9 @@ def generate_deploy_timestamp():
         .isoformat(timespec="microseconds")
         .replace("+00:00", "Z")
     )
+
+
+def remove_queue_attributes_for_cross_org(queue_copy: dict):
+    queue_copy.pop("workflows", None)
+    for attr in QUEUE_ENGINE_ATTRIBUTES:
+        queue_copy.pop(attr, None)

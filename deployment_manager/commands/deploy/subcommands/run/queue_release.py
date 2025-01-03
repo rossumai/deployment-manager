@@ -6,6 +6,7 @@ from anyio import Path
 from pydantic import Field
 import questionary
 from rossum_api import APIClientError
+from deployment_manager.commands.deploy.subcommands.run.helpers import remove_queue_attributes_for_cross_org
 from deployment_manager.commands.deploy.subcommands.run.inbox_release import (
     InboxRelease,
 )
@@ -125,7 +126,7 @@ class QueueRelease(ObjectRelease):
                 queue_copy = deepcopy(self.data)
                 queue_copy.pop("inbox", None)
                 if not self.is_same_org_deploy:
-                    self.remove_attributes_for_cross_org(queue_copy=queue_copy)
+                    remove_queue_attributes_for_cross_org(queue_copy=queue_copy)
 
                 previous_workspace_url = queue_copy["workspace"]
                 replace_dependency_url(
@@ -214,11 +215,6 @@ class QueueRelease(ObjectRelease):
                 e,
             )
             self.deploy_failed = True
-
-    def remove_attributes_for_cross_org(self, queue_copy: dict):
-        queue_copy.pop("workflows", None)
-        for attr in QUEUE_ENGINE_ATTRIBUTES:
-            queue_copy.pop(attr)
 
     async def verify_subobjects_have_same_target_count(self):
         mismatch_found = False
