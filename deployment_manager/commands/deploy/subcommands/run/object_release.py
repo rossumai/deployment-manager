@@ -260,14 +260,6 @@ class ObjectRelease(BaseModel):
                             "Unexpected timestamp mismatch"
                         )
             else:
-                if (
-                    not self.ignore_timestamp_mismatch
-                    and not await self.check_modified_timestamps_equal(
-                        self.last_deploy_timestamp, target.id
-                    )
-                ):
-                    raise TimestampMismatchException("Unexpected timestamp mismatch")
-
                 result = await self.client._http_client.update(
                     self.type, id_=target.id, data=target_object
                 )
