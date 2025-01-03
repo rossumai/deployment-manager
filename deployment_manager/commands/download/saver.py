@@ -149,14 +149,17 @@ class QueueSaver(Saver):
 
         return None
 
-    def construct_object_path(
-        self, subdir: Subdirectory, queue: dict, workspace: dict
-    ) -> Path:
+    def construct_object_path(self, subdir: Subdirectory, queue: dict) -> Path:
+        workspace_for_queue = self.find_workspace_for_queue(queue)
+        if not workspace_for_queue:
+
+            return
+
         object_path = (
             self.base_path
             / subdir.name
             / "workspaces"
-            / templatize_name_id(workspace["name"], workspace["id"])
+            / templatize_name_id(workspace_for_queue["name"], workspace_for_queue["id"])
             / "queues"
             / templatize_name_id(queue["name"], queue["id"])
             / "queue.json"
@@ -164,16 +167,9 @@ class QueueSaver(Saver):
         return object_path
 
     async def save_downloaded_object(self, queue: dict, subdir: Subdirectory):
-        workspace_for_queue = self.find_workspace_for_queue(queue)
-        if not workspace_for_queue:
-            display_error(
-                f"Could not find workspace for {self.display_type} {self.display_label(queue.get('name', "no-name"), queue.get('id', 'no-id'))}. Skipping."
-            )
+        object_path = self.construct_object_path(subdir=subdir, queue=queue)
+        if not object_path:
             return
-
-        object_path = self.construct_object_path(
-            subdir=subdir, queue=queue, workspace=workspace_for_queue
-        )
         if self.download_all or await should_write_object(
             object_path, queue, self.changed_files
         ):
@@ -188,6 +184,9 @@ class QueueSaver(Saver):
         for ws in self.workspaces:
             if ws["url"] == queue.get("workspace", None):
                 return ws
+        display_error(
+            f"Could not find workspace for {self.display_type} {self.display_label(queue.get('name', "no-name"), queue.get('id', 'no-id'))}. Skipping."
+        )
         return None
 
 
@@ -211,18 +210,26 @@ class InboxSaver(QueueSaver):
         for queue in self.queues:
             if queue["url"] == inbox.get("queues", [None])[0]:
                 return queue
+        display_warning(
+            f"Could not find queue for {self.display_type} {self.display_label(inbox.get('name', 'no-name'), inbox.get('id', 'no-id'))}. The object will not be saved locally."
+        )
         return None
 
-    def construct_object_path(
-        self, subdir: Subdirectory, queue: dict, workspace: dict
-    ) -> Path:
+    def construct_object_path(self, subdir: Subdirectory, inbox: dict) -> Path:
+        queue_for_inbox = self.find_queue(inbox)
+        if not queue_for_inbox:
+            return
+        workspace_for_queue = self.find_workspace_for_queue(queue_for_inbox)
+        if not workspace_for_queue:
+            return
+
         object_path = (
             self.base_path
             / subdir.name
             / "workspaces"
-            / templatize_name_id(workspace["name"], workspace["id"])
+            / templatize_name_id(workspace_for_queue["name"], workspace_for_queue["id"])
             / "queues"
-            / templatize_name_id(queue["name"], queue["id"])
+            / templatize_name_id(queue_for_inbox["name"], queue_for_inbox["id"])
             / "inbox.json"
         )
         return object_path
@@ -231,22 +238,9 @@ class InboxSaver(QueueSaver):
         if not inbox.get("queues", []):
             return
 
-        queue_for_inbox = self.find_queue(inbox)
-        if not queue_for_inbox:
-            display_warning(
-                f"Could not find queue for {self.display_type} {inbox['name']} ({inbox['id']}). The object will not be saved locally."
-            )
+        object_path = self.construct_object_path(subdir=subdir, inbox=inbox)
+        if not object_path:
             return
-        workspace_for_queue = self.find_workspace_for_queue(queue_for_inbox)
-        if not workspace_for_queue:
-            display_error(
-                f"Could not find workspace for {self.display_type}'s queue {self.display_label(queue_for_inbox.get('name', "no-name"), queue_for_inbox.get('id', 'no-id'))}. Skipping."
-            )
-            return
-
-        object_path = self.construct_object_path(
-            subdir=subdir, queue=queue_for_inbox, workspace=workspace_for_queue
-        )
         if self.download_all or await should_write_object(
             object_path, inbox, self.changed_files
         ):
@@ -287,46 +281,46 @@ class SchemaSaver(QueueSaver):
 
     def find_queue(self, schema: dict):
         schema_queues = schema.get("queues", [None])
+        warning_message = f"Could not find queue for {self.display_type} {self.display_label(schema.get('name', 'no-name'), schema.get('id', 'no-id'))}. The object will not be saved locally."
         # The schema might not have any queues assigned ([])
         if not schema_queues:
+            display_warning(warning_message)
             return None
 
         for queue in self.queues:
             if queue["url"] == schema_queues[0]:
                 return queue
+
+        display_warning(warning_message)
         return None
 
     def construct_object_path(
-        self, subdir: Subdirectory, queue: dict, workspace: dict
+        self,
+        subdir: Subdirectory,
+        schema: dict,
     ) -> Path:
+        queue_for_schema = self.find_queue(schema)
+        if not queue_for_schema:
+            return
+        workspace_for_queue = self.find_workspace_for_queue(queue_for_schema)
+        if not workspace_for_queue:
+            return
+
         object_path = (
             self.base_path
             / subdir.name
             / "workspaces"
-            / templatize_name_id(workspace["name"], workspace["id"])
+            / templatize_name_id(workspace_for_queue["name"], workspace_for_queue["id"])
             / "queues"
-            / templatize_name_id(queue["name"], queue["id"])
+            / templatize_name_id(queue_for_schema["name"], queue_for_schema["id"])
             / "schema.json"
         )
         return object_path
 
     async def save_downloaded_object(self, schema: dict, subdir: Subdirectory):
-        queue_for_schema = self.find_queue(schema)
-        if not queue_for_schema:
-            display_warning(
-                f"Could not find queue for {self.display_type} {schema['name']} ({schema['id']}). The object will not be saved locally."
-            )
+        object_path = self.construct_object_path(subdir=subdir, schema=schema)
+        if not object_path:
             return
-        workspace_for_queue = self.find_workspace_for_queue(queue_for_schema)
-        if not workspace_for_queue:
-            display_error(
-                f"Could not find workspace for {self.display_type}'s queue {self.display_label(queue_for_schema.get('name', "no-name"), queue_for_schema.get('id', 'no-id'))}. Skipping."
-            )
-            return
-
-        object_path = self.construct_object_path(
-            subdir=subdir, queue=queue_for_schema, workspace=workspace_for_queue
-        )
         if self.download_all or await should_write_object(
             object_path, schema, self.changed_files
         ):
@@ -360,7 +354,8 @@ class HookSaver(Saver):
 
     async def save_downloaded_object(self, hook: dict, subdir: Subdirectory):
         object_path = self.construct_object_path(subdir=subdir, hook=hook)
-
+        if not object_path:
+            return
         if self.download_all or await should_write_object(
             object_path, hook, self.changed_files
         ):

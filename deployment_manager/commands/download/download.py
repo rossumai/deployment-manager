@@ -24,11 +24,6 @@ from deployment_manager.utils.functions import (
 # TODO: handle case of 1 schema being assigned to multiple queues:
 # Assign it to the first one, the others should get robust checks during deploy etc.
 
-# TODO: migration of mapping into deploy file and config file
-# Cross-org will create 2 directories (named after orgs)
-# Same org will have 1 directory merged together
-# Do not delete any folders automatically though
-
 
 @click.command(
     name=settings.DOWNLOAD_COMMAND_NAME,
@@ -135,7 +130,6 @@ async def download_destinations(
                 e,
             )
 
-    # TODO: test if no subdirs were specified
     # TODO: test with deleting objects
     # TODO: test just empty org file (subdirs should not be required then
     # TODO: org_path assumption test

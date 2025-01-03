@@ -18,7 +18,10 @@ from deployment_manager.commands.download.helpers import (
     replace_code_paths,
     should_write_object,
 )
-from deployment_manager.commands.download.subdirectory import SubdirectoriesDict
+from deployment_manager.commands.download.subdirectory import (
+    SubdirectoriesDict,
+    Subdirectory,
+)
 from deployment_manager.common.determine_path import determine_object_type_from_url
 from deployment_manager.utils.consts import display_error, display_warning, settings
 from deployment_manager.commands.download.saver import (
@@ -32,6 +35,7 @@ from deployment_manager.common.git import get_changed_file_paths
 from deployment_manager.common.read_write import read_json, write_json
 from deployment_manager.utils.functions import (
     detemplatize_name_id,
+    extract_id_from_url,
     find_all_object_paths,
     templatize_name_id,
 )
@@ -92,6 +96,12 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
 
     download_all: bool = False
 
+    workspace_saver: WorkspaceSaver = None
+    queue_saver: QueueSaver = None
+    inbox_saver: InboxSaver = None
+    schema_saver: SchemaSaver = None
+    hook_saver: HookSaver = None
+
     async def initialize(self):
         if not self.project_path:
             self.project_path = Path(".")
@@ -149,16 +159,16 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
         subdir_list = list(self.subdirectories.values())
 
         try:
-            workspace_saver = WorkspaceSaver(
+            self.workspace_saver = WorkspaceSaver(
                 base_path=self.project_path / self.name,
                 objects=workspaces_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
                 subdirs=subdir_list,
             )
-            await workspace_saver.save_downloaded_objects()
+            await self.workspace_saver.save_downloaded_objects()
 
-            queue_saver = QueueSaver(
+            self.queue_saver = QueueSaver(
                 base_path=self.project_path / self.name,
                 objects=queues_for_mapping,
                 workspaces=workspaces_for_mapping,
@@ -166,10 +176,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 download_all=self.download_all,
                 subdirs=subdir_list,
             )
-            await queue_saver.save_downloaded_objects()
+            await self.queue_saver.save_downloaded_objects()
 
             # TODO: test inbox without any queue
-            inbox_saver = InboxSaver(
+            self.inbox_saver = InboxSaver(
                 base_path=self.project_path / self.name,
                 objects=inboxes_for_mapping,
                 workspaces=workspaces_for_mapping,
@@ -178,9 +188,9 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 download_all=self.download_all,
                 subdirs=subdir_list,
             )
-            await inbox_saver.save_downloaded_objects()
+            await self.inbox_saver.save_downloaded_objects()
 
-            schema_saver = SchemaSaver(
+            self.schema_saver = SchemaSaver(
                 base_path=self.project_path / self.name,
                 objects=schemas_for_mapping,
                 workspaces=workspaces_for_mapping,
@@ -189,24 +199,18 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 download_all=self.download_all,
                 subdirs=subdir_list,
             )
-            await schema_saver.save_downloaded_objects()
+            await self.schema_saver.save_downloaded_objects()
 
-            hook_saver = HookSaver(
+            self.hook_saver = HookSaver(
                 base_path=self.project_path / self.name,
                 objects=hooks_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
                 subdirs=subdir_list,
             )
-            await hook_saver.save_downloaded_objects()
+            await self.hook_saver.save_downloaded_objects()
         except Exception as e:
             display_error("Error while saving objects ^", e)
-
-        # 2. Find preexisting objects in download:true subdirs and update them
-        # 3. For new objects from remote, apply the subdir regex if it is there.
-        # If a download:true subdir matches, put it there
-        # If no such subdir matches, list the objects to the user and ask if he wants to assign them into one of the subdirs manually (not just download:true)
-        # 4. Delete non-existent objects, moved objects are moved on their own (by the user)
 
         self.id_object_map = self.create_id_object_map(
             [
@@ -217,7 +221,8 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 *hooks_for_mapping,
             ]
         )
-        await self.remove_objects_without_remote()
+
+        await self.remove_stale_objects()
         self.remove_empty_ws_queue_dirs()
 
         pprint(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME} for {self.name}."))
@@ -253,25 +258,25 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             map[object["id"]] = object
         return map
 
-    async def remove_objects_without_remote(self):
-        object_paths = []
+    async def remove_stale_objects(self):
         for subdir in self.subdirectories.values():
             if not subdir.include:
                 continue
+
+            object_paths = []
             subdir_path = self.project_path / self.name / subdir.name
             object_paths.extend(await find_all_object_paths(subdir_path))
 
-        for object_path in object_paths:
-            if object_path.name == "organization.json":
-                continue
-            remove = await self.should_remove_object(object_path)
-            if not remove:
-                continue
+            for object_path in object_paths:
+                if object_path.name == "organization.json":
+                    continue
 
-            display_warning(
-                f"Deleting a local object that no longer exists in Rossum or was renamed: {object_path}"
-            )
-            os.remove(object_path)
+                remove = await self.should_remove_object(object_path, subdir=subdir)
+                if remove:
+                    display_warning(
+                        f"Deleting a local object that no longer exists in Rossum or was renamed: [green]{object_path}[/green]"
+                    )
+                    os.remove(object_path)
 
     def remove_empty_ws_queue_dirs(self):
         for subdir in self.subdirectories.values():
@@ -280,32 +285,60 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             subdir_ws_path = self.project_path / self.name / subdir.name / "workspaces"
             delete_empty_folders(subdir_ws_path)
 
-    async def should_remove_object(self, object_path: Path):
-        object = await read_json(object_path)
-        url, id = object.get("url", ""), object.get("id", "")
-        # Clearly not a Rossum object, just ignore
-        if not url or not id:
+    async def should_remove_object(self, object_path: Path, subdir: Subdirectory):
+        try:
+            local_object = await read_json(object_path)
+            url, id = local_object.get("url", ""), local_object.get("id", "")
+            # Clearly not a Rossum object, just ignore
+            if not url or not id:
+                return False
+
+            # The ID is not among all downloaded objects in that organization
+            if id not in self.id_object_map:
+                return True
+
+            if self.is_object_path_different(
+                local_object=local_object, local_path=object_path, subdir=subdir
+            ):
+                return True
+
+            return False
+        except Exception as e:
+            display_error(
+                f"Error while checking if object [green]{object_path}[/green] should be removed (skipping) ^",
+                e,
+            )
             return False
 
-        object_type = determine_object_type_from_url(url)
+    def is_object_path_different(
+        self, local_object: dict, local_path: Path, subdir: Subdirectory
+    ):
+        remote_object = self.id_object_map[local_object["id"]]
+        object_type = determine_object_type_from_url(local_object["url"])
 
-        if id not in self.id_object_map:
-            return True
-        remote_object = self.id_object_map[id]
+        # Construct paths and compare them
+        # Objects with same IDs and different paths should get the local (previous) version removed
+        match object_type:
+            case Resource.Hook:
+                remote_path = self.hook_saver.construct_object_path(
+                    subdir, remote_object
+                )
+            case Resource.Schema:
+                remote_path = self.schema_saver.construct_object_path(
+                    subdir, remote_object
+                )
+            case Resource.Inbox:
+                remote_path = self.inbox_saver.construct_object_path(
+                    subdir, remote_object
+                )
+            case Resource.Queue:
+                remote_path = self.queue_saver.construct_object_path(
+                    subdir, remote_object
+                )
+            case Resource.Workspace:
+                remote_path = self.workspace_saver.construct_object_path(
+                    subdir, remote_object
+                )
 
-        # Name might have changed
-        previous_name, _ = detemplatize_name_id(object_path)
-        # Use the same process to create the name (e.g., missing forbidden chars like '/')
-        path_from_remote = templatize_name_id(
-            remote_object.get("name", ""), remote_object.get("id", "")
-        )
-        cleaned_name, _ = detemplatize_name_id(path_from_remote)
-        # Inboxes and schemas are in the queue folder, but can have a different name than their queue
         # The names are lowercased because some OS's (mainly MacOS) are case-insensitive in their paths
-        if cleaned_name.casefold() != previous_name.casefold() and object_type not in [
-            Resource.Inbox,
-            Resource.Schema,
-        ]:
-            return True
-
-        return False
+        return str(remote_path).casefold() != str(local_path).casefold()
