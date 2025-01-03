@@ -26,10 +26,9 @@ patch_target_org: true
 
 workspaces: []
 
-queues: 
+queues:
   - id: 1530833
     name: Q1
-    base_path: test-org/test/workspaces/some_ws_[1]
     targets:
       - id: 111
 

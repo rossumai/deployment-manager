@@ -2,10 +2,10 @@
 # The organization's ID is determined automatically based on the token / user credentials.
 target_url: https://rdttest.rossum.app/api/v1
 # Which local folder is considered to be the source (takes JSON objects from there)
-source_dir: prod-org/prod
+source_dir: test-org/test
 
 # [Optional] Which local folder is considered to be the target (takes URL and credentials if found)
-target_dir: prod-org/prod
+target_dir: test-org/test
 # [Optional] API URL for the source organization (otherwise taken from the source dir config.yaml)
 source_url: https://rdttest.rossum.app/api/v1
 
@@ -13,7 +13,7 @@ source_url: https://rdttest.rossum.app/api/v1
 token_owner_id:
 
 # [Automatic] Marks the deploy file as used and validates that another deploy is into the same org
-deployed_org_id: 255590
+deployed_org_id:
 
 # Define anchors in the following way:
 # x_any_name: &anchor_name
@@ -24,17 +24,21 @@ deployed_org_id: 255590
 # Update attributes of target organization with those from source organization
 patch_target_org: true
 
-workspaces: []
+workspaces:
+  - id: 521887
+    name: WS1 DEV
+    targets:
+      - id:
 
 queues:
   - id: 1530833
     name: Q1
     targets:
-      - id: 111
+      - id:
     schema:
-        id: 1461103
-        targets:
-          - id: 222
+      id: 1461103
+      targets:
+        - id:
 
 hooks: []
 
