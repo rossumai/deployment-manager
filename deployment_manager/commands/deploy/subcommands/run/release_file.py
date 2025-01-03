@@ -90,8 +90,12 @@ class ReleaseFile(BaseModel):
             *self.workspaces,
             *self.queues,
         ]
-        for release_object in release_objects:
-            await release_object.implicit_override_targets(lookup_table)
+        await asyncio.gather(
+            *[
+                release_object.implicit_override_targets(lookup_table)
+                for release_object in release_objects
+            ]
+        )
 
     def gather_targets(self, release_objects: list[ObjectRelease]):
         targets = {}
