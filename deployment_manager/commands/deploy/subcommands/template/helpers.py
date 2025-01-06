@@ -199,6 +199,7 @@ def prepare_deploy_file_objects(
     deploy_objects = []
     for object in objects:
         deploy_representation = {
+            **previous_objects_by_id.get(object["id"], {}),
             "id": object["id"],
             "name": object["name"],
             settings.DEPLOY_KEY_BASE_PATH: str(object["path"].parent.parent.parent),
