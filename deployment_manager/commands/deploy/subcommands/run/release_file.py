@@ -1,6 +1,8 @@
 import asyncio
 import dataclasses
+import json
 from anyio import Path
+import pathlib
 from rich import print as pprint
 from rich.panel import Panel
 import questionary
@@ -24,7 +26,7 @@ from deployment_manager.commands.deploy.subcommands.run.workspace_release import
 )
 from deployment_manager.commands.migrate.helpers import get_token_owner
 from deployment_manager.utils.consts import display_error, display_warning, settings
-from deployment_manager.utils.functions import extract_id_from_url
+from deployment_manager.utils.functions import extract_id_from_url, templatize_name_id
 
 
 from pydantic import BaseModel
@@ -49,6 +51,9 @@ class ReleaseFile(BaseModel):
     token_owner_id: int | None = None
     deployed_org_id: int | None = ""
     last_deployed_at: str | None = ""
+    secrets_file: str | None = ""
+
+    secrets: dict | None = {}
 
     client: ElisAPIClient
     source_client: ElisAPIClient
@@ -70,6 +75,15 @@ class ReleaseFile(BaseModel):
     hook_targets: list[Target] = []
     workspace_targets: list[Target] = []
     queue_targets: list[Target] = []
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        if (
+            self.secrets_file
+            and (secrets_file_path := pathlib.Path(self.secrets_file)).exists()
+        ):
+            # Read and parse the secrets file
+            self.secrets = json.loads(secrets_file_path.read_text())
 
     @property
     def is_same_org(self):
@@ -146,6 +160,9 @@ class ReleaseFile(BaseModel):
                     source_dir_path=self.source_dir_path,
                     token_owner_id=self.token_owner_id,
                     plan_only=self.plan_only,
+                    secrets=self.secrets.get(
+                        templatize_name_id(hook_release.name, hook_release.id), {}
+                    ),
                     is_same_org_deploy=self.is_same_org,
                     hook_template_url=self.hook_templates.get(hook_release.id, None),
                     last_deploy_timestamp=self.last_deployed_at,

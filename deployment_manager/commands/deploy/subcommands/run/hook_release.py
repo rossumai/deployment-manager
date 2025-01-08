@@ -25,11 +25,13 @@ class HookRelease(ObjectRelease):
     type: Resource = Resource.Hook
     token_owner_id: int = None
     hook_template_url: str = None
+    secrets: dict = {}
 
-    async def initialize(self, hook_template_url, token_owner_id, **kwargs):
+    async def initialize(self, hook_template_url, token_owner_id, secrets, **kwargs):
         try:
             await super().initialize(**kwargs)
             self.token_owner_id = token_owner_id
+            self.secrets = secrets
             if not self.hook_template_url:
                 self.hook_template_url = hook_template_url
             await self.update_hook_code()
@@ -50,6 +52,7 @@ class HookRelease(ObjectRelease):
                 hook_copy = deepcopy(self.data)
                 hook_copy["run_after"] = []
                 hook_copy["queues"] = []
+                hook_copy["secrets"] = self.secrets
 
                 # Change token owner to TARGET user (important for cross-org migrations)
                 if not self.is_same_org_deploy:

@@ -30,7 +30,7 @@ async def init_project(name: Path):
     subprocess.run(["git", "init", name])
 
     git_ignore_path = name / ".gitignore"
-    credentials_ignore_lines = ["\n**/credentials.json", "\n**/credentials.yaml"]
+    credentials_ignore_lines = ["\n**/credentials.json", f"\n**/{settings.CREDENTIALS_FILENAME}", f"\n**/{settings.DEFAULT_DEPLOY_SECRETS_PARENT}/"]
 
     git_ignore_contents = (
         await git_ignore_path.read_text() if await git_ignore_path.exists() else ""
