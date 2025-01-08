@@ -1,6 +1,8 @@
 import os
+import shutil
 from typing import Any
 from anyio import Path
+import anyio
 import questionary
 from rossum_api.api_client import Resource
 
@@ -58,18 +60,47 @@ async def should_write_object(path: Path, remote_object: Any, changed_files: lis
         return True
 
 
-def delete_empty_folders(root: Path):
+async def delete_empty_folders(root: Path):
     deleted = set()
 
-    for current_dir, subdirs, files in os.walk(root, topdown=False):
-        still_has_subdirs = False
-        for subdir in subdirs:
-            if os.path.join(current_dir, subdir) not in deleted:
-                still_has_subdirs = True
-                break
+    # Walk through the directories in reverse (bottom-up)
+    async for current_dir in root.rglob("*"):
+        current_dir = Path(current_dir)
 
-        if not any(files) and not still_has_subdirs:
-            os.rmdir(current_dir)
-            deleted.add(current_dir)
+        if await current_dir.is_dir():
+            # Check if the directory has subdirectories or files
+            subdirs = [
+                subdir
+                async for subdir in current_dir.iterdir()
+                if await subdir.is_dir()
+            ]
+            files = [
+                file async for file in current_dir.iterdir() if await file.is_file()
+            ]
+
+            # If no files or valid subdirectories, delete the directory
+            if not files and not subdirs:
+                shutil.rmtree(current_dir)
+                deleted.add(current_dir)
 
     return deleted
+
+
+async def delete_orphaned_formulas(ws_root: Path):
+    # Iterate over workspaces in the root path
+    async for ws_path in ws_root.iterdir():
+        if not await ws_path.is_dir():
+            continue
+        queues_path = ws_path / "queues"
+        if not await queues_path.exists():
+            continue
+
+        async for queue_path in queues_path.iterdir():
+            if not await queue_path.is_dir():
+                continue
+
+            contents = [item async for item in queue_path.iterdir()]
+
+            # If the directory only contains a 'formula' folder, delete it
+            if len(contents) == 1 and contents[0].name == "formulas":
+                shutil.rmtree(queue_path)

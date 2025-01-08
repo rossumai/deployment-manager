@@ -15,6 +15,7 @@ from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
 from deployment_manager.commands.download.downloader import Downloader
 from deployment_manager.commands.download.helpers import (
     delete_empty_folders,
+    delete_orphaned_formulas,
     replace_code_paths,
     should_write_object,
 )
@@ -223,7 +224,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
         )
 
         await self.remove_stale_objects()
-        self.remove_empty_ws_queue_dirs()
+        await self.remove_empty_queue_dirs()
 
         pprint(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME} for {self.name}."))
 
@@ -278,12 +279,13 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                     )
                     os.remove(object_path)
 
-    def remove_empty_ws_queue_dirs(self):
+    async def remove_empty_queue_dirs(self):
         for subdir in self.subdirectories.values():
             if not subdir.include:
                 continue
             subdir_ws_path = self.project_path / self.name / subdir.name / "workspaces"
-            delete_empty_folders(subdir_ws_path)
+            await delete_orphaned_formulas(subdir_ws_path)
+            await delete_empty_folders(subdir_ws_path)
 
     async def should_remove_object(self, object_path: Path, subdir: Subdirectory):
         try:
