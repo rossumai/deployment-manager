@@ -1,3 +1,4 @@
+import questionary
 from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
 from deployment_manager.commands.deploy.common.helpers import (
     get_api_url_from_config,
@@ -13,10 +14,12 @@ from deployment_manager.commands.deploy.subcommands.template.helpers import (
     get_multi_targets_from_user,
     get_queues_from_user,
     get_dir_and_subdir_from_user,
+    get_secrets_from_user,
     get_token_owner_from_user,
     get_workspaces_from_user,
 )
 from deployment_manager.common.mapping import read_mapping
+from deployment_manager.common.read_write import read_json, write_json
 from deployment_manager.utils.consts import display_error, display_info, settings
 
 from rich import print as pprint
@@ -25,19 +28,19 @@ from rossum_api import ElisAPIClient
 
 
 async def create_deploy_template(
-    input_file: Path = None,
-    mapping_file: Path = None,
+    input_file_path: Path = None,
+    mapping_file_path: Path = None,
     org_path: Path = None,
     interactive: bool = False,
     source_client: ElisAPIClient = None,
     target_client: ElisAPIClient = None,
 ):
-    if not input_file:
+    if not input_file_path:
         input_file_content = create_deploy_file_template()
         # Without an initial input file, the user must always do the selections himself
         interactive = True
     else:
-        input_file_content = await input_file.read_text()
+        input_file_content = await input_file_path.read_text()
 
     yaml = DeployYaml(file=input_file_content)
     deploy_file_object = yaml.data
@@ -152,6 +155,14 @@ async def create_deploy_template(
         for override in overrides:
             add_override_to_deploy_file_objects(override, deploy_file_object)
 
+    # Mapping reuse
+    if mapping_file_path and await mapping_file_path.exists():
+        try:
+            mapping = await read_mapping(mapping_path=mapping_file_path)
+            add_targets_from_mapping(mapping=mapping, deploy_file=yaml.data)
+        except Exception as e:
+            display_error(f"Error while applying mapping ^", e)
+
     # Filename
     if interactive:
         source_subdir_name = source_dir_and_subdir.split("/")[1]
@@ -160,27 +171,54 @@ async def create_deploy_template(
         deploy_filepath = await get_filepath_from_user(
             org_path,
             default=(
-                str(input_file)
-                if input_file
-                else settings.DEFAULT_DEPLOY_PARENT + default_deploy_name
+                str(input_file_path)
+                if input_file_path
+                else settings.DEFAULT_DEPLOY_PARENT + "/" + default_deploy_name
             ),
         )
     else:
-        deploy_filepath = input_file
+        deploy_filepath = input_file_path
 
-    # Mapping reuse
-    if mapping_file and await mapping_file.exists():
-        try:
-            mapping = await read_mapping(mapping_path=mapping_file)
-            add_targets_from_mapping(mapping=mapping, deploy_file=yaml.data)
-        except Exception as e:
-            display_error(f"Error while applying mapping ^", e)
+    # Deploy secrets
+    secrets_file_path = deploy_file_object.get(settings.DEPLOY_KEY_SECRETS_PATH, None)
+    if (
+        secrets_file_path
+        and await (secrets_file_path := Path(secrets_file_path)).exists()
+    ):
+        previous_secrets_file = await read_json(secrets_file_path)
+    else:
+        secrets_file_path = None
+        previous_secrets_file = {}
+    if (
+        interactive
+        and await questionary.confirm(
+            f"Do you wish to {'update' if secrets_file_path else 'create'} secrets file?"
+        ).ask_async()
+    ):
+        secrets = await get_secrets_from_user(
+            deploy_file_object,
+            previous_secrets_file=(previous_secrets_file),
+        )
+        if not secrets_file_path:
+            secrets_file_path = await get_filepath_from_user(
+                org_path,
+                default=(
+                    settings.DEFAULT_DEPLOY_SECRETS_PARENT
+                    + "/"
+                    + f"{deploy_filepath.stem}_secrets.json"
+                ),
+            )
+
+        await write_json(secrets_file_path, secrets)
+
+    deploy_file_object[settings.DEPLOY_KEY_SECRETS_PATH] = str(secrets_file_path)
 
     await yaml.save_to_file(deploy_filepath)
 
     display_info(
         f"Deploy file saved to [green]{deploy_filepath}[/green]. Use it by running:"
     )
+
     pprint(
         f"\n  {settings.NEW_COMMAND_NAME} {settings.DEPLOY_COMMAND_NAME} {settings.DEPLOY_RUN_COMMAND_NAME} {deploy_filepath}\n"
     )

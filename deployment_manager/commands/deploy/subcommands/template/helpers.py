@@ -518,6 +518,35 @@ async def get_attribute_overrides_from_user():
     return overrides
 
 
+async def get_secrets_from_user(deploy_file_object: dict, previous_secrets_file: dict):
+    hooks = deploy_file_object.get(settings.DEPLOY_KEY_HOOKS, [])
+    object_choices = [
+        questionary.Choice(
+            title=f"{hook.get('name', 'no-name')} ({hook.get('id', 'no-id')})",
+            value=hook,
+            checked=templatize_name_id(
+                hook.get("name", "no-name"), hook.get("id", "no-id")
+            )
+            in previous_secrets_file.keys(),
+        )
+        for hook in hooks
+    ]
+    selected_hooks = await questionary.checkbox(
+        "Select hooks for secrets:", choices=object_choices
+    ).ask_async()
+
+    secrets = {}
+
+    for selected_hook in selected_hooks:
+        key = templatize_name_id(
+            selected_hook.get("name", "no-name"), selected_hook.get("id", "no-id")
+        )
+        # Preserve previous secrets and create empty dicts for new entries
+        secrets[key] = {**previous_secrets_file.get(key, {})}
+
+    return secrets
+
+
 def add_override_to_deploy_file_objects(
     override: AttributeOverride, root_deploy_file_object: dict
 ):

@@ -50,6 +50,7 @@ async def init_deploy_template_wrapper():
 )
 @click.option(
     "--mapping-file",
+    "-mf",
     help="PRD v1 mapping for reusing IDs and attribute overrides",
     type=click.Path(path_type=Path, exists=True),
 )
@@ -62,10 +63,14 @@ async def init_deploy_template_wrapper():
 )
 @coro
 async def create_deploy_template_wrapper(
-    deploy_file: Path = None, mapping_file: Path = None, interactive: bool = False
+    deploy_file: Path = None,
+    mapping_file: Path = None,
+    interactive: bool = False,
 ):
     await create_deploy_template(
-        input_file=deploy_file, mapping_file=mapping_file, interactive=interactive
+        input_file_path=deploy_file,
+        mapping_file_path=mapping_file,
+        interactive=interactive,
     )
 
 

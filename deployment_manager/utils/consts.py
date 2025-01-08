@@ -210,6 +210,8 @@ class Settings:
     DEPLOY_OVERRIDE_REGEX_SEPARATOR = "/#/"
     DEPLOY_DEFAULT_TARGET_URL = "https://my-org.rossum.app/api/v1"
     DEFAULT_DEPLOY_PARENT = "deploy_files"
+    DEFAULT_DEPLOY_SECRETS_PARENT = "deploy_secrets"
+    DEPLOY_KEY_SECRETS_PATH = "secrets_file"
     DEPLOY_KEY_TARGETS = "targets"
     DEPLOY_KEY_OVERRIDES = "attribute_override"
     DEPLOY_KEY_DEPLOYED_ORG_ID = "deployed_org_id"
