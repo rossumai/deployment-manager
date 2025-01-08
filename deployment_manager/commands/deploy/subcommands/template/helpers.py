@@ -219,7 +219,6 @@ def prepare_subqueue_deploy_file_object(
 ):
     deploy_representation = {
         "id": object["id"],
-        "name": object["name"],
         settings.DEPLOY_KEY_TARGETS: previous_object.get(
             settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)
         ),
