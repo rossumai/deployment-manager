@@ -8,6 +8,7 @@ from rossum_api.api_client import Resource
 
 from deployment_manager.common.determine_path import (
     determine_object_type_from_path,
+    determine_object_type_from_url,
 )
 from deployment_manager.common.read_write import (
     read_json,
@@ -34,18 +35,20 @@ async def should_write_object(path: Path, remote_object: Any, changed_files: lis
     if await path.exists():
         local_file = await read_json(path)
 
-        object_type = (
-            determine_object_type_from_path(path)
-            if "organization" not in str(path)
-            else ""
-        )
-        # Queues are always pulled - their hooks/webhooks attribute might have changed.
+        object_type = determine_object_type_from_url(local_file.get("url", ""))
+        # Queues might have their hooks attribute changed. Same for schema.rules
         # This does not update the timestamp in the DB because this change is only done on hooks entities.
-        if (local_timestamp := local_file.get("modified_at", "")) != (
-            remote_timestamp := remote_object.get("modified_at", "")
-        ) or (
-            object_type == Resource.Queue
-            and local_file.get("hooks", []) != remote_object.get("hooks", [])
+        if (
+            (local_timestamp := local_file.get("modified_at", ""))
+            != (remote_timestamp := remote_object.get("modified_at", ""))
+            or (
+                object_type == Resource.Queue
+                and local_file.get("hooks", []) != remote_object.get("hooks", [])
+            )
+            or (
+                object_type == Resource.Schema
+                and local_file.get("rules", []) != remote_object.get("rules", [])
+            )
         ):
             if path in changed_files:
                 display_warning(
