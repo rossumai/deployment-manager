@@ -180,6 +180,7 @@ class Settings:
 
     IGNORED_KEYS: dict = {
         Resource.Queue: ["counts", "users", "workflows"],
+        Resource.Schema: ["rules"],
         Resource.Hook: ["status"],
     }
 

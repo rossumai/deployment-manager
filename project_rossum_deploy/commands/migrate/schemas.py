@@ -59,6 +59,8 @@ async def migrate_schemas(
 
             schema["queues"] = []
 
+            schema.pop("rules", None)
+
             schema_mapping = find_mapping_of_object(
                 mapping["organization"]["schemas"], id
             )
