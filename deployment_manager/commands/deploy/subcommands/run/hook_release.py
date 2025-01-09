@@ -52,7 +52,8 @@ class HookRelease(ObjectRelease):
                 hook_copy = deepcopy(self.data)
                 hook_copy["run_after"] = []
                 hook_copy["queues"] = []
-                hook_copy["secrets"] = self.secrets
+                if self.secrets:
+                    hook_copy["secrets"] = self.secrets
 
                 # Change token owner to TARGET user (important for cross-org migrations)
                 if not self.is_same_org_deploy:
