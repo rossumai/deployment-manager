@@ -167,7 +167,7 @@ async def create_deploy_template(
     if interactive:
         source_subdir_name = source_dir_and_subdir.split("/")[1]
         target_subdir_name = target_dir_and_subdir.split("/")
-        default_deploy_name = f"/{source_subdir_name}_{target_subdir_name[1] if len(target_subdir_name) > 1 else "NA"}.yaml"
+        default_deploy_name = f"{source_subdir_name}_{target_subdir_name[1] if len(target_subdir_name) > 1 else "NA"}.yaml"
         deploy_filepath = await get_filepath_from_user(
             org_path,
             default=(

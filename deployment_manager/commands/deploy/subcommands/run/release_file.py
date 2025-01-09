@@ -6,7 +6,10 @@ import pathlib
 from rich import print as pprint
 from rich.panel import Panel
 import questionary
-from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
+from deployment_manager.commands.deploy.subcommands.run.helpers import (
+    DeployYaml,
+    generate_deploy_timestamp,
+)
 from deployment_manager.commands.deploy.subcommands.run.hook_release import (
     HookRelease,
 )
@@ -128,7 +131,12 @@ class ReleaseFile(BaseModel):
             plan_only=self.plan_only,
             client=self.client,
             source_client=self.source_client,
-            last_deploy_timestamp=self.last_deployed_at,
+            # When running initial deploy, there is no timestamp to check
+            last_deploy_timestamp=(
+                self.last_deployed_at
+                if self.last_deployed_at
+                else generate_deploy_timestamp()
+            ),
             ignore_timestamp_mismatch=self.force_deploy
             or self.ignore_timestamp_mismatches.get(self.source_org.id, False),
         )
@@ -261,6 +269,11 @@ class ReleaseFile(BaseModel):
         if self.plan_only:
             for queue_release in self.queues:
                 await queue_release.deploy()
+
+                if queue_release.ignore_all_deploy_warnings:
+                    for queue_release in self.queues:
+                        queue_release.ignore_deploy_warnings = True
+
                 self.queue_ignore_warnings[queue_release.id] = (
                     queue_release.ignore_deploy_warnings
                 )

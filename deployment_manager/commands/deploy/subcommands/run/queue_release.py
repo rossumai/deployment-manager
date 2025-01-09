@@ -6,7 +6,9 @@ from anyio import Path
 from pydantic import Field
 import questionary
 from rossum_api import APIClientError
-from deployment_manager.commands.deploy.subcommands.run.helpers import remove_queue_attributes_for_cross_org
+from deployment_manager.commands.deploy.subcommands.run.helpers import (
+    remove_queue_attributes_for_cross_org,
+)
 from deployment_manager.commands.deploy.subcommands.run.inbox_release import (
     InboxRelease,
 )
@@ -39,6 +41,8 @@ class SubObjectException(Exception): ...
 class QueueRelease(ObjectRelease):
     type: Resource = Resource.Queue
     keep_hook_dependencies_without_equivalent: bool = False
+
+    ignore_all_deploy_warnings: bool = False
     ignore_deploy_warnings: bool = False
 
     schema_ignore_timestamp_mismatch: bool = False
@@ -246,9 +250,7 @@ class QueueRelease(ObjectRelease):
             display_warning(
                 f"{self.display_type} {self.display_label} has 'workflows' defined. Please make sure to create and assign them manually for the target."
             )
-            return await questionary.confirm(
-                "Do you want to disable warnings like this for this queue?",
-            ).ask_async()
+            return await self.prompt_user_about_warnings()
 
     async def evaluate_engine_warning(self):
         for attr in QUEUE_ENGINE_ATTRIBUTES:
@@ -259,9 +261,21 @@ class QueueRelease(ObjectRelease):
                 display_warning(
                     f"{self.display_type} {self.display_label} has '{attr}' defined. Please make sure to create and assign it manually for the target."
                 )
-                return await questionary.confirm(
-                    "Do you want to disable warnings like this for this queue?",
-                ).ask_async()
+                return await self.prompt_user_about_warnings()
+
+    async def prompt_user_about_warnings(
+        self, message="Do you want to disable warnings like this for this queue?"
+    ):
+        user_answer = await questionary.text(
+            message=message,
+            instruction="(y/n/yy)",
+        ).ask_async()
+        # Disable warnings for all other queues
+        if user_answer.casefold() == "yy":
+            self.ignore_all_deploy_warnings = True
+            return True
+
+        return user_answer == "y"
 
     async def check_source_object(self):
         try:
