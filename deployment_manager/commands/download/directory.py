@@ -24,11 +24,17 @@ from deployment_manager.commands.download.subdirectory import (
     Subdirectory,
 )
 from deployment_manager.common.determine_path import determine_object_type_from_url
-from deployment_manager.utils.consts import display_error, display_warning, settings
+from deployment_manager.utils.consts import (
+    CustomResource,
+    display_error,
+    display_warning,
+    settings,
+)
 from deployment_manager.commands.download.saver import (
     HookSaver,
     InboxSaver,
     QueueSaver,
+    RuleSaver,
     SchemaSaver,
     WorkspaceSaver,
 )
@@ -101,6 +107,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
     queue_saver: QueueSaver = None
     inbox_saver: InboxSaver = None
     schema_saver: SchemaSaver = None
+    rule_saver: RuleSaver = None
     hook_saver: HookSaver = None
 
     async def initialize(self):
@@ -137,6 +144,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 queues_for_mapping,
                 inboxes_for_mapping,
                 schemas_for_mapping,
+                rules_for_mapping,
                 hooks_for_mapping,
             ) = await asyncio.gather(
                 *[
@@ -144,6 +152,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                     downloader.download_remote_objects(type=Resource.Queue),
                     downloader.download_remote_objects(type=Resource.Inbox),
                     downloader.download_remote_objects(type=Resource.Schema),
+                    downloader.download_remote_objects(CustomResource.Rule),
                     downloader.download_remote_objects(type=Resource.Hook),
                 ]
             )
@@ -202,6 +211,18 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             )
             await self.schema_saver.save_downloaded_objects()
 
+            self.rule_saver = RuleSaver(
+                base_path=self.project_path / self.name,
+                objects=rules_for_mapping,
+                schemas=schemas_for_mapping,
+                workspaces=workspaces_for_mapping,
+                queues=queues_for_mapping,
+                changed_files=self.changed_files,
+                download_all=self.download_all,
+                subdirs=subdir_list,
+            )
+            await self.rule_saver.save_downloaded_objects()
+
             self.hook_saver = HookSaver(
                 base_path=self.project_path / self.name,
                 objects=hooks_for_mapping,
@@ -219,6 +240,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 *queues_for_mapping,
                 *inboxes_for_mapping,
                 *schemas_for_mapping,
+                *rules_for_mapping,
                 *hooks_for_mapping,
             ]
         )
@@ -329,6 +351,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 remote_path = self.schema_saver.construct_object_path(
                     subdir, remote_object
                 )
+            case CustomResource.Rule:
+                remote_path = self.rule_saver.construct_object_path(
+                    subdir, remote_object
+                )
             case Resource.Inbox:
                 remote_path = self.inbox_saver.construct_object_path(
                     subdir, remote_object
@@ -341,6 +367,11 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 remote_path = self.workspace_saver.construct_object_path(
                     subdir, remote_object
                 )
+            case _:
+                display_warning(
+                    f"Cannot determine if object of type {object_type} should be deleted - unsupported type"
+                )
+                return False
 
         # The names are lowercased because some OS's (mainly MacOS) are case-insensitive in their paths
         return str(remote_path).casefold() != str(local_path).casefold()

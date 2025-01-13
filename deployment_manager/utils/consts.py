@@ -1,4 +1,4 @@
-from enum import StrEnum
+from enum import Enum, StrEnum
 import json
 import logging
 from pathlib import Path
@@ -244,6 +244,7 @@ class Settings:
     }
 
     FORMULA_DIR_NAME: str = "formulas"
+    RULES_DIR_NAME: str = "rules"
 
     @property
     def SOURCE_API_URL(self):
@@ -291,3 +292,7 @@ def initialize_settings():
 
 
 initialize_settings()
+
+
+class CustomResource(Enum):
+    Rule = "rules"

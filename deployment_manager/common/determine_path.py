@@ -1,5 +1,8 @@
+import resource
 from anyio import Path
 from rossum_api.api_client import Resource
+
+from deployment_manager.utils.consts import CustomResource
 
 
 def determine_object_type_from_path(path: Path) -> Resource:
@@ -20,8 +23,9 @@ def determine_object_type_from_path(path: Path) -> Resource:
 def determine_object_type_from_url(url: str) -> Resource:
     split_path = url.split("/")
     type = split_path[-2]
-    allowed_types = set(resource.value for resource in Resource)
-    if type in allowed_types:
+    if type in set(resource.value for resource in Resource):
         return Resource(type)
+    elif type in set(resource.value for resource in CustomResource):
+        return CustomResource(type)
     else:
         raise Exception(f'Unknown resource "{type}".')
