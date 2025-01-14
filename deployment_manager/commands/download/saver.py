@@ -198,6 +198,60 @@ class QueueSaver(Saver):
         return None
 
 
+class EmailTemplateSaver(QueueSaver):
+    type: Resource = Resource.EmailTemplate
+    queues: list[dict]
+
+    def find_parent_object(self, child):
+        return self.find_queue(child)
+
+    def find_queue(self, email_template: dict):
+        for queue in self.queues:
+            if queue["url"] == email_template.get("queue", None):
+                return queue
+        display_warning(
+            f"Could not find queue for {self.display_type} {self.display_label(email_template.get('name', 'no-name'), email_template.get('id', 'no-id'))}. The object will not be saved locally."
+        )
+        return None
+
+    def construct_object_path(self, subdir: Subdirectory, email_template: dict) -> Path:
+        queue_for_schema = self.find_queue(email_template)
+        if not queue_for_schema:
+            return
+        workspace_for_queue = self.find_workspace_for_queue(queue_for_schema)
+        if not workspace_for_queue:
+            return
+
+        object_path = (
+            self.base_path
+            / subdir.name
+            / "workspaces"
+            / templatize_name_id(workspace_for_queue["name"], workspace_for_queue["id"])
+            / "queues"
+            / templatize_name_id(queue_for_schema["name"], queue_for_schema["id"])
+            / Settings.EMAIL_TEMPLATES_DIR_NAME
+            / f'{templatize_name_id(email_template["name"], email_template["id"])}.json'
+        )
+        return object_path
+
+    async def save_downloaded_object(self, email_template: dict, subdir: Subdirectory):
+        if not email_template.get("queue", None):
+            return
+
+        object_path = self.construct_object_path(subdir=subdir, email_template=email_template)
+        if not object_path:
+            return
+        if self.download_all or await should_write_object(
+            object_path, email_template, self.changed_files
+        ):
+            await write_json(
+                object_path,
+                email_template,
+                self.type,
+                log_message=f"Pulled {self.display_type} {object_path}",
+            )
+
+
 class InboxSaver(QueueSaver):
     type: Resource = Resource.Inbox
     queues: list[dict]

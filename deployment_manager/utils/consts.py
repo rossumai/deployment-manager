@@ -246,6 +246,7 @@ class Settings:
 
     FORMULA_DIR_NAME: str = "formulas"
     RULES_DIR_NAME: str = "rules"
+    EMAIL_TEMPLATES_DIR_NAME: str = "email_templates"
 
     @property
     def SOURCE_API_URL(self):

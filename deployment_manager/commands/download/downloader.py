@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 
+from deployment_manager.utils.consts import CustomResource
+
 
 class Downloader(BaseModel):
     class Config:
@@ -10,7 +12,7 @@ class Downloader(BaseModel):
 
     client: ElisAPIClient
 
-    async def download_remote_objects(self, type: Resource):
+    async def download_remote_objects(self, type: Resource | CustomResource):
         paginated_object_ids = await self.download_remote_object_ids(type=type)
 
         # Refetch in case the paginated fields don't include everything

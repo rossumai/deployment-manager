@@ -12,6 +12,7 @@ from deployment_manager.commands.deploy.subcommands.run.helpers import get_token
 from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
     Credentials,
 )
+from deployment_manager.commands.download import email_templates
 from deployment_manager.commands.download.downloader import Downloader
 from deployment_manager.commands.download.helpers import (
     delete_empty_folders,
@@ -31,6 +32,7 @@ from deployment_manager.utils.consts import (
     settings,
 )
 from deployment_manager.commands.download.saver import (
+    EmailTemplateSaver,
     HookSaver,
     InboxSaver,
     QueueSaver,
@@ -105,6 +107,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
 
     workspace_saver: WorkspaceSaver = None
     queue_saver: QueueSaver = None
+    email_template_saver: EmailTemplateSaver = None
     inbox_saver: InboxSaver = None
     schema_saver: SchemaSaver = None
     rule_saver: RuleSaver = None
@@ -142,6 +145,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             (
                 workspaces_for_mapping,
                 queues_for_mapping,
+                email_templates_for_mapping,
                 inboxes_for_mapping,
                 schemas_for_mapping,
                 rules_for_mapping,
@@ -150,9 +154,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 *[
                     downloader.download_remote_objects(type=Resource.Workspace),
                     downloader.download_remote_objects(type=Resource.Queue),
+                    downloader.download_remote_objects(type=Resource.EmailTemplate),
                     downloader.download_remote_objects(type=Resource.Inbox),
                     downloader.download_remote_objects(type=Resource.Schema),
-                    downloader.download_remote_objects(CustomResource.Rule),
+                    downloader.download_remote_objects(type=CustomResource.Rule),
                     downloader.download_remote_objects(type=Resource.Hook),
                 ]
             )
@@ -187,6 +192,17 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 subdirs=subdir_list,
             )
             await self.queue_saver.save_downloaded_objects()
+
+            self.email_template_saver = EmailTemplateSaver(
+                base_path=self.project_path / self.name,
+                objects=email_templates_for_mapping,
+                workspaces=workspaces_for_mapping,
+                queues=queues_for_mapping,
+                changed_files=self.changed_files,
+                download_all=self.download_all,
+                subdirs=subdir_list,
+            )
+            await self.email_template_saver.save_downloaded_objects()
 
             # TODO: test inbox without any queue
             self.inbox_saver = InboxSaver(
@@ -231,24 +247,25 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 subdirs=subdir_list,
             )
             await self.hook_saver.save_downloaded_objects()
+
+            self.id_object_map = self.create_id_object_map(
+                [
+                    *workspaces_for_mapping,
+                    *queues_for_mapping,
+                    *email_templates_for_mapping,
+                    *inboxes_for_mapping,
+                    *schemas_for_mapping,
+                    *rules_for_mapping,
+                    *hooks_for_mapping,
+                ]
+            )
+
+            await self.remove_stale_objects()
+            await self.remove_empty_queue_dirs()
+
+            pprint(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME} for {self.name}."))
         except Exception as e:
-            display_error("Error while saving objects ^", e)
-
-        self.id_object_map = self.create_id_object_map(
-            [
-                *workspaces_for_mapping,
-                *queues_for_mapping,
-                *inboxes_for_mapping,
-                *schemas_for_mapping,
-                *rules_for_mapping,
-                *hooks_for_mapping,
-            ]
-        )
-
-        await self.remove_stale_objects()
-        await self.remove_empty_queue_dirs()
-
-        pprint(Panel(f"Finished {settings.DOWNLOAD_COMMAND_NAME} for {self.name}."))
+            display_error("Error while saving downloaded objects ^", e)
 
     async def download_and_save_organization_object(self):
         try:
@@ -361,6 +378,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 )
             case Resource.Queue:
                 remote_path = self.queue_saver.construct_object_path(
+                    subdir, remote_object
+                )
+            case Resource.EmailTemplate:
+                remote_path = self.email_template_saver.construct_object_path(
                     subdir, remote_object
                 )
             case Resource.Workspace:
