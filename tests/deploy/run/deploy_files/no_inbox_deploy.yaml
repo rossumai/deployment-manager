@@ -24,7 +24,11 @@ deployed_org_id: 255590
 # Update attributes of target organization with those from source organization
 patch_target_org: true
 
-workspaces: []
+workspaces:
+  - id: 521887
+    name: WS1 DEV
+    targets:
+      - id:
 
 queues:
   - id: 1530833

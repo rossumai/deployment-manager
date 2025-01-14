@@ -51,10 +51,13 @@ class InboxRelease(ObjectRelease):
         inbox_copy = deepcopy(self.data)
         override_copy = deepcopy(target.attribute_override)
 
-        # Use the target queue's name for the schema unless user specified explicit schema.name override
-        parent_name_override = target_queue.attribute_override.get("name", None)
-        if parent_name_override and "name" not in override_copy:
-            override_copy["name"] = parent_name_override
+        if "name" not in override_copy:
+            # Use the target queue's name for the schema unless user specified explicit schema.name override
+            parent_name_override = target_queue.attribute_override.get("name", None)
+            if parent_name_override:
+                override_copy["name"] = parent_name_override
+            else:
+                inbox_copy["name"] = self.name
 
         # Should either create a new one or it is already present
         inbox_copy.pop("email", None)

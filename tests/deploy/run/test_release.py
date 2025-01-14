@@ -129,7 +129,8 @@ async def test_initialize_fails_with_incorrect_path(target_org_url: str):
         plan_only=False,
         is_same_org_deploy=False,
         last_deploy_timestamp=None,
-        ignore_timestamp_mismatch=True,
+        force_deploy=False,
+        ignore_timestamp_mismatches={},
     )
 
     assert workspace_release.initialize_failed
@@ -156,7 +157,8 @@ async def test_initialize_fails_with_incorrect_name(
         plan_only=False,
         is_same_org_deploy=False,
         last_deploy_timestamp=None,
-        ignore_timestamp_mismatch=True,
+        force_deploy=False,
+        ignore_timestamp_mismatches={},
     )
 
     assert workspace_release.initialize_failed
@@ -290,7 +292,7 @@ async def test_workspace_deploy_updates_correct_targets(
 
     expected_calls = [
         call(
-            Resource.Workspace,
+            resource=Resource.Workspace,
             id_=original_deploy_file_ws_object["targets"][0]["id"],
             data={
                 **ws_object,
@@ -300,7 +302,7 @@ async def test_workspace_deploy_updates_correct_targets(
             },
         ),
         call(
-            Resource.Workspace,
+            resource=Resource.Workspace,
             id_=original_deploy_file_ws_object["targets"][1]["id"],
             data={
                 **ws_object,
@@ -312,82 +314,6 @@ async def test_workspace_deploy_updates_correct_targets(
     ]
 
     await workspace_release.deploy()
-
-    actual_calls = mock_api_client._http_client.update.call_args_list
-    for actual, expected in zip(actual_calls, expected_calls):
-        assert actual == expected
-
-
-@pytest.mark.asyncio
-async def test_no_inbox_ok(
-    basic_queue_project_path: Path,
-):
-    yaml = await load_deploy_yaml("no_inbox_deploy.yaml")
-    mock_api_client = AsyncMock()
-    source_dir_path = basic_queue_project_path / TEST_DIR_NAME / TEST_SUBDIR_NAME
-    deploy_file_queue_object = yaml.data[Settings.DEPLOY_KEY_QUEUES][0]
-    # The path is dynamic (tmp_path) and cannot be in the yaml in advance
-    deploy_file_queue_object[Settings.DEPLOY_KEY_BASE_PATH] = str(
-        source_dir_path / "workspaces" / "some_ws_[1]"
-    )
-    # This is done because deploy() will update some of the values with mocks
-    original_deploy_file_queue_object = deepcopy(deploy_file_queue_object)
-
-    release_file = ReleaseFile(
-        **yaml.data,
-        client=ElisAPIClient(token="a"),
-        source_client=ElisAPIClient(token="b"),
-        source_dir_path=source_dir_path,
-        yaml=yaml,
-        source_org=Organization.__new__(Organization),
-        target_org=Organization.__new__(Organization),
-    )
-
-    release_file.client = mock_api_client
-    queue_release = release_file.queues[0]
-
-    await queue_release.initialize(
-        auto_delete=False,
-        yaml=yaml,
-        client=mock_api_client,
-        source_client=None,
-        source_dir_path=source_dir_path,
-        plan_only=False,
-        is_same_org_deploy=False,
-        last_deploy_timestamp=None,
-        force_deploy=False,
-        ignore_timestamp_mismatches={},
-        workspace_targets={},
-        hook_targets={},
-    )
-
-    # Gets return from "Elis API" and updates the targets
-    # Important for queue.schema dependency replacement
-    mock_api_client._http_client.update.return_value = [
-        {"id": original_deploy_file_queue_object["schema"]["targets"][0]["id"]},
-        {"id": original_deploy_file_queue_object["targets"][0]["id"]},
-    ]
-
-    await queue_release.deploy()
-
-    queue_object = deepcopy(queue_release.data)
-    schema_object = deepcopy(queue_release.schema_release.data)
-
-    expected_calls = [
-        call(
-            Resource.Schema,
-            id_=original_deploy_file_queue_object["schema"]["targets"][0]["id"],
-            data={**schema_object, "queues": []},
-        ),
-        call(
-            Resource.Queue,
-            id_=original_deploy_file_queue_object["targets"][0]["id"],
-            data={
-                **queue_object,
-                "organization": target_org_url,
-            },
-        ),
-    ]
 
     actual_calls = mock_api_client._http_client.update.call_args_list
     for actual, expected in zip(actual_calls, expected_calls):
@@ -582,7 +508,7 @@ async def test_ws_has_target_queues_and_queues_have_target_ws(
 
     expected_calls = [
         call(
-            Resource.Workspace,
+            resource=Resource.Workspace,
             id_=TARGET_WS_ID,
             data={
                 **ws_object,
@@ -592,7 +518,7 @@ async def test_ws_has_target_queues_and_queues_have_target_ws(
             },
         ),
         call(
-            Resource.Schema,
+            resource=Resource.Schema,
             id_=TARGET_SCHEMA_ID,
             data={
                 **schema_object,

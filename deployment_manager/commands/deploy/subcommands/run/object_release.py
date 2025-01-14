@@ -269,7 +269,7 @@ class ObjectRelease(BaseModel):
                         )
             else:
                 result = await self.client._http_client.update(
-                    self.type, id_=target.id, data=target_object
+                    resource=self.type, id_=target.id, data=target_object
                 )
                 # Important for the ID override phase (deploy file still the old one and the remote just got updated)
                 self.last_deploy_timestamp = result.get(

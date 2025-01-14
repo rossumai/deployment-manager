@@ -56,10 +56,13 @@ class SchemaRelease(ObjectRelease):
         schema_copy = deepcopy(self.data)
         override_copy = deepcopy(target.attribute_override)
 
-        # Use the target queue's name for the schema unless user specified explicit schema.name override
-        parent_name_override = target_queue.attribute_override.get("name", None)
-        if parent_name_override and "name" not in override_copy:
-            override_copy["name"] = parent_name_override
+        if "name" not in override_copy:
+            # Use the target queue's name for the schema unless user specified explicit schema.name override
+            parent_name_override = target_queue.attribute_override.get("name", None)
+            if parent_name_override:
+                override_copy["name"] = parent_name_override
+            else:
+                schema_copy["name"] = self.name
 
         schema_copy["rules"] = []
         schema_copy["queues"] = []
