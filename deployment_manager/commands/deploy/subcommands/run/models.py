@@ -23,3 +23,6 @@ def convert_int_id_to_class(model, val):
 TargetWithDefault = Annotated[
     Target, BeforeValidator(lambda x: convert_int_id_to_class(Target, x))
 ]
+
+
+class SubObjectException(Exception): ...

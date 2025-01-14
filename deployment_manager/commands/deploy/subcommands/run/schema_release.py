@@ -1,9 +1,12 @@
 from anyio import Path
+from pydantic import Field
+from deployment_manager.commands.deploy.subcommands.run.models import SubObjectException
 from deployment_manager.commands.deploy.subcommands.run.object_release import (
     ObjectRelease,
     PathNotFoundException,
     Target,
 )
+from deployment_manager.commands.deploy.subcommands.run.rule_release import RuleRelease
 from deployment_manager.common.read_write import read_formula_file
 from deployment_manager.common.schema import find_schema_id
 from deployment_manager.utils.consts import display_error, settings
@@ -21,6 +24,7 @@ from deployment_manager.utils.functions import templatize_name_id
 class SchemaRelease(ObjectRelease):
     type: Resource = Resource.Schema
     name: str = ""
+    rule_releases: list[RuleRelease] = Field(default_factory=lambda: [], alias="rules")
 
     parent_queue: ObjectRelease = None
 
@@ -57,6 +61,7 @@ class SchemaRelease(ObjectRelease):
         if parent_name_override and "name" not in override_copy:
             override_copy["name"] = parent_name_override
 
+        schema_copy["rules"] = []
         schema_copy["queues"] = []
         self.overrider.override_attributes_v2(
             object=schema_copy, attribute_overrides=override_copy
@@ -68,11 +73,6 @@ class SchemaRelease(ObjectRelease):
         try:
             release_requests = []
             for target_index, target in enumerate(self.targets):
-                if len(self.parent_queue.targets) < target_index:
-                    raise Exception(
-                        f"Parent {self.parent_queue.display_type} {self.parent_queue.display_label} does not have target with index {target_index}"
-                    )
-
                 target.index = target_index
 
                 target_queue = self.parent_queue.targets[target.index]
@@ -85,6 +85,39 @@ class SchemaRelease(ObjectRelease):
 
             results = await asyncio.gather(*release_requests)
             self.update_targets(results)
+
+            await asyncio.gather(
+                *[
+                    rule_release.initialize(
+                        yaml=self.yaml,
+                        client=self.client,
+                        source_dir_path=self.base_path,
+                        plan_only=self.plan_only,
+                        is_same_org_deploy=self.is_same_org_deploy,
+                        parent_schema=self,
+                        schema_targets={
+                            self.id: [target.data for target in self.targets]
+                        },
+                        last_deploy_timestamp=self.last_deploy_timestamp,
+                        force_deploy=self.force_deploy,
+                        ignore_timestamp_mismatches=self.ignore_timestamp_mismatches,
+                        source_client=self.source_client,
+                    )
+                    for rule_release in self.rule_releases
+                ]
+            )
+
+            for rule_release in self.rule_releases:
+                if rule_release.initialize_failed:
+                    raise SubObjectException()
+
+            for rule in self.rule_releases:
+                await rule.deploy()
+                if rule.deploy_failed:
+                    raise SubObjectException()
+
+        except SubObjectException:
+            self.deploy_failed = True
         except Exception as e:
             display_error(
                 f"Error while deploying {self.display_type} {self.display_label}: {e}",

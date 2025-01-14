@@ -15,7 +15,7 @@ from anyio import Path
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
 
-from deployment_manager.commands.deploy.subcommands.run.queue_release import (
+from deployment_manager.commands.deploy.subcommands.run.models import (
     SubObjectException,
 )
 from deployment_manager.utils.consts import display_error, display_warning, settings

@@ -59,6 +59,7 @@ class ObjectRelease(BaseModel):
     source_client: ElisAPIClient = None
 
     plan_only: bool = False
+    force_deploy: bool = False
     auto_delete: bool = False
     is_same_org_deploy: bool = False
 
@@ -66,6 +67,7 @@ class ObjectRelease(BaseModel):
     deploy_failed: bool = False
 
     last_deploy_timestamp: str = ""
+    ignore_timestamp_mismatches: dict = {}
     ignore_timestamp_mismatch: bool = False
 
     targets: list[TargetWithDefault] = []
@@ -83,8 +85,9 @@ class ObjectRelease(BaseModel):
         source_dir_path,
         auto_delete=False,
         plan_only=False,
+        force_deploy=False,
         is_same_org_deploy=False,
-        ignore_timestamp_mismatch=False,
+        ignore_timestamp_mismatches: dict = {},
         last_deploy_timestamp="",
     ):
         # Base path is defined in the config itself for some objects (queues), for others, it needs to be added
@@ -95,9 +98,13 @@ class ObjectRelease(BaseModel):
 
         self.auto_delete = auto_delete
         self.plan_only = plan_only
+        self.force_deploy = force_deploy
         self.is_same_org_deploy = is_same_org_deploy
 
-        self.ignore_timestamp_mismatch = ignore_timestamp_mismatch
+        self.ignore_timestamp_mismatches = ignore_timestamp_mismatches
+        self.ignore_timestamp_mismatch = (
+            force_deploy or ignore_timestamp_mismatches.get(self.id, False)
+        )
         self.last_deploy_timestamp = last_deploy_timestamp
 
         self.overrider = AttributeOverrider(type=self.type, plan_only=self.plan_only)
@@ -265,7 +272,9 @@ class ObjectRelease(BaseModel):
                     self.type, id_=target.id, data=target_object
                 )
                 # Important for the ID override phase (deploy file still the old one and the remote just got updated)
-                self.last_deploy_timestamp = result.get('modified_at', generate_deploy_timestamp())
+                self.last_deploy_timestamp = result.get(
+                    "modified_at", generate_deploy_timestamp()
+                )
             pprint(
                 f"{settings.PLAN_PRINT_STR if self.plan_only else ''} {settings.UPDATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}."
             )
@@ -315,9 +324,7 @@ class ObjectRelease(BaseModel):
                     # When updating, take the real remote object
                     # The diff comparison will then show only overrides that are not on the remote already (not all overrides from source)
                     if target.id and not self.check_plan_object_id(target.id):
-                        overriden_object_data = await self.get_remote_object(
-                            target.id
-                        )
+                        overriden_object_data = await self.get_remote_object(target.id)
                     else:
                         overriden_object_data = deepcopy(self.data)
 
@@ -391,3 +398,8 @@ class EmptyObjectRelease(BaseModel):
     async def initialize(*args, **kwargs): ...
 
     async def deploy(self): ...
+
+    @property
+    def display_type(self):
+        # Remove the plural 's'
+        return f"[yellow]{self.type.value[:-2 if self.type in [Resource.Inbox] else -1]}[/yellow]"

@@ -12,6 +12,7 @@ from deployment_manager.commands.deploy.subcommands.run.helpers import (
 from deployment_manager.commands.deploy.subcommands.run.inbox_release import (
     InboxRelease,
 )
+from deployment_manager.commands.deploy.subcommands.run.models import SubObjectException
 from deployment_manager.commands.deploy.subcommands.run.object_release import (
     EmptyObjectRelease,
     ObjectRelease,
@@ -35,9 +36,6 @@ from deployment_manager.utils.functions import (
 )
 
 
-class SubObjectException(Exception): ...
-
-
 class QueueRelease(ObjectRelease):
     type: Resource = Resource.Queue
     keep_hook_dependencies_without_equivalent: bool = False
@@ -45,12 +43,9 @@ class QueueRelease(ObjectRelease):
     ignore_all_deploy_warnings: bool = False
     ignore_deploy_warnings: bool = False
 
-    schema_ignore_timestamp_mismatch: bool = False
-    inbox_ignore_timestamp_mismatch: bool = False
-
     schema_release: SchemaRelease = Field(alias="schema")
     inbox_release: Optional[InboxRelease] = Field(
-        default_factory=lambda: EmptyObjectRelease(), alias="inbox"
+        default_factory=lambda: EmptyObjectRelease(type=Resource.Inbox), alias="inbox"
     )
 
     schema_targets: dict[int, list] = []
@@ -59,8 +54,6 @@ class QueueRelease(ObjectRelease):
 
     async def initialize(
         self,
-        schema_ignore_timestamp_mismatch,
-        inbox_ignore_timestamp_mismatch,
         workspace_targets: dict[int, list],
         hook_targets: dict[int, list],
         **kwargs,
@@ -68,9 +61,6 @@ class QueueRelease(ObjectRelease):
         try:
             self.schema_release.base_path = self.base_path
             self.inbox_release.base_path = self.base_path
-
-            self.schema_ignore_timestamp_mismatch = schema_ignore_timestamp_mismatch
-            self.inbox_ignore_timestamp_mismatch = inbox_ignore_timestamp_mismatch
 
             await super().initialize(**kwargs)
 
@@ -109,7 +99,8 @@ class QueueRelease(ObjectRelease):
                 is_same_org_deploy=self.is_same_org_deploy,
                 parent_queue=self,
                 last_deploy_timestamp=self.last_deploy_timestamp,
-                ignore_timestamp_mismatch=self.schema_ignore_timestamp_mismatch,
+                force_deploy=self.force_deploy,
+                ignore_timestamp_mismatches=self.ignore_timestamp_mismatches,
                 source_client=self.source_client,
             )
             if self.schema_release.initialize_failed:
@@ -143,7 +134,7 @@ class QueueRelease(ObjectRelease):
 
                 if previous_workspace_url == queue_copy["workspace"] and not target.id:
                     raise Exception(
-                        f'Cannot create target for queue "{queue_copy['name']} ({queue_copy['id']})" - there is no target workspace to put it into.'
+                        f'Cannot create target for {self.display_type} "{queue_copy['name']} ({queue_copy['id']})" - there is no target workspace to put it into.'
                     )
 
                 previous_schema_url = queue_copy["schema"]
@@ -157,7 +148,7 @@ class QueueRelease(ObjectRelease):
 
                 if previous_schema_url == queue_copy["schema"] and not target.id:
                     raise Exception(
-                        f'Cannot create target for queue "{queue_copy['name']} ({queue_copy['id']})" - there is no target schema to use it with.'
+                        f'Cannot create target for {self.display_type} "{queue_copy['name']} ({queue_copy['id']})" - there is no target schema to use it with.'
                     )
 
                 # Both should be updated, otherwise Elis API uses 'webhooks' in case of a mismatch even though it is deprecated
@@ -200,7 +191,8 @@ class QueueRelease(ObjectRelease):
                 queue_targets={self.id: [target.data for target in self.targets]},
                 parent_queue=self,
                 last_deploy_timestamp=self.last_deploy_timestamp,
-                ignore_timestamp_mismatch=self.inbox_ignore_timestamp_mismatch,
+                force_deploy=self.force_deploy,
+                ignore_timestamp_mismatches=self.ignore_timestamp_mismatches,
                 source_client=self.source_client,
             )
             if self.inbox_release.initialize_failed:
@@ -225,22 +217,33 @@ class QueueRelease(ObjectRelease):
 
         queue_targets_len = len(self.targets)
         schema_targets_len = len(self.schema_release.targets)
-        inbox_targets_len = len(self.inbox_release.targets)
-        queue_has_inbox = bool(self.data.get("inbox", ""))
 
         if queue_targets_len != schema_targets_len:
-            display_warning(
-                f"{self.display_type} {self.display_label} has {queue_targets_len} targets while its schema has {schema_targets_len}. Please make the target counts are equal."
+            display_error(
+                f"{self.display_type} {self.display_label} has {queue_targets_len} targets while its {self.schema_release.display_type} has {schema_targets_len}. Please make the target counts equal."
             )
             mismatch_found = True
+
+        for rule in self.schema_release.rule_releases:
+            rule_targets_len = len(rule.targets)
+            if queue_targets_len != rule_targets_len:
+                display_error(
+                    f"{self.display_type} {self.display_label} has {queue_targets_len} targets while one of its [yellow]schema rules[/yellow] ({rule.display_label}) has {rule_targets_len}. Please make the target counts equal."
+                )
+                mismatch_found = True
+
+        inbox_targets_len = len(self.inbox_release.targets)
+        queue_has_inbox = bool(self.data.get("inbox", "")) and self.inbox_release.id
         if queue_has_inbox and queue_targets_len != inbox_targets_len:
-            display_warning(
-                f"{self.display_type} {self.display_label} has {queue_targets_len} targets while its inbox has {inbox_targets_len}. Please make the target counts are equal."
+            display_error(
+                f"{self.display_type} {self.display_label} has {queue_targets_len} targets while its {self.inbox_release.display_type} has {inbox_targets_len}. Please make the target counts equal."
             )
             mismatch_found = True
 
         if mismatch_found:
-            raise Exception("Incorrect inbox/schema target count vs queue target count")
+            raise SubObjectException(
+                "Incorrect inbox/schema target count vs queue target count"
+            )
 
     async def evaluate_workflow_warning(self):
         if self.ignore_deploy_warnings or self.is_same_org_deploy:

@@ -182,7 +182,8 @@ async def test_workspace_deploy_object_correct(
         plan_only=False,
         is_same_org_deploy=False,
         last_deploy_timestamp=None,
-        ignore_timestamp_mismatch=True,
+        force_deploy=False,
+        ignore_timestamp_mismatches={},
     )
 
     ws_object = deepcopy(workspace_release.data)
@@ -222,7 +223,8 @@ async def test_workspace_deploy_twice_for_two_targets(
         plan_only=False,
         is_same_org_deploy=False,
         last_deploy_timestamp=None,
-        ignore_timestamp_mismatch=True,
+        force_deploy=False,
+        ignore_timestamp_mismatches={},
     )
 
     ws_object = deepcopy(workspace_release.data)
@@ -280,7 +282,8 @@ async def test_workspace_deploy_updates_correct_targets(
         plan_only=False,
         is_same_org_deploy=False,
         last_deploy_timestamp=None,
-        ignore_timestamp_mismatch=True,
+        force_deploy=False,
+        ignore_timestamp_mismatches={},
     )
 
     ws_object = deepcopy(workspace_release.data)
@@ -352,9 +355,8 @@ async def test_no_inbox_ok(
         plan_only=False,
         is_same_org_deploy=False,
         last_deploy_timestamp=None,
-        ignore_timestamp_mismatch=True,
-        schema_ignore_timestamp_mismatch=True,
-        inbox_ignore_timestamp_mismatch=True,
+        force_deploy=False,
+        ignore_timestamp_mismatches={},
         workspace_targets={},
         hook_targets={},
     )
@@ -454,9 +456,8 @@ async def test_no_schema_path_not_ok(
         plan_only=False,
         is_same_org_deploy=False,
         last_deploy_timestamp=None,
-        ignore_timestamp_mismatch=True,
-        schema_ignore_timestamp_mismatch=True,
-        inbox_ignore_timestamp_mismatch=True,
+        force_deploy=False,
+        ignore_timestamp_mismatches={},
         workspace_targets={},
         hook_targets={},
     )

@@ -137,8 +137,8 @@ class ReleaseFile(BaseModel):
                 if self.last_deployed_at
                 else generate_deploy_timestamp()
             ),
-            ignore_timestamp_mismatch=self.force_deploy
-            or self.ignore_timestamp_mismatches.get(self.source_org.id, False),
+            force_deploy=self.force_deploy,
+            ignore_timestamp_mismatches=self.ignore_timestamp_mismatches,
         )
 
         if self.plan_only:
@@ -174,8 +174,8 @@ class ReleaseFile(BaseModel):
                     is_same_org_deploy=self.is_same_org,
                     hook_template_url=self.hook_templates.get(hook_release.id, None),
                     last_deploy_timestamp=self.last_deployed_at,
-                    ignore_timestamp_mismatch=self.force_deploy
-                    or self.ignore_timestamp_mismatches.get(hook_release.id, False),
+                    force_deploy=self.force_deploy,
+                    ignore_timestamp_mismatches=self.ignore_timestamp_mismatches,
                 )
                 for hook_release in self.hooks
             ]
@@ -210,10 +210,8 @@ class ReleaseFile(BaseModel):
                     plan_only=self.plan_only,
                     is_same_org_deploy=self.is_same_org,
                     last_deploy_timestamp=self.last_deployed_at,
-                    ignore_timestamp_mismatch=self.force_deploy
-                    or self.ignore_timestamp_mismatches.get(
-                        workspace_release.id, False
-                    ),
+                    force_deploy=self.force_deploy,
+                    ignore_timestamp_mismatches=self.ignore_timestamp_mismatches,
                 )
                 for workspace_release in self.workspaces
             ]
@@ -249,16 +247,8 @@ class ReleaseFile(BaseModel):
                     hook_targets=self.hook_targets,
                     workspace_targets=self.workspace_targets,
                     last_deploy_timestamp=self.last_deployed_at,
-                    ignore_timestamp_mismatch=self.force_deploy
-                    or self.ignore_timestamp_mismatches.get(queue_release.id, False),
-                    schema_ignore_timestamp_mismatch=self.force_deploy
-                    or self.ignore_timestamp_mismatches.get(
-                        queue_release.schema_release.id, False
-                    ),
-                    inbox_ignore_timestamp_mismatch=self.force_deploy
-                    or self.ignore_timestamp_mismatches.get(
-                        queue_release.inbox_release.id, False
-                    ),
+                    force_deploy=self.force_deploy,
+                    ignore_timestamp_mismatches=self.ignore_timestamp_mismatches,
                 )
                 for queue_release in self.queues
             ]
@@ -273,10 +263,10 @@ class ReleaseFile(BaseModel):
                 if queue_release.ignore_all_deploy_warnings:
                     for queue_release in self.queues:
                         queue_release.ignore_deploy_warnings = True
-
                 self.queue_ignore_warnings[queue_release.id] = (
                     queue_release.ignore_deploy_warnings
                 )
+
                 self.ignore_timestamp_mismatches[queue_release.id] = (
                     queue_release.ignore_timestamp_mismatch
                 )
@@ -286,6 +276,10 @@ class ReleaseFile(BaseModel):
                 self.ignore_timestamp_mismatches[queue_release.inbox_release.id] = (
                     queue_release.inbox_release.ignore_timestamp_mismatch
                 )
+                for rule in queue_release.schema_release.rule_releases:
+                    self.ignore_timestamp_mismatches[rule.id] = (
+                        rule.ignore_timestamp_mismatch
+                    )
         else:
             await asyncio.gather(
                 *[queue_release.deploy() for queue_release in self.queues]

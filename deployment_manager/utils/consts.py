@@ -206,7 +206,7 @@ class Settings:
     DOWNLOAD_KEY_REGEX = "regex"
 
     # Deploy consts
-    DEPLOY_IGNORED_DIRS = [".git", "payloads", "deploy_files"]
+    DEPLOY_IGNORED_DIRS = [".git", "payloads", "deploy_files", 'deploy_secrets']
     DEPLOY_OVERRIDE_REGEX_SEPARATOR = "/#/"
     DEPLOY_DEFAULT_TARGET_URL = "https://my-org.rossum.app/api/v1"
     DEFAULT_DEPLOY_PARENT = "deploy_files"
@@ -230,6 +230,7 @@ class Settings:
     DEPLOY_KEY_WORKSPACES = "workspaces"
     DEPLOY_KEY_QUEUES = "queues"
     DEPLOY_KEY_SCHEMA = "schema"
+    DEPLOY_KEY_RULES = "rules"
     DEPLOY_KEY_INBOX = "inbox"
     DEPLOY_KEY_HOOKS = "hooks"
 

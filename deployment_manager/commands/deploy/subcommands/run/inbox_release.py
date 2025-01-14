@@ -46,11 +46,6 @@ class InboxRelease(ObjectRelease):
         return parent_yaml_reference.get("inbox", {})
 
     def prepare_object_copy_for_deploy(self, target: Target, target_index: int):
-        if len(self.parent_queue.targets) < target_index:
-            raise Exception(
-                f"Parent {self.parent_queue.display_type} {self.parent_queue.display_label} does not have target with index {target_index}"
-            )
-
         target_queue = self.parent_queue.targets[target_index]
 
         inbox_copy = deepcopy(self.data)

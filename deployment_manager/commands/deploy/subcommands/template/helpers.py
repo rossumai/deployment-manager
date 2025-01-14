@@ -166,7 +166,9 @@ async def find_queue_paths_for_workspaces(ws_paths: list[Path]):
         if not (await (ws_path / "queues").exists()):
             continue
         ws_queue_paths = [
-            queue_path async for queue_path in (ws_path / "queues").iterdir()
+            queue_path
+            async for queue_path in (ws_path / "queues").iterdir()
+            if await queue_path.is_dir()
         ]
         for ws_queue_path in ws_queue_paths:
             queue_path_to_file = ws_queue_path / "queue.json"
@@ -182,6 +184,10 @@ async def find_ws_paths_for_dir(base_dir: Path):
         async for workspace_path in (base_dir / "workspaces").iterdir()
         if await workspace_path.is_dir()
     ]
+
+
+async def find_rule_paths_for_dir(base_dir: Path):
+    return [rule_path async for rule_path in (base_dir).iterdir()]
 
 
 DEFAULT_TARGETS = [{"id": None}]
@@ -216,6 +222,7 @@ def prepare_deploy_file_objects(
 def prepare_subqueue_deploy_file_object(
     object: dict,
     previous_object: dict = {},
+    include_name: bool = False,
 ):
     deploy_representation = {
         "id": object["id"],
@@ -223,6 +230,9 @@ def prepare_subqueue_deploy_file_object(
             settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)
         ),
     }
+    if include_name:
+        deploy_representation["name"] = object["name"]
+
     return deploy_representation
 
 
@@ -301,6 +311,11 @@ async def get_queues_from_user(
         await get_schema_for_queue(
             queue=queue, previous_queues_by_id=previous_queues_by_id
         )
+        await get_rules_for_schema(
+            schema=queue[settings.DEPLOY_KEY_SCHEMA],
+            queue=queue,
+            previous_queues_by_id=previous_queues_by_id,
+        )
         await get_inbox_for_queue(
             queue=queue, previous_queues_by_id=previous_queues_by_id
         )
@@ -329,6 +344,33 @@ async def get_schema_for_queue(queue: dict, previous_queues_by_id: dict):
         object=schema_object, previous_object=previous_schema
     )
     queue[settings.DEPLOY_KEY_SCHEMA] = deploy_schema_object
+
+
+async def get_rules_for_schema(queue: dict, schema: dict, previous_queues_by_id: dict):
+    rules_path = (
+        Path(queue[settings.DEPLOY_KEY_BASE_PATH])
+        / settings.DEPLOY_KEY_QUEUES
+        / templatize_name_id(queue["name"], queue["id"])
+        / settings.RULES_DIR_NAME
+    )
+
+    if not (await rules_path.exists()):
+        return
+
+    previous_rules = previous_queues_by_id.get(queue["id"], {}).get(
+        settings.DEPLOY_KEY_RULES, []
+    )
+    deploy_rule_objects = []
+    for rule_path in await find_rule_paths_for_dir(rules_path):
+        rule_object = await read_json(rule_path)
+
+        previous_rule = find_rule(rules=previous_rules, rule_id=rule_object["id"])
+        deploy_rule_object = prepare_subqueue_deploy_file_object(
+            object=rule_object, previous_object=previous_rule, include_name=True
+        )
+        deploy_rule_objects.append(deploy_rule_object)
+
+    schema[settings.DEPLOY_KEY_RULES] = deploy_rule_objects
 
 
 async def get_inbox_for_queue(queue: dict, previous_queues_by_id: dict):
@@ -452,14 +494,16 @@ async def get_multi_targets_from_user(deploy_file_object: dict):
                 # Automatically mirror target count for queue's inbox and schema
                 if object_type == settings.DEPLOY_KEY_QUEUES:
                     schema = selected_object.get(settings.DEPLOY_KEY_SCHEMA, None)
-                    if not schema:
-                        continue
-                    add_multi_targets_to_object(schema, target_count)
+                    if schema:
+                        add_multi_targets_to_object(schema, target_count)
+                        rules = schema.get(settings.DEPLOY_KEY_RULES, [])
+                        if rules:
+                            for rule in rules:
+                                add_multi_targets_to_object(rule, target_count)
 
                     inbox = selected_object.get(settings.DEPLOY_KEY_INBOX, None)
-                    if not inbox:
-                        continue
-                    add_multi_targets_to_object(inbox, target_count)
+                    if inbox:
+                        add_multi_targets_to_object(inbox, target_count)
 
 
 def add_multi_targets_to_object(object, target_count: int):
@@ -664,3 +708,10 @@ def add_targets_for_objects(
             deploy_object[settings.DEPLOY_KEY_TARGETS] = new_deploy_targets
     except Exception as e:
         display_error(f"Error while adding targets to deploy file {object_type} ^", e)
+
+
+def find_rule(rules, rule_id):
+    for rule in rules:
+        if rule["id"] == rule_id:
+            return rule
+    return {}

@@ -79,9 +79,9 @@ async def revert_release_file(
 
         await planned_release.revert_hooks()
 
-        await planned_release.revert_workspaces()
-
         await planned_release.revert_queues()
+
+        await planned_release.revert_workspaces()
 
     except DeployException as e:
         display_error(f"Planning failed: {e}")
@@ -101,9 +101,9 @@ async def revert_release_file(
     try:
         await release.revert_hooks()
 
-        await release.revert_workspaces()
-
         await release.revert_queues()
+
+        await release.revert_workspaces()
 
     except Exception:
         revert_error = True
