@@ -97,6 +97,13 @@ If these objects don't exist, they get created.
     help="Checks if source object exists and if not, deletes target + removes the object from deploy file.",
 )
 @click.option(
+    "--auto-apply",
+    "-y",
+    default=False,
+    is_flag=True,
+    help="Does not ask user for confirmation of the plan - applies it blindly.",
+)
+@click.option(
     "--commit",
     "-c",
     default=False,
@@ -114,12 +121,14 @@ async def deploy_project_wrapper(
     deploy_file: Path,
     force: bool,
     auto_delete: bool,
+    auto_apply: bool,
     commit: bool,
     message: str,
 ):
     await deploy_release_file(
         deploy_file_path=deploy_file,
         auto_delete=auto_delete,
+        auto_apply_plan=auto_apply,
         force=force,
         commit=commit,
         commit_message=message,

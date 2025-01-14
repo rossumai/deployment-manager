@@ -33,12 +33,12 @@ from deployment_manager.utils.consts import (
 )
 
 
-# TODO: yes flag to skip the question after plan
 async def deploy_release_file(
     deploy_file_path: Path,
     project_path: Path = None,
     source_client: ElisAPIClient = None,
     target_client: ElisAPIClient = None,
+    auto_apply_plan: bool = False,
     force: bool = False,
     auto_delete: bool = False,
     commit: bool = False,
@@ -189,7 +189,7 @@ async def deploy_release_file(
         display_error(f"Planning failed: {e}", e)
         return
 
-    if not (
+    if not auto_apply_plan and not (
         await questionary.confirm(
             "Do you wish to apply the plan?", default=False
         ).ask_async()
