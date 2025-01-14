@@ -68,6 +68,7 @@ class RevertObjectDeploy(BaseModel):
 
             await asyncio.gather(*delete_requests)
 
+            # self.delete_target_ids()
         except Exception as e:
             display_error(
                 f"Error while reverting deploy of {self.display_type} {self.name} ({self.id}) ^",
@@ -119,12 +120,17 @@ class RevertObjectDeploy(BaseModel):
             display_warning(
                 f"{self.display_type} [purple]{target.id}[/purple] already does not exist on remote."
             )
+            self.yaml_reference["targets"][target.index]["id"] = None
         except Exception as e:
             display_error(
                 f"Error while deleting {self.display_type} [purple]{target.id}[/purple]: {e}",
                 e,
             )
             self.revert_failed = True
+
+    def delete_target_ids(self):
+        for target in self.yaml_reference["targets"]:
+            target["id"] = None
 
 
 class EmptyRevertObjectDeploy(BaseModel):
@@ -135,6 +141,8 @@ class EmptyRevertObjectDeploy(BaseModel):
     name: str = ""
     type: Resource = "no-type"
     base_path: Path = None
+
+    revert_failed: bool = False
 
     targets: list[TargetWithDefault] = []
 
@@ -201,13 +209,12 @@ class RevertQueueDeploy(RevertObjectDeploy):
             remote_object = await self.get_remote_object(target.id)
 
             if not self.plan_only:
-                (
-                    await self.client._http_client._request(
-                        "DELETE",
-                        f"queues/{target.id}",
-                        params={"delete_after": "0"},
-                    ),
+                await self.client._http_client._request(
+                    "DELETE",
+                    f"queues/{target.id}",
+                    params={"delete_after": "0"},
                 )
+                self.yaml_reference["targets"][target.index]["id"] = None
 
             pprint(
                 f"{settings.PLAN_PRINT_STR if self.plan_only else ''} {settings.DELETE_PRINT_STR} {self.display_type}: {self.target_display_label(remote_object.get('name', 'no-name'), remote_object.get('id', 'no-id'))}"
@@ -216,6 +223,7 @@ class RevertQueueDeploy(RevertObjectDeploy):
             display_warning(
                 f"{self.display_type} [purple]{target.id}[/purple] already does not exist on remote."
             )
+            self.yaml_reference["targets"][target.index]["id"] = None
         except Exception as e:
             display_error(
                 f"Error while deleting {self.display_type} [purple]{target.id}[/purple]: {e}",
