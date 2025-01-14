@@ -383,6 +383,7 @@ async def test_no_schema_path_not_ok(
         is_same_org_deploy=False,
         last_deploy_timestamp=None,
         force_deploy=False,
+        unselected_hooks=[],
         ignore_timestamp_mismatches={},
         workspace_targets={},
         hook_targets={},

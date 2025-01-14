@@ -69,6 +69,7 @@ class ReleaseFile(BaseModel):
     workspaces: list[WorkspaceRelease] = []
     queues: list[QueueRelease] = []
     hooks: list[HookRelease] = []
+    unselected_hooks: list[int] = []
 
     hook_templates: dict = {}
     queue_ignore_warnings: dict = {}
@@ -245,6 +246,7 @@ class ReleaseFile(BaseModel):
                     plan_only=self.plan_only,
                     is_same_org_deploy=self.is_same_org,
                     hook_targets=self.hook_targets,
+                    unselected_hooks=self.unselected_hooks,
                     workspace_targets=self.workspace_targets,
                     last_deploy_timestamp=self.last_deployed_at,
                     force_deploy=self.force_deploy,

@@ -32,6 +32,7 @@ from deployment_manager.utils.consts import (
     display_warning,
 )
 from deployment_manager.utils.functions import (
+    extract_id_from_url,
     templatize_name_id,
 )
 
@@ -52,10 +53,13 @@ class QueueRelease(ObjectRelease):
     workspace_targets: dict[int, list] = []
     hook_targets: dict[int, list] = []
 
+    unselected_hooks: list[int] = []
+
     async def initialize(
         self,
         workspace_targets: dict[int, list],
         hook_targets: dict[int, list],
+        unselected_hooks: list[int],
         **kwargs,
     ):
         try:
@@ -64,6 +68,7 @@ class QueueRelease(ObjectRelease):
 
             await super().initialize(**kwargs)
 
+            self.unselected_hooks = unselected_hooks
             self.workspace_targets = workspace_targets
             self.hook_targets = hook_targets
         except Exception as e:
@@ -88,8 +93,16 @@ class QueueRelease(ObjectRelease):
                 await self.verify_subobjects_have_same_target_count()
 
                 # Ignore warnings independently (ignore in first function would hide warning in second)
-                self.ignore_deploy_warnings = await self.evaluate_workflow_warning()
-                self.ignore_deploy_warnings = await self.evaluate_engine_warning()
+                ignore_unassigned_hooks = await self.verify_no_unassigned_hooks()
+                ignore_workflow_warnings = await self.evaluate_workflow_warning()
+                ignore_engine_warnings = await self.evaluate_engine_warning()
+                self.ignore_deploy_warnings = any(
+                    [
+                        ignore_unassigned_hooks,
+                        ignore_workflow_warnings,
+                        ignore_engine_warnings,
+                    ]
+                )
 
             await self.schema_release.initialize(
                 yaml=self.yaml,
@@ -245,8 +258,28 @@ class QueueRelease(ObjectRelease):
                 "Incorrect inbox/schema target count vs queue target count"
             )
 
+    async def verify_no_unassigned_hooks(self):
+        if self.ignore_all_deploy_warnings or self.ignore_deploy_warnings:
+            return True
+
+        queue_hook_urls = self.data.get("hooks", [])
+        queue_hook_ids = [extract_id_from_url(url) for url in queue_hook_urls]
+
+        deployed_hook_ids = set(self.hook_targets.keys()) | set(self.unselected_hooks)
+
+        for queue_hook_id in queue_hook_ids:
+            if queue_hook_id not in deployed_hook_ids:
+                display_warning(
+                    f"{self.display_type} {self.display_label} depends on hook [purple]{queue_hook_id}[/purple] that is not in the deploy file - is this a new hook created after the deploy file?"
+                )
+                return await self.prompt_user_about_warnings()
+
     async def evaluate_workflow_warning(self):
-        if self.ignore_deploy_warnings or self.is_same_org_deploy:
+        if (
+            self.ignore_all_deploy_warnings
+            or self.ignore_deploy_warnings
+            or self.is_same_org_deploy
+        ):
             return True
 
         if self.data.get("workflows", []):
@@ -257,7 +290,11 @@ class QueueRelease(ObjectRelease):
 
     async def evaluate_engine_warning(self):
         for attr in QUEUE_ENGINE_ATTRIBUTES:
-            if self.ignore_deploy_warnings or self.is_same_org_deploy:
+            if (
+                self.ignore_all_deploy_warnings
+                or self.ignore_deploy_warnings
+                or self.is_same_org_deploy
+            ):
                 return True
 
             if self.data.get(attr, None):
