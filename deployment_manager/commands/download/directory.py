@@ -157,7 +157,9 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                     downloader.download_remote_objects(type=Resource.EmailTemplate),
                     downloader.download_remote_objects(type=Resource.Inbox),
                     downloader.download_remote_objects(type=Resource.Schema),
-                    downloader.download_remote_objects(type=CustomResource.Rule),
+                    downloader.download_remote_objects(
+                        type=CustomResource.Rule, check_access=True
+                    ),
                     downloader.download_remote_objects(type=Resource.Hook),
                 ]
             )
