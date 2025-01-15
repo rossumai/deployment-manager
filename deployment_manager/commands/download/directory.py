@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 import os
 from anyio import Path
 from pydantic import BaseModel
@@ -100,7 +101,7 @@ class OrganizationDirectory(BaseModel):
 
 
 class DownloadOrganizationDirectory(OrganizationDirectory):
-    id_object_map: dict = {}
+    id_object_map: dict[str, dict[int, dict]] = {}
     changed_files: list = []
 
     download_all: bool = False
@@ -295,9 +296,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 )
 
     def create_id_object_map(self, objects: list[dict]):
-        map = {}
+        map = defaultdict(dict)
         for object in objects:
-            map[object["id"]] = object
+            type = determine_object_type_from_url(object["url"])
+            map[type][object["id"]] = object
         return map
 
     async def remove_stale_objects(self):
@@ -336,12 +338,19 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             if not url or not id:
                 return False
 
-            # The ID is not among all downloaded objects in that organization
-            if id not in self.id_object_map:
+            object_type = determine_object_type_from_url(url)
+            remote_object = self.id_object_map.get(object_type, {}).get(id, None)
+
+            # There is not remote object with this ID (for this type)
+            if not remote_object:
                 return True
 
             if self.is_object_path_different(
-                local_object=local_object, local_path=object_path, subdir=subdir
+                object_type=object_type,
+                local_object=local_object,
+                local_path=object_path,
+                subdir=subdir,
+                remote_object=remote_object,
             ):
                 return True
 
@@ -354,11 +363,13 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             return False
 
     def is_object_path_different(
-        self, local_object: dict, local_path: Path, subdir: Subdirectory
+        self,
+        local_path: Path,
+        object_type: Resource | CustomResource,
+        local_object: dict,
+        remote_object: dict,
+        subdir: Subdirectory,
     ):
-        remote_object = self.id_object_map[local_object["id"]]
-        object_type = determine_object_type_from_url(local_object["url"])
-
         # Construct paths and compare them
         # Objects with same IDs and different paths should get the local (previous) version removed
         match object_type:
@@ -392,7 +403,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 )
             case _:
                 display_warning(
-                    f"Cannot determine if object of type {object_type} should be deleted - unsupported type"
+                    f"Cannot determine if object [green]{local_object.get('name', 'no-name')}[/green] [purple]{local_object.get('id', 'no-id')}[/purple] of type {object_type} should be deleted: unsupported type"
                 )
                 return False
 
