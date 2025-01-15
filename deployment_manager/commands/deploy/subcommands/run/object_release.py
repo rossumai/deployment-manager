@@ -357,6 +357,12 @@ class ObjectRelease(BaseModel):
         # These attribute either should not be compared or were already replaced via replace_dependency_url()
         data.pop("modified_by", None)
         data.pop("modified_at", None)
+
+        # These keys are not pulled locally so comparing a remote object with a local one would yield false diffs
+        ignored_keys_for_type = settings.IGNORED_KEYS.get(self.type, [])
+        for key in ignored_keys_for_type:
+            data.pop(key, None)
+
         match self.type:
             case Resource.Schema:
                 data.pop("queues", None)
