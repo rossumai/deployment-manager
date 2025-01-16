@@ -1,3 +1,4 @@
+from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime
 
@@ -25,7 +26,7 @@ from anyio import Path
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
 
-from deployment_manager.utils.consts import display_error, settings
+from deployment_manager.utils.consts import CustomResource, display_error, settings
 from deployment_manager.utils.functions import templatize_name_id
 
 
@@ -67,7 +68,7 @@ class ObjectRelease(BaseModel):
     deploy_failed: bool = False
 
     last_deploy_timestamp: str = ""
-    ignore_timestamp_mismatches: dict = {}
+    ignore_timestamp_mismatches: dict[Resource | CustomResource, dict[int, bool]] = defaultdict(dict)
     ignore_timestamp_mismatch: bool = False
 
     targets: list[TargetWithDefault] = []
@@ -103,7 +104,8 @@ class ObjectRelease(BaseModel):
 
         self.ignore_timestamp_mismatches = ignore_timestamp_mismatches
         self.ignore_timestamp_mismatch = (
-            force_deploy or ignore_timestamp_mismatches.get(self.id, False)
+            force_deploy
+            or ignore_timestamp_mismatches.get(self.type, {}).get(self.id, False)
         )
         self.last_deploy_timestamp = last_deploy_timestamp
 

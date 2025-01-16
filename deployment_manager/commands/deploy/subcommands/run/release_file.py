@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 import dataclasses
 import json
 from anyio import Path
@@ -28,7 +29,12 @@ from deployment_manager.commands.deploy.subcommands.run.workspace_release import
     WorkspaceRelease,
 )
 from deployment_manager.commands.migrate.helpers import get_token_owner
-from deployment_manager.utils.consts import display_error, display_warning, settings
+from deployment_manager.utils.consts import (
+    CustomResource,
+    display_error,
+    display_warning,
+    settings,
+)
 from deployment_manager.utils.functions import extract_id_from_url, templatize_name_id
 
 
@@ -74,11 +80,13 @@ class ReleaseFile(BaseModel):
     hook_templates: dict = {}
     queue_ignore_warnings: dict = {}
 
-    ignore_timestamp_mismatches: dict = {}
+    ignore_timestamp_mismatches: dict[Resource | CustomResource, dict[int, bool]] = (
+        defaultdict(dict)
+    )
 
-    hook_targets: list[Target] = []
-    workspace_targets: list[Target] = []
-    queue_targets: list[Target] = []
+    hook_targets: dict[int, Target] = {}
+    workspace_targets: dict[int, Target] = {}
+    queue_targets: dict[int, Target] = {}
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -97,11 +105,7 @@ class ReleaseFile(BaseModel):
         if not self.plan_only:
             pprint(Panel("Applying implicit ID override"))
 
-        lookup_table = {
-            **self.hook_targets,
-            **self.workspace_targets,
-            **self.queue_targets,
-        }
+        lookup_table = self.create_lookup_table()
 
         release_objects: list[ObjectRelease] = [
             *self.hooks,
@@ -115,6 +119,16 @@ class ReleaseFile(BaseModel):
             ]
         )
 
+    def create_lookup_table(self):
+        lookup_table = defaultdict(dict)
+        for source_id, targets in self.hook_targets.items():
+            lookup_table[source_id][Resource.Hook] = targets
+        for source_id, targets in self.workspace_targets.items():
+            lookup_table[source_id][Resource.Workspace] = targets
+        for source_id, targets in self.queue_targets.items():
+            lookup_table[source_id][Resource.Queue] = targets
+        return lookup_table
+
     def gather_targets(self, release_objects: list[ObjectRelease]):
         targets = {}
         for object in release_objects:
@@ -124,37 +138,45 @@ class ReleaseFile(BaseModel):
         return targets
 
     async def deploy_organization(self):
-        organization_release = OrganizationRelease(
-            id=self.source_org.id,
-            name=self.source_org.name,
-            data=dataclasses.asdict(self.source_org),
-            target_org=self.target_org,
-            plan_only=self.plan_only,
-            client=self.client,
-            source_client=self.source_client,
-            # When running initial deploy, there is no timestamp to check
-            last_deploy_timestamp=(
-                self.last_deployed_at
-                if self.last_deployed_at
-                else generate_deploy_timestamp()
-            ),
-            force_deploy=self.force_deploy,
-            ignore_timestamp_mismatches=self.ignore_timestamp_mismatches,
-        )
+        try:
+            organization_release = OrganizationRelease(
+                id=self.source_org.id,
+                name=self.source_org.name,
+                data=dataclasses.asdict(self.source_org),
+                target_org=self.target_org,
+                plan_only=self.plan_only,
+                client=self.client,
+                source_client=self.source_client,
+                # When running initial deploy, there is no timestamp to check
+                last_deploy_timestamp=(
+                    self.last_deployed_at
+                    if self.last_deployed_at
+                    else generate_deploy_timestamp()
+                ),
+                force_deploy=self.force_deploy,
+                ignore_timestamp_mismatches=self.ignore_timestamp_mismatches,
+            )
+        except Exception as e:
+            display_error("Error while initializing organization ^", e)
+            raise e
 
-        if self.plan_only:
-            pprint(
-                Panel(
-                    f"{organization_release.create_source_to_target_string(dataclasses.asdict(self.target_org))}"
+        try:
+            if self.plan_only:
+                pprint(
+                    Panel(
+                        f"{organization_release.create_source_to_target_string(dataclasses.asdict(self.target_org))}"
+                    )
                 )
-            )
 
-        if self.patch_target_org and not self.is_same_org:
-            await organization_release.deploy()
-            self.ignore_timestamp_mismatches[organization_release.id] = (
-                organization_release.ignore_timestamp_mismatch
-            )
-            self.detect_deploy_phase_exceptions([organization_release])
+            if self.patch_target_org and not self.is_same_org:
+                await organization_release.deploy()
+                self.ignore_timestamp_mismatches[Resource.Organization][
+                    organization_release.id
+                ] = organization_release.ignore_timestamp_mismatch
+                self.detect_deploy_phase_exceptions([organization_release])
+        except Exception as e:
+            display_error("Error while deploying organization ^", e)
+            raise e
 
     async def deploy_hooks(self):
         await self.ensure_token_owner()
@@ -187,9 +209,9 @@ class ReleaseFile(BaseModel):
         if self.plan_only:
             for hook_release in self.hooks:
                 await hook_release.deploy()
-                self.ignore_timestamp_mismatches[hook_release.id] = (
-                    hook_release.ignore_timestamp_mismatch
-                )
+                self.ignore_timestamp_mismatches[Resource.Hook][
+                    hook_release.id
+                ] = hook_release.ignore_timestamp_mismatch
                 self.hook_templates[hook_release.id] = hook_release.hook_template_url
         else:
             await asyncio.gather(
@@ -223,9 +245,9 @@ class ReleaseFile(BaseModel):
         if self.plan_only:
             for workspace_release in self.workspaces:
                 await workspace_release.deploy()
-                self.ignore_timestamp_mismatches[workspace_release.id] = (
-                    workspace_release.ignore_timestamp_mismatch
-                )
+                self.ignore_timestamp_mismatches[Resource.Workspace][
+                    workspace_release.id
+                ] = workspace_release.ignore_timestamp_mismatch
 
         else:
             await asyncio.gather(
@@ -269,19 +291,19 @@ class ReleaseFile(BaseModel):
                     queue_release.ignore_deploy_warnings
                 )
 
-                self.ignore_timestamp_mismatches[queue_release.id] = (
-                    queue_release.ignore_timestamp_mismatch
-                )
-                self.ignore_timestamp_mismatches[queue_release.schema_release.id] = (
-                    queue_release.schema_release.ignore_timestamp_mismatch
-                )
-                self.ignore_timestamp_mismatches[queue_release.inbox_release.id] = (
-                    queue_release.inbox_release.ignore_timestamp_mismatch
-                )
+                self.ignore_timestamp_mismatches[Resource.Queue][
+                    queue_release.id
+                ] = queue_release.ignore_timestamp_mismatch
+                self.ignore_timestamp_mismatches[Resource.Schema][
+                    queue_release.schema_release.id
+                ] = queue_release.schema_release.ignore_timestamp_mismatch
+                self.ignore_timestamp_mismatches[Resource.Inbox][
+                    queue_release.inbox_release.id
+                ] = queue_release.inbox_release.ignore_timestamp_mismatch
                 for rule in queue_release.schema_release.rule_releases:
-                    self.ignore_timestamp_mismatches[rule.id] = (
-                        rule.ignore_timestamp_mismatch
-                    )
+                    self.ignore_timestamp_mismatches[CustomResource.Rule][
+                        rule.id
+                    ] = rule.ignore_timestamp_mismatch
         else:
             await asyncio.gather(
                 *[queue_release.deploy() for queue_release in self.queues]

@@ -9,6 +9,9 @@ from rossum_api.api_client import Resource
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     traverse_object,
 )
+from deployment_manager.commands.deploy.subcommands.run.models import (
+    LookupTable,
+)
 from deployment_manager.commands.deploy.subcommands.run.models import Target
 from deployment_manager.utils.consts import display_warning, settings
 from deployment_manager.utils.functions import (
@@ -32,7 +35,7 @@ class AttributeOverrider:
     def replace_ids_in_target_object(
         self,
         target: Target,
-        lookup_table: dict,
+        lookup_table: LookupTable,
         target_object_index: int,
         num_targets: int,
     ):
@@ -43,23 +46,34 @@ class AttributeOverrider:
             for parent, key_in_parent, value in traverse_object(
                 target.data, key, target.data[key]
             ):
-                for source_id, targets in lookup_table.items():
+                for source_id, types_dict in lookup_table.items():
                     # source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
                     # if not re.search(source_id_regex, str(value)):
                     # continue
                     if str(source_id) not in str(value):
                         continue
 
-                    if not targets:
+                    if len(types_dict.keys()) > 1:
                         display_warning(
-                            f'Could not override source_id "{source_id}" to its target equivalent in {self.type.value} "{target.id}". No target IDs found.',
+                            f'Could not override source_id "{source_id}" to its target equivalent in {self.type.value} "{target.id}". There are different types of objects with the same ID ({list(types_dict.keys())}).',
                         )
-                        self.remove_id_from_boject(
+                        self.remove_id_from_list(
                             object=parent, key=key_in_parent, value=value
                         )
                         continue
+
+                    elif not len(types_dict.keys()):
+                        display_warning(
+                            f'Could not override source_id "{source_id}" to its target equivalent in {self.type.value} "{target.id}". No target IDs found.',
+                        )
+                        self.remove_id_from_list(
+                            object=parent, key=key_in_parent, value=value
+                        )
+                        continue
+
+                    targets = list(types_dict.values())[0]
                     # N:N objects -> objects are referenced in pairs
-                    elif num_targets == len(targets):
+                    if num_targets == len(targets):
                         target_id = targets[target_object_index]["id"]
                         self.replace_id_in_object(
                             object=parent,
@@ -108,7 +122,7 @@ class AttributeOverrider:
         #     object_str,
         # )
 
-    def remove_id_from_boject(self, object: dict, key: str, value: str | int):
+    def remove_id_from_list(self, object: dict, key: str, value: str | int):
         if isinstance(object[key], list):
             value_index = object[key].index(value)
             if value_index > -1:

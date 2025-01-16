@@ -1,8 +1,8 @@
 from typing import Annotated
 from pydantic import AliasChoices, BaseModel, BeforeValidator, Field
+from rossum_api.api_client import Resource
 
-
-type LookupTable = dict[int, list[int]]
+type LookupTable = dict[int, dict[Resource, list[int]]]
 
 
 class Target(BaseModel):
