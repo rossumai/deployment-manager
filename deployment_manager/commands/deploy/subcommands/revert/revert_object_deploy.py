@@ -18,7 +18,12 @@ from rossum_api.api_client import Resource
 from deployment_manager.commands.deploy.subcommands.run.models import (
     SubObjectException,
 )
-from deployment_manager.utils.consts import display_error, display_warning, settings
+from deployment_manager.utils.consts import (
+    display_error,
+    display_info,
+    display_warning,
+    settings,
+)
 
 
 class NonExistentObjectException(Exception): ...
@@ -68,7 +73,8 @@ class RevertObjectDeploy(BaseModel):
 
             await asyncio.gather(*delete_requests)
 
-            # self.delete_target_ids()
+            self.delete_target_ids_in_deploy_file()
+
         except Exception as e:
             display_error(
                 f"Error while reverting deploy of {self.display_type} {self.name} ({self.id}) ^",
@@ -84,6 +90,10 @@ class RevertObjectDeploy(BaseModel):
     @property
     def display_label(self):
         return f'"[green]{self.name}[/green] ([purple]{self.id}[/purple])"'
+
+    def delete_target_ids_in_deploy_file(self):
+        for target_index, _ in enumerate(self.targets):
+            self.yaml_reference["targets"][target_index]["id"] = None
 
     def target_display_label(self, name, id):
         return f'"[green]{name}[/green] ([purple]{id}[/purple])"'
@@ -111,7 +121,6 @@ class RevertObjectDeploy(BaseModel):
 
             if not self.plan_only:
                 await self.client._http_client.delete(self.type, id_=target.id)
-                self.yaml_reference["targets"][target.index]["id"] = None
 
             pprint(
                 f"{settings.PLAN_PRINT_STR if self.plan_only else ''} {settings.DELETE_PRINT_STR} {self.display_type}: {self.target_display_label(remote_object.get('name', 'no-name'), remote_object.get('id', 'no-id'))}"
@@ -204,6 +213,22 @@ class RevertQueueDeploy(RevertObjectDeploy):
         default_factory=lambda: EmptyRevertObjectDeploy(), alias="inbox"
     )
 
+    async def ensure_queues_deleted(self):
+        if not self.plan_only:
+            queue_deleted_count = 0
+            while queue_deleted_count != len(self.targets):
+                # Deleting queues (even when providing 'delete_after': 0) is asynchronous, wait for a short while
+                display_info("Waiting for queues to be deleted in the API...")
+                await asyncio.sleep(5)
+                for target in self.targets:
+                    try:
+                        await self.client.retrieve_queue(target.id)
+                    except APIClientError as e:
+                        if e.status_code == 404:
+                            queue_deleted_count += 1
+                        else:
+                            raise e
+
     async def delete_remote(self, target: Target):
         try:
             remote_object = await self.get_remote_object(target.id)
@@ -246,6 +271,11 @@ class RevertQueueDeploy(RevertObjectDeploy):
                 raise SubObjectException()
 
             await super().revert()
+
+            if self.revert_failed:
+                return
+
+            await self.ensure_queues_deleted()
 
             await self.schema_release.initialize(
                 yaml=self.yaml,
