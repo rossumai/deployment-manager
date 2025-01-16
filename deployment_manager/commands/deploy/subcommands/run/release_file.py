@@ -80,9 +80,9 @@ class ReleaseFile(BaseModel):
     hook_templates: dict = {}
     queue_ignore_warnings: dict = {}
 
-    ignore_timestamp_mismatches: dict[Resource | CustomResource, dict[int, bool]] = (
-        defaultdict(dict)
-    )
+    ignore_timestamp_mismatches: dict[
+        Resource | CustomResource, dict[int, bool]
+    ] = defaultdict(dict)
 
     hook_targets: dict[int, Target] = {}
     workspace_targets: dict[int, Target] = {}
@@ -297,9 +297,10 @@ class ReleaseFile(BaseModel):
                 self.ignore_timestamp_mismatches[Resource.Schema][
                     queue_release.schema_release.id
                 ] = queue_release.schema_release.ignore_timestamp_mismatch
-                self.ignore_timestamp_mismatches[Resource.Inbox][
-                    queue_release.inbox_release.id
-                ] = queue_release.inbox_release.ignore_timestamp_mismatch
+                if queue_release.inbox_release.id:
+                    self.ignore_timestamp_mismatches[Resource.Inbox][
+                        queue_release.inbox_release.id
+                    ] = queue_release.inbox_release.ignore_timestamp_mismatch
                 for rule in queue_release.schema_release.rule_releases:
                     self.ignore_timestamp_mismatches[CustomResource.Rule][
                         rule.id
