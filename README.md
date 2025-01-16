@@ -343,6 +343,13 @@ When creating a deploy file, PRD will ask you if you want to create an associate
 
 Tthe path to the secrets file is stored in the deploy file.
 
+#### Showing diffs
+
+When using `deploy run`, the deploy plan will show you diffs between the source and target objects. If the target is being created, you might see IDs with many zeros at the end (e.g., `15093900000`). These IDs are placeholders for IDs that are yet to be created. In case you are updating and existing target object, PRD will fetch the its remote version and compare it to what will be deployed.
+
+This diff feature is mostly there for you to see if your explicit `attribute_override` or the "implicit ID override" worked as expected. Please note that for brevity's and clarity's sake **not everything is shown in the diff**. The dependencies automatically replaced by PRD (e.g., `queue.hooks`) is not displayed since those changes are always made. Furthermore, attributes that cannot be recreated via PRD (e.g., `workflows`, `dedicated_engine`, etc.) are also removed from the diff.
+
+
 ### Hook
 
 #### Creating a hook payload
