@@ -1,10 +1,11 @@
+import asyncio
 from anyio import Path
 
 import questionary
 from rich import print as pprint
 from rich.panel import Panel
 import click
-from rossum_api import ElisAPIClient
+from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
 
 # from project_rossum_deploy.commands.download.download import download_project
@@ -19,11 +20,13 @@ from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
 from deployment_manager.commands.download.downloader import Downloader
 from deployment_manager.utils.consts import (
     display_error,
+    display_info,
     display_warning,
     settings,
 )
 from deployment_manager.utils.functions import (
     coro,
+    extract_id_from_url,
 )
 
 ALL_OBJECT_TYPES = [
@@ -150,7 +153,7 @@ async def purge_object_types(
         for type, object_id in object_types_ids:
             try:
                 # Queues have a "cooldown" period for deletion which needs to be overriden
-                if type == Resource.Queue.value:
+                if type == Resource.Queue:
                     (
                         await client._http_client._request(
                             "DELETE",
@@ -159,12 +162,40 @@ async def purge_object_types(
                         ),
                     )
                 else:
+                    if type == Resource.Schema:
+                        schema = await client.retrieve_schema(object_id)
+                        queues = extract_id_from_url(schema.queues)
+                        if not queues:
+                            queues = []
+
+                        queue_deleted_count = 0
+                        while queue_deleted_count != len(queues):
+                            for queue in queues:
+                                queue_id = extract_id_from_url(queue)
+                                try:
+                                    await client.retrieve_queue(queue_id)
+                                except APIClientError as e:
+                                    if e.status_code == 404:
+                                        queue_deleted_count += 1
+
+                            if queue_deleted_count == len(queues):
+                                break
+                            # Deleting queues (even when providing 'delete_after': 0) is asynchronous, wait for a short while
+                            display_info(
+                                "Waiting for queues to be deleted in the API..."
+                            )
+                            await asyncio.sleep(5)
+
                     await client._http_client.delete(resource=type, id_=object_id)
 
                 pprint(
                     f"Deleted [yellow]{type.value}[/yellow] [purple]{object_id}[/purple]"
                 )
             except Exception as e:
+                if isinstance(e, APIClientError) and e.status_code == 404:
+                    display_warning(
+                        f"{type} [purple]{object_id}[/purple] already does not exist on remote."
+                    )
                 display_error(f"Error while deleting {type.value} {object_id}: {e}")
 
         pprint(Panel(f"{settings.PURGE_COMMAND_NAME} finished."))
