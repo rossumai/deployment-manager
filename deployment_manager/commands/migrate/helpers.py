@@ -130,8 +130,10 @@ def replace_list_of_dependency_urls(
         source_id_str = str(source_id)
         new_url = source_dependency_url.replace(source_id_str, target_id_str)
 
+        # We push back the ID even if it was not changed
         if keep_dependencies_without_equivalent:
             new_urls[source_index] = new_url
+        # Unchanged IDs are ignored in the new list
         elif source_id_str != target_id_str:
             new_urls.append(new_url)
         else:

@@ -61,7 +61,7 @@ You can rerun this command later to add new directories into the project.
 
 > ℹ️ Note: all dirs and subdirs need to be added inside the configuration file (`prd_config.yaml`) to work properly with PRD commands.
 
-This command creates the specified directories and puts the provided credentials into them. 
+This command creates the specified directories and puts the provided credentials into them.
 
 This command also initializes an empty GIT repository.
 
@@ -166,6 +166,10 @@ A full example of a project directory structure with 2 organizations and 2 subdi
 │               │   └── Invoices_[1509387]
 │               │       ├── formulas
 │               │       │   └── some_formula.py
+│               │       ├── rules
+│               │       │   └── some_rule.py
+│               │       ├── email_templates
+│               │       │   └── some_email_template.py
 │               │       ├── inbox.json
 │               │       ├── queue.json
 │               │       └── schema.json
@@ -206,7 +210,7 @@ PRD has 2 mechanisms to keep track of changes when comparing local and remote Ro
 
 `push` command by default analyzes the `modified_at` attribute on each API object in the remote and compares it to the one in the local JSON object. If the `modifed_at` timestamp in remote is different from the local one, `push` will skip this object to avoid overwriting changes to the object made on the remote, but not existing locally.
 
-You can override this and push such local objects with `--force` or `-f`. 
+You can override this and push such local objects with `--force` or `-f`.
 
 ##### Pull
 
@@ -222,7 +226,7 @@ You can override this and pull all objects with `--all` or `-a`.
 
 ##### Pull
 
-`pull` uses GIT to prevent overwriting local uncommitted changes. If the timestamps are not equal (see above), but the object is tracked in GIT as modified, PRD will ask the user to confirm overwriting the object. 
+`pull` uses GIT to prevent overwriting local uncommitted changes. If the timestamps are not equal (see above), but the object is tracked in GIT as modified, PRD will ask the user to confirm overwriting the object.
 
 PRD does not create any commits for the user, but it expects the user to commit in the following situations:
 - Running `prd2 pull` and having a synced up version of local-remote
@@ -269,21 +273,40 @@ If you have many local changes and want to push only some of them to remote, you
 
 ### Deploy
 
+#### Ignoring some attributes
+
 **For cross-org deploys, some parts of the Rossum configuration are ignored because they are not writable via the API** (e.g., approval workflows, engines, etc.).
 
-IDs of dependencies (e.g., `queue.hooks`) are automatically replaced when deploying. PRD does a lookup of each source dependency to find its target equivalent.
+#### Automatic ID override
+
+PRD has 2 methods of automatic ID replacement:
+
+##### 1. Replacing IDs in known attributes (e.g., `queue.hooks`)
+
+IDs of dependencies  are automatically replaced when deploying. PRD does a lookup of each source dependency to find its target equivalent.
 
 PRD handles the following edge cases:
 1. For a single ID, if there is no target equivalent, the dependency is kept the same (e.g., `queue.schema`) and a warning is shown.
-2. For a list of IDs, if one of the dependencies has no target equivalent, it is skipped (the rest of the list of IDs is applied). This can be overriden for queues and their hooks (see the deploy file reference below).
+2. For a list of IDs, if one of the dependencies has no target equivalent, the dependency is ignored and only dependencies with a target equivalent are applied. This can be overriden for queues and their hooks (see the deploy file reference below).
 3. For both cases, if there are multiple target equivalents, their count is compared to the count of "siblings" of the current object:
     - If this count is equal (e.g., releasing 2 `queues`, each with its own version of `hooks), each sibiling object gets its own target equivalent (based on the index)
-    - If the count is not equal, all siblings get the first target equivalent as their dependency
-4. For queues, any dependencies that exist in target, but not in source (e.g., a production-only "dangling" hook) are kept in the list of dependencies.
+    - If the count is not equal, all siblings get the first target equivalent as their dependency.
+
+##### 2. Implicit ID override = replacing IDs in `settings` and `metadata`
+
+PRD scans these objects and if it finds any mention of a source ID that it knows about, it tries to find its target equivalent in a source->target lookup table. This lookup table is created during the deploy so it only knows about target objects that it created or updated.
+
+This second override feature effectively takes care of replacing random queue_ids in hook settings and other similar cases where it is easy to forget to do this change. However, it is naturally less robust than the first override feature and works only for selected attributes mentioned above.
+
+PRD handles the following edge cases:
+1. There can theoretically be different target objects with the same ID (e.g., queue "22" and inbox "22"). PRD will flag such cases for you.
+2. There might not be any known target ID to use, PRD will flag these for you as well.
+
+In both cases, **if the ID was found in a list (not a single value), the source ID will be removed from this list** (for instance, unknown queue_id in `hook.settings.queue_ids` gets removed since it is a source queue and this is a target object which should not have any connection to source).
 
 #### Multiple targets
 
-A single object can be deployed to multiple target objects by specifying an array of `targets`. The smallest viable configuration example is the following: 
+A single object can be deployed to multiple target objects by specifying an array of `targets`. The smallest viable configuration example is the following:
 ```YAML
 workspaces:
   - id: 521887
@@ -314,6 +337,36 @@ In cases where the user has a configuration in Rossum production and wants to re
 
 This flag will replicate `source_org` into `target_org` and then reverse the left and right hand sides for each object. The resulting deploy file thus has `source_org` and `target_org` reversed and is ready for a dev->prod release.
 
+#### Working with secrets
+
+When creating a deploy file, PRD will ask you if you want to create an associated secrets file and for which hooks. The secrets file will be saved in a git-ignored folder `deploy_secrets` and will have an entry for all the hooks you selected. You can then fill in the secrets for each hook. Once you do `deploy run`, the secrets file will be used
+
+Tthe path to the secrets file is stored in the deploy file.
+
+### Hook
+
+#### Creating a hook payload
+
+```
+prd2 hook payload <HOOK-PATH> [ -au <ANNOTATION-URL>]
+```
+
+Given a local hook path, this command generates a corresponding payload (similarly to what the UI SF editor does).
+
+You can optionally provide the annotation URL (otherwise you will be asked by the CLI to provide it).
+
+#### Testing a hook
+
+```
+prd2 hook payload <HOOK-PATH> [-pp <PAYLOAD-PATH> -au <ANNOTATION-URL>]
+```
+
+Given a loal hook path, this command runs the hook and displays logs and the return value.
+
+Optionally, you can provide an already created payload, otherwise a new one is created on the fly. You can combine an already created payload with a different annotation URL than the one provided when creating the payload.
+
+---
+
 ## Deploy File Reference
 
 You can leave comments in the deploy file and they will be preserved (in almost all cases) even after running PRD commands (this is different from PRD v1).
@@ -336,7 +389,7 @@ If `true`, `deploy` does not display the warning that the queue has a workflow o
 
 To override attributes in target objects, the user can specify key:value pairs. The keys are JMESPath queries. The values replace whatever is found with these queries during the `deploy` call.
 
-#### Using regex 
+#### Using regex
 
 Attribute override can also replace only a part of the value by using a regex:
 ```YAML
@@ -376,4 +429,3 @@ attribute_override:
   metadata:
 	  som: 'second'
 ```
-
