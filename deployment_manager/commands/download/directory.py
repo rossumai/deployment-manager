@@ -17,10 +17,11 @@ from deployment_manager.commands.download import email_templates
 from deployment_manager.commands.download.downloader import Downloader
 from deployment_manager.commands.download.helpers import (
     delete_empty_folders,
-    delete_orphaned_formulas,
+    delete_empty_formula_dir,
     replace_code_paths,
     should_write_object,
 )
+from deployment_manager.commands.download.remover import ObjectRemover
 from deployment_manager.commands.download.subdirectory import (
     SubdirectoriesDict,
     Subdirectory,
@@ -101,7 +102,7 @@ class OrganizationDirectory(BaseModel):
 
 
 class DownloadOrganizationDirectory(OrganizationDirectory):
-    id_object_map: dict[str, dict[int, dict]] = {}
+    id_objects_map: dict[str, dict[int, dict]] = {}
     changed_files: list = []
 
     download_all: bool = False
@@ -251,7 +252,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             )
             await self.hook_saver.save_downloaded_objects()
 
-            self.id_object_map = self.create_id_object_map(
+            self.id_objects_map = self.create_id_objects_map(
                 [
                     *workspaces_for_mapping,
                     *queues_for_mapping,
@@ -295,7 +296,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                     f'Invalid token "{self.client._http_client.token}" for organization with ID "{self.org_id}" and URL "{self.api_base}". Please make sure you have to correct token.'
                 )
 
-    def create_id_object_map(self, objects: list[dict]):
+    def create_id_objects_map(self, objects: list[dict]):
         map = defaultdict(dict)
         for object in objects:
             type = determine_object_type_from_url(object["url"])
@@ -312,61 +313,43 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             object_paths.extend(await find_all_object_paths(subdir_path))
 
             for object_path in object_paths:
-                if object_path.name == "organization.json":
-                    continue
-
-                remove = await self.should_remove_object(object_path, subdir=subdir)
-                if remove:
-                    display_warning(
-                        f"Deleting a local object that no longer exists in Rossum or was renamed: [green]{object_path}[/green]"
-                    )
-                    os.remove(object_path)
+                await self.validate_and_remove_object(object_path, subdir=subdir)
 
     async def remove_empty_queue_dirs(self):
         for subdir in self.subdirectories.values():
             if not subdir.include:
                 continue
+
             subdir_ws_path = self.project_path / self.name / subdir.name / "workspaces"
-            await delete_orphaned_formulas(subdir_ws_path)
+            await delete_empty_formula_dir(subdir_ws_path)
             await delete_empty_folders(subdir_ws_path)
 
-    async def should_remove_object(self, object_path: Path, subdir: Subdirectory):
+    async def validate_and_remove_object(self, object_path: Path, subdir: Subdirectory):
         try:
-            local_object = await read_json(object_path)
-            url, id = local_object.get("url", ""), local_object.get("id", "")
-            # Clearly not a Rossum object, just ignore
-            if not url or not id:
-                return False
+            if object_path.name == "organization.json":
+                return
 
-            object_type = determine_object_type_from_url(url)
-            remote_object = self.id_object_map.get(object_type, {}).get(id, None)
-
-            # There is not remote object with this ID (for this type)
-            if not remote_object:
-                return True
-
-            if self.is_object_path_different(
-                object_type=object_type,
-                local_object=local_object,
-                local_path=object_path,
+            object_remover = await ObjectRemover.construct_remover(
+                object_path=object_path,
                 subdir=subdir,
-                remote_object=remote_object,
-            ):
-                return True
+                id_objects_map=self.id_objects_map,
+                path_constructor=self.construct_path_for_remote_object,
+                directory=self,
+            )
 
-            return False
+            if not object_remover:
+                return
+
+            await object_remover.remove_if_stale()
         except Exception as e:
             display_error(
                 f"Error while checking if object [green]{object_path}[/green] should be removed (skipping) ^",
                 e,
             )
-            return False
 
-    def is_object_path_different(
+    def construct_path_for_remote_object(
         self,
-        local_path: Path,
         object_type: Resource | CustomResource,
-        local_object: dict,
         remote_object: dict,
         subdir: Subdirectory,
     ):
@@ -402,10 +385,6 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                     subdir, remote_object
                 )
             case _:
-                display_warning(
-                    f"Cannot determine if object [green]{local_object.get('name', 'no-name')}[/green] [purple]{local_object.get('id', 'no-id')}[/purple] of type {object_type} should be deleted: unsupported type"
-                )
-                return False
+                return ""
 
-        # The names are lowercased because some OS's (mainly MacOS) are case-insensitive in their paths
-        return str(remote_path).casefold() != str(local_path).casefold()
+        return remote_path

@@ -16,8 +16,6 @@ from deployment_manager.common.read_write import (
 from deployment_manager.utils.consts import (
     CustomResource,
     Settings,
-    display_error,
-    display_warning,
 )
 from deployment_manager.utils.functions import (
     templatize_name_id,
@@ -28,7 +26,7 @@ from deployment_manager.commands.download.subdirectory import (
 
 
 # TODO: error handling? Level of objects vs level of object ?
-class Saver(BaseModel):
+class ObjectSaver(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
@@ -112,7 +110,7 @@ class Saver(BaseModel):
         return None
 
 
-class WorkspaceSaver(Saver):
+class WorkspaceSaver(ObjectSaver):
     type: Resource = Resource.Workspace
 
     def construct_object_path(self, subdir: Subdirectory, object: dict) -> Path:
@@ -138,7 +136,7 @@ class WorkspaceSaver(Saver):
             )
 
 
-class QueueSaver(Saver):
+class QueueSaver(ObjectSaver):
     type: Resource = Resource.Queue
     workspaces: list[dict]
 
@@ -192,9 +190,9 @@ class QueueSaver(Saver):
         for ws in self.workspaces:
             if ws["url"] == queue.get("workspace", None):
                 return ws
-        display_error(
-            f"Could not find workspace for {self.display_type} {self.display_label(queue.get('name', "no-name"), queue.get('id', 'no-id'))}. Skipping."
-        )
+        # display_error(
+        #     f"Could not find workspace for {self.display_type} {self.display_label(queue.get('name', "no-name"), queue.get('id', 'no-id'))}. Skipping."
+        # )
         return None
 
 
@@ -209,9 +207,9 @@ class EmailTemplateSaver(QueueSaver):
         for queue in self.queues:
             if queue["url"] == email_template.get("queue", None):
                 return queue
-        display_warning(
-            f"Could not find queue for {self.display_type} {self.display_label(email_template.get('name', 'no-name'), email_template.get('id', 'no-id'))}. The object will not be saved locally."
-        )
+        # display_warning(
+        #     f"Could not find queue for {self.display_type} {self.display_label(email_template.get('name', 'no-name'), email_template.get('id', 'no-id'))}. The object will not be saved locally."
+        # )
         return None
 
     def construct_object_path(self, subdir: Subdirectory, email_template: dict) -> Path:
@@ -238,7 +236,9 @@ class EmailTemplateSaver(QueueSaver):
         if not email_template.get("queue", None):
             return
 
-        object_path = self.construct_object_path(subdir=subdir, email_template=email_template)
+        object_path = self.construct_object_path(
+            subdir=subdir, email_template=email_template
+        )
         if not object_path:
             return
         if self.download_all or await should_write_object(
@@ -263,9 +263,9 @@ class InboxSaver(QueueSaver):
         for queue in self.queues:
             if queue["url"] == inbox.get("queues", [None])[0]:
                 return queue
-        display_warning(
-            f"Could not find queue for {self.display_type} {self.display_label(inbox.get('name', 'no-name'), inbox.get('id', 'no-id'))}. The object will not be saved locally."
-        )
+        # display_warning(
+        #     f"Could not find queue for {self.display_type} {self.display_label(inbox.get('name', 'no-name'), inbox.get('id', 'no-id'))}. The object will not be saved locally."
+        # )
         return None
 
     def construct_object_path(self, subdir: Subdirectory, inbox: dict) -> Path:
@@ -328,14 +328,14 @@ class SchemaSaver(QueueSaver):
         warning_message = f"Could not find queue for {self.display_type} {self.display_label(schema.get('name', 'no-name'), schema.get('id', 'no-id'))}. The object will not be saved locally."
         # The schema might not have any queues assigned ([])
         if not schema_queues:
-            display_warning(warning_message)
+            # display_warning(warning_message)
             return None
 
         for queue in self.queues:
             if queue["url"] == schema_queues[0]:
                 return queue
 
-        display_warning(warning_message)
+        # display_warning(warning_message)
         return None
 
     def construct_object_path(
@@ -375,13 +375,34 @@ class SchemaSaver(QueueSaver):
                 log_message=f"Pulled {self.display_type} {object_path}",
             )
 
-            formula_fields = find_formula_fields_in_schema(schema["content"])
-            if formula_fields:
-                formula_directory_path = create_formula_directory_path(object_path)
-                for field_id, code in formula_fields:
-                    await create_formula_file(
-                        formula_directory_path / f"{field_id}.py", code
-                    )
+            formula_saver = FormulaSaver(
+                parent_schema_path=object_path, parent_schema=schema
+            )
+            await formula_saver.save_downloaded_objects()
+
+
+class FormulaSaver(BaseModel):
+    class Config:
+        arbitrary_types_allowed = True
+
+    parent_schema_path: Path
+    parent_schema: dict
+
+    formula_fields: dict[str, str] = {}
+
+    @property
+    def formula_directory_path(self):
+        return create_formula_directory_path(self.parent_schema_path)
+
+    async def save_downloaded_objects(self):
+        formula_fields = find_formula_fields_in_schema(self.parent_schema["content"])
+        for field_id, code in formula_fields:
+            await create_formula_file(
+                self.construct_object_path(field_id=field_id), code
+            )
+
+    def construct_object_path(self, field_id):
+        return self.formula_directory_path / f"{field_id}.py"
 
 
 class RuleSaver(SchemaSaver):
@@ -456,7 +477,7 @@ class RuleSaver(SchemaSaver):
             )
 
 
-class HookSaver(Saver):
+class HookSaver(ObjectSaver):
     type: Resource = Resource.Hook
 
     def construct_object_path(self, subdir: Subdirectory, hook: dict) -> Path:
