@@ -144,7 +144,7 @@ def generate_deploy_timestamp():
     return (
         datetime.now(timezone.utc)
         .isoformat(timespec="microseconds")
-        .replace("+00:00", "Z")
+        .replace("+00:00", "") + "Z"
     )
 
 
