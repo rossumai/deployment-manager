@@ -311,11 +311,12 @@ async def get_queues_from_user(
         await get_schema_for_queue(
             queue=queue, previous_queues_by_id=previous_queues_by_id
         )
-        await get_rules_for_schema(
-            schema=queue[settings.DEPLOY_KEY_SCHEMA],
-            queue=queue,
-            previous_queues_by_id=previous_queues_by_id,
-        )
+        if schema := queue.get(settings.DEPLOY_KEY_SCHEMA, None):
+            await get_rules_for_schema(
+                schema=schema,
+                queue=queue,
+                previous_queues_by_id=previous_queues_by_id,
+            )
         await get_inbox_for_queue(
             queue=queue, previous_queues_by_id=previous_queues_by_id
         )
@@ -332,6 +333,9 @@ async def get_schema_for_queue(queue: dict, previous_queues_by_id: dict):
     )
 
     if not (await schema_path.exists()):
+        display_warning(
+            f'No schema found for queue [green]{templatize_name_id(queue["name"], queue["id"])}[/green] - you will not be able to release the queue without providing a schema'
+        )
         return
 
     schema_object = await read_json(schema_path)

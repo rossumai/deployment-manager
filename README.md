@@ -349,6 +349,9 @@ When using `deploy run`, the deploy plan will show you diffs between the source 
 
 This diff feature is mostly there for you to see if your explicit `attribute_override` or the "implicit ID override" worked as expected. Please note that for brevity's and clarity's sake **not everything is shown in the diff**. The dependencies automatically replaced by PRD (e.g., `queue.hooks`) is not displayed since those changes are always made. Furthermore, attributes that cannot be recreated via PRD (e.g., `workflows`, `dedicated_engine`, etc.) are also removed from the diff.
 
+#### Sharing between multiple queues
+
+PRD expects each to find a schema next to each queue that you want to release. In cases where a schema is assigned to multiple queues, the release will not work. If you need to distribute schema changes, you can create a release from a source queue to all queues which currently share the same schema.
 
 ### Hook
 

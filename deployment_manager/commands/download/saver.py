@@ -16,6 +16,7 @@ from deployment_manager.common.read_write import (
 from deployment_manager.utils.consts import (
     CustomResource,
     Settings,
+    display_warning,
 )
 from deployment_manager.utils.functions import (
     templatize_name_id,
@@ -333,6 +334,11 @@ class SchemaSaver(QueueSaver):
 
         for queue in self.queues:
             if queue["url"] == schema_queues[0]:
+                if len(schema_queues) > 1:
+                    display_warning(
+                        f"{self.display_type} {self.display_label(schema.get('name', 'no-name'), schema.get('id', 'no-id'))} has multiple queues assigned - saving it under the first one ({self.display_label(queue.get('name', 'no-name'), queue.get('id', 'no-id'))})"
+                    )
+
                 return queue
 
         # display_warning(warning_message)

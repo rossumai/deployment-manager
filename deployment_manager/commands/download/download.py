@@ -21,9 +21,6 @@ from deployment_manager.utils.functions import (
 
 # TODO: fix foreign JSONs in the subdir (mongo.json...)
 
-# TODO: handle case of 1 schema being assigned to multiple queues:
-# Assign it to the first one, the others should get robust checks during deploy etc.
-
 
 @click.command(
     name=settings.DOWNLOAD_COMMAND_NAME,
