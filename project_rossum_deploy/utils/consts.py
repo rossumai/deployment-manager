@@ -184,7 +184,7 @@ class Settings:
         Resource.Hook: ["status"],
     }
 
-    FORMULA_DIR_PREFIX: str = "formulas:"
+    FORMULA_DIR_PREFIX: str = "formulas_"
 
     @property
     def SOURCE_API_URL(self):
