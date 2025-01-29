@@ -5,7 +5,7 @@ from deployment_manager.commands.deploy import deploy
 from deployment_manager.commands.deploy.subcommands.run.attribute_override import (
     create_regex_override_syntax,
 )
-from deployment_manager.common.read_write import read_json
+from deployment_manager.common.read_write import read_json, read_prd_project_config
 from pydantic import BaseModel
 import questionary
 from anyio import Path
@@ -99,12 +99,20 @@ async def get_token_owner_from_user(default: str = ""):
 
 
 async def get_dir_and_subdir_from_user(org_path: Path, type: str, default: str = None):
+    config = await read_prd_project_config(org_path)
+
+    if not config:
+        return ""
+
     dir_candidates = [
         dir_path
-        async for dir_path in org_path.iterdir()
-        if await dir_path.is_dir() and str(dir_path) not in settings.DEPLOY_IGNORED_DIRS
+        for dir_path in config.get(settings.CONFIG_KEY_DIRECTORIES, {}).keys()
+        if await (Path(org_path) / dir_path).exists()
     ]
-    dir_choices = [questionary.Choice(title=str(path)) for path in dir_candidates]
+
+    dir_choices = [
+        questionary.Choice(title=str(Path(org_path / path))) for path in dir_candidates
+    ]
     # Target dirname is not required (it might not exist unlike the source one)
     if type.casefold() == settings.TARGET_DIRNAME:
         dir_choices.append(questionary.Choice(title="N/A", value=""))
@@ -122,10 +130,16 @@ async def get_dir_and_subdir_from_user(org_path: Path, type: str, default: str =
 
     subdir_candidates = [
         subdir_path
-        async for subdir_path in (org_path / selected_dir).iterdir()
-        if await subdir_path.is_dir()
+        for subdir_path in config.get(settings.CONFIG_KEY_DIRECTORIES, {})
+        .get(selected_dir, {})
+        .get(settings.CONFIG_KEY_SUBDIRECTORIES, {})
+        .keys()
+        if await (Path(selected_dir) / subdir_path).exists()
     ]
-    subdir_choices = [questionary.Choice(title=str(path)) for path in subdir_candidates]
+    subdir_choices = [
+        questionary.Choice(title=str(Path(selected_dir) / path))
+        for path in subdir_candidates
+    ]
 
     # Reset default if it is not found in the current options
     if default not in [choice.title for choice in subdir_choices]:
