@@ -55,9 +55,14 @@ prd2
 
 ### 1. Create a new project
 
-Prepare the Rossum API URL for your organization by taking your Rossum URL (e.g., `https://rdttest.rossum.app/`) and append `/api/v1` to it (`https://rdttest.rossum.app/api/v1`).
+Follow the CLI instructions to initialize a new project. **You must setup at least one org-level directory and one subdir**:
+```
+prd2 init <NAME-OF-PROJECT>
+```
 
-You will also need a username/password to generate a token, curl example:
+You will need Rossum API URL for your organization: take your Rossum URL (e.g., `https://rdttest.rossum.app/`) and append `/api/v1` to it (`https://rdttest.rossum.app/api/v1`).
+
+You will also need a username/password to generate a token, `curl` example:
 ```
 curl --location 'https://rdttest.rossum.app/api/v1/auth/login' \
 --header 'Content-Type: application/json' \
@@ -67,10 +72,6 @@ curl --location 'https://rdttest.rossum.app/api/v1/auth/login' \
 }'
 ```
 
-Then, follow the CLI instructions to initialize a new project. **You must setup at least one org-level directory and one subdir**:
-```
-prd2 init <NAME-OF-PROJECT>
-```
 For each subdir, you can specify a regex for the name of objects. Once you `pull` objects from Rossum, these objects will automatically be placed into the respective subdir.
 > This only applies if the object does not have a local copy in a different subdir though!
 

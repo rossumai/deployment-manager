@@ -106,6 +106,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
     changed_files: list = []
 
     download_all: bool = False
+    skip_objects_without_subdir: bool = False
 
     workspace_saver: WorkspaceSaver = None
     queue_saver: QueueSaver = None
@@ -176,6 +177,8 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
         await self.find_object_ids_for_subdirs()
 
         subdir_list = list(self.subdirectories.values())
+        # Assigned outside of the constructor because Pydantic creates a copy - we need a shared reference
+        subdirs_by_object_id: dict[int, str] = {}
 
         try:
             self.workspace_saver = WorkspaceSaver(
@@ -183,8 +186,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 objects=workspaces_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
+                skip_objects_without_subdir=self.skip_objects_without_subdir,
                 subdirs=subdir_list,
             )
+            self.workspace_saver.subdirs_by_object_id = subdirs_by_object_id
             await self.workspace_saver.save_downloaded_objects()
 
             self.queue_saver = QueueSaver(
@@ -193,8 +198,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 workspaces=workspaces_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
+                skip_objects_without_subdir=self.skip_objects_without_subdir,
                 subdirs=subdir_list,
             )
+            self.queue_saver.subdirs_by_object_id = subdirs_by_object_id
             await self.queue_saver.save_downloaded_objects()
 
             self.email_template_saver = EmailTemplateSaver(
@@ -204,8 +211,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 queues=queues_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
+                skip_objects_without_subdir=self.skip_objects_without_subdir,
                 subdirs=subdir_list,
             )
+            self.email_template_saver.subdirs_by_object_id = subdirs_by_object_id
             await self.email_template_saver.save_downloaded_objects()
 
             # TODO: test inbox without any queue
@@ -216,8 +225,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 queues=queues_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
+                skip_objects_without_subdir=self.skip_objects_without_subdir,
                 subdirs=subdir_list,
             )
+            self.inbox_saver.subdirs_by_object_id = subdirs_by_object_id
             await self.inbox_saver.save_downloaded_objects()
 
             self.schema_saver = SchemaSaver(
@@ -227,8 +238,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 queues=queues_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
+                skip_objects_without_subdir=self.skip_objects_without_subdir,
                 subdirs=subdir_list,
             )
+            self.schema_saver.subdirs_by_object_id = subdirs_by_object_id
             await self.schema_saver.save_downloaded_objects()
 
             self.rule_saver = RuleSaver(
@@ -239,8 +252,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 queues=queues_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
+                skip_objects_without_subdir=self.skip_objects_without_subdir,
                 subdirs=subdir_list,
             )
+            self.rule_saver.subdirs_by_object_id = subdirs_by_object_id
             await self.rule_saver.save_downloaded_objects()
 
             self.hook_saver = HookSaver(
@@ -248,8 +263,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 objects=hooks_for_mapping,
                 changed_files=self.changed_files,
                 download_all=self.download_all,
+                skip_objects_without_subdir=self.skip_objects_without_subdir,
                 subdirs=subdir_list,
             )
+            self.hook_saver.subdirs_by_object_id = subdirs_by_object_id
             await self.hook_saver.save_downloaded_objects()
 
             self.id_objects_map = self.create_id_objects_map(
@@ -321,6 +338,9 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 continue
 
             subdir_ws_path = self.project_path / self.name / subdir.name / "workspaces"
+            if not await subdir_ws_path.exists():
+                continue
+
             await delete_empty_formula_dir(subdir_ws_path)
             await delete_empty_folders(subdir_ws_path)
 

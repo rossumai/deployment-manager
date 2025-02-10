@@ -50,6 +50,13 @@ In case the directory already exists, it first deletes its contents and then dow
     help="Downloads all remote files and overwrites the local ones in the selected destinations.",
 )
 @click.option(
+    "--skip-objects-without-subdir",
+    "-s",
+    default=False,
+    is_flag=True,
+    help="If there are objects whose subdir cannot be determined, user is not manually prompted - objects are not downloaded.",
+)
+@click.option(
     "--message",
     "-m",
     default="Sync changes to local",
@@ -62,12 +69,14 @@ async def download_project_wrapper(
     commit: bool = False,
     message: str = "",
     all: bool = False,
+    skip_objects_without_subdir: bool = False,
 ):
     await download_destinations(
         destinations=destinations,
         commit_message=message,
         commit=commit,
         download_all=all,
+        skip_objects_without_subdir=skip_objects_without_subdir,
     )
 
 
@@ -77,6 +86,7 @@ async def download_destinations(
     commit: bool = False,
     commit_message: str = "",
     download_all: bool = False,
+    skip_objects_without_subdir: bool = False,
 ):
     if not destinations:
         display_warning(
@@ -91,7 +101,11 @@ async def download_destinations(
     # TODO: const keys for stuff like 'directories'
     configured_directories = {
         name: DownloadOrganizationDirectory(
-            name=name, project_path=project_path, download_all=download_all, **value
+            name=name,
+            project_path=project_path,
+            skip_objects_without_subdir=skip_objects_without_subdir,
+            download_all=download_all,
+            **value,
         )
         for name, value in project_config.get("directories", {}).items()
     }

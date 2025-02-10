@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import questionary
 from rossum_api.api_client import Resource
 
+from rich import print as pprint
 from deployment_manager.commands.download.helpers import should_write_object
 from deployment_manager.common.read_write import (
     create_custom_hook_code_path,
@@ -37,8 +38,10 @@ class ObjectSaver(BaseModel):
     objects: list[dict]
     changed_files: list
     download_all: bool = False
+    skip_objects_without_subdir: bool = False
 
     objects_without_subdir: list[dict] = []
+    subdirs_by_object_id: dict[int, str] = {}
 
     @property
     def display_type(self):
@@ -57,35 +60,31 @@ class ObjectSaver(BaseModel):
             # The subdir should not be pulled, disregard the current object
             elif not subdir.include:
                 continue
+
+            self.subdirs_by_object_id[object["id"]] = subdir
             await self.save_downloaded_object(object, subdir)
 
         await self.handle_objects_without_subdir()
 
     async def handle_objects_without_subdir(self):
-        if self.objects_without_subdir:
-            object_name_ids = [
-                templatize_name_id(object["name"], object["id"])
-                for object in self.objects_without_subdir
-            ]
-            # Keeping in plural on purpose -> hence self.type
-            manual_assign = await questionary.confirm(
-                f"Found remote {self.type} that could not be assigned to any subdirectory. Do you want to assign them manually now?\n{'\n'.join(object_name_ids)}\n"
-            ).ask_async()
+        if not self.objects_without_subdir or self.skip_objects_without_subdir:
+            return
 
-            if not manual_assign:
-                return
-
-            for object in self.objects_without_subdir:
-                subdir = await self.get_subdir_from_user(object)
-                await self.save_downloaded_object(object, subdir)
+        for object in self.objects_without_subdir:
+            subdir = await self.get_subdir_from_user(object)
+            self.subdirs_by_object_id[object["id"]] = subdir
+            await self.save_downloaded_object(object, subdir)
 
     async def get_subdir_from_user(self, object):
         subdir_choices = [
             questionary.Choice(title=subdir.name, value=subdir)
             for subdir in self.subdirs
         ]
+        pprint(
+            f"{self.display_type} {self.display_label(object['name'], object['id'])}", end=" "
+        )
         return await questionary.select(
-            f"Choose subdir for {templatize_name_id(object['name'], object['id'])}:",
+            f"- select subdir:",
             choices=subdir_choices,
         ).ask_async()
 
@@ -149,7 +148,8 @@ class QueueSaver(ObjectSaver):
         parent = self.find_parent_object(object)
         if parent:
             # If you know the parent's subdir, you can use its subdir
-            return super().find_subdir_of_object(parent)
+            subdir = self.subdirs_by_object_id.get(parent["id"])
+            return subdir if subdir else super().find_subdir_of_object(parent)
 
         return None
 
