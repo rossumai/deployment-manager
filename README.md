@@ -4,6 +4,8 @@ This CLI tool aims to help users configure and manage projects on the Rossum pla
 
 ## Installation guide
 
+#### Linux/MacOS
+
 1. You can use this one-liner to download the installation script and let it execute the steps automatically:
 ```
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/rossumai/deployment-manager/main/install.sh)"
@@ -19,12 +21,16 @@ pipx ensurepath
 pipx install .
 ```
 
-Make sure to restart the terminal before using the command.
+**Make sure to restart the terminal before using the command.**
 
-You can then start using the tool in any directory by running:
+#### Windows
+
+The command is not directly compatible with Windows, but you can use it easily via WSL: https://learn.microsoft.com/en-us/windows/wsl/install. Once you install WSL and any Linux distro (Ubuntu by default), you just need to run this in your PowerShell/CMD:
 ```
-prd2
+wsl
 ```
+
+This will switch your shell to the default Linux distro one (usually BASH). From there, you can use the installation steps described above for Linux/MacOS. When using the tool, you will still need to switch to WSL - it stores files permanently so you can use it across sessions.
 
 ### Updating to a new version
 This command will automatically pull the latest vesion from the GIT repo and install it locally:
@@ -38,7 +44,7 @@ prd2 update --branch=some-cool-early-feature
 
 ### Migration from v1
 
-Please note that the new version of the tool (`prd2`) is not backwards-compatible. If you would like to use it for an existing project, we recommend downloading the whole project again via the new version and going from there. You can keep using the old version under `prd`.
+Please note that the new version of the tool (`prd2`) is not backwards-compatible. If you would like to use it for an existing project, we recommend downloading the whole project again via the new version and going from there. You can keep using the old version command under `prd`.
 
 Here are a few specific tips when migrating projects manually:
 - You need to make sure to pull the objects into the right directories that you create for them (e.g., `org/test` and `org/prod`).
@@ -46,6 +52,12 @@ Here are a few specific tips when migrating projects manually:
 - **The old version of the tool is still available under the name `prd`**, You can use it for older projects where the migration would not be worth it.
 
 ## Quick Start Guide
+
+You can then start using the tool in any directory by running:
+```
+prd2
+```
+
 
 > ℹ️ Whenever in doubt, you can run `prd2 --help` to get guidance and overview of all parameters and options. `--help` is also available for all subcommands (e.g., `prd2 pull --help`).
 
@@ -101,6 +113,8 @@ Then you can go ahead and **run the deploy**:
 prd2 deploy run <DEPLOY-FILE-PATH>
 ```
 You will first see a plan of the deploy (what will be deployed, what are the changes) and then you are asked for confirmation that those changes should be applied.
+
+If there is any error during the planning phase, you will see an error and the deploy will automatically abort. If there was an error during the execution phase, PRD will log the error and stop deploying. Any intermediate results (newly created targets) are stored in the deploy file.
 
 Once the `deploy` is finished, you will get a new file with a `_deployed` suffix. If you created new objects, their IDs will be on the right hand side. This file is created in case you wanted to keep using the original deploy file as a template. For future deploys, you should use the `_deployed` file since it will update the right objects, not create new ones again.
 
