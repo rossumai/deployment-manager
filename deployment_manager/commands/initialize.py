@@ -30,7 +30,11 @@ async def init_project(name: Path):
     subprocess.run(["git", "init", name])
 
     git_ignore_path = name / ".gitignore"
-    credentials_ignore_lines = ["\n**/credentials.json", f"\n**/{settings.CREDENTIALS_FILENAME}", f"\n**/{settings.DEFAULT_DEPLOY_SECRETS_PARENT}/"]
+    credentials_ignore_lines = [
+        "\n**/credentials.json",
+        f"\n**/{settings.CREDENTIALS_FILENAME}",
+        f"\n**/{settings.DEFAULT_DEPLOY_SECRETS_PARENT}/",
+    ]
 
     git_ignore_contents = (
         await git_ignore_path.read_text() if await git_ignore_path.exists() else ""
@@ -53,10 +57,13 @@ async def init_project(name: Path):
     previous_directories = deepcopy(directories)
     credentials = {}
 
-    while await questionary.confirm(
-        "Would you like to specify **ORG-LEVEL** directory?"
-    ).ask_async():
-        org_dir_name = await questionary.text("org-level directory name:").ask_async()
+    while (
+        not len(directories)
+        or await questionary.confirm(
+            "Would you like to specify another **ORG-LEVEL** directory?"
+        ).ask_async()
+    ):
+        org_dir_name = await questionary.text("ORG-LEVEL directory name:").ask_async()
         org_id = await questionary.text("ORG ID:").ask_async()
         api_base_url = await questionary.text(
             f"Base API URL: (e.g., {settings.DEPLOY_DEFAULT_TARGET_URL})"
@@ -70,6 +77,7 @@ async def init_project(name: Path):
         credentials[org_dir_name] = token
         await add_subdirs(directories=directories, org_dir_name=org_dir_name)
 
+    # Add subdirs to already existing directories
     if previous_directories:
         for org_dir_name in previous_directories.keys():
             await add_subdirs(directories=directories, org_dir_name=org_dir_name)
@@ -91,11 +99,13 @@ async def init_project(name: Path):
 
 
 async def add_subdirs(directories: dict, org_dir_name: str):
-    while await questionary.confirm(
-        f"Would you like to specify **SUBDIRECTORY** inside {org_dir_name}?"
-    ).ask_async():
-        subdir_name = await questionary.text("subdir name:").ask_async()
+    subdirs = directories[org_dir_name][settings.CONFIG_KEY_SUBDIRECTORIES]
+    while (
+        not len(subdirs)
+        or await questionary.confirm(
+            f"Would you like to specify another **SUBDIR** inside {org_dir_name}?"
+        ).ask_async()
+    ):
+        subdir_name = await questionary.text("SUBDIR name:").ask_async()
         subdir_regex = await questionary.text("subdir regex (OPTIONAL):").ask_async()
-        directories[org_dir_name][settings.CONFIG_KEY_SUBDIRECTORIES][subdir_name] = {
-            settings.DOWNLOAD_KEY_REGEX: subdir_regex
-        }
+        subdirs[subdir_name] = {settings.DOWNLOAD_KEY_REGEX: subdir_regex}
