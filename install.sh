@@ -5,17 +5,22 @@ PRD_GIT_URL="https://github.com/rossumai/deployment-manager.git"
 # Detect OS
 OS=$(uname -s)
 
-# Function to check Python version
-check_python_version() {
-    if command -v python3 &>/dev/null; then
-        PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')
-        PYTHON_MAJOR=$(echo "$PYTHON_VERSION" | cut -d'.' -f1)
-        PYTHON_MINOR=$(echo "$PYTHON_VERSION" | cut -d'.' -f2)
-        if [[ "$PYTHON_MAJOR" -eq 3 && "$PYTHON_MINOR" -ge 12 ]]; then
-            return 0  # Python version is valid
-        fi
+# Function to check if Python 3.12 is installed and find its path
+find_python312() {
+    if command -v python3.12 &>/dev/null; then
+        PYTHON312_PATH=$(command -v python3.12)
+        return 0
+    else
+        return 1
     fi
-    return 1  # Python version is too old or not found
+}
+
+# Function to refresh shell environment for pipx
+refresh_shell() {
+    echo "Refreshing shell to apply pipx changes..."
+    eval "$PYTHON312_PATH -m pipx ensurepath"
+    export PATH="$HOME/.local/bin:$PATH"
+    hash -r  # Refresh shell command cache
 }
 
 # macOS-specific setup
@@ -33,18 +38,13 @@ if [[ "$OS" == "Darwin" ]]; then
     fi
 
     # Ensure correct Python version is installed
-    if ! check_python_version; then
-        echo "Installing/Upgrading Python to 3.12+..."
+    if ! find_python312; then
+        echo "Installing Python 3.12..."
         brew install python@3.12
         brew link --force --overwrite python@3.12
+        PYTHON312_PATH=$(brew --prefix python@3.12)/bin/python3.12
     fi
 
-    # Ensure pipx is installed
-    if ! command -v pipx &> /dev/null; then
-        echo "pipx not found, installing via Homebrew..."
-        brew install pipx
-        pipx ensurepath
-    fi
 else
     # Linux-specific setup
     if [[ -f /etc/os-release ]]; then
@@ -52,38 +52,60 @@ else
         if [[ "$ID_LIKE" == "debian" || "$ID" == "ubuntu" ]]; then
             sudo apt update
             sudo apt install -y git software-properties-common
-            if ! check_python_version; then
-                echo "Adding PPA and Installing Python 3.12..."
+
+            if ! find_python312; then
+                echo "Installing Python 3.12..."
                 sudo add-apt-repository ppa:deadsnakes/ppa -y
                 sudo apt update
                 sudo apt install -y python3.12 python3.12-venv python3.12-distutils
-                sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
+                PYTHON312_PATH=$(which python3.12)
             fi
+
+            # Ensure python3 points to python3.12
+            sudo update-alternatives --install /usr/bin/python3 python3 "$PYTHON312_PATH" 1
+            sudo update-alternatives --set python3 "$PYTHON312_PATH"
+
         elif [[ "$ID_LIKE" == "rhel fedora" || "$ID" == "fedora" ]]; then
             sudo dnf install -y git
-            if ! check_python_version; then
+
+            if ! find_python312; then
                 echo "Installing Python 3.12..."
                 sudo dnf install -y python3.12
-                sudo alternatives --set python3 /usr/bin/python3.12
+                PYTHON312_PATH=$(which python3.12)
             fi
+
+            # Ensure python3 points to python3.12
+            sudo alternatives --install /usr/bin/python3 python3 "$PYTHON312_PATH" 1
+            sudo alternatives --set python3 "$PYTHON312_PATH"
+
         elif [[ "$ID_LIKE" == "arch" || "$ID" == "arch" ]]; then
             sudo pacman -Sy --noconfirm git
-            if ! check_python_version; then
+
+            if ! find_python312; then
                 echo "Installing Python 3.12..."
                 sudo pacman -Sy --noconfirm python
+                PYTHON312_PATH=$(which python3)
             fi
         else
             echo "Unsupported Linux distribution. Install Python 3.12 manually."
             exit 1
         fi
     fi
+fi
 
-    # Install pipx if missing
-    if ! command -v pipx &> /dev/null; then
-        echo "pipx not found, installing..."
-        python3 -m pip install --user pipx
-        python3 -m pipx ensurepath
-    fi
+# Ensure pipx is installed for Python 3.12
+if ! "$PYTHON312_PATH" -m pip show pipx &>/dev/null; then
+    echo "Installing pipx for Python 3.12..."
+    "$PYTHON312_PATH" -m ensurepip --upgrade
+    "$PYTHON312_PATH" -m pip install --user --force-reinstall pipx
+    refresh_shell
+fi
+
+# Ensure pipx works after installation
+if ! command -v pipx &> /dev/null; then
+    echo "pipx not found after installation. Adding it to PATH manually."
+    export PATH="$HOME/.local/bin:$PATH"
+    hash -r  # Refresh shell command cache
 fi
 
 # Clone repository
@@ -97,5 +119,5 @@ if [ -n "$BRANCH" ]; then
     git checkout "$BRANCH"
 fi
 
-# Install Deployment Manager
-pipx install . --force
+# Install Deployment Manager using Python 3.12 explicitly
+"$PYTHON312_PATH" -m pipx install . --force

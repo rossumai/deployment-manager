@@ -10,16 +10,8 @@ This CLI tool aims to help users configure and manage projects on the Rossum pla
 ```
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/rossumai/deployment-manager/main/install.sh)"
 ```
-2. You can also do these steps manually:
-```
-git clone https://github.com/rossumai/deployment-manager.git
-cd deployment-manager
 
-brew install pipx
-
-pipx ensurepath
-pipx install .
-```
+The command tries to instally all prerequisites based on the OS (Python 3.12, git, pipx) - please install them manually if the command is unable to do it.
 
 **Make sure to restart the terminal before using the command.**
 
@@ -62,7 +54,20 @@ prd2
 > ℹ️ Whenever in doubt, you can run `prd2 --help` to get guidance and overview of all parameters and options. `--help` is also available for all subcommands (e.g., `prd2 pull --help`).
 
 ### 1. Create a new project
-Follow the CLI instructions to initialize a new project. **You must setup at least one org-level directory and one subdir**:
+
+Prepare the Rossum API URL for your organization by taking your Rossum URL (e.g., `https://rdttest.rossum.app/`) and append `/api/v1` to it (`https://rdttest.rossum.app/api/v1`).
+
+You will also need a username/password to generate a token, curl example:
+```
+curl --location 'https://rdttest.rossum.app/api/v1/auth/login' \
+--header 'Content-Type: application/json' \
+--data '{
+    "username": "my-user",
+    "password": "my-password"
+}'
+```
+
+Then, follow the CLI instructions to initialize a new project. **You must setup at least one org-level directory and one subdir**:
 ```
 prd2 init <NAME-OF-PROJECT>
 ```
