@@ -68,7 +68,9 @@ class ObjectRelease(BaseModel):
     deploy_failed: bool = False
 
     last_deploy_timestamp: str = ""
-    ignore_timestamp_mismatches: dict[Resource | CustomResource, dict[int, bool]] = defaultdict(dict)
+    ignore_timestamp_mismatches: dict[Resource | CustomResource, dict[int, bool]] = (
+        defaultdict(dict)
+    )
     ignore_timestamp_mismatch: bool = False
 
     targets: list[TargetWithDefault] = []
@@ -198,7 +200,9 @@ class ObjectRelease(BaseModel):
     def update_targets(self, results):
         # asyncio.gather returns results in the same order as they were put in
         for index, (result, target) in enumerate(zip(results, self.targets)):
-            target.id = result.get("id", None)
+            # In case of errors, do not overwrite the existing target ID, the object still exists
+            if new_id := result.get("id", None):
+                target.id = new_id
             target.data = result
             self.yaml_reference["targets"][index]["id"] = target.id
 
