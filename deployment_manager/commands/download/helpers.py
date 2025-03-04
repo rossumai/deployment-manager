@@ -31,7 +31,12 @@ def replace_code_paths(file_paths: list[Path]):
     return replaced_paths
 
 
-async def should_write_object(path: Path, remote_object: Any, changed_files: list):
+async def should_write_object(
+    path: Path,
+    remote_object: Any,
+    changed_files: list,
+    parent_dir_reference: "DownloadOrganizationDirectory",
+):
     if await path.exists():
         local_file = await read_json(path)
 
@@ -50,13 +55,23 @@ async def should_write_object(path: Path, remote_object: Any, changed_files: lis
                 and local_file.get("rules", []) != remote_object.get("rules", [])
             )
         ):
-            if path in changed_files:
+            if (
+                path in changed_files
+                and not parent_dir_reference.ignore_changed_file_warnings
+            ):
                 display_warning(
                     f"File [green]{path}[/green] has local unversioned changes [white](local: {local_timestamp} | remote: {remote_timestamp})[/white]."
                 )
-                return await questionary.confirm(
-                    "Should the remote version overwrite the local one?",
+                user_answer = await questionary.text(
+                    message="Should the remote version overwrite the local one?",
+                    instruction="(y/n/yy)",
                 ).ask_async()
+                # Disable warnings for all other queues
+                if user_answer.casefold() == "yy":
+                    parent_dir_reference.ignore_changed_file_warnings = True
+
+                return user_answer == "y" or user_answer == "yy"
+
             return True
 
     else:
