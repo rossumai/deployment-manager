@@ -1,6 +1,7 @@
 import asyncio
 from collections import defaultdict
 import os
+from typing import Optional
 from anyio import Path
 from pydantic import BaseModel
 from rich import print as pprint
@@ -13,7 +14,6 @@ from deployment_manager.commands.deploy.subcommands.run.helpers import get_token
 from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
     Credentials,
 )
-from deployment_manager.commands.download import email_templates
 from deployment_manager.commands.download.downloader import Downloader
 from deployment_manager.commands.download.helpers import (
     delete_empty_folders,
@@ -22,6 +22,7 @@ from deployment_manager.commands.download.helpers import (
     should_write_object,
 )
 from deployment_manager.commands.download.remover import ObjectRemover
+from deployment_manager.commands.download.saver import EmailTemplateSaver, HookSaver, InboxSaver, QueueSaver, RuleSaver, SchemaSaver, WorkspaceSaver
 from deployment_manager.commands.download.subdirectory import (
     SubdirectoriesDict,
     Subdirectory,
@@ -33,15 +34,7 @@ from deployment_manager.utils.consts import (
     display_warning,
     settings,
 )
-from deployment_manager.commands.download.saver import (
-    EmailTemplateSaver,
-    HookSaver,
-    InboxSaver,
-    QueueSaver,
-    RuleSaver,
-    SchemaSaver,
-    WorkspaceSaver,
-)
+
 from deployment_manager.common.git import get_changed_file_paths
 from deployment_manager.common.read_write import read_json, write_json
 from deployment_manager.utils.functions import (
@@ -107,14 +100,15 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
 
     download_all: bool = False
     skip_objects_without_subdir: bool = False
+    ignore_changed_file_warnings: bool = False
 
-    workspace_saver: WorkspaceSaver = None
-    queue_saver: QueueSaver = None
-    email_template_saver: EmailTemplateSaver = None
-    inbox_saver: InboxSaver = None
-    schema_saver: SchemaSaver = None
-    rule_saver: RuleSaver = None
-    hook_saver: HookSaver = None
+    workspace_saver: Optional["WorkspaceSaver"] = None
+    queue_saver: Optional["QueueSaver"] = None
+    email_template_saver: Optional["EmailTemplateSaver"] = None
+    inbox_saver: Optional["InboxSaver"] = None
+    schema_saver: Optional["SchemaSaver"] = None
+    rule_saver: Optional["RuleSaver"] = None
+    hook_saver: Optional["HookSaver"] = None
 
     async def initialize(self):
         if not self.project_path:
@@ -182,6 +176,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
 
         try:
             self.workspace_saver = WorkspaceSaver(
+                parent_dir_reference=self,
                 base_path=self.project_path / self.name,
                 objects=workspaces_for_mapping,
                 changed_files=self.changed_files,
@@ -193,6 +188,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             await self.workspace_saver.save_downloaded_objects()
 
             self.queue_saver = QueueSaver(
+                parent_dir_reference=self,
                 base_path=self.project_path / self.name,
                 objects=queues_for_mapping,
                 workspaces=workspaces_for_mapping,
@@ -205,6 +201,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             await self.queue_saver.save_downloaded_objects()
 
             self.email_template_saver = EmailTemplateSaver(
+                parent_dir_reference=self,
                 base_path=self.project_path / self.name,
                 objects=email_templates_for_mapping,
                 workspaces=workspaces_for_mapping,
@@ -219,6 +216,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
 
             # TODO: test inbox without any queue
             self.inbox_saver = InboxSaver(
+                parent_dir_reference=self,
                 base_path=self.project_path / self.name,
                 objects=inboxes_for_mapping,
                 workspaces=workspaces_for_mapping,
@@ -232,6 +230,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             await self.inbox_saver.save_downloaded_objects()
 
             self.schema_saver = SchemaSaver(
+                parent_dir_reference=self,
                 base_path=self.project_path / self.name,
                 objects=schemas_for_mapping,
                 workspaces=workspaces_for_mapping,
@@ -245,6 +244,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             await self.schema_saver.save_downloaded_objects()
 
             self.rule_saver = RuleSaver(
+                parent_dir_reference=self,
                 base_path=self.project_path / self.name,
                 objects=rules_for_mapping,
                 schemas=schemas_for_mapping,
@@ -259,6 +259,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             await self.rule_saver.save_downloaded_objects()
 
             self.hook_saver = HookSaver(
+                parent_dir_reference=self,
                 base_path=self.project_path / self.name,
                 objects=hooks_for_mapping,
                 changed_files=self.changed_files,
@@ -295,7 +296,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             )
             org_file_path = self.project_path / self.name / "organization.json"
             if self.download_all or await should_write_object(
-                org_file_path, organization, self.changed_files
+                org_file_path, organization, self.changed_files, self
             ):
                 await write_json(
                     org_file_path,
