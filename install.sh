@@ -25,19 +25,16 @@ refresh_shell() {
 
 # macOS-specific setup
 if [[ "$OS" == "Darwin" ]]; then
-    # Ensure Homebrew is installed
-    if ! command -v brew &> /dev/null; then
+    if ! command -v brew &>/dev/null; then
         echo "Homebrew not found, installing..."
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
 
-    # Ensure Git is installed
-    if ! command -v git &> /dev/null; then
+    if ! command -v git &>/dev/null; then
         echo "Git not found, installing via Homebrew..."
         brew install git
     fi
 
-    # Ensure correct Python version is installed
     if ! find_python312; then
         echo "Installing Python 3.12..."
         brew install python@3.12
@@ -46,7 +43,6 @@ if [[ "$OS" == "Darwin" ]]; then
     fi
 
 else
-    # Linux-specific setup
     if [[ -f /etc/os-release ]]; then
         source /etc/os-release
         if [[ "$ID_LIKE" == "debian" || "$ID" == "ubuntu" ]]; then
@@ -61,7 +57,6 @@ else
                 PYTHON312_PATH=$(which python3.12)
             fi
 
-            # Ensure python3 points to python3.12
             sudo update-alternatives --install /usr/bin/python3 python3 "$PYTHON312_PATH" 1
             sudo update-alternatives --set python3 "$PYTHON312_PATH"
 
@@ -74,7 +69,6 @@ else
                 PYTHON312_PATH=$(which python3.12)
             fi
 
-            # Ensure python3 points to python3.12
             sudo alternatives --install /usr/bin/python3 python3 "$PYTHON312_PATH" 1
             sudo alternatives --set python3 "$PYTHON312_PATH"
 
@@ -101,11 +95,10 @@ if ! "$PYTHON312_PATH" -m pip show pipx &>/dev/null; then
     refresh_shell
 fi
 
-# Ensure pipx works after installation
-if ! command -v pipx &> /dev/null; then
+if ! command -v pipx &>/dev/null; then
     echo "pipx not found after installation. Adding it to PATH manually."
     export PATH="$HOME/.local/bin:$PATH"
-    hash -r  # Refresh shell command cache
+    hash -r
 fi
 
 # Clone repository
@@ -114,10 +107,12 @@ cd "$TEMP_GIT_DIR" || { echo "Failed to change directory"; exit 1; }
 git clone "$PRD_GIT_URL"
 cd deployment-manager || { echo "Failed to enter repository directory"; exit 1; }
 
-# Checkout specified branch if provided
 if [ -n "$BRANCH" ]; then
     git checkout "$BRANCH"
 fi
 
 # Install Deployment Manager using Python 3.12 explicitly
 "$PYTHON312_PATH" -m pipx install . --force
+
+# Always attempt to install txscript — but allow failure without stopping the process
+"$PYTHON312_PATH" -m pip install txscript || true
