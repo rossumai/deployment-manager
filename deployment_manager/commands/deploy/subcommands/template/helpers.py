@@ -275,7 +275,7 @@ async def get_workspaces_from_user(
     deploy_file_workspaces = [ws.value for ws in ws_choices if ws.checked]
     if interactive or not selected_ws_ids:
         deploy_file_workspaces = await questionary.checkbox(
-            "Select WS:", choices=ws_choices
+            "Select workspaces:", choices=ws_choices
         ).ask_async()
 
     return prepare_deploy_file_objects(
