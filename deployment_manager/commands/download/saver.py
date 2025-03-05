@@ -56,15 +56,15 @@ class QueueSaver(ObjectSaver):
     workspaces: list[dict]
 
     def find_subdir_of_object(self, object: dict):
-        subdir = super().find_subdir_of_object(object)
-        if subdir:
-            return subdir
-
         parent = self.find_parent_object(object)
         if parent:
             # If you know the parent's subdir, you can use its subdir
             subdir = self.subdirs_by_object_id.get(parent["id"])
             return subdir if subdir else super().find_subdir_of_object(parent)
+
+        subdir = super().find_subdir_of_object(object)
+        if subdir:
+            return subdir
 
         return None
 
