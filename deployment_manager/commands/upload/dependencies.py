@@ -38,18 +38,17 @@ async def merge_formula_changes(changes: list[tuple[str, Path]]):
                 GIT_CHARACTERS.CREATED,
                 GIT_CHARACTERS.CREATED_STAGED,
             ]
-            and "schemas" in path.parent.parent.name
+            and settings.FORMULA_DIR_NAME in path.parent.name
             and (path.suffix == ".py")
         ):
             formula_code = await read_formula_file(path)
             formula_name = path.stem
 
-            schema_file_name = str(path.parent.stem).removeprefix(
-                settings.FORMULA_DIR_NAME
-            )
-            schema_path = path.parent.parent / f"{schema_file_name}.json"
-            schema = await read_json(schema_path)
+            schema_path = path.parent.parent / f"schema.json"
+            if not await schema_path.exists():
+                continue
 
+            schema = await read_json(schema_path)
             schema_id = find_schema_id(schema["content"], formula_name)
             schema_id["formula"] = formula_code
 
@@ -61,7 +60,7 @@ async def merge_formula_changes(changes: list[tuple[str, Path]]):
             merged_changes.append(change)
 
     # If code file was not among the changes, the JSON schemas file already has the new code thanks to the for loop above and no change is technically actually made.
-    # In case code of a schema was changed directly in the JSON file, update the code file as well.
+    # In case code of a schema was changed directly in the JSON file, update the formula code file as well.
     for change in merged_changes:
         op, path = change
         if (
@@ -71,15 +70,13 @@ async def merge_formula_changes(changes: list[tuple[str, Path]]):
                 GIT_CHARACTERS.CREATED,
                 GIT_CHARACTERS.CREATED_STAGED,
             ]
-            and "schemas" in path.parent.name
-        ) and path.suffix == ".json":
+            and "schema.json" in path.name
+        ):
             schema = await read_json(path)
 
             formula_fields = find_formula_fields_in_schema(schema["content"])
             if formula_fields:
-                formula_directory_path = create_formula_directory_path(
-                    path, schema.get("name", ""), schema.get("id", "")
-                )
+                formula_directory_path = create_formula_directory_path(path)
                 for field_id, code in formula_fields:
                     await create_formula_file(
                         formula_directory_path / f"{field_id}.py", code
