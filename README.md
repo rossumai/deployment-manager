@@ -15,6 +15,19 @@ The command tries to instally all prerequisites based on the OS (Python 3.12, gi
 
 **Make sure to restart the terminal before using the command.**
 
+2. You can also install the tool step by step manually:
+```bash
+cd $(mktemp -d)
+git clone git@github.com:rossumai/deployment-manager.git
+cd deployment-manager
+
+python3 -m venv .
+source bin/activate
+python3 -m pip install pipx
+
+python3 -m pipx install . --force
+```
+
 #### Windows
 
 The command is not directly compatible with Windows, but you can use it easily via WSL: https://learn.microsoft.com/en-us/windows/wsl/install. Once you install WSL and any Linux distro (Ubuntu by default), you just need to run this in your PowerShell/CMD:
