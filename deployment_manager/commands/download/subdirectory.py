@@ -7,7 +7,7 @@ class Subdirectory(BaseModel):
     name: str
     regex: str = None
     include: bool = False
-    object_ids: set[int] = None
+    object_ids: set[int] = []
 
 
 def create_subdir_configuration(subdirs):
