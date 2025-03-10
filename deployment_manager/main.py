@@ -12,7 +12,7 @@ from deployment_manager.commands.purge.purge import purge_object_types_wrapper
 from deployment_manager.commands.upload.upload import upload_project_wrapper
 
 
-@click.group()
+@click.group(context_settings={"max_content_width": 120})
 @click.version_option()
 def main(): ...
 
