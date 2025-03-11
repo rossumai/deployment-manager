@@ -201,7 +201,7 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
                 else:
                     if type == Resource.Schema:
                         schema = await self.client.retrieve_schema(object_id)
-                        queues = extract_id_from_url(schema.queues)
+                        queues = [extract_id_from_url(queue_url) for queue_url in schema.queues]
                         if not queues:
                             queues = []
 
