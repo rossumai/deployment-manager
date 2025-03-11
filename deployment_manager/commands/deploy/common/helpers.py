@@ -33,6 +33,38 @@ async def get_api_url_from_config(base_path: Path, org_name: str):
     return ""
 
 
+async def get_directory_from_config(base_path: Path, org_name: str):
+    try:
+        config_data = await read_prd_project_config(base_path)
+        if not config_data:
+            return ""
+
+        return (
+            config_data.get(settings.CONFIG_KEY_DIRECTORIES, {}).get(org_name, {})
+        )
+    except Exception:
+        ...
+
+    return None
+
+
+async def get_org_id_from_config(base_path: Path, org_name: str):
+    try:
+        config_data = await read_prd_project_config(base_path)
+        if not config_data:
+            return ""
+
+        return int(
+            config_data.get(settings.CONFIG_KEY_DIRECTORIES, {})
+            .get(org_name, {})
+            .get(settings.CONFIG_KEY_ORG_ID, "")
+        )
+    except Exception:
+        ...
+
+    return None
+
+
 async def get_token_from_cred_file(org_path: Path, api_url: str):
     credentials_path: Path = org_path / settings.CREDENTIALS_FILENAME
     if not (await credentials_path.exists()):

@@ -98,20 +98,17 @@ async def get_token_owner_from_user(default: str = ""):
         return await get_token_owner_from_user(default=default)
 
 
-async def get_dir_and_subdir_from_user(org_path: Path, type: str, default: str = None):
-    config = await read_prd_project_config(org_path)
-
-    if not config:
-        return ""
-
+async def get_dir_from_user(
+    project_path: Path, type: str, config: dict, default: str = None
+):
     dir_candidates = [
         dir_path
         for dir_path in config.get(settings.CONFIG_KEY_DIRECTORIES, {}).keys()
-        if await (Path(org_path) / dir_path).exists()
+        if await (Path(project_path) / dir_path).exists()
     ]
 
     dir_choices = [
-        questionary.Choice(title=str(Path(org_path / path))) for path in dir_candidates
+        questionary.Choice(title=str(Path(project_path / path))) for path in dir_candidates
     ]
     # Target dirname is not required (it might not exist unlike the source one)
     if type.casefold() == settings.TARGET_DIRNAME:
@@ -125,6 +122,20 @@ async def get_dir_and_subdir_from_user(org_path: Path, type: str, default: str =
         f"Which folder is the {type}?", choices=dir_choices, default=default
     ).ask_async()
 
+    return selected_dir
+
+
+async def get_dir_and_subdir_from_user(
+    project_path: Path, type: str, default: str = None
+):
+    config = await read_prd_project_config(project_path)
+
+    if not config:
+        return ""
+
+    selected_dir = await get_dir_from_user(
+        project_path=project_path, type=type, default=default, config=config
+    )
     if not selected_dir:
         return ""
 

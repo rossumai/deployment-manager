@@ -198,6 +198,7 @@ class Settings:
 
     CONFIG_KEY_API_BASE_URL = "api_base"
     CONFIG_KEY_TOKEN = "token"
+    CONFIG_KEY_ORG_ID = "org_id"
     CONFIG_KEY_DIRECTORIES = "directories"
     CONFIG_KEY_SUBDIRECTORIES = "subdirectories"
 

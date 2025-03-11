@@ -52,7 +52,7 @@ async def create_deploy_template(
     source_dir_and_subdir = deploy_file_object.get(settings.DEPLOY_KEY_SOURCE_DIR, None)
     if interactive or not source_dir_and_subdir:
         source_dir_and_subdir = await get_dir_and_subdir_from_user(
-            org_path=org_path,
+            project_path=org_path,
             type=settings.SOURCE_DIRNAME.upper(),
             default=source_dir_and_subdir,
         )
@@ -69,7 +69,7 @@ async def create_deploy_template(
     target_dir_and_subdir = deploy_file_object.get(settings.DEPLOY_KEY_TARGET_DIR, None)
     if interactive or not target_dir_and_subdir:
         target_dir_and_subdir = await get_dir_and_subdir_from_user(
-            org_path=org_path,
+            project_path=org_path,
             type=settings.TARGET_DIRNAME.upper(),
             default=target_dir_and_subdir,
         )

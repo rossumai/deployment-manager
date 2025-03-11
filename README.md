@@ -304,6 +304,21 @@ If you have many local changes and want to push only some of them to remote, you
 
 `-c` or `-cm` parameter can be added to automatically commit all changes with default or custom (`-m` parameter) commit message.
 
+### Purge
+
+This command allows you to remove objects from a specific organization. You always specify types of objects to delete (e.g., hooks, all, etc.).
+
+You can either specify a locally configured org-level directory and optionally subdirectories to delete, or you provide an API URL + token and the command will find the right organization remotely.
+
+The command first presents a plan of what it will delete and the user is asked to confirm. **This deletion cannot be undone, so carefully check what is being deleted and where before you confirm.**
+
+##### Deleting unused schemas
+
+You can delete only schemas unassigned to any queues that can accumulate in an organization:
+```
+prd2 purge unused_schemas
+```
+
 ### Deploy
 
 #### Ignoring some attributes
