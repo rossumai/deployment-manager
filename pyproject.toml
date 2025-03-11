@@ -10,6 +10,9 @@ authors = [
 license = "MIT"
 readme = "README.md"
 
+[tool.poetry-dynamic-versioning]
+enable = true
+
 [tool.poetry.dependencies]
 python = "^3.12"
 httpx = "^0.25.2"

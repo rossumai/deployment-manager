@@ -1,3 +1,4 @@
+import importlib
 import click
 
 from deployment_manager.commands.deploy.deploy import deploy
@@ -13,7 +14,7 @@ from deployment_manager.commands.upload.upload import upload_project_wrapper
 
 
 @click.group(context_settings={"max_content_width": 120})
-@click.version_option()
+@click.version_option(version=importlib.metadata.version("deployment-manager"))
 def main(): ...
 
 
