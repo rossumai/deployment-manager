@@ -111,6 +111,8 @@ if [ -n "$BRANCH" ]; then
     git checkout "$BRANCH"
 fi
 
+"$PYTHON312_PATH" -m pipx inject deployment-manager poetry-dynamic-versioning
+
 # Install Deployment Manager using Python 3.12 explicitly
 "$PYTHON312_PATH" -m pipx install . --force
 
