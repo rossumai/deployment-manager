@@ -2,9 +2,10 @@
 name = "deployment-manager"
 version = "0.0.0"
 packages = [
-    { include = "deployment_manager" }, # Keeps main package
+    { include = "deployment_manager" },    # Keeps main package
     { include = "rossum_api" },
 ]
+
 
 # Force Poetry to include rossum_api, even if it's in .gitignore
 include = ["rossum_api/**/*"]
@@ -35,6 +36,12 @@ jmespath = "^1.0.1"
 ruamel-yaml = "^0.18.6"
 pydantic = "^2.9.2"
 questionary = "^2.0.1"
+
+# Moved from `rossum_api` dependencies:
+tenacity = "^8.2.3"
+datamodel-code-generator = "^0.21.2"
+fastapi = "^0.100.0"
+uvicorn = "^0.20.0"
 
 [tool.poetry.scripts]
 prd2 = "deployment_manager.main:main"
