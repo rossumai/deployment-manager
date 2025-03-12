@@ -51,8 +51,7 @@ requires = ["poetry-core", "poetry-dynamic-versioning"]
 build-backend = "poetry_dynamic_versioning.backend"
 
 [tool.ruff]
-exclude = ["dummy_project", "dist"]
+exclude = ["dummy_project", "dist", "rossum_api"]
 
 [tool.pytest]
 env_files = [".env"]
-rossum-api = { path = "rossum_sdk" }
