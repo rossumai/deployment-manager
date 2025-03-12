@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "deployment-manager"
-version = "2.0.0"
+version = "0.0.0"
 description = ""
 authors = [
     "Miroslav Rehounek <miroslav.rehounek@rossum.ai>",
@@ -12,11 +12,14 @@ readme = "README.md"
 
 [tool.poetry-dynamic-versioning]
 enable = true
+vcs = "git"
+style = "pep440"
+pattern = "v(?P<base>\\d+\\.\\d+\\.\\d+)"
 
 [tool.poetry.dependencies]
 python = "^3.12"
+rossum-api = { path = 'rossum_sk' }
 httpx = "^0.25.2"
-rossum-api = { git = "https://github.com/rossumai/rossum-sdk", rev = "v0.20.0" }
 click = "^8.1.7"
 pyyaml = "^6.0.1"
 anyio = "^4.2.0"
@@ -45,3 +48,4 @@ exclude = ["dummy_project", "dist"]
 
 [tool.pytest]
 env_files = [".env"]
+rossum-api = { path = "rossum_sdk" }
