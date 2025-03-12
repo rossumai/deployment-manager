@@ -3,20 +3,29 @@ name: Build and Release Deployment Manager
 on:
   push:
     tags:
-      - "v*.*.*"  # Runs when a version tag (e.g., v2.1.0) is pushed
+      - "v*.*.*" # Runs when a version tag (e.g., v2.1.0) is pushed
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Code with Full History
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Ensures all Git tags are available
 
-      - name: Install Poetry
-        run: pip install poetry
+      - name: Install Poetry & Plugins
+        run: |
+          pip install poetry poetry-dynamic-versioning
 
-      - name: Build Wheel
-        run: poetry build
+      - name: Verify Git Tags
+        run: git tag
+
+      - name: Build the Wheel with Correct Version
+        run: |
+          poetry lock --no-update
+          poetry install
+          poetry build
 
       - name: Find the Generated Wheel
         id: find_wheel

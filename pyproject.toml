@@ -18,7 +18,7 @@ pattern = "v(?P<base>\\d+\\.\\d+\\.\\d+)"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-rossum-api = { path = 'rossum_sdk' }
+rossum-api = { path = 'deployment_manager/rossum_sdk' }
 httpx = "^0.25.2"
 click = "^8.1.7"
 pyyaml = "^6.0.1"
@@ -40,8 +40,8 @@ pytest-dotenv = "^0.5.2"
 pytest = "^8.2.2"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core", "poetry-dynamic-versioning"]
+build-backend = "poetry_dynamic_versioning.backend"
 
 [tool.ruff]
 exclude = ["dummy_project", "dist"]
