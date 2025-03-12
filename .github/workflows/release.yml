@@ -1,0 +1,29 @@
+name: Build and Release Deployment Manager
+
+on:
+  push:
+    tags:
+      - "v*.*.*"  # Run when a version tag is pushed
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Build Wheel
+        run: |
+          poetry build
+          mv dist/deployment_manager-*.whl dist/deployment_manager.whl
+
+      - name: Upload Release to GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/deployment_manager.whl
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false

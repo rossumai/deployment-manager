@@ -4,38 +4,32 @@ This CLI tool aims to help users configure and manage projects on the Rossum pla
 
 ## Installation guide
 
-#### Linux/MacOS
+### Prerequisites
+- Python 3.12
 
-1. You can use this one-liner to download the installation script and let it execute the steps automatically:
-```
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/rossumai/deployment-manager/main/install.sh)"
-```
+### Linux/MacOS
 
-The command tries to instally all prerequisites based on the OS (Python 3.12, git, pipx) - please install them manually if the command is unable to do it.
+Install the tool via pip:
+```
+pip install https://github.com/rossumai/deployment-manager/releases/latest/download/deployment_manager.whl
+```
 
 **Make sure to restart the terminal before using the command.**
 
-2. You can also install the tool step by step manually:
-```bash
-cd $(mktemp -d)
-git clone git@github.com:rossumai/deployment-manager.git
-cd deployment-manager
+### Windows
 
-python3 -m venv .
-source bin/activate
-python3 -m pip install pipx
-
-python3 -m pipx install . --force
+1. Install the tool via pip:
+```
+pip install https://github.com/rossumai/deployment-manager/releases/latest/download/deployment_manager.whl
+```
+2. Run this in your terminal to add the tool to PATH:
+```
+powershell -ExecutionPolicy Bypass -Command "& {Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/rossumai/deployment-manager/main/add_to_path.ps1' -OutFile add_to_path.ps1; & ./add_to_path.ps1}"
 ```
 
-#### Windows
+If you encounter errors during the second step, please make sure you have Python installed from [https://www.python.org/downloads/windows/](https://www.python.org/downloads/windows/), not from MS Store.
 
-The command is not directly compatible with Windows, but you can use it easily via WSL: https://learn.microsoft.com/en-us/windows/wsl/install. Once you install WSL and any Linux distro (Ubuntu by default), you just need to run this in your PowerShell/CMD:
-```
-wsl
-```
-
-This will switch your shell to the default Linux distro one (usually BASH). From there, you can use the installation steps described above for Linux/MacOS. When using the tool, you will still need to switch to WSL - it stores files permanently so you can use it across sessions.
+**Make sure to restart the terminal before using the command.**
 
 ### Updating to a new version
 This command will automatically pull the latest vesion from the GIT repo and install it locally:
