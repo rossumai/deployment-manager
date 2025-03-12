@@ -1,6 +1,14 @@
 [tool.poetry]
 name = "deployment-manager"
 version = "0.0.0"
+packages = [
+    { include = "deployment_manager" }, # Keeps main package
+    { include = "rossum_api" },
+]
+
+# Force Poetry to include rossum_api, even if it's in .gitignore
+include = ["rossum_api/**/*"]
+
 description = ""
 authors = [
     "Miroslav Rehounek <miroslav.rehounek@rossum.ai>",
@@ -18,7 +26,6 @@ pattern = "v(?P<base>\\d+\\.\\d+\\.\\d+)"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-rossum-api = { path = 'deployment_manager/rossum_sdk' }
 httpx = "^0.25.2"
 click = "^8.1.7"
 pyyaml = "^6.0.1"

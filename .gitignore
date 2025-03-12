@@ -10,3 +10,4 @@ temp_project
 .vscode
 **/.DS_Store
 rossum_sdk
+rossum_api
