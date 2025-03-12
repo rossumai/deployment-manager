@@ -3,7 +3,7 @@ name: Build and Release Deployment Manager
 on:
   push:
     tags:
-      - "v*.*.*"  # Runs when a version tag (e.g., v2.1.0) is pushed
+      - "v*.*.*"
 
 jobs:
   build:
@@ -11,6 +11,15 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Clone Rossum SDK and Copy `rossum_api`
+        run: |
+          git clone --depth 1 --branch v0.20.0 https://github.com/rossumai/rossum-sdk tmp_rossum_sdk
+          cp -r tmp_rossum_sdk/rossum_api .  # 🚀 Copy to project root!
+          rm -rf tmp_rossum_sdk
+
+      - name: Verify rossum_api Exists Before Build
+        run: ls -R rossum_api/
 
       - name: Install Poetry & Plugins
         run: pip install poetry poetry-dynamic-versioning
@@ -21,14 +30,13 @@ jobs:
       - name: Build Wheel
         run: poetry build
 
-      - name: Find the Generated Wheel
-        id: find_wheel
-        run: echo "WHEEL_FILE=$(ls dist/*.whl)" >> $GITHUB_ENV
+      - name: Verify rossum_api in Built Package
+        run: unzip -l dist/*.whl | grep rossum_api || echo "❌ rossum_api NOT FOUND!"
 
       - name: Upload Release to GitHub
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.WHEEL_FILE }}
+          files: dist/*.whl
           tag_name: ${{ github.ref_name }}
           draft: false
           prerelease: false
