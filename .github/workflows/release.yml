@@ -1,0 +1,31 @@
+name: Build and Release Deployment Manager
+
+on:
+  push:
+    tags:
+      - "v*.*.*"  # Runs when a version tag (e.g., v2.1.0) is pushed
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Build Wheel
+        run: poetry build
+
+      - name: Find the Generated Wheel
+        id: find_wheel
+        run: echo "WHEEL_FILE=$(ls dist/*.whl)" >> $GITHUB_ENV
+
+      - name: Upload Release to GitHub (Versioned)
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.WHEEL_FILE }}
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
