@@ -1,4 +1,3 @@
-import resource
 from anyio import Path
 from rossum_api.api_client import Resource
 
