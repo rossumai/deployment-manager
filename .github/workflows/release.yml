@@ -12,6 +12,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Clone Rossum SDK
+        run: |
+          git clone --depth 1 --branch v0.20.0 https://github.com/rossumai/rossum-sdk deployment_manager/rossum_sdk
+
       - name: Install Poetry & Plugins
         run: pip install poetry poetry-dynamic-versioning
 
