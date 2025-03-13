@@ -11,18 +11,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive  # ✅ Ensures `rossum_sdk` is pulled correctly
-
-      - name: Checkout Submodule Tag
-        run: |
-          cd rossum_sdk
-          git fetch --tags
-          git checkout v0.20.0
-          cd ..
-
-      - name: Verify rossum_api Exists Before Build
-        run: ls -R rossum_sdk/rossum_api/ || echo "❌ rossum_api NOT FOUND!"
 
       - name: Install Poetry & Plugins
         run: pip install poetry poetry-dynamic-versioning
@@ -32,9 +20,6 @@ jobs:
 
       - name: Build Wheel
         run: poetry build
-
-      - name: Verify rossum_api in Built Package
-        run: unzip -l dist/*.whl | grep rossum_sdk/rossum_api || echo "❌ rossum_api NOT FOUND!"
 
       - name: Upload Release to GitHub
         uses: softprops/action-gh-release@v2
