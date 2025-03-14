@@ -54,7 +54,7 @@ jobs:
 
       - name: Generate Changelog from Commits
         run: |
-          git-cliff --unreleased --tag "${{ github.ref_name }}" --output CHANGELOG_TMP.md
+          git-cliff --config cliff.toml --tag "${{ env.latest_tag }}" --output CHANGELOG_TMP.md
           cat CHANGELOG.md >> CHANGELOG_TMP.md  # Append existing changelog
           mv CHANGELOG_TMP.md CHANGELOG.md  # Replace with updated version
 
