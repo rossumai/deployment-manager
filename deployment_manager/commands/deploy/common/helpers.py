@@ -13,6 +13,10 @@ from deployment_manager.utils.consts import display_error, settings
 from anyio import Path
 
 
+from rossum_api.models.user import User
+from rossum_api.models.group import Group
+
+
 class InvalidCredentialsException(Exception): ...
 
 
@@ -39,9 +43,7 @@ async def get_directory_from_config(base_path: Path, org_name: str):
         if not config_data:
             return ""
 
-        return (
-            config_data.get(settings.CONFIG_KEY_DIRECTORIES, {}).get(org_name, {})
-        )
+        return config_data.get(settings.CONFIG_KEY_DIRECTORIES, {}).get(org_name, {})
     except Exception:
         ...
 
@@ -107,6 +109,33 @@ async def get_api_url_from_user(type: str = "Rossum", default: str = ""):
 
 async def get_token_from_user(name: str = "Rossum"):
     return await questionary.text(f"Enter token for the {name} API:").ask_async()
+
+
+def is_user_admin(user: User, user_roles: list[Group]):
+    admin_urls = [
+        role.url
+        for role in user_roles
+        if role.name in ["admin", "organization_group_admin"]
+    ]
+    for user_role_url in user.groups:
+        if user_role_url in admin_urls:
+            return True
+    return False
+
+
+async def get_token_owner_from_user(client: ElisAPIClient):
+    users = [user async for user in client.list_all_users()]
+    user_roles = [role async for role in client.list_all_user_roles()]
+    user_choices = [
+        questionary.Choice(title=user.username, value=user.id)
+        for user in users
+        if is_user_admin(user=user, user_roles=user_roles)
+    ]
+    token_owner_id = await questionary.select(
+        "Please choose target hook token owner:", choices=user_choices
+    ).ask_async()
+
+    return token_owner_id
 
 
 async def validate_credentials(credentials: Credentials):

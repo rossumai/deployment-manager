@@ -15,7 +15,6 @@ from deployment_manager.commands.deploy.subcommands.template.helpers import (
     get_queues_from_user,
     get_dir_and_subdir_from_user,
     get_secrets_from_user,
-    get_token_owner_from_user,
     get_workspaces_from_user,
 )
 from deployment_manager.common.mapping import read_mapping
@@ -102,15 +101,6 @@ async def create_deploy_template(
             type=settings.TARGET_DIRNAME, default=target_url
         )
     deploy_file_object[settings.DEPLOY_KEY_TARGET_URL] = target_url
-
-    # Hook token owner
-    token_owner = deploy_file_object.get(settings.DEPLOY_KEY_TOKEN_OWNER, None)
-    if interactive or not token_owner:
-        token_owner = await get_token_owner_from_user(default=token_owner)
-    # Enforce None instead of empty string
-    deploy_file_object[settings.DEPLOY_KEY_TOKEN_OWNER] = (
-        token_owner if token_owner else None
-    )
 
     # Workspaces
     workspaces = deploy_file_object.get(settings.DEPLOY_KEY_WORKSPACES, [])

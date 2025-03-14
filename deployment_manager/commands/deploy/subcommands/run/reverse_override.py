@@ -1,12 +1,9 @@
 from copy import deepcopy
 import questionary
+from deployment_manager.commands.deploy.common.helpers import get_token_owner_from_user
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
 )
-from deployment_manager.commands.deploy.subcommands.run.release_file import (
-    ReleaseFile,
-)
-from deployment_manager.commands.migrate.helpers import get_token_owner
 from deployment_manager.utils.consts import display_warning, settings
 
 
@@ -174,22 +171,8 @@ async def reverse_source_target_in_yaml(
     if source_org.id == target_org.id:
         token_owner_id = yaml.data[settings.DEPLOY_KEY_TOKEN_OWNER]
     else:
-        target_token_owner_from_remote = await get_token_owner(prev_target_client)
-        if target_token_owner_from_remote:
-            token_owner_id = target_token_owner_from_remote.id
-        else:
-            users = [user async for user in prev_target_client.list_all_users()]
-            user_roles = [
-                role async for role in prev_target_client.list_all_user_roles()
-            ]
-            user_choices = [
-                questionary.Choice(title=user.username, value=user.id)
-                for user in users
-                if ReleaseFile.is_user_admin(user=user, user_roles=user_roles)
-            ]
-            token_owner_id = await questionary.select(
-                "Please choose target hook token owner:", choices=user_choices
-            ).ask_async()
+        token_owner_id = await get_token_owner_from_user(prev_target_client)
+
     yaml.data[settings.DEPLOY_KEY_TOKEN_OWNER] = token_owner_id
 
     # Reverse objects

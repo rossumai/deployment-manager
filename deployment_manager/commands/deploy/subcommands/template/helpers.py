@@ -80,24 +80,6 @@ async def prepare_choices(
     return sorted(choices, key=lambda choice: choice.value["id"])
 
 
-async def get_token_owner_from_user(default: str = ""):
-    # YAML can have an explicit None, overwrite
-    if default is None:
-        default = ""
-    token_owner = await questionary.text(
-        "What is the token owner user ID (can be empty for same-org target):",
-        default=str(default),
-    ).ask_async()
-
-    try:
-        if not token_owner:
-            return token_owner
-        return int(token_owner)
-    except Exception:
-        display_error("Invalid ID (not an int, please try again).")
-        return await get_token_owner_from_user(default=default)
-
-
 async def get_dir_from_user(
     project_path: Path, type: str, config: dict, default: str = None
 ):
@@ -108,7 +90,8 @@ async def get_dir_from_user(
     ]
 
     dir_choices = [
-        questionary.Choice(title=str(Path(project_path / path))) for path in dir_candidates
+        questionary.Choice(title=str(Path(project_path / path)))
+        for path in dir_candidates
     ]
     # Target dirname is not required (it might not exist unlike the source one)
     if type.casefold() == settings.TARGET_DIRNAME:

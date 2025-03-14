@@ -163,14 +163,6 @@ def replace_list_of_dependency_urls(
     object[dependency] = new_urls
 
 
-async def get_token_owner(client: ElisAPIClient):
-    async for user in client.list_all_users(username=client._http_client.username):
-        if user.username == settings.TARGET_USERNAME:
-            return user
-
-    return None
-
-
 def traverse_mapping(submapping: dict):
     if isinstance(submapping, list):
         for el in submapping:

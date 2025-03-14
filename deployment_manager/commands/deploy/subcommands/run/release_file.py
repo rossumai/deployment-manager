@@ -7,6 +7,7 @@ import pathlib
 from rich import print as pprint
 from rich.panel import Panel
 import questionary
+from deployment_manager.commands.deploy.common.helpers import get_token_owner_from_user
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
     generate_deploy_timestamp,
@@ -28,7 +29,6 @@ from deployment_manager.commands.deploy.subcommands.run.queue_release import (
 from deployment_manager.commands.deploy.subcommands.run.workspace_release import (
     WorkspaceRelease,
 )
-from deployment_manager.commands.migrate.helpers import get_token_owner
 from deployment_manager.utils.consts import (
     CustomResource,
     display_error,
@@ -42,8 +42,6 @@ from pydantic import BaseModel
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
 from rossum_api.models.organization import Organization
-from rossum_api.models.user import User
-from rossum_api.models.group import Group
 
 
 # TODO: rename
@@ -80,9 +78,9 @@ class ReleaseFile(BaseModel):
     hook_templates: dict = {}
     queue_ignore_warnings: dict = {}
 
-    ignore_timestamp_mismatches: dict[
-        Resource | CustomResource, dict[int, bool]
-    ] = defaultdict(dict)
+    ignore_timestamp_mismatches: dict[Resource | CustomResource, dict[int, bool]] = (
+        defaultdict(dict)
+    )
 
     hook_targets: dict[int, Target] = {}
     workspace_targets: dict[int, Target] = {}
@@ -324,32 +322,7 @@ class ReleaseFile(BaseModel):
                 self.token_owner_id = None
 
         if not self.token_owner_id:
-            target_token_owner_from_remote = await get_token_owner(self.client)
-            if target_token_owner_from_remote:
-                self.token_owner_id = target_token_owner_from_remote.id
-            else:
-                users = [user async for user in self.client.list_all_users()]
-                user_roles = [role async for role in self.client.list_all_user_roles()]
-                user_choices = [
-                    questionary.Choice(title=user.username, value=user.id)
-                    for user in users
-                    if self.is_user_admin(user=user, user_roles=user_roles)
-                ]
-                self.token_owner_id = await questionary.select(
-                    "Please choose target hook token owner:", choices=user_choices
-                ).ask_async()
-
-    @classmethod
-    def is_user_admin(cls, user: User, user_roles: list[Group]):
-        admin_urls = [
-            role.url
-            for role in user_roles
-            if role.name in ["admin", "organization_group_admin"]
-        ]
-        for user_role_url in user.groups:
-            if user_role_url in admin_urls:
-                return True
-        return False
+            self.token_owner_id = await get_token_owner_from_user(self.client)
 
     def detect_initialize_phase_exceptions(self, releases: list[ObjectRelease]):
         for release in releases:
