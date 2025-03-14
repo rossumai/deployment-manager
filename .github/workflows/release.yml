@@ -27,9 +27,20 @@ jobs:
 
       - name: Install git-cliff (for Changelog)
         run: |
-          curl -fsSL https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-$(uname -s)-$(uname -m) -o git-cliff
-          chmod +x git-cliff
-          sudo mv git-cliff /usr/local/bin/
+          CLIFF_URL=$(curl -s https://api.github.com/repos/orhun/git-cliff/releases/latest | jq -r '.assets[].browser_download_url' | grep '.deb' | head -n 1)
+
+          if [ -z "$CLIFF_URL" ]; then
+            echo "❌ Could not find a git-cliff .deb release."
+            exit 1
+          fi
+
+          echo "Downloading from: $CLIFF_URL"
+          curl -fsSL "$CLIFF_URL" -o git-cliff.deb
+
+          echo "Installing git-cliff..."
+          sudo dpkg -i git-cliff.deb
+
+          echo "✅ git-cliff installed successfully!"
 
       - name: Generate Changelog from Commits
         run: |
