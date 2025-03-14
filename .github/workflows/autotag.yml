@@ -1,0 +1,57 @@
+name: Auto Tag on Merge
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  tag_release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+
+      - name: Get Latest Tag
+        id: get_tag
+        run: |
+          latest_tag=$(git describe --tags --abbrev=0 || echo "v0.0.0")
+          echo "latest_tag=$latest_tag" >> $GITHUB_ENV
+
+      - name: Determine Next Version
+        id: bump_version
+        run: |
+          latest="${{ env.latest_tag }}"
+          major=$(echo $latest | cut -d. -f1 | tr -d 'v')
+          minor=$(echo $latest | cut -d. -f2)
+          patch=$(echo $latest | cut -d. -f3)
+
+          # Get commit messages since last tag
+          commits=$(git log --oneline $latest..HEAD)
+
+          # Default to patch release
+          new_major=$major
+          new_minor=$minor
+          new_patch=$((patch + 1))
+
+          if echo "$commits" | grep -q "BREAKING CHANGE"; then
+            new_major=$((major + 1))
+            new_minor=0
+            new_patch=0
+          elif echo "$commits" | grep -q "feat:"; then
+            new_minor=$((minor + 1))
+            new_patch=0
+          fi
+
+          new_version="v$new_major.$new_minor.$new_patch"
+          echo "new_version=$new_version" >> $GITHUB_ENV
+          echo "New version: $new_version"
+
+      - name: Create and Push New Tag
+        run: |
+          git tag ${{ env.new_version }}
+          git push origin ${{ env.new_version }}
