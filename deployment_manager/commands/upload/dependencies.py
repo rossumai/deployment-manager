@@ -44,7 +44,7 @@ async def merge_formula_changes(changes: list[tuple[str, Path]]):
             formula_code = await read_formula_file(path)
             formula_name = path.stem
 
-            schema_path = path.parent.parent / f"schema.json"
+            schema_path = path.parent.parent / "schema.json"
             if not await schema_path.exists():
                 continue
 

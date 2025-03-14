@@ -9,7 +9,6 @@ from rossum_api import ElisAPIClient
 
 from deployment_manager.commands.deploy.common.helpers import (
     get_directory_from_config,
-    get_org_id_from_config,
 )
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     get_url_and_credentials,
@@ -143,7 +142,7 @@ async def get_dir_from_user(project_path: Path, config: dict):
     dir_choices.append(questionary.Choice(title="N/A", value=""))
 
     selected_dir = await questionary.select(
-        f"Select directory to purge:", choices=dir_choices
+        "Select directory to purge:", choices=dir_choices
     ).ask_async()
 
     return selected_dir
