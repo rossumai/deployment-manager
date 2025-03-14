@@ -42,14 +42,7 @@ pip install https://github.com/rossumai/deployment-manager/releases/v2.0.1/downl
 ```
 
 ### Updating to a new version
-This command will automatically pull the latest vesion from the GIT repo and install it locally:
-```
-prd2 update
-```
-You can also specify a branch to install:
-```
-prd2 update --branch=some-cool-early-feature
-```
+You can use the same command as for installing the tool the first time. `pip` will recognize that you are installing a newer version and uninstall the previous one automatically.
 
 ### Migration from v1
 
