@@ -21,10 +21,23 @@ jobs:
       - name: Build Wheel
         run: poetry build
 
-      - name: Upload Release to GitHub
+      - name: Install git-cliff (for Changelog)
+        run: |
+          curl -fsSL https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-$(uname -s)-$(uname -m) -o git-cliff
+          chmod +x git-cliff
+          sudo mv git-cliff /usr/local/bin/
+
+      - name: Generate Changelog from Commits
+        run: |
+          git-cliff --unreleased --tag "${{ github.ref_name }}" --output CHANGELOG_TMP.md
+          cat CHANGELOG.md >> CHANGELOG_TMP.md  # Append existing changelog
+          mv CHANGELOG_TMP.md CHANGELOG.md  # Replace with updated version
+
+      - name: Upload Release to GitHub with Changelog
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.whl
           tag_name: ${{ github.ref_name }}
+          body_path: CHANGELOG.md
           draft: false
           prerelease: false
