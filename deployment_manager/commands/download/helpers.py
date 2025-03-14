@@ -1,13 +1,10 @@
-import os
 import shutil
 from typing import Any
 from anyio import Path
-import anyio
 import questionary
 from rossum_api.api_client import Resource
 
 from deployment_manager.common.determine_path import (
-    determine_object_type_from_path,
     determine_object_type_from_url,
 )
 from deployment_manager.common.read_write import (

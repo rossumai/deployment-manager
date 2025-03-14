@@ -37,9 +37,6 @@ class ObjectRemover(BaseModel):
 
     @staticmethod
     async def construct_remover(object_path: Path, id_objects_map, **kwargs):
-        from deployment_manager.commands.download.directory import (
-            DownloadOrganizationDirectory,
-        )  # Lazy import
 
         local_object = await read_json(object_path)
         url, id = local_object.get("url", ""), local_object.get("id", "")
