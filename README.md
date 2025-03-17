@@ -6,6 +6,7 @@ This CLI tool aims to help users configure and manage projects on the Rossum pla
 
 ### Prerequisites
 - Python 3.12
+- Recommended: [txscript](https://pypi.org/project/txscript/) (`pip install txscript`)
 
 ### Linux/MacOS
 
