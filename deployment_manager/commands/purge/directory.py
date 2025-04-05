@@ -1,5 +1,4 @@
 import asyncio
-import dataclasses
 import questionary
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
@@ -155,7 +154,7 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
                 )
 
             if not await questionary.confirm(
-                f"Are you sure you want to delete the objects above? This operation cannot be undone.",
+                "Are you sure you want to delete the objects above? This operation cannot be undone.",
                 default=False,
             ).ask_async():
                 return

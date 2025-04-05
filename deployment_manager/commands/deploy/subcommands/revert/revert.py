@@ -1,9 +1,7 @@
-import asyncio
 from copy import deepcopy
 from anyio import Path
 from pydantic import ValidationError
 import questionary
-from rich import print as pprint
 from rossum_api import ElisAPIClient
 
 from deployment_manager.commands.deploy.subcommands.run.object_release import (

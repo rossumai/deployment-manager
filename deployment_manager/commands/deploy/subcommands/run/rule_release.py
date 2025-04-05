@@ -5,9 +5,7 @@ from deployment_manager.commands.deploy.subcommands.run.object_release import (
     Target,
 )
 from deployment_manager.commands.migrate.helpers import replace_dependency_url
-from deployment_manager.common.read_write import read_formula_file
-from deployment_manager.common.schema import find_schema_id
-from deployment_manager.utils.consts import CustomResource, display_error, settings
+from deployment_manager.utils.consts import CustomResource, display_error
 
 
 import asyncio

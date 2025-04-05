@@ -2,9 +2,7 @@
 from typing import Optional, TYPE_CHECKING
 from pydantic import BaseModel
 import re
-from typing import Optional
 from anyio import Path
-from pydantic import BaseModel
 import questionary
 from rossum_api.api_client import Resource
 
@@ -79,7 +77,7 @@ class ObjectSaver(BaseModel):
             end=" ",
         )
         return await questionary.select(
-            f"- select subdir:",
+            "- select subdir:",
             choices=subdir_choices,
         ).ask_async()
 
