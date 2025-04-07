@@ -181,7 +181,6 @@ class Settings:
     NEW_COMMAND_NAME: str = "prd2"
 
     UPDATE_COMMAND_NAME: str = "update"
-    MIGRATE_MAPPING_COMMAND_NAME: str = "migrate-mapping"
     INITIALIZE_COMMAND_NAME: str = "init"
     DOWNLOAD_COMMAND_NAME: str = "pull"
     UPLOAD_COMMAND_NAME: str = "push"
