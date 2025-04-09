@@ -1,5 +1,13 @@
-captured field
+Generate documentation for the following object representing a single field.
     - use the provided json snippet as a source of information. generate description of the field by using its label in "label" json key and additionally by using "schema_id" json key which is its unique technical id. Do not mention the name or id of the field in the description, only its meaning.
-    - what is a captured field - annotated and extracted value from a document (like PDF) using OCR
+    - this is a captured field - annotated and extracted value from a document (like PDF) using OCR
 
 {schema_id}
+
+generate the following description of the field to humans:
+label
+type (string)
+ui_configuration.type (formula)
+required
+can_export
+hidden
