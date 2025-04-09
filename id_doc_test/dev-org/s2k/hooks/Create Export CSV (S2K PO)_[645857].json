@@ -1,0 +1,71 @@
+{
+  "id": 645857,
+  "type": "webhook",
+  "name": "Create Export CSV (S2K PO)",
+  "url": "https://us.api.rossum.ai/v1/hooks/645857",
+  "description": "",
+  "settings": {
+    "export_configs": [
+      {
+        "export_reference_key": "export_annotation_to_csv",
+        "file_content_template_multiline": [
+          "\"meta_file_name\",\"document_id\",\"order_id\",\"location_number\",\"date_issue\",\"amount_due\",\"subtotal\",\"trade_discount\",\"misc_charges_export\",\"freight_export\",\"dropship_freight_export\",\"merchant_tax_export\",\"retention_tax_export\",\"backhaul_allowance_export\",\"plate_charge_export\",\"rebate_export\",\"pallet_charge_export\",\"purchase_discount_export\",\"inventory_quantity_variances_export\",\"inventory_price_variances_export\",\"amount_discountable\",\"vendor_match\",\"selected_terms_id\",\"cash_discount\",\"cash_discount_gl_code\",\"discount_due_date\",\"net_due_date\",\"item_description\",\"item_code\",\"item_order_line_number\",\"item_quantity\",\"item_quantity_received\",\"item_uom\",\"item_amount\",\"item_total_amount\",\"notes\",\"rossum_document_id\",\"rossum_annotation_id\",\"confirmed_by\",\"receipt_number\",\"receipt_seq_number\",\"accrual_seq_number\"",
+          "{%- for item in field.line_items %}",
+          "\"{{payload['document']['original_file_name']}}\",\"{{field.invoice_number_normalized}}\",\"{{field.order_id_match}}\",\"{{field.order_location_match}}\",\"{{field.date_issue}}\",\"{{field.amount_due_export|default(0, true)}}\",\"{{field.subtotal|default(0, true)}}\",\"{{field.trade_discount|default(0, true)}}\",\"{{field.misc_charges_export|default(0, true)}}\",\"{{field.freight_export|default(0, true)}}\",\"{{field.dropship_freight_export|default(0, true)}}\",\"{{field.merchant_tax_export|default(0, true)}}\",\"{{field.retention_tax_export|default(0, true)}}\",\"{{field.backhaul_allowance_export|default(0, true)}}\",\"{{field.plate_charge_export|default(0, true)}}\",\"{{field.rebate_export|default(0, true)}}\",\"{{field.pallet_charge_export|default(0, true)}}\",\"{{field.purchase_discount_export|default(0, true)}}\",\"{{field.inventory_quantity_variances|default(0, true)}}\",\"{{field.inventory_price_variances|default(0, true)}}\",\"{{field.amount_discountable|default(0, true)}}\",\"{{field.selected_vendor_id}}\",\"{{field.selected_terms_id}}\",\"{{field.cash_discount|default(0, true)}}\",\"{{field.cash_discount_gl_code}}\",\"{{field.discount_due_date}}\",\"{{field.net_due_date}}\",\"{{item.item_order_description_match | replace('\n', ' ')}}\",\"{{item.item_order_id_match}}\",\"{{item.item_order_line_number}}\",\"{{item.item_quantity_export}}\",\"{{item.item_quantity_received_match}}\",\"{{item.item_receipt_uom_match}}\",\"{{item.item_amount_export}}\",\"{{item.item_amount_total_export}}\",\"{{ field.notes.replace('\n', ' ').replace('\r', ' ') | escape }}\",\"{{field.original_document_id}}\",\"{{field.annotation_id}}\",\"{{field.confirmed_by}}\",\"{{item.item_receipt_control_number_match}}\",\"{{item.item_receipt_line_number_match}}\",\"{{item.item_accrual_line_number_match}}\" {%- endfor %}"
+        ]
+      }
+    ]
+  },
+  "active": true,
+  "events": [
+    "annotation_content.export"
+  ],
+  "queues": [
+    "https://us.api.rossum.ai/v1/queues/1771791"
+  ],
+  "run_after": [
+    "https://us.api.rossum.ai/v1/hooks/684928",
+    "https://us.api.rossum.ai/v1/hooks/687183",
+    "https://us.api.rossum.ai/v1/hooks/712691",
+    "https://us.api.rossum.ai/v1/hooks/718139"
+  ],
+  "metadata": {},
+  "config": {
+    "schedule": {
+      "cron": ""
+    },
+    "app": null,
+    "payload_logging_enabled": false,
+    "timeout_s": 30,
+    "max_polling_time_s": 300,
+    "retry_count": 4,
+    "retry_after_polling_failure": true,
+    "url": "https://us.custom-format-templating.rossum-ext.app",
+    "secret": null,
+    "insecure_ssl": false,
+    "client_ssl_certificate": null,
+    "retry_on_any_non_2xx": false
+  },
+  "test": {},
+  "sideload": [
+    "schemas"
+  ],
+  "settings_schema": null,
+  "secrets_schema": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "string"
+    }
+  },
+  "token_owner": "https://us.api.rossum.ai/v1/users/383208",
+  "extension_source": "custom",
+  "guide": null,
+  "read_more_url": null,
+  "extension_image_url": null,
+  "token_lifetime_s": null,
+  "hook_template": null,
+  "created_by": null,
+  "created_at": null,
+  "modified_by": "https://us.api.rossum.ai/v1/users/354857",
+  "modified_at": "2025-05-09T06:12:01.856066Z"
+}

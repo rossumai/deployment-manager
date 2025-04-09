@@ -1,0 +1,13 @@
+### item_check_quantity_unit_price_existence (item_check_quantity_unit_price_existence)
+
+* **Description**: This is a validation field that checks if both the item amount (unit price) and item quantity have values. If the item amount is empty, it shows a warning message "Missing invoice unit price". If the item quantity is empty, it shows a warning message "Missing invoice quantity". This helps ensure that both price and quantity information are provided for invoice items.
+
+* **Field type**: formula
+
+* **Data type**: string
+
+* **Required**: false
+
+* **Exported**: false
+
+* **Hidden**: true

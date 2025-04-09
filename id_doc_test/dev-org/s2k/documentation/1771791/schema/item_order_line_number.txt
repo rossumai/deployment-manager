@@ -1,0 +1,1 @@
+This field, "PO Line Number (Match)", is populated from the main matching query. Please refer to the definition of the field with schema_id "item_order_match" for more information about how this data is obtained and used in the matching process.

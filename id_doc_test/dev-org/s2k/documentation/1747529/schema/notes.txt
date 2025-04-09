@@ -1,0 +1,13 @@
+### Notes (notes)
+
+- **Description**: Reviewer's notes. This field allows a reviewer to add additional information or comments about the document.
+
+- **Field Type**: manual
+
+- **Data Type**: string
+
+- **Required**: False
+
+- **Exported**: False
+
+- **Hidden**: False

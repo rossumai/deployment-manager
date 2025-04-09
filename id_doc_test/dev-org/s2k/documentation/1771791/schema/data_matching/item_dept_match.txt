@@ -1,0 +1,28 @@
+### Dept matching
+
+This configuration is designed to match a department based on branch and GL code information from the `s2k_po_gl_codes` dataset.
+
+**Dataset**: `s2k_po_gl_codes`
+
+**Target Field**: `item_dept_match` (Dept)
+
+**Query Process**:
+1. **First Query**:
+   - Converts `dept_str`, `branch_str`, and `gl_code_str` fields to string type
+   - Matches records where either:
+     - `branch_str` equals the value of `item_branch_id_normalized`, or
+     - `branch_str` is empty or null
+   - AND where `gl_code_str` equals the value of `item_gl_code_export`
+
+2. **Second Query** (runs if first query returns no results):
+   - Converts `branch_str` to string type
+   - Matches records where either:
+     - `branch_str` equals the value of `item_branch_id_normalized`, or
+     - `branch_str` is empty or null
+
+**Result Handling**:
+- If no matches are found: Shows an error message "No match found"
+- If exactly one match is found: Selects the best match (first record)
+- If multiple matches are found: Uses the default value (empty string with label "---")
+
+The value from the `dept` field in the matched record will be used to populate the `item_dept_match` field.

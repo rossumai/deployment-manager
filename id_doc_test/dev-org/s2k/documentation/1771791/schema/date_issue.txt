@@ -1,0 +1,8 @@
+### Document Date (date_issue)
+
+* **description**: Represents the date when the document was issued or created.
+* **field type**: captured
+* **data type**: date
+* **required**: true
+* **exported**: not specified
+* **hidden**: false

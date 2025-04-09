@@ -1,0 +1,63 @@
+### Create Export CSV (S2K PO) (645857)
+
+#### Summary:
+This extension generates a CSV export file for purchase orders processed in the S2K system. It formats extracted data into a structured CSV with header fields and line items, including order details, financial information, and item-specific data.
+
+#### Fields Used:
+- invoice_number_normalized
+- order_id_match
+- order_location_match
+- date_issue
+- amount_due_export
+- subtotal
+- trade_discount
+- misc_charges_export
+- freight_export
+- dropship_freight_export
+- merchant_tax_export
+- retention_tax_export
+- backhaul_allowance_export
+- plate_charge_export
+- rebate_export
+- pallet_charge_export
+- purchase_discount_export
+- inventory_quantity_variances
+- inventory_price_variances
+- amount_discountable
+- selected_vendor_id
+- selected_terms_id
+- cash_discount
+- cash_discount_gl_code
+- discount_due_date
+- net_due_date
+- notes
+- original_document_id
+- annotation_id
+- confirmed_by
+- Line item fields:
+  - item_order_description_match
+  - item_order_id_match
+  - item_order_line_number
+  - item_quantity_export
+  - item_quantity_received_match
+  - item_receipt_uom_match
+  - item_amount_export
+  - item_amount_total_export
+  - item_receipt_control_number_match
+  - item_receipt_line_number_match
+  - item_accrual_line_number_match
+
+#### Logic:
+The extension creates a CSV export with a specific format required by the S2K purchase order system. It generates a CSV file with a header row containing column names, followed by data rows for each line item in the purchase order. The template combines header-level information (like order ID, location, dates, and totals) with line-item details (like item descriptions, quantities, and amounts). Special handling is applied to text fields like notes and descriptions to escape special characters and remove line breaks.
+
+#### Active Queues:
+- S2K PO (1771791)
+
+#### Events:
+- annotation_content.export
+
+#### Related Extensions:
+- Add Discount Line (S2K PO) (684928)
+- Save confirmed_by Email (S2K PO) (687183)
+- Add Line Charges to Header (S2K PO) (712691)
+- Add Inventory Variances (S2K PO) (718139)

@@ -1,0 +1,1 @@
+default_to(field.pallet_charge_from_lines, 0)

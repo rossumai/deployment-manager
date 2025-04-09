@@ -1,0 +1,8 @@
+{
+  "Schema_id": null,
+  "Name of extension": "Export To SFTP (S2K PO)",
+  "Extension ID": 646792,
+  "INPUT": [],
+  "OUTPUT": [],
+  "Description": "This extension connects Rossum with an SFTP server. It sends extracted data and documents from Rossum to a target folder on the SFTP server. The extension is configured to export data to sftp01.imperialdade.com in the /out/materials directory, with files named according to the template 'invoice_data-{annotation.id}.csv'."
+}

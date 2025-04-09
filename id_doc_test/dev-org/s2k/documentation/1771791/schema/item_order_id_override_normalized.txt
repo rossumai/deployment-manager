@@ -1,0 +1,8 @@
+### item_order_id_override_normalized (item_order_id_override_normalized)
+
+* **description**: This field extracts the first part of the item order ID override value (before the first underscore). If the item_order_id_override field contains a value like "ABC_123", this field will contain "ABC". If item_order_id_override is not set, this field will be empty.
+* **field type**: formula
+* **data type**: string
+* **required**: false
+* **exported**: false
+* **hidden**: true

@@ -1,0 +1,15 @@
+### Backhaul Allowance From Lines (backhaul_allowance_from_lines)
+
+- **Description:** A numeric field that stores the calculated backhaul allowance value derived from line items. This field is automatically populated by a system hook and is not intended for direct user interaction.
+
+- **Field type:** data
+
+- **Data type:** number
+
+- **Required:** No
+
+- **Exported:** No
+
+- **Hidden:** Yes
+
+**Hook information:** This field is populated by hook ID 712691.

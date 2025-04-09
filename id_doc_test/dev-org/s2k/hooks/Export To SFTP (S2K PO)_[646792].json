@@ -1,0 +1,81 @@
+{
+  "id": 646792,
+  "type": "webhook",
+  "name": "Export To SFTP (S2K PO)",
+  "url": "https://us.api.rossum.ai/v1/hooks/646792",
+  "description": "Connect Rossum with your SFTP server. Send extracted data and documents from Rossum to target folder on SFTP server.",
+  "settings": {
+    "credentials": {
+      "host": "sftp01.imperialdade.com",
+      "port": "22",
+      "type": "sftp",
+      "username": "rossum"
+    },
+    "export_rules": [
+      {
+        "path_to_directory": "/out/materials",
+        "export_object_configurations": [
+          {
+            "type": "custom_format",
+            "filename_template": "invoice_data-{annotation.id}.csv",
+            "export_reference_key": "export_annotation_to_csv"
+          }
+        ]
+      }
+    ]
+  },
+  "active": true,
+  "events": [
+    "annotation_content.export"
+  ],
+  "queues": [
+    "https://us.api.rossum.ai/v1/queues/1771791"
+  ],
+  "run_after": [
+    "https://us.api.rossum.ai/v1/hooks/645857"
+  ],
+  "metadata": {},
+  "config": {
+    "private": true,
+    "schedule": {},
+    "app": null,
+    "payload_logging_enabled": false,
+    "timeout_s": 30,
+    "max_polling_time_s": 300,
+    "retry_count": 4,
+    "retry_after_polling_failure": true,
+    "insecure_ssl": false,
+    "client_ssl_certificate": null,
+    "retry_on_any_non_2xx": true
+  },
+  "test": {},
+  "sideload": [],
+  "settings_schema": null,
+  "secrets_schema": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "description": "Server type - SFTP"
+      },
+      "password": {
+        "type": "string",
+        "description": "User password"
+      }
+    },
+    "additionalProperties": {
+      "type": "string"
+    }
+  },
+  "token_owner": "https://us.api.rossum.ai/v1/users/383208",
+  "extension_source": "rossum_store",
+  "guide": "<div>\r\n  <p>Set up your SFTP Export extension:</p>\r\n  <ol>\r\n    <li>Choose the queue(s) from which you want to export extracted data and documents to your SFTP server.</li>\r\n    <li>For easy setup open the configuration form by clicking the \"Configure extension\" button.</li>\r\n    <li>\r\n      Alternatively you can use the JSON editor for setting up the configuration\r\n      parameters and secrets (using e.g. previously saved configuration).\r\n    </li>\r\n  </ol>\r\n  <p>\r\n    More information can be found in Help Center article\r\n    <a href=\"https://rossum.ai/help/article/export-extracted-data-and-documents-to-file-storage/\" target=\"_blank\">here</a>\r\n  </p>\r\n</div>",
+  "read_more_url": "https://rossum.ai/help/article/export-extracted-data-and-documents-to-file-storage/",
+  "extension_image_url": "https://rossum.ai/help/wp-content/uploads/2024/01/Export-To-SFTP.png",
+  "token_lifetime_s": null,
+  "hook_template": "https://us.api.rossum.ai/v1/hook_templates/33",
+  "created_by": null,
+  "created_at": null,
+  "modified_by": "https://us.api.rossum.ai/v1/users/354857",
+  "modified_at": "2025-03-28T13:19:47.443939Z"
+}

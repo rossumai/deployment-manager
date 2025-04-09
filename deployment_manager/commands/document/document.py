@@ -6,7 +6,6 @@ from deployment_manager.commands.deploy.subcommands.template.helpers import (
     find_hooks_for_queues,
     find_queue_paths_for_workspaces,
     find_ws_paths_for_dir,
-    get_schema_for_queue,
 )
 
 from deployment_manager.commands.document.llm_helper import LLMHelper
@@ -20,7 +19,6 @@ from deployment_manager.utils.consts import display_info, settings, display_warn
 
 from deployment_manager.utils.functions import (
     coro,
-    find_all_hook_paths_in_destination,
 )
 
 
@@ -75,6 +73,9 @@ class DirectoryDocumentator:
         self.schema_id_docs = {}
         self.queue_docs = {}
 
+        self.hooks = []
+
+    # TODO: naming...
     @property
     def org_path(self):
         return self.project_path / self.name
@@ -91,6 +92,8 @@ class DirectoryDocumentator:
 
         for queue in queues:
             await self.document_queue(queue)
+            # !!!! remove
+            break
 
         # Check if the doc for an object is not already created
         # (Allow to run only second/third stage)
@@ -129,7 +132,7 @@ class DirectoryDocumentator:
         # TODO: true async IO operations
         # TODO: display progress / what is being documented
         # TODO: error handling
-        # TODO: cache objects by queue ID
+        # TODO: static analysis for any data schema_id
 
         display_info(
             f"Documenting queue [green]{queue.get('name', 'unkonwn-queue')}[/green] ([purple]{queue.get('id', 'unknown-id')}[/purple])"
@@ -142,13 +145,14 @@ class DirectoryDocumentator:
         hook_documentations_base_path = (
             self.org_path / "documentation" / str(queue["id"]) / "hooks"
         )
-        hooks = await find_hooks_for_queues(self.org_path, queues=[queue])
+        self.hooks = await find_hooks_for_queues(self.org_path, queues=[queue])
+
         await asyncio.gather(
             *[
                 self.limited_run(
                     self.document_hook, hook, hook_documentations_base_path
                 )
-                for hook in hooks
+                for hook in self.hooks
             ]
         )
 
@@ -178,7 +182,7 @@ class DirectoryDocumentator:
             )
         )
         queue_documentation += (
-            "\n\n ## 4. Extensions documentation" + hook_documentations
+            "\n\n ## 4. Extensions documentation\n" + hook_documentations
         )
 
         self.queue_docs[queue["id"]] = queue_documentation
@@ -188,19 +192,35 @@ class DirectoryDocumentator:
         )
 
     async def document_hook(self, hook: dict, base_path: Path):
-        # TODO: what hook is it? choose template...
-
-        # TODO: run after
+        run_after = self.format_map_after_section(hook)
 
         hook_path = base_path / f"{hook['id']}.txt"
         if await hook_path.exists():
             return
 
         template_path = Path(__file__).parent / "templates" / "generic_extension.txt"
+
+        image_url = hook.get("extension_image_url", "") or ""
+        hook_config_url = hook.get("config", {}).get("url", "") or ""
+        if "Document-Sorting" in image_url:
+            template_path = Path(__file__).parent / "templates" / "document_sorting.txt"
+        elif "Document-Splitting" in image_url:
+            template_path = (
+                Path(__file__).parent / "templates" / "document_splitting.txt"
+            )
+        elif "Master-Data-Hub" in image_url:
+            template_path = Path(__file__).parent / "templates" / "mdh.txt"
+        elif "Duplicate-Handling" in image_url:
+            template_path = (
+                Path(__file__).parent / "templates" / "duplicate_handling.txt"
+            )
+        elif "custom-format-templating" in hook_config_url:
+            template_path = Path(__file__).parent / "templates" / "mega.txt"
+
         template = await read_txt(template_path)
 
         hook_documentation = await self.model.run(
-            template.format(attributes=hook, run_after=[])
+            template.format(attributes=hook, run_after=run_after)
         )
 
         self.hook_docs[hook["id"]] = hook_documentation
@@ -208,6 +228,20 @@ class DirectoryDocumentator:
             hook_path,
             hook_documentation,
         )
+
+    def format_map_after_section(self, hook: dict):
+        run_after_urls = hook.get("run_after", [])
+        run_after_formatting = ""
+
+        for url in run_after_urls:
+            id = url.split("/")[-1]
+
+            for hook in self.hooks:
+                if hook.get("id") == id:
+                    run_after_formatting += (
+                        f'{hook.get("name", "unkonwn")} ({hook.get('id', 'no-id')})\n'
+                    )
+        return run_after_formatting
 
     async def document_schema_ids(self, schema: dict, base_path: Path):
         datapoints = extract_datapoints(schema)

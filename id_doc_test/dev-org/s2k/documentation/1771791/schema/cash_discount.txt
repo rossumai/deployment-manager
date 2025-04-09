@@ -1,0 +1,8 @@
+### Cash Discount (cash_discount)
+
+* **Description**: This field represents the cash discount amount. It uses the value from the vendor discount calculation field if available; otherwise, it defaults to 0.
+* **Field type**: formula
+* **Data type**: number
+* **Required**: false
+* **Exported**: true
+* **Hidden**: false

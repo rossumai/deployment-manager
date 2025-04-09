@@ -1,0 +1,55 @@
+{
+  "id": 645890,
+  "type": "function",
+  "name": "Upload Fields from Inbox (S2K PO)",
+  "url": "https://us.api.rossum.ai/v1/hooks/645890",
+  "description": "",
+  "settings": {},
+  "active": true,
+  "events": [
+    "annotation_status.changed"
+  ],
+  "queues": [
+    "https://us.api.rossum.ai/v1/queues/1740142",
+    "https://us.api.rossum.ai/v1/queues/1747529"
+  ],
+  "run_after": [],
+  "metadata": {},
+  "config": {
+    "schedule": {
+      "cron": ""
+    },
+    "app": null,
+    "payload_logging_enabled": false,
+    "timeout_s": 30,
+    "max_polling_time_s": 300,
+    "retry_count": 4,
+    "retry_after_polling_failure": true,
+    "runtime": "python3.12",
+    "code": "\"\"\"\nThis custom serverless function example demonstrates showing messages to the\nuser on the validation screen, updating values of specific fields, and\nexecuting actions on the annotation.\n\nSee https://elis.rossum.ai/api/docs/#rossum-transaction-scripts for more examples.\n\"\"\"\n\nfrom rossum.lib.api_client import RossumClient, RossumException\nfrom rossum_api import ElisAPIClientSync\n\n\ndef rossum_hook_request_handler(payload: dict) -> dict:\n    if payload['event'] != 'annotation_status' or payload['action'] != 'changed' or payload['annotation']['status'] != 'confirmed':\n        return {}\n    \n    rossum_client = get_rossum_client(payload)\n    annotation = rossum_client.retrieve_annotation(\n        payload[\"annotation\"][\"id\"], sideloads=[\"content\"]\n    )\n    \n    annotation_content= annotation.content\n    order_id_manual = find_by_schema_id(annotation_content, 'order_id_manual')[0].get('content', {}).get('value', None)\n    notes = find_by_schema_id(annotation_content, 'notes')[0].get('content', {}).get('value', None)\n\n\n    annotation_content= annotation.content\n\n    bounding_boxes = {\n        \"order_id\": find_by_schema_id(annotation_content, \"order_id\")[0]\n    }\n    res = rossum_client.update_part_annotation(\n        payload[\"annotation\"][\"id\"],\n        data={\n            \"metadata\": {\n                **payload[\"annotation\"].get(\"metadata\", {}),\n               \"bounding_boxes\": bounding_boxes,\n                \"order_id_manual\": order_id_manual,\n                \"notes\": notes,\n            }\n        },\n    )\n\n    return {}\n\n\ndef get_rossum_client(payload: dict):\n    rossum_client = ElisAPIClientSync(\n        token=get_auth_token_from_payload(payload),\n        base_url=payload[\"base_url\"] + \"/api/v1\",\n    )\n    return rossum_client\n\n\ndef get_auth_token_from_payload(payload: dict) -> str:\n    auth_token = payload.get(\"rossum_authorization_token\")\n    if not auth_token:\n        raise HookConfigurationError(\n            f\"Authorization token not found in the payload. Configure Rossum API access at {payload['hook']}.\"\n        )\n    return auth_token\n\n\ndef find_by_schema_id(content, schema_id: str):\n    accumulator = []\n    for node in content:\n        if node[\"schema_id\"] == schema_id:\n            accumulator.append(node)\n        elif \"children\" in node:\n            accumulator.extend(find_by_schema_id(node[\"children\"], schema_id))\n\n    return accumulator",
+    "third_party_library_pack": "default",
+    "memory_size_mb": 256
+  },
+  "test": {},
+  "sideload": [
+    "schemas"
+  ],
+  "settings_schema": null,
+  "secrets_schema": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "string"
+    }
+  },
+  "token_owner": "https://us.api.rossum.ai/v1/users/383208",
+  "extension_source": "custom",
+  "guide": null,
+  "read_more_url": null,
+  "extension_image_url": null,
+  "token_lifetime_s": null,
+  "hook_template": null,
+  "created_by": null,
+  "created_at": null,
+  "modified_by": "https://us.api.rossum.ai/v1/users/354857",
+  "modified_at": "2025-03-19T08:54:39.099441Z"
+}

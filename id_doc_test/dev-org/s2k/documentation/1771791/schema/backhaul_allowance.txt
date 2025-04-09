@@ -1,0 +1,8 @@
+### Backhaul Allowance (backhaul_allowance)
+
+* **Description**: Represents the monetary amount allocated for transportation of goods back to their origin or to another location after primary delivery.
+* **Field type**: captured
+* **Data type**: number
+* **Required**: false
+* **Exported**: true
+* **Hidden**: false

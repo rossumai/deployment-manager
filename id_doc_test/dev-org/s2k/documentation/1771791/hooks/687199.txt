@@ -1,0 +1,16 @@
+### Get Annotation ID into Schema (S2K PO) (687199)
+
+**Summary:** This extension captures the annotation ID and stores it in the schema field. It runs during initialization of annotation content.
+
+**Logic:**
+- Extracts the annotation ID from the payload
+- Assigns the ID to a field named "annotation_id" in the schema
+
+**Active Queues:**
+- S2K PO (1771791)
+
+**Events:**
+- annotation_content.initialize
+
+**Related Extensions:**
+- None

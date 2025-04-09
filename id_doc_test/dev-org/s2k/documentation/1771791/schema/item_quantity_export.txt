@@ -1,0 +1,17 @@
+### ⬇ 🔢 Quantity (into S2K) (item_quantity_export)
+
+* **Description**: This field calculates the quantity to export into the S2K system. It takes the user-entered quantity and applies several business rules:
+  * If the item doesn't need to match a PO (item_match_po_flag is 'false'), it uses the captured quantity as is
+  * If a quantity ratio is set and enabled, it converts the quantity by multiplying it by the ratio and shows a warning
+  * If the captured quantity exceeds the maximum billable quantity, it caps the value at the maximum billable amount and shows a warning
+  * When the quantity is capped, it requires the user to add a note explaining who approved the variance
+
+* **Field type**: formula
+
+* **Data type**: number
+
+* **Required**: False
+
+* **Exported**: True
+
+* **Hidden**: False

@@ -1,0 +1,1 @@
+The field `vendor_terms_description` is populated from the main matching query. For information about this field, please refer to the definition of the field with schema_id `vendor_terms_match`, which contains the main matching query that populates this field.

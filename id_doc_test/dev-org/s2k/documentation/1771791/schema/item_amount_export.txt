@@ -1,0 +1,17 @@
+### ⬇Unit Price (into S2K) (item_amount_export)
+
+* **Description**: This formula field calculates the unit price to be exported to the S2K system. It compares the invoice price with the PO (Purchase Order) price and applies specific business rules:
+  * If the item is a dropship (D flag), it uses the invoice price when it's less than or equal to the PO price. Otherwise, it uses the PO price and requires approval notes.
+  * For non-dropship items, it uses the invoice price if it's less than or equal to the PO price OR if the difference is within acceptable limits (≤3% and ≤$250 total difference).
+  * If the price difference exceeds these thresholds, it uses the PO price instead and requires approval notes.
+  * When a quantity ratio is specified and enabled, the invoice price is converted using this ratio, and a warning is displayed.
+
+* **Field type**: formula
+
+* **Data type**: number
+
+* **Required**: False
+
+* **Exported**: True
+
+* **Hidden**: False

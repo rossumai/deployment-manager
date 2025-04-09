@@ -1,0 +1,56 @@
+{
+  "id": 759357,
+  "type": "function",
+  "name": "Freight Percentage Info Message (S2K PO)",
+  "url": "https://us.api.rossum.ai/v1/hooks/759357",
+  "description": "",
+  "settings": {},
+  "active": true,
+  "events": [
+    "annotation_content.initialize",
+    "annotation_content.updated",
+    "annotation_content.started"
+  ],
+  "queues": [
+    "https://us.api.rossum.ai/v1/queues/1771791"
+  ],
+  "run_after": [],
+  "metadata": {},
+  "config": {
+    "schedule": {
+      "cron": ""
+    },
+    "app": null,
+    "payload_logging_enabled": true,
+    "timeout_s": 30,
+    "max_polling_time_s": 300,
+    "retry_count": 4,
+    "retry_after_polling_failure": true,
+    "runtime": "python3.12",
+    "code": "from txscript import TxScript, default_to, substitute, is_set\n\ndef rossum_hook_request_handler(payload: dict) -> dict:\n    t = TxScript.from_payload(payload)\n\n    amount_due_export = t.field.amount_due_export\n    freight_export = t.field.freight_export\n    \n    if is_set(amount_due_export) and is_set(freight_export) and amount_due_export!=0:\n        freight_percentage = round(freight_export/amount_due_export*100,2)\n        t.show_info(f'Inbound Freight/Total percentage is: {freight_percentage}%', amount_due_export)\n        if freight_percentage > 5 and t.field.notes == \"\":\n            t.show_error(f'Freight % > 5 requires a note.', t.field.notes)\n    \n    return t.hook_response()",
+    "third_party_library_pack": "default",
+    "memory_size_mb": 256
+  },
+  "test": {},
+  "sideload": [
+    "schemas"
+  ],
+  "settings_schema": null,
+  "secrets_schema": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "string"
+    }
+  },
+  "token_owner": null,
+  "extension_source": "custom",
+  "guide": null,
+  "read_more_url": null,
+  "extension_image_url": null,
+  "token_lifetime_s": null,
+  "hook_template": null,
+  "created_by": "https://us.api.rossum.ai/v1/users/176601",
+  "created_at": "2025-05-02T16:03:48.916246Z",
+  "modified_by": "https://us.api.rossum.ai/v1/users/176601",
+  "modified_at": "2025-05-13T06:09:50.110704Z"
+}

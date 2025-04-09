@@ -1,0 +1,19 @@
+### Save Invoice Item Code <> PO Item Code (S2K PO) (713109)
+
+**Summary:** This extension saves the association between invoice item codes and PO item codes for S2K purchase orders. It stores these associations in a data storage collection for future reference and matching.
+
+**Logic:**
+- Triggers when an annotation status changes to confirmed, exported, or failed_export
+- Extracts item_order_id_match (PO item code), item_code_normalized (invoice item code), selected_vendor_id, and item_description from line items
+- Stores these values in a data storage collection named "associations_s2k_item_codes"
+- Maintains unique records based on PO item code, invoice item code, and vendor ID
+- Skips records where item_order_id_match is empty
+
+**Active Queues:**
+- S2K PO (1771791)
+
+**Events:**
+- annotation_status.changed
+
+**Related Extensions:**
+- None

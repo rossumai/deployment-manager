@@ -1,0 +1,663 @@
+{
+  "id": 592634,
+  "type": "webhook",
+  "name": "Master Data Hub (S2K PO Vendor)",
+  "url": "https://us.api.rossum.ai/v1/hooks/592634",
+  "description": "Enhance the extracted data with details from your master records.",
+  "settings": {
+    "configurations": [
+      {
+        "name": "Invoice vendor matching",
+        "source": {
+          "dataset": "vendors",
+          "queries": [
+            {
+              "aggregate": [
+                {
+                  "$match": {
+                    "$and": [
+                      {
+                        "Supplier Number": "{sender_id}"
+                      },
+                      {
+                        "Supplier Number": {
+                          "$ne": ""
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "//": "Match by name and address and phone",
+              "aggregate": [
+                {
+                  "$search": {
+                    "compound": {
+                      "must": [
+                        {
+                          "text": {
+                            "path": [
+                              "Name"
+                            ],
+                            "fuzzy": {
+                              "maxEdits": 1
+                            },
+                            "query": [
+                              "{sender_name}"
+                            ]
+                          }
+                        }
+                      ],
+                      "should": [
+                        {
+                          "text": {
+                            "path": [
+                              "Primary Address Street1",
+                              "Primary Address Street2",
+                              "Primary Address City"
+                            ],
+                            "fuzzy": {
+                              "maxEdits": 1
+                            },
+                            "query": [
+                              "{sender_address}"
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "$match": {
+                    "Phone Number": "{sender_phone_normalized}"
+                  }
+                },
+                {
+                  "$limit": 10
+                },
+                {
+                  "$addFields": {
+                    "__score": {
+                      "$meta": "searchScore"
+                    }
+                  }
+                },
+                {
+                  "$addFields": {
+                    "__score_normalized": {
+                      "$divide": [
+                        "$__score",
+                        {
+                          "$add": [
+                            1,
+                            "$__score",
+                            {
+                              "$abs": {
+                                "$subtract": [
+                                  1,
+                                  {
+                                    "$divide": [
+                                      {
+                                        "$strLenCP": "$Name"
+                                      },
+                                      {
+                                        "$strLenCP": "{sender_name}"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "$setWindowFields": {
+                    "output": {
+                      "__score_normalized_max": {
+                        "$max": "$__score_normalized"
+                      }
+                    }
+                  }
+                },
+                {
+                  "$sort": {
+                    "__score_normalized": -1
+                  }
+                },
+                {
+                  "$match": {
+                    "$expr": {
+                      "$cond": {
+                        "if": {
+                          "$or": [
+                            {
+                              "$and": [
+                                {
+                                  "$gt": [
+                                    "$__score_normalized_max",
+                                    0.9
+                                  ]
+                                },
+                                {
+                                  "$gt": [
+                                    "$__score_normalized",
+                                    0.9
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "$and": [
+                                {
+                                  "$gt": [
+                                    "$__score_normalized_max",
+                                    0.8
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized_max",
+                                    0.9
+                                  ]
+                                },
+                                {
+                                  "$gt": [
+                                    "$__score_normalized",
+                                    0.8
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized",
+                                    0.9
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "$and": [
+                                {
+                                  "$gt": [
+                                    "$__score_normalized_max",
+                                    0.7
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized_max",
+                                    0.8
+                                  ]
+                                },
+                                {
+                                  "$gt": [
+                                    "$__score_normalized",
+                                    0.7
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized",
+                                    0.8
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "else": false,
+                        "then": true
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "//": "Match by name and address",
+              "aggregate": [
+                {
+                  "$search": {
+                    "compound": {
+                      "must": [
+                        {
+                          "text": {
+                            "path": [
+                              "Name"
+                            ],
+                            "fuzzy": {
+                              "maxEdits": 1
+                            },
+                            "query": [
+                              "{sender_name}"
+                            ]
+                          }
+                        }
+                      ],
+                      "should": [
+                        {
+                          "text": {
+                            "path": [
+                              "Primary Address Street1",
+                              "Primary Address Street2",
+                              "Primary Address City"
+                            ],
+                            "fuzzy": {
+                              "maxEdits": 1
+                            },
+                            "query": [
+                              "{sender_address}"
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "$limit": 10
+                },
+                {
+                  "$addFields": {
+                    "__score": {
+                      "$meta": "searchScore"
+                    }
+                  }
+                },
+                {
+                  "$addFields": {
+                    "__score_normalized": {
+                      "$divide": [
+                        "$__score",
+                        {
+                          "$add": [
+                            1,
+                            "$__score",
+                            {
+                              "$abs": {
+                                "$subtract": [
+                                  1,
+                                  {
+                                    "$divide": [
+                                      {
+                                        "$strLenCP": "$Name"
+                                      },
+                                      {
+                                        "$strLenCP": "{sender_name}"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "$setWindowFields": {
+                    "output": {
+                      "__score_normalized_max": {
+                        "$max": "$__score_normalized"
+                      }
+                    }
+                  }
+                },
+                {
+                  "$sort": {
+                    "__score_normalized": -1
+                  }
+                },
+                {
+                  "$match": {
+                    "$expr": {
+                      "$cond": {
+                        "if": {
+                          "$or": [
+                            {
+                              "$and": [
+                                {
+                                  "$gt": [
+                                    "$__score_normalized_max",
+                                    0.9
+                                  ]
+                                },
+                                {
+                                  "$gt": [
+                                    "$__score_normalized",
+                                    0.9
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "$and": [
+                                {
+                                  "$gt": [
+                                    "$__score_normalized_max",
+                                    0.8
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized_max",
+                                    0.9
+                                  ]
+                                },
+                                {
+                                  "$gt": [
+                                    "$__score_normalized",
+                                    0.8
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized",
+                                    0.9
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "$and": [
+                                {
+                                  "$gt": [
+                                    "$__score_normalized_max",
+                                    0.7
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized_max",
+                                    0.8
+                                  ]
+                                },
+                                {
+                                  "$gt": [
+                                    "$__score_normalized",
+                                    0.7
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized",
+                                    0.8
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "else": false,
+                        "then": true
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "//": "Match by name",
+              "aggregate": [
+                {
+                  "$search": {
+                    "compound": {
+                      "must": [
+                        {
+                          "text": {
+                            "path": [
+                              "Name"
+                            ],
+                            "fuzzy": {
+                              "maxEdits": 1
+                            },
+                            "query": [
+                              "{sender_name}"
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "$limit": 10
+                },
+                {
+                  "$addFields": {
+                    "__score": {
+                      "$meta": "searchScore"
+                    }
+                  }
+                },
+                {
+                  "$addFields": {
+                    "__score_normalized": {
+                      "$divide": [
+                        "$__score",
+                        {
+                          "$add": [
+                            1,
+                            "$__score",
+                            {
+                              "$abs": {
+                                "$subtract": [
+                                  1,
+                                  {
+                                    "$divide": [
+                                      {
+                                        "$strLenCP": "$Name"
+                                      },
+                                      {
+                                        "$strLenCP": "{sender_name}"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "$setWindowFields": {
+                    "output": {
+                      "__score_normalized_max": {
+                        "$max": "$__score_normalized"
+                      }
+                    }
+                  }
+                },
+                {
+                  "$sort": {
+                    "__score_normalized": -1
+                  }
+                },
+                {
+                  "$match": {
+                    "$expr": {
+                      "$cond": {
+                        "if": {
+                          "$or": [
+                            {
+                              "$and": [
+                                {
+                                  "$gt": [
+                                    "$__score_normalized_max",
+                                    0.9
+                                  ]
+                                },
+                                {
+                                  "$gt": [
+                                    "$__score_normalized",
+                                    0.9
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "$and": [
+                                {
+                                  "$gt": [
+                                    "$__score_normalized_max",
+                                    0.8
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized_max",
+                                    0.9
+                                  ]
+                                },
+                                {
+                                  "$gt": [
+                                    "$__score_normalized",
+                                    0.8
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized",
+                                    0.9
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "$and": [
+                                {
+                                  "$gt": [
+                                    "$__score_normalized_max",
+                                    0.7
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized_max",
+                                    0.8
+                                  ]
+                                },
+                                {
+                                  "$gt": [
+                                    "$__score_normalized",
+                                    0.7
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized",
+                                    0.8
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "else": false,
+                        "then": true
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "default": {
+          "label": "---",
+          "value": ""
+        },
+        "mapping": {
+          "dataset_key": "Supplier Number",
+          "label_template": "({\"Supplier Number\"}) {Name}",
+          "target_schema_id": "vendor_match"
+        },
+        "result_actions": {
+          "no_match_found": {
+            "message": {
+              "type": "error",
+              "content": "No match found"
+            }
+          },
+          "one_match_found": {
+            "select": "best_match"
+          },
+          "multiple_matches_found": {
+            "select": "best_match",
+            "message": {
+              "type": "warning",
+              "content": "Multiple matches found"
+            }
+          }
+        },
+        "additional_mappings": [
+          {
+            "dataset_key": "\"Payment Terms\"",
+            "target_schema_id": "invoice_vendor_terms_match"
+          },
+          {
+            "dataset_key": "Name",
+            "target_schema_id": "vendor_name_match"
+          }
+        ]
+      }
+    ]
+  },
+  "active": false,
+  "events": [
+    "annotation_content.initialize",
+    "annotation_content.started",
+    "annotation_content.updated"
+  ],
+  "queues": [
+    "https://us.api.rossum.ai/v1/queues/1771791"
+  ],
+  "run_after": [],
+  "metadata": {},
+  "config": {
+    "private": true,
+    "schedule": {},
+    "app": null,
+    "payload_logging_enabled": false,
+    "timeout_s": 60,
+    "max_polling_time_s": 300,
+    "retry_count": 4,
+    "retry_after_polling_failure": true,
+    "insecure_ssl": false,
+    "client_ssl_certificate": null,
+    "retry_on_any_non_2xx": false
+  },
+  "test": {},
+  "sideload": [
+    "schemas"
+  ],
+  "settings_schema": null,
+  "secrets_schema": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "string"
+    }
+  },
+  "token_owner": "https://us.api.rossum.ai/v1/users/383208",
+  "extension_source": "rossum_store",
+  "guide": "<div>\r\n    <p>To manage and configure the behavior, use our configurator below.</p> \r\n    <p>Start by</p>\r\n    <ul>\r\n        <li>Selecting the queues that you want to use for this extension below</li>\r\n    </ul>\r\n    <p>Then open Master Data Hub and</p>\r\n    <ul>\r\n        <li>Import the dataset with Dataset Management</li>\r\n        <li>Create and set up a new configuration in Configurator</li>\r\n    </ul>\r\n    <p>For more information, take a look at our documentation <a href=\"https://rossum.ai/help/article/master-data-hub-extension\" target=\"_blank\">here</a>.</p>\r\n\r\n    <p><form action=\"https://us.app.rossum.ai/svc/master-data-hub/web/\" target=\"_blank\" rel=\"noopener noreferrer\">\r\n        <button type=\"submit\"style=\"\r\n            border: none;    \r\n            background: var(--color-primary);\r\n            border-radius: 4px;\r\n            padding: 6px 16px;\r\n            color: var(--white);\r\n            font-weight: 500;\"\r\n         >\r\n            Open configurator\r\n        </button>\r\n    </form></p>\r\n</div>",
+  "read_more_url": "https://elis.rossum.ai/svc/master-data-hub/api/docs",
+  "extension_image_url": "https://rossum.ai/help/wp-content/uploads/2024/01/Master-Data-Hub.png",
+  "token_lifetime_s": 7200,
+  "hook_template": "https://us.api.rossum.ai/v1/hook_templates/39",
+  "created_by": null,
+  "created_at": null,
+  "modified_by": "https://us.api.rossum.ai/v1/users/354857",
+  "modified_at": "2025-03-26T08:53:30.639983Z"
+}

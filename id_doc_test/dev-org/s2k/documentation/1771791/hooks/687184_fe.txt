@@ -1,0 +1,8 @@
+{
+  "Schema_id": null,
+  "Name of extension": "Get Document ID into Schema (S2K PO)",
+  "Extension ID": 687184,
+  "INPUT": [],
+  "OUTPUT": ["original_document_id"],
+  "Description": "This extension captures the document ID from the payload and writes it to the 'original_document_id' field in the schema. It runs during the annotation_content.initialize event, effectively storing the document's identifier for reference within the schema."
+}

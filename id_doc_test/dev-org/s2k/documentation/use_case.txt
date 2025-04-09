@@ -1,0 +1,13 @@
+# Use Case Overview
+
+| Queue Name | Queue ID | Workspace | Email | Purpose |
+|------------|----------|-----------|-------|---------|
+| S2K PO Inbox | 1740142 | 831083 | inbox-s2k-ce2b7b@us.app.rossum.ai | Initial document receipt and processing |
+| S2K PO Dropship | 1747529 | 831083 | s2k-dropship-8d0ec4@us.app.rossum.ai | Processing of dropship purchase orders |
+| S2K PO | 1771791 | 831083 | s2k-po-cf9399@us.app.rossum.ai | Main purchase order processing and validation |
+
+The S2K PO-backed invoice processing use case is designed to efficiently handle purchase order-related documents through a series of specialized queues. The workflow begins when documents are received via email in the S2K PO Inbox queue, which serves as the entry point for all PO-related documents. This initial queue performs document splitting for multi-page files, validates purchase order numbers against a master data hub, identifies dropship orders, and applies appropriate labels for routing.
+
+Once processed in the inbox queue, documents are routed based on their characteristics. Standard purchase orders proceed to the S2K PO queue for detailed processing, while dropship orders are directed to the S2K PO Dropship queue for specialized handling. The S2K PO queue represents the core processing stage, where documents undergo extensive validation against master data, including vendor information, payment terms, GL coding, and receipt matching. This queue implements numerous business rules to validate pricing, quantities, and accounting codes before exporting the processed data to an SFTP server.
+
+Throughout the workflow, various extensions work together to ensure data accuracy and process efficiency. These include matching PO numbers and vendor information against master data, calculating discounts based on payment terms, validating receipt quantities, handling freight charges, and detecting duplicate documents. The system also maintains associations between invoice item codes and PO item codes for future reference, and tracks document receipt dates. This comprehensive approach ensures that purchase orders are properly validated, accurately processed, and correctly exported to the S2K system.

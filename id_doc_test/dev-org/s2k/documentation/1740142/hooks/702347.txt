@@ -1,0 +1,24 @@
+### (S2K PO) - Document Splitting (702347)
+
+## Summary
+This extension automatically splits multi-document files into individual documents based on configurable text search rules. It identifies document boundaries by searching for specific phrases like "REMITTANCE ADVICE", "This Memorandum", and "Bill of Lading".
+
+## Logic
+The extension uses text search rules to identify where to split documents:
+
+1. **Rule Type**: All rules are configured as `text_search` with suggestion enabled
+2. **Split Triggers**:
+   - When "REMITTANCE ADVICE" is found (with tolerance of 1), split before this page
+   - When "This Memorandum" is found (with tolerance of 1), split before this page
+   - When "Bill of Lading" is found (with tolerance of 1), split before this page
+3. **Tolerance**: All rules have a tolerance value of 1, allowing for minor text variations
+4. **Split Position**: All rules are configured to split before the page containing the trigger phrase
+
+## Active Queues
+- S2K PO Inbox (1740142)
+
+## Events
+- annotation_content.initialize
+
+## Related Extensions
+None specified (no extensions listed in the 'run_after' attribute)

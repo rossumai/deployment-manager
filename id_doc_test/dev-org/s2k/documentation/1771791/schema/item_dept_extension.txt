@@ -1,0 +1,15 @@
+### Dept (Extension) (item_dept_extension)
+
+- **Description**: This field stores department information that is not directly captured from the invoice document. It is used by an extension to maintain additional department data related to the item.
+
+- **Field type**: data
+
+- **Data type**: string
+
+- **Required**: false
+
+- **Exported**: false
+
+- **Hidden**: true
+
+**Source Hook ID**: 684928

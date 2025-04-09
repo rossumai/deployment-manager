@@ -1,0 +1,8 @@
+### Printing/Plate Charge (plate_charge)
+
+* **description**: Represents the monetary charge associated with printing or plate production in the document
+* **field type**: captured
+* **data type**: number
+* **required**: false
+* **exported**: true
+* **hidden**: false

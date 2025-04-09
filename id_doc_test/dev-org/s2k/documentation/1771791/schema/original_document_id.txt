@@ -1,0 +1,15 @@
+### Original Document ID (original_document_id)
+
+* **Description**: This field stores the original identifier of the document. It is a system-generated field that maintains a reference to the source document's ID and is not meant to be modified by users.
+
+* **Field type**: data
+
+* **Data type**: string
+
+* **Required**: False
+
+* **Exported**: False
+
+* **Hidden**: True
+
+**Source hook ID**: 687184

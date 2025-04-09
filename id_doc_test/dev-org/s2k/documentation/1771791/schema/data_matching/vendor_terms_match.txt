@@ -1,0 +1,18 @@
+### Vendor Payment Terms Match
+
+This configuration populates the `vendor_terms_match` field by querying the `payment_terms` dataset.
+
+**Query Process:**
+- The configuration searches the `payment_terms` dataset for records where the "Payment Terms" field matches the value in `{selected_vendor_terms_id}`.
+- Dataset keys referenced: "Payment Terms"
+
+**Result Handling:**
+- If no match is found: The default value (label: "---", value: "") is used
+- If exactly one match is found: The best match (first result) is selected
+- If multiple matches are found: The best match (first result) is selected, and a warning message "Multiple matches found" is displayed
+
+**Field Population:**
+- The value from the "Payment Terms" field in the matched record is used to populate the `vendor_terms_match` field
+- The label displayed will be formatted using the "Description" field from the matched record
+
+This configuration is part of a vendor payment terms validation process, checking if the selected vendor terms ID exists in the payment terms master data.

@@ -1,0 +1,79 @@
+{
+  "id": 578985,
+  "type": "webhook",
+  "name": "Document Sorting (S2K PO Inbox)",
+  "url": "https://us.api.rossum.ai/v1/hooks/578985",
+  "description": "Automatically sort documents into specific queues based on document type (i.e. invoice, receipt etc.)",
+  "settings": {
+    "rules": [
+      {
+        "value": "non_s2k",
+        "recompute": true,
+        "schema_id": "routing_flag",
+        "target_queue": 1731515,
+        "target_status": "importing",
+        "trigger_status": "confirmed"
+      },
+      {
+        "value": "s2k_po",
+        "recompute": true,
+        "schema_id": "routing_flag",
+        "target_queue": 1771791,
+        "target_status": "importing",
+        "trigger_status": "confirmed"
+      },
+      {
+        "value": "dropship",
+        "recompute": false,
+        "schema_id": "routing_flag",
+        "target_queue": 1747529,
+        "target_status": "importing",
+        "trigger_status": "confirmed"
+      }
+    ]
+  },
+  "active": true,
+  "events": [
+    "annotation_status.changed"
+  ],
+  "queues": [
+    "https://us.api.rossum.ai/v1/queues/1740142"
+  ],
+  "run_after": [
+    "https://us.api.rossum.ai/v1/hooks/645890"
+  ],
+  "metadata": {},
+  "config": {
+    "private": true,
+    "schedule": {},
+    "app": null,
+    "payload_logging_enabled": false,
+    "timeout_s": 30,
+    "max_polling_time_s": 300,
+    "retry_count": 4,
+    "retry_after_polling_failure": true,
+    "insecure_ssl": false,
+    "client_ssl_certificate": null,
+    "retry_on_any_non_2xx": false
+  },
+  "test": {},
+  "sideload": [],
+  "settings_schema": null,
+  "secrets_schema": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "string"
+    }
+  },
+  "token_owner": "https://us.api.rossum.ai/v1/users/383208",
+  "extension_source": "rossum_store",
+  "guide": "<div style=\"color: var(--white)\">\r\n<p>Set up your Document Sorting settings:</p>\r\n<ol>\r\n    <li><b>Choose the queue(s) where you receive documents.</b></li>\r\n    <li><b>In configuration, for each document type fill in the queue ID of the target queue.</b></li>\r\n    <li>You may change the name (useful when using different settings on different queues).</li>\r\n</ol>\r\n<p><a href=\"https://rossum.ai/help/article/how-to-set-up-the-document-sorting-function-from-rossum-store/\" target=\"_blank\">Read this article</a> or watch the video below if you need help.</p>\r\n<iframe width=\"560\" height=\"315\" src=\"https://www.youtube.com/embed/ULDSX2Q_j_k\" title=\"YouTube video player\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture\" allowfullscreen></iframe>\r\n</div>",
+  "read_more_url": "https://rossum.ai/help/article/how-to-set-up-the-document-sorting-function-from-rossum-store/#setup",
+  "extension_image_url": "https://rossum.ai/help/wp-content/uploads/2024/01/Document-Sorting.png",
+  "token_lifetime_s": null,
+  "hook_template": "https://us.api.rossum.ai/v1/hook_templates/2",
+  "created_by": null,
+  "created_at": null,
+  "modified_by": "https://us.api.rossum.ai/v1/users/354857",
+  "modified_at": "2025-03-13T08:09:08.573264Z"
+}

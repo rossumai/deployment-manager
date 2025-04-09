@@ -1,0 +1,18 @@
+### Add Line Charges to Header (S2K PO) (712691)
+
+**Summary:** This extension aggregates line item charges with specific GL codes and updates corresponding header fields. It calculates totals for various charge types based on matching branch ID, GL code, and department values.
+
+**Logic:**
+- Iterates through each charge type defined in settings
+- For each charge type, sums up the total amount from matching line items based on branch ID, GL code, and department
+- Updates the corresponding header field with the calculated total
+
+**Active Queues:**
+- S2K PO (1771791)
+
+**Events:**
+- annotation_content.updated
+- annotation_content.initialize
+
+**Related Extensions:**
+- Master Data Hub (S2K PO) (DEPT Coding) (741617)

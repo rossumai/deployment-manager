@@ -1,0 +1,1 @@
+The field `order_dropship_flag_match` is populated from the main matching query. Please refer to the definition of the field with schema_id `order_id_match` for more information about how this data is retrieved and populated.

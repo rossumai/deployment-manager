@@ -1,0 +1,8 @@
+{
+  "Schema_id": null,
+  "Name of extension": "Assigning Labels (Rejecting CMs) (S2K PO)",
+  "Extension ID": "724570",
+  "INPUT": ["rejected_status"],
+  "OUTPUT": [],
+  "Description": "This extension adds or removes a specific label (ID 189) to an annotation based on the value of a 'rejected_status' field. It compares the field value against configurable conditions. If the value meets the 'add_condition', the label is added. If it matches the 'remove_condition', the label is removed. The extension supports various comparison operators (>, <, >=, <=, ==, !=) for numeric values."
+}

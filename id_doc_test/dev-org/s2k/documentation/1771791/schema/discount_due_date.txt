@@ -1,0 +1,13 @@
+### ╰━ Due Date for Discount (discount_due_date)
+
+* **Description**: This field calculates the due date for receiving a discount on a payment. If the vendor discount size is 0 (meaning no discount is offered), it automatically uses the same date as the regular payment due date. Otherwise, it uses the specific discount due date provided by the vendor.
+
+* **Field type**: formula
+
+* **Data type**: date
+
+* **Required**: false
+
+* **Exported**: true
+
+* **Hidden**: false

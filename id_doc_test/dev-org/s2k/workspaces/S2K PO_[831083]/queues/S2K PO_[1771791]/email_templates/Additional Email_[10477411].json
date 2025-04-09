@@ -1,0 +1,20 @@
+{
+  "id": 10477411,
+  "url": "https://us.api.rossum.ai/v1/email_templates/10477411",
+  "name": "Additional Email",
+  "queue": "https://us.api.rossum.ai/v1/queues/1771791",
+  "organization": "https://us.api.rossum.ai/v1/organizations/354207",
+  "subject": "Test",
+  "message": "<p></p>",
+  "type": "custom",
+  "enabled": false,
+  "automate": false,
+  "triggers": [],
+  "to": [
+    {
+      "email": "sergey.levchenko@rossum.ai"
+    }
+  ],
+  "cc": [],
+  "bcc": []
+}

@@ -1,0 +1,329 @@
+{
+  "id": 1771791,
+  "name": "S2K PO",
+  "url": "https://us.api.rossum.ai/v1/queues/1771791",
+  "workspace": "https://us.api.rossum.ai/v1/workspaces/831083",
+  "connector": null,
+  "hooks": [
+    "https://us.api.rossum.ai/v1/hooks/578986",
+    "https://us.api.rossum.ai/v1/hooks/592634",
+    "https://us.api.rossum.ai/v1/hooks/593147",
+    "https://us.api.rossum.ai/v1/hooks/645857",
+    "https://us.api.rossum.ai/v1/hooks/645889",
+    "https://us.api.rossum.ai/v1/hooks/646792",
+    "https://us.api.rossum.ai/v1/hooks/670261",
+    "https://us.api.rossum.ai/v1/hooks/670292",
+    "https://us.api.rossum.ai/v1/hooks/684928",
+    "https://us.api.rossum.ai/v1/hooks/685961",
+    "https://us.api.rossum.ai/v1/hooks/687183",
+    "https://us.api.rossum.ai/v1/hooks/687184",
+    "https://us.api.rossum.ai/v1/hooks/687199",
+    "https://us.api.rossum.ai/v1/hooks/689103",
+    "https://us.api.rossum.ai/v1/hooks/689106",
+    "https://us.api.rossum.ai/v1/hooks/689137",
+    "https://us.api.rossum.ai/v1/hooks/689194",
+    "https://us.api.rossum.ai/v1/hooks/699804",
+    "https://us.api.rossum.ai/v1/hooks/703124",
+    "https://us.api.rossum.ai/v1/hooks/704652",
+    "https://us.api.rossum.ai/v1/hooks/712691",
+    "https://us.api.rossum.ai/v1/hooks/713109",
+    "https://us.api.rossum.ai/v1/hooks/718139",
+    "https://us.api.rossum.ai/v1/hooks/724570",
+    "https://us.api.rossum.ai/v1/hooks/724571",
+    "https://us.api.rossum.ai/v1/hooks/726860",
+    "https://us.api.rossum.ai/v1/hooks/741617",
+    "https://us.api.rossum.ai/v1/hooks/748268",
+    "https://us.api.rossum.ai/v1/hooks/759357",
+    "https://us.api.rossum.ai/v1/hooks/766700",
+    "https://us.api.rossum.ai/v1/hooks/771115",
+    "https://us.api.rossum.ai/v1/hooks/771116"
+  ],
+  "webhooks": [
+    "https://us.api.rossum.ai/v1/webhooks/578986",
+    "https://us.api.rossum.ai/v1/webhooks/592634",
+    "https://us.api.rossum.ai/v1/webhooks/593147",
+    "https://us.api.rossum.ai/v1/webhooks/645857",
+    "https://us.api.rossum.ai/v1/webhooks/645889",
+    "https://us.api.rossum.ai/v1/webhooks/646792",
+    "https://us.api.rossum.ai/v1/webhooks/670261",
+    "https://us.api.rossum.ai/v1/webhooks/670292",
+    "https://us.api.rossum.ai/v1/webhooks/684928",
+    "https://us.api.rossum.ai/v1/webhooks/685961",
+    "https://us.api.rossum.ai/v1/webhooks/687183",
+    "https://us.api.rossum.ai/v1/webhooks/687184",
+    "https://us.api.rossum.ai/v1/webhooks/687199",
+    "https://us.api.rossum.ai/v1/webhooks/689103",
+    "https://us.api.rossum.ai/v1/webhooks/689106",
+    "https://us.api.rossum.ai/v1/webhooks/689137",
+    "https://us.api.rossum.ai/v1/webhooks/689194",
+    "https://us.api.rossum.ai/v1/webhooks/699804",
+    "https://us.api.rossum.ai/v1/webhooks/703124",
+    "https://us.api.rossum.ai/v1/webhooks/704652",
+    "https://us.api.rossum.ai/v1/webhooks/712691",
+    "https://us.api.rossum.ai/v1/webhooks/713109",
+    "https://us.api.rossum.ai/v1/webhooks/718139",
+    "https://us.api.rossum.ai/v1/webhooks/724570",
+    "https://us.api.rossum.ai/v1/webhooks/724571",
+    "https://us.api.rossum.ai/v1/webhooks/726860",
+    "https://us.api.rossum.ai/v1/webhooks/741617",
+    "https://us.api.rossum.ai/v1/webhooks/748268",
+    "https://us.api.rossum.ai/v1/webhooks/759357",
+    "https://us.api.rossum.ai/v1/webhooks/766700",
+    "https://us.api.rossum.ai/v1/webhooks/771115",
+    "https://us.api.rossum.ai/v1/webhooks/771116"
+  ],
+  "schema": "https://us.api.rossum.ai/v1/schemas/1701573",
+  "inbox": "https://us.api.rossum.ai/v1/inboxes/635472",
+  "session_timeout": "01:00:00",
+  "rir_url": null,
+  "rir_params": null,
+  "default_score_threshold": 0.975,
+  "automation_enabled": false,
+  "automation_level": "never",
+  "locale": "auto",
+  "metadata": {
+    "queueTemplate": "taxinvoiceus"
+  },
+  "settings": {
+    "columns": [
+      {
+        "schema_id": "document_id"
+      },
+      {
+        "schema_id": "order_id"
+      },
+      {
+        "schema_id": "date_due"
+      },
+      {
+        "schema_id": "amount_due"
+      },
+      {
+        "schema_id": "sender_name"
+      }
+    ],
+    "hide_export_button": false,
+    "accepted_mime_types": [
+      "image/*",
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/msword",
+      "application/vnd.ms-excel",
+      "application/zip"
+    ],
+    "suggested_edit": "suggest",
+    "automation": {
+      "automate_duplicates": true,
+      "automate_suggested_edit": false
+    },
+    "rejection_config": {
+      "enabled": true
+    },
+    "suggested_recipients_sources": [
+      {
+        "source": "email_header"
+      },
+      {
+        "source": "queue_mailing_history"
+      }
+    ],
+    "email_notifications": {
+      "recipient": null,
+      "unprocessable_attachments": false,
+      "postponed_annotations": false,
+      "deleted_annotations": false,
+      "email_with_no_attachments": true
+    },
+    "dashboard_customization": {
+      "all_documents": false,
+      "to_review": true,
+      "postponed": true,
+      "confirmed": true,
+      "exported": true,
+      "rejected": true,
+      "deleted": true,
+      "labels": true
+    },
+    "workflows": {
+      "enabled": false,
+      "bypass_workflows_allowed": false
+    },
+    "annotation_list_table": {
+      "columns": [
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 120.0,
+          "schema_id": "check_total_vs_line_item_totals",
+          "data_type": "string"
+        },
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 120.0,
+          "schema_id": "receipts_flag_extension",
+          "data_type": "string"
+        },
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 120.0,
+          "schema_id": "vendor_terms_description",
+          "data_type": "string"
+        },
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 120.0,
+          "schema_id": "receipts_flag",
+          "data_type": "string"
+        },
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 120.0,
+          "schema_id": "discount_term_flag",
+          "data_type": "string"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 170.0,
+          "meta_name": "status"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 270.0,
+          "meta_name": "original_file_name"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 150.0,
+          "meta_name": "details"
+        },
+        {
+          "visible": false,
+          "column_type": "meta",
+          "width": 300.0,
+          "meta_name": "queue"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 250.0,
+          "meta_name": "labels"
+        },
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 170.0,
+          "schema_id": "document_id",
+          "data_type": "string"
+        },
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 170.0,
+          "schema_id": "order_id",
+          "data_type": "string"
+        },
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 170.0,
+          "schema_id": "date_due",
+          "data_type": "date"
+        },
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 170.0,
+          "schema_id": "amount_due",
+          "data_type": "number"
+        },
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 170.0,
+          "schema_id": "sender_name",
+          "data_type": "string"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 150.0,
+          "meta_name": "created_at"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 150.0,
+          "meta_name": "modified_at"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 170.0,
+          "meta_name": "modifier"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 150.0,
+          "meta_name": "deleted_at"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 170.0,
+          "meta_name": "deleted_by"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 150.0,
+          "meta_name": "rejected_at"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 170.0,
+          "meta_name": "rejected_by"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 150.0,
+          "meta_name": "exported_at"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 150.0,
+          "meta_name": "export_failed_at"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 170.0,
+          "meta_name": "exported_by"
+        }
+      ]
+    }
+  },
+  "use_confirmed_state": false,
+  "document_lifetime": null,
+  "dedicated_engine": null,
+  "generic_engine": "https://us.api.rossum.ai/v1/generic_engines/5",
+  "delete_after": null,
+  "status": "active",
+  "workflows": [],
+  "modified_by": "https://us.api.rossum.ai/v1/users/354857",
+  "modified_at": "2025-05-19T13:51:50.392575Z",
+  "engine": null,
+  "training_enabled": true,
+  "archive_enabled": false
+}

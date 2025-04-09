@@ -1,0 +1,8 @@
+### Selected Terms (selected_terms)
+
+* **description**: This field automatically sets the value to "vendor". It's a predefined value that doesn't depend on any other fields.
+* **field type**: formula
+* **data type**: enum (string)
+* **required**: false
+* **exported**: false
+* **hidden**: true

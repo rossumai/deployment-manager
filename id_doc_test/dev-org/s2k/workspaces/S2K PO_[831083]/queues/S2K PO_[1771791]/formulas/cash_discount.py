@@ -1,0 +1,1 @@
+default_to(field.vendor_discount_calculated, 0)

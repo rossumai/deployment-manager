@@ -1,0 +1,1 @@
+For information about the "Vendor Terms: Discount Percentage" field, please refer to the main matching query defined in the "vendor_terms_match" field. This field is populated based on the results of that matching query.

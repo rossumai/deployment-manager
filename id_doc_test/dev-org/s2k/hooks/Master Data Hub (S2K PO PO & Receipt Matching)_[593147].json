@@ -1,0 +1,1191 @@
+{
+  "id": 593147,
+  "type": "webhook",
+  "name": "Master Data Hub (S2K PO PO & Receipt Matching)",
+  "url": "https://us.api.rossum.ai/v1/hooks/593147",
+  "description": "Enhance the extracted data with details from your master records.",
+  "settings": {
+    "configurations": [
+      {
+        "name": "PO header matching",
+        "source": {
+          "dataset": "s2k_purchase_orders",
+          "queries": [
+            {
+              "aggregate": [
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}"
+                  }
+                },
+                {
+                  "$group": {
+                    "_id": "$PO Number",
+                    "__tmpRoot": {
+                      "$first": "$$ROOT"
+                    }
+                  }
+                },
+                {
+                  "$replaceRoot": {
+                    "newRoot": "$__tmpRoot"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "default": {
+          "label": "---",
+          "value": ""
+        },
+        "mapping": {
+          "dataset_key": "PO Number",
+          "target_schema_id": "order_id_match"
+        },
+        "result_actions": {
+          "no_match_found": {
+            "selected": "default"
+          },
+          "one_match_found": {
+            "select": "best_match"
+          },
+          "multiple_matches_found": {
+            "select": "best_match"
+          }
+        },
+        "additional_mappings": [
+          {
+            "dataset_key": "Vendor Number",
+            "target_schema_id": "order_vendor_match"
+          },
+          {
+            "dataset_key": "PO Type",
+            "target_schema_id": "order_dropship_flag_match"
+          },
+          {
+            "dataset_key": "Location",
+            "target_schema_id": "order_location_match"
+          }
+        ]
+      },
+      {
+        "name": "PO Vendor name and terms matching",
+        "source": {
+          "dataset": "vendors",
+          "queries": [
+            {
+              "aggregate": [
+                {
+                  "$match": {
+                    "Supplier Number": "{order_vendor_match}"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "default": {
+          "label": "---",
+          "value": ""
+        },
+        "mapping": {
+          "dataset_key": "Name",
+          "target_schema_id": "order_vendor_name_match"
+        },
+        "result_actions": {
+          "no_match_found": {
+            "selected": "default"
+          },
+          "one_match_found": {
+            "select": "best_match"
+          },
+          "multiple_matches_found": {
+            "select": "default",
+            "message": {
+              "type": "warning",
+              "content": "Multiple matches found"
+            }
+          }
+        },
+        "additional_mappings": [
+          {
+            "dataset_key": "\"Payment Terms\"",
+            "target_schema_id": "order_vendor_terms_match"
+          }
+        ]
+      },
+      {
+        "name": "Branch header matching",
+        "source": {
+          "dataset": "s2k_locations",
+          "queries": [
+            {
+              "aggregate": [
+                {
+                  "$match": {
+                    "$expr": {
+                      "$eq": [
+                        "$Location Number",
+                        "{order_location_match}"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "default": {
+          "label": "---",
+          "value": ""
+        },
+        "mapping": {
+          "dataset_key": "Profit Center",
+          "target_schema_id": "branch_id"
+        },
+        "result_actions": {
+          "no_match_found": {
+            "selected": "default"
+          },
+          "one_match_found": {
+            "select": "best_match"
+          },
+          "multiple_matches_found": {
+            "select": "default",
+            "message": {
+              "type": "warning",
+              "content": "Multiple matches found"
+            }
+          }
+        }
+      },
+      {
+        "name": "Receipt flag header matching",
+        "source": {
+          "dataset": "s2k_receipts",
+          "queries": [
+            {
+              "aggregate": [
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "default": {
+          "label": "---",
+          "value": ""
+        },
+        "mapping": {
+          "dataset_key": "PO Number",
+          "target_schema_id": "receipts_flag_match"
+        },
+        "result_actions": {
+          "no_match_found": {
+            "selected": "default"
+          },
+          "one_match_found": {
+            "select": "best_match"
+          },
+          "multiple_matches_found": {
+            "select": "best_match"
+          }
+        }
+      },
+      {
+        "name": "PO Line Override Matching",
+        "source": {
+          "dataset": "s2k_purchase_orders",
+          "queries": [
+            {
+              "//": "Match by PO only",
+              "aggregate": [
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}"
+                  }
+                },
+                {
+                  "$addFields": {
+                    "dm_id": {
+                      "$concat": [
+                        "$Item Number",
+                        "_",
+                        {
+                          "$toString": "$PO Line Number"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "default": {
+          "label": "---",
+          "value": ""
+        },
+        "mapping": {
+          "dataset_key": "dm_id",
+          "label_template": "(S2K:{\"Item Number\"} ~ V:{\"Vendor Item Number\"}) {\"Description 1\"} (q: {\"Order Quantity\"}, l: {\"PO Line Number\"})",
+          "target_schema_id": "item_order_id_override"
+        },
+        "result_actions": {
+          "no_match_found": {
+            "select": "default"
+          },
+          "one_match_found": {
+            "select": "default"
+          },
+          "multiple_matches_found": {
+            "select": "default"
+          }
+        },
+        "action_condition": "'{item_match_po_flag}' == 'true'"
+      },
+      {
+        "name": "PO Line Matching",
+        "source": {
+          "dataset": "s2k_purchase_orders",
+          "queries": [
+            {
+              "//": "Match by Override Dropdown Selection.",
+              "aggregate": [
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}",
+                    "Item Number": "{item_order_id_override_normalized}"
+                  }
+                },
+                {
+                  "$addFields": {
+                    "dm_id": {
+                      "$concat": [
+                        "$Item Number",
+                        "_",
+                        {
+                          "$toString": "$PO Line Number"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "//": "Match by Item Number.",
+              "aggregate": [
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}"
+                  }
+                },
+                {
+                  "$match": {
+                    "Item Number": {
+                      "$ne": ""
+                    }
+                  }
+                },
+                {
+                  "$match": {
+                    "Item Number": {
+                      "$regex": "^{item_code_normalized | re }$",
+                      "$options": "i"
+                    }
+                  }
+                },
+                {
+                  "$addFields": {
+                    "dm_id": {
+                      "$concat": [
+                        "$Item Number",
+                        "_",
+                        {
+                          "$toString": "$PO Line Number"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "//": "Match by Vendor Item Number.",
+              "aggregate": [
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}"
+                  }
+                },
+                {
+                  "$match": {
+                    "Vendor Item Number": {
+                      "$ne": ""
+                    }
+                  }
+                },
+                {
+                  "$match": {
+                    "Vendor Item Number": {
+                      "$regex": "^{item_code_normalized | re}$",
+                      "$options": "i"
+                    }
+                  }
+                },
+                {
+                  "$addFields": {
+                    "dm_id": {
+                      "$concat": [
+                        "$Item Number",
+                        "_",
+                        {
+                          "$toString": "$PO Line Number"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "//": "Match by memorized Vendor Item Number.",
+              "aggregate": [
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}"
+                  }
+                },
+                {
+                  "$lookup": {
+                    "as": "matched_vendor_items",
+                    "let": {
+                      "itemNo": "$Item Number"
+                    },
+                    "from": "associations_s2k_item_codes",
+                    "pipeline": [
+                      {
+                        "$match": {
+                          "$expr": {
+                            "$and": [
+                              {
+                                "$eq": [
+                                  "$po_item_code",
+                                  "$$itemNo"
+                                ]
+                              },
+                              {
+                                "$eq": [
+                                  "$vendor_id",
+                                  "{selected_vendor_id}"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "$addFields": {
+                    "memorized_item": {
+                      "$arrayElemAt": [
+                        "$matched_vendor_items",
+                        0
+                      ]
+                    }
+                  }
+                },
+                {
+                  "$match": {
+                    "memorized_item.invoice_item_code": {
+                      "$regex": "^{item_code_normalized | re}$",
+                      "$options": "i"
+                    }
+                  }
+                },
+                {
+                  "$addFields": {
+                    "dm_id": {
+                      "$concat": [
+                        "$Item Number",
+                        "_",
+                        {
+                          "$toString": "$PO Line Number"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "//": "Match by Item Number in invoice description.",
+              "aggregate": [
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}"
+                  }
+                },
+                {
+                  "$match": {
+                    "$expr": {
+                      "$regexMatch": {
+                        "input": "{item_description}",
+                        "regex": "$Item Number",
+                        "options": "i"
+                      }
+                    }
+                  }
+                },
+                {
+                  "$addFields": {
+                    "dm_id": {
+                      "$concat": [
+                        "$Item Number",
+                        "_",
+                        {
+                          "$toString": "$PO Line Number"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "//": "Match by memorized Vendor Item Number -> PO Item Number in invoice description.",
+              "aggregate": [
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}"
+                  }
+                },
+                {
+                  "$lookup": {
+                    "as": "matched_vendor_items",
+                    "let": {
+                      "itemNo": "$Item Number"
+                    },
+                    "from": "associations_s2k_item_codes",
+                    "pipeline": [
+                      {
+                        "$match": {
+                          "$expr": {
+                            "$and": [
+                              {
+                                "$eq": [
+                                  "$po_item_code",
+                                  "$$itemNo"
+                                ]
+                              },
+                              {
+                                "$eq": [
+                                  "$vendor_id",
+                                  "{selected_vendor_id}"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "$addFields": {
+                    "memorized_item": {
+                      "$arrayElemAt": [
+                        "$matched_vendor_items",
+                        0
+                      ]
+                    }
+                  }
+                },
+                {
+                  "$match": {
+                    "$expr": {
+                      "$regexMatch": {
+                        "input": "{item_description}",
+                        "regex": "$memorized_item.invoice_item_code",
+                        "options": "i"
+                      }
+                    }
+                  }
+                },
+                {
+                  "$addFields": {
+                    "dm_id": {
+                      "$concat": [
+                        "$Item Number",
+                        "_",
+                        {
+                          "$toString": "$PO Line Number"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "//": "Match by invoice item code in PO description.",
+              "aggregate": [
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}"
+                  }
+                },
+                {
+                  "$match": {
+                    "$expr": {
+                      "$regexMatch": {
+                        "input": "$Description 1",
+                        "regex": "{item_code_normalized | re}",
+                        "options": "i"
+                      }
+                    }
+                  }
+                },
+                {
+                  "$addFields": {
+                    "dm_id": {
+                      "$concat": [
+                        "$Item Number",
+                        "_",
+                        {
+                          "$toString": "$PO Line Number"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "//": "Match by memorized Vendor Item Number -> PO Item Number in PO description.",
+              "aggregate": [
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}"
+                  }
+                },
+                {
+                  "$lookup": {
+                    "as": "matched_vendor_items",
+                    "let": {
+                      "itemNo": "$Item Number"
+                    },
+                    "from": "associations_s2k_item_codes",
+                    "pipeline": [
+                      {
+                        "$match": {
+                          "$expr": {
+                            "$and": [
+                              {
+                                "$eq": [
+                                  "$po_item_code",
+                                  "$$itemNo"
+                                ]
+                              },
+                              {
+                                "$eq": [
+                                  "$vendor_id",
+                                  "{selected_vendor_id}"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "$addFields": {
+                    "memorized_item": {
+                      "$arrayElemAt": [
+                        "$matched_vendor_items",
+                        0
+                      ]
+                    }
+                  }
+                },
+                {
+                  "$match": {
+                    "$expr": {
+                      "$regexMatch": {
+                        "input": "$Description 1",
+                        "regex": "$memorized_item.invoice_item_code",
+                        "options": "i"
+                      }
+                    }
+                  }
+                },
+                {
+                  "$addFields": {
+                    "dm_id": {
+                      "$concat": [
+                        "$Item Number",
+                        "_",
+                        {
+                          "$toString": "$PO Line Number"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "//": "Match by description",
+              "aggregate": [
+                {
+                  "$search": {
+                    "compound": {
+                      "must": [
+                        {
+                          "text": {
+                            "path": "Description 1",
+                            "fuzzy": {
+                              "maxEdits": 1
+                            },
+                            "query": [
+                              "{item_description}"
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "$limit": 50
+                },
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}"
+                  }
+                },
+                {
+                  "$addFields": {
+                    "__score": {
+                      "$meta": "searchScore"
+                    },
+                    "__source": "fuzzy"
+                  }
+                },
+                {
+                  "$addFields": {
+                    "dm_id": {
+                      "$concat": [
+                        "$Item Number",
+                        "_",
+                        {
+                          "$toString": "$PO Line Number"
+                        },
+                        "_",
+                        "{item_description}"
+                      ]
+                    },
+                    "__score_normalized": {
+                      "$divide": [
+                        "$__score",
+                        {
+                          "$add": [
+                            1,
+                            "$__score",
+                            {
+                              "$abs": {
+                                "$subtract": [
+                                  1,
+                                  {
+                                    "$divide": [
+                                      {
+                                        "$strLenCP": "Description 1"
+                                      },
+                                      {
+                                        "$strLenCP": "{item_description}"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "$setWindowFields": {
+                    "output": {
+                      "__score_normalized_max": {
+                        "$max": "$__score_normalized"
+                      }
+                    }
+                  }
+                },
+                {
+                  "$match": {
+                    "$expr": {
+                      "$cond": {
+                        "if": {
+                          "$or": [
+                            {
+                              "$and": [
+                                {
+                                  "$gt": [
+                                    "$__score_normalized_max",
+                                    0.9
+                                  ]
+                                },
+                                {
+                                  "$gt": [
+                                    "$__score_normalized",
+                                    0.9
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "$and": [
+                                {
+                                  "$gt": [
+                                    "$__score_normalized_max",
+                                    0.8
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized_max",
+                                    0.9
+                                  ]
+                                },
+                                {
+                                  "$gt": [
+                                    "$__score_normalized",
+                                    0.8
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized",
+                                    0.9
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "$and": [
+                                {
+                                  "$gt": [
+                                    "$__score_normalized_max",
+                                    0.7
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized_max",
+                                    0.8
+                                  ]
+                                },
+                                {
+                                  "$gt": [
+                                    "$__score_normalized",
+                                    0.7
+                                  ]
+                                },
+                                {
+                                  "$lte": [
+                                    "$__score_normalized",
+                                    0.8
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "else": false,
+                        "then": true
+                      }
+                    }
+                  }
+                },
+                {
+                  "$unionWith": {
+                    "coll": "s2k_purchase_orders",
+                    "pipeline": [
+                      {
+                        "$match": {
+                          "PO Number": "{order_id_normalized}"
+                        }
+                      },
+                      {
+                        "$addFields": {
+                          "dm_id": {
+                            "$concat": [
+                              "$Item Number",
+                              "_",
+                              {
+                                "$toString": "$PO Line Number"
+                              },
+                              "_",
+                              "{item_description}"
+                            ]
+                          },
+                          "__score": -1,
+                          "__source": "po_number_only",
+                          "__score_normalized": -1
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "$group": {
+                    "_id": {
+                      "item": "$Item Number",
+                      "line": "$PO Line Number"
+                    },
+                    "best_match": {
+                      "$first": "$$ROOT"
+                    }
+                  }
+                },
+                {
+                  "$replaceRoot": {
+                    "newRoot": "$best_match"
+                  }
+                },
+                {
+                  "$sort": {
+                    "__source": 1,
+                    "__score_normalized": -1
+                  }
+                }
+              ]
+            },
+            {
+              "//": "Match by PO only",
+              "aggregate": [
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}"
+                  }
+                },
+                {
+                  "$addFields": {
+                    "dm_id": {
+                      "$concat": [
+                        "$Item Number",
+                        "_",
+                        {
+                          "$toString": "$PO Line Number"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "default": {
+          "label": "---",
+          "value": ""
+        },
+        "mapping": {
+          "dataset_key": "dm_id",
+          "label_template": "(S2K:{\"Item Number\"} ~ V:{\"Vendor Item Number\"}) {\"Description 1\"} (q: {\"Order Quantity\"}, l: {\"PO Line Number\"})",
+          "target_schema_id": "item_order_match"
+        },
+        "result_actions": {
+          "no_match_found": {
+            "message": {
+              "type": "warning",
+              "content": "No PO line match found"
+            }
+          },
+          "one_match_found": {
+            "select": "best_match"
+          },
+          "multiple_matches_found": {
+            "select": "default",
+            "message": {
+              "type": "warning",
+              "content": "Multiple matches found"
+            }
+          }
+        },
+        "action_condition": "'{item_match_po_flag}' == 'true'",
+        "additional_mappings": [
+          {
+            "dataset_key": "Description 1",
+            "target_schema_id": "item_order_description_match"
+          },
+          {
+            "dataset_key": "Item Number",
+            "target_schema_id": "item_order_id_match"
+          },
+          {
+            "dataset_key": "PO Line Number",
+            "target_schema_id": "item_order_line_number"
+          },
+          {
+            "dataset_key": "Order Quantity",
+            "target_schema_id": "item_quantity_match"
+          },
+          {
+            "dataset_key": "Item Cost",
+            "target_schema_id": "item_amount_base_match"
+          }
+        ]
+      },
+      {
+        "name": "Received quantity + UOM LineItem Matching",
+        "source": {
+          "dataset": "s2k_receipts",
+          "queries": [
+            {
+              "//": "Match by item code",
+              "aggregate": [
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}",
+                    "Item Number": "{item_order_id_match}"
+                  }
+                },
+                {
+                  "$group": {
+                    "_id": "$Item Number",
+                    "__tmpRoot": {
+                      "$first": "$$ROOT"
+                    },
+                    "total_quantity_received": {
+                      "$sum": {
+                        "$toDouble": "$Receipt Quantity"
+                      }
+                    }
+                  }
+                },
+                {
+                  "$addFields": {
+                    "__tmpRoot.total_quantity_received": "$total_quantity_received"
+                  }
+                },
+                {
+                  "$replaceRoot": {
+                    "newRoot": "$__tmpRoot"
+                  }
+                }
+              ]
+            },
+            {
+              "//": "Match by PO number only",
+              "aggregate": [
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}"
+                  }
+                },
+                {
+                  "$group": {
+                    "_id": "$Item Number",
+                    "__tmpRoot": {
+                      "$first": "$$ROOT"
+                    },
+                    "total_quantity_received": {
+                      "$sum": {
+                        "$toDouble": "$Receipt Quantity"
+                      }
+                    }
+                  }
+                },
+                {
+                  "$addFields": {
+                    "__tmpRoot.total_quantity_received": "$total_quantity_received"
+                  }
+                },
+                {
+                  "$replaceRoot": {
+                    "newRoot": "$__tmpRoot"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "default": {
+          "label": "---",
+          "value": ""
+        },
+        "mapping": {
+          "dataset_key": "Item Number",
+          "label_template": "{\"Description 1\"} ({\"Item Number\"})",
+          "target_schema_id": "item_receipt_id_match"
+        },
+        "result_actions": {
+          "no_match_found": {
+            "message": {
+              "type": "warning",
+              "content": "No receipt match found"
+            }
+          },
+          "one_match_found": {
+            "select": "best_match"
+          },
+          "multiple_matches_found": {
+            "select": "default"
+          }
+        },
+        "action_condition": "'{item_match_po_flag}' == 'true'",
+        "additional_mappings": [
+          {
+            "dataset_key": "total_quantity_received",
+            "target_schema_id": "item_quantity_received_match"
+          },
+          {
+            "dataset_key": "Unit of Measure",
+            "target_schema_id": "item_receipt_uom_match"
+          },
+          {
+            "dataset_key": "\"Line/Seq Number\"",
+            "target_schema_id": "item_receipt_line_number_match"
+          },
+          {
+            "dataset_key": "Receipt Control Number",
+            "target_schema_id": "item_receipt_control_number_match"
+          }
+        ]
+      },
+      {
+        "name": "Invoiced Quantity (Accrual) LineItem Matching",
+        "source": {
+          "dataset": "s2k_accruals",
+          "queries": [
+            {
+              "//": "Match by item code",
+              "aggregate": [
+                {
+                  "$match": {
+                    "PO Number": "{order_id_normalized}",
+                    "Item Number": "{item_order_id_match}"
+                  }
+                },
+                {
+                  "$group": {
+                    "_id": "$Item Number",
+                    "__tmpRoot": {
+                      "$first": "$$ROOT"
+                    },
+                    "total_quantity_open": {
+                      "$sum": {
+                        "$toDouble": "$Open Quantity"
+                      }
+                    }
+                  }
+                },
+                {
+                  "$addFields": {
+                    "__tmpRoot.total_quantity_open": "$total_quantity_open"
+                  }
+                },
+                {
+                  "$replaceRoot": {
+                    "newRoot": "$__tmpRoot"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "default": {
+          "label": "---",
+          "value": ""
+        },
+        "mapping": {
+          "dataset_key": "total_quantity_open",
+          "target_schema_id": "item_quantity_open"
+        },
+        "result_actions": {
+          "no_match_found": {
+            "select": "default"
+          },
+          "one_match_found": {
+            "select": "best_match"
+          },
+          "multiple_matches_found": {
+            "select": "default",
+            "message": {
+              "type": "warning",
+              "content": "Multiple matches found"
+            }
+          }
+        },
+        "additional_mappings": [
+          {
+            "dataset_key": "File Sequence",
+            "target_schema_id": "item_accrual_line_number_match"
+          }
+        ]
+      }
+    ]
+  },
+  "active": true,
+  "events": [
+    "annotation_content.initialize",
+    "annotation_content.started",
+    "annotation_content.updated"
+  ],
+  "queues": [
+    "https://us.api.rossum.ai/v1/queues/1771791"
+  ],
+  "run_after": [
+    "https://us.api.rossum.ai/v1/hooks/645889",
+    "https://us.api.rossum.ai/v1/hooks/703124"
+  ],
+  "metadata": {},
+  "config": {
+    "private": true,
+    "schedule": {},
+    "app": null,
+    "payload_logging_enabled": true,
+    "timeout_s": 60,
+    "max_polling_time_s": 300,
+    "retry_count": 4,
+    "retry_after_polling_failure": true,
+    "insecure_ssl": false,
+    "client_ssl_certificate": null,
+    "retry_on_any_non_2xx": false
+  },
+  "test": {},
+  "sideload": [
+    "schemas"
+  ],
+  "settings_schema": null,
+  "secrets_schema": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "string"
+    }
+  },
+  "token_owner": "https://us.api.rossum.ai/v1/users/383208",
+  "extension_source": "rossum_store",
+  "guide": "<div>\r\n    <p>To manage and configure the behavior, use our configurator below.</p> \r\n    <p>Start by</p>\r\n    <ul>\r\n        <li>Selecting the queues that you want to use for this extension below</li>\r\n    </ul>\r\n    <p>Then open Master Data Hub and</p>\r\n    <ul>\r\n        <li>Import the dataset with Dataset Management</li>\r\n        <li>Create and set up a new configuration in Configurator</li>\r\n    </ul>\r\n    <p>For more information, take a look at our documentation <a href=\"https://rossum.ai/help/article/master-data-hub-extension\" target=\"_blank\">here</a>.</p>\r\n\r\n    <p><form action=\"https://us.app.rossum.ai/svc/master-data-hub/web/\" target=\"_blank\" rel=\"noopener noreferrer\">\r\n        <button type=\"submit\"style=\"\r\n            border: none;    \r\n            background: var(--color-primary);\r\n            border-radius: 4px;\r\n            padding: 6px 16px;\r\n            color: var(--white);\r\n            font-weight: 500;\"\r\n         >\r\n            Open configurator\r\n        </button>\r\n    </form></p>\r\n</div>",
+  "read_more_url": "https://elis.rossum.ai/svc/master-data-hub/api/docs",
+  "extension_image_url": "https://rossum.ai/help/wp-content/uploads/2024/01/Master-Data-Hub.png",
+  "token_lifetime_s": 7200,
+  "hook_template": "https://us.api.rossum.ai/v1/hook_templates/39",
+  "created_by": null,
+  "created_at": null,
+  "modified_by": "https://us.api.rossum.ai/v1/users/354857",
+  "modified_at": "2025-05-16T09:35:00.537383Z"
+}

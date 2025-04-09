@@ -1,0 +1,1 @@
+For information about the "Vendor Terms: Net Period" field, please refer to the definition of the "vendor_terms_match" field. This field is populated from the main matching query described in that definition.

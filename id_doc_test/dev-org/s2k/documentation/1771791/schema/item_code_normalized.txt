@@ -1,0 +1,13 @@
+### Code (Normalized) (item_code_normalized)
+
+* **Description**: This field takes the value from the `item_code` field and removes any characters that are not letters, numbers, hyphens, spaces, or parentheses. It essentially "cleans" the code by stripping out special characters.
+
+* **Field type**: formula
+
+* **Data type**: string
+
+* **Required**: false
+
+* **Exported**: true
+
+* **Hidden**: true

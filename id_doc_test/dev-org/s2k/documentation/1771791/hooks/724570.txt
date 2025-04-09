@@ -1,0 +1,19 @@
+### Assigning Labels (Rejecting CMs) (S2K PO) (724570)
+
+**Summary:** Automatically adds or removes a specific label (ID: 189) to annotations based on the value of the "rejected_status" field, comparing it against configured conditions.
+
+**Logic:**
+- Evaluates the value of the "rejected_status" field against a specified condition
+- Adds a label (ID: 189) to the annotation when the value meets the add_condition
+- Removes the label when the value meets the remove_condition
+- Supports various comparison operators (>, <, >=, <=, ==, !=) for numeric conditions
+
+**Active Queues:**
+- S2K PO (1771791)
+
+**Events:**
+- annotation_content.updated
+- annotation_content.initialize
+
+**Related Extensions:**
+- None

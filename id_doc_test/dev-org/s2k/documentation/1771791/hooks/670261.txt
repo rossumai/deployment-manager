@@ -1,0 +1,15 @@
+### Master Data Hub (S2K PO Terms Matching) (670261)
+
+**Summary**: This extension matches vendor payment terms from a master data source based on the selected vendor terms ID. When a match is found, it populates various payment term details including discount information and net payment periods.
+
+**Logic**:
+
+| Configuration | Source dataset | Dataset fields | Target schema IDs | Select actions |
+|---------------|----------------|----------------|-------------------|----------------|
+| Vendor Payment Terms Match | payment_terms | Payment Terms | vendor_terms_match, vendor_terms_description, vendor_discount_size, vendor_discount_period, vendor_discount_day_of_month, vendor_discount_beginning_month, vendor_net_period, vendor_net_day_of_month, vendor_net_beginning_month | No match: select default<br>One match: select best_match<br>Multiple matches: select best_match with warning message |
+
+**Active Queues**: S2K PO (1771791)
+
+**Related Extensions**:
+- Master Data Hub (S2K PO Vendor) (592634)
+- Master Data Hub (S2K PO PO & Receipt Matching) (593147)

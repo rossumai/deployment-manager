@@ -1,0 +1,13 @@
+### Save Order/Quantity ratio (item_save_ratio)
+
+- **Description**: This field indicates whether there is a ratio between the order and quantity that needs to be saved. It's a simple Yes/No option that users can select manually.
+
+- **Field type**: manual
+
+- **Data type**: enum (string values)
+
+- **Required**: No
+
+- **Exported**: No
+
+- **Hidden**: No

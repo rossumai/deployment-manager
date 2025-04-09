@@ -1,0 +1,8 @@
+{
+  "Schema_id": 684928,
+  "Name of extension": "Add Discount Line (S2K PO)",
+  "Extension ID": 684928,
+  "INPUT": ["line_items", "item_amount_discount", "flag_virtual_discount_line", "item_branch_id_normalized"],
+  "OUTPUT": ["line_items", "item_branch_id_extension", "item_gl_code_extension", "item_dept_extension", "item_amount_total", "flag_virtual_discount_line"],
+  "Description": "This extension aggregates discount amounts from line items and creates or updates a virtual discount line in the purchase order. It calculates the total discount from all line items, then adds a new line with negative amount representing the total discount. If a discount line already exists, it updates it. The extension also sets specific GL code and department values for the discount line."
+}

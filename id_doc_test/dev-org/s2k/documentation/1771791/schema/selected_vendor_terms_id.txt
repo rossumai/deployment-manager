@@ -1,0 +1,13 @@
+### Selected Vendor Terms ID (selected_vendor_terms_id)
+
+* **Description**: This field automatically captures the ID of the vendor terms that match the order. It pulls this information directly from the `order_vendor_terms_match` field without requiring manual input.
+
+* **Field type**: formula
+
+* **Data type**: string
+
+* **Required**: false
+
+* **Exported**: true
+
+* **Hidden**: true

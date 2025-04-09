@@ -1,0 +1,54 @@
+{
+  "id": 766700,
+  "type": "function",
+  "name": "Trigger Refresh (S2K PO)",
+  "url": "https://us.api.rossum.ai/v1/hooks/766700",
+  "description": "",
+  "settings": {
+    "hook_id": "578986"
+  },
+  "active": false,
+  "events": [
+    "invocation.scheduled"
+  ],
+  "queues": [
+    "https://us.api.rossum.ai/v1/queues/1771791"
+  ],
+  "run_after": [],
+  "metadata": {},
+  "config": {
+    "schedule": {
+      "cron": "*/10 * * * *"
+    },
+    "app": null,
+    "payload_logging_enabled": false,
+    "timeout_s": 30,
+    "max_polling_time_s": 300,
+    "retry_count": 4,
+    "retry_after_polling_failure": true,
+    "runtime": "python3.12",
+    "code": "\"\"\"\nThis custom serverless function example demonstrates showing messages to the\nuser on the validation screen, updating values of specific fields, and\nexecuting actions on the annotation.\n\nSee https://elis.rossum.ai/api/docs/#rossum-transaction-scripts for more examples.\n\"\"\"\n\nfrom rossum.lib.api_client import RossumClient, RossumException\nfrom rossum_api import ElisAPIClientSync\n\n\ndef rossum_hook_request_handler(payload: dict) -> dict:\n    rossum_client = get_rossum_client(payload)\n\n    hook_id = payload['settings'].get('hook_id', None)\n    if not hook_id:\n        return {}\n   \n    rossum_client.request_json(method='POST', url=f\"hooks/{hook_id}/invoke\")\n\n    return {}\n\n\ndef get_rossum_client(payload: dict):\n    rossum_client = ElisAPIClientSync(\n        token=get_auth_token_from_payload(payload),\n        base_url=payload[\"base_url\"] + \"/api/v1\",\n    )\n    return rossum_client\n\n\ndef get_auth_token_from_payload(payload: dict) -> str:\n    auth_token = payload.get(\"rossum_authorization_token\")\n    if not auth_token:\n        raise HookConfigurationError(\n            f\"Authorization token not found in the payload. Configure Rossum API access at {payload['hook']}.\"\n        )\n    return auth_token\n\n\ndef find_by_schema_id(content, schema_id: str):\n    accumulator = []\n    for node in content:\n        if node[\"schema_id\"] == schema_id:\n            accumulator.append(node)\n        elif \"children\" in node:\n            accumulator.extend(find_by_schema_id(node[\"children\"], schema_id))\n\n    return accumulator",
+    "third_party_library_pack": "default",
+    "memory_size_mb": 256
+  },
+  "test": {},
+  "sideload": [],
+  "settings_schema": null,
+  "secrets_schema": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "string"
+    }
+  },
+  "token_owner": "https://us.api.rossum.ai/v1/users/383208",
+  "extension_source": "custom",
+  "guide": null,
+  "read_more_url": null,
+  "extension_image_url": null,
+  "token_lifetime_s": null,
+  "hook_template": null,
+  "created_by": "https://us.api.rossum.ai/v1/users/354857",
+  "created_at": "2025-05-09T07:24:31.377355Z",
+  "modified_by": "https://us.api.rossum.ai/v1/users/354857",
+  "modified_at": "2025-05-12T13:43:13.001538Z"
+}

@@ -1,0 +1,35 @@
+### Received quantity + UOM LineItem Matching
+
+This configuration populates the `item_receipt_id_match` field by querying the `s2k_receipts` dataset to find matching receipt line items.
+
+**Dataset**: `s2k_receipts`
+
+**Queries**:
+1. First query attempts to match by both PO number and item code:
+   - Matches records where `PO Number` equals the value in `order_id_normalized` AND `Item Number` equals the value in `item_order_id_match`
+   - Groups the results by `Item Number`
+   - Calculates the total received quantity by summing the `Receipt Quantity` field (converted to double)
+   - Adds the calculated total quantity to the original record
+
+2. Second query (runs if first query returns no results) matches by PO number only:
+   - Matches records where `PO Number` equals the value in `order_id_normalized`
+   - Groups the results by `Item Number`
+   - Calculates the total received quantity by summing the `Receipt Quantity` field (converted to double)
+   - Adds the calculated total quantity to the original record
+
+**Result Actions**:
+- If no matches are found: Displays a warning message "No receipt match found"
+- If exactly one match is found: Selects the best match (first result)
+- If multiple matches are found: Selects the default value (empty string with label "---")
+
+**Mapping**:
+- The value from the `Item Number` field is stored in `item_receipt_id_match`
+- The label is formatted as "[Description 1] ([Item Number])"
+
+**Action Condition**:
+- This configuration only runs if `item_match_po_flag` equals "true"
+
+**Referenced Schema IDs**:
+- `order_id_normalized`
+- `item_order_id_match`
+- `item_match_po_flag`

@@ -1,0 +1,13 @@
+### PO Total (Calculated) (item_order_amount_total_calculated)
+
+* **Description**: This field calculates the total purchase order amount by multiplying the item quantity by the base amount. If either the quantity or base amount is missing, the result is 0. The base amount is converted from a string to a number, handling both comma and period decimal separators.
+
+* **Field type**: formula
+
+* **Data type**: number
+
+* **Required**: False
+
+* **Exported**: False
+
+* **Hidden**: True

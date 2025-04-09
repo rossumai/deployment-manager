@@ -7,9 +7,10 @@ Here is what you need to know about:
 Related extensions:
 {run_after}
 
-generate a structured documentation of the extension to humans in markdown:
-Name of the extension (extension id) (h3 markdown)
-Fields Used: Which fields (schema_ids) are used in the configuration (bullet point)
-Extension Logic: What does the extension do (bullet point, hint: Use description if available. You can also infer it based on the extension’s ‘code’ attribute if available.)
-Events: list of events on which events is the hook triggered (bullet point)
-Related Extensions: list of hooks that are listed in ‘run_after’ attribute. Look at the IDs of the related extensions section to know which is which. (bullet point)
+Create these sections in the output:
+Fields Used = Which fields (schema_ids) are used in the configuration.
+Logic = What does the extension do
+Use description if available.
+You can also infer it based on the extension’s ‘code’ attribute if available.
+Events = on which events is the hook triggered
+Related Extensions = hooks that are listed in ‘run_after’ attribute. Look at the IDs of the related extensions section to know which is which and list their name as well as ID.

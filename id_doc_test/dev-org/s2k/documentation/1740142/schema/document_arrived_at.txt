@@ -1,0 +1,15 @@
+### document_arrived_at (document_arrived_at)
+
+- **Description**: This field records when a document was received or arrived in the system. It is hidden from the user interface and is automatically populated by the system rather than being captured from the invoice.
+
+- **Field type**: data
+
+- **Data type**: string
+
+- **Required**: No
+
+- **Exported**: No
+
+- **Hidden**: Yes
+
+**Source Hook ID**: 748268
