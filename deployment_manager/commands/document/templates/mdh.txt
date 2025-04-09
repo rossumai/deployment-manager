@@ -1,0 +1,22 @@
+Use the provided json definition and provide a description of the configuration. The provided json definition is a list of individual configurations. Mention briefly what each configuration does. Do not go into detail about each individual query, but list in a table which dataset field the query references and which schema_id fields it populates.
+Source.dataset - name of the dataset that contains the data and is being queried
+Source.queries -  this is a list of individual mongoDB queries. The queries are started from top to bottom. Schema_ids are referenced in the query by its name being enclosed in curly brackets, for example schema_id sender_name is referenced in the query as {{sender_name}}. Always list all dataset keys that are referenced.
+Result_actions - this key defines what type of message and what is the selected value of the query result whenever the query returns 0, exactly 1 or more than one record. Select key means which value is selected, either the default value (in the config represented by select: default), or the first value (in the config represented by select: best_match) in the query result set.
+Focus only on the keys settings which hold the main configuration and list queues the configuration is assigned to in the queues key.
+Make sure to list all dataset keys and schema_ids referenced in the queries and all target schema IDs exactly as they are written in the json configuration
+Include in the table also a description of result_actions for each configuration
+The output will contain the following table columns
+Configuration - name of the configuration
+Source dataset - lists the main source.dataset and all datasets referenced in $unionWith and $lookup stages
+Dataset fields - referenced dataset fields in the configuration queries (ignore mentions in $project phase)
+Target schema IDs - schema_ids referenced in mapping and addition_mappings sections
+Select actions - actions described in result_actions
+
+Return also list of Related Extensions = hooks that are listed in ‘run_after’ attribute. Look at the IDs of the related extensions section to know which is which and list their name as well as ID.
+
+JSON:
+{attributes}
+
+
+Related extensions:
+{run_after}

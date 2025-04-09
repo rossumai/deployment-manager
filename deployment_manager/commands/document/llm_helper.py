@@ -18,7 +18,7 @@ class LLMHelper:
         )
 
         self.bedrock_runtime = self.session.client(
-            "bedrock-runtime", region_name="us-east-1", config=config
+            "bedrock-runtime", region_name="us-west-2", config=config
         )
 
         self.payload_basis = {
