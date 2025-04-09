@@ -1,0 +1,8 @@
+### Cash Discount GL (cash_discount_gl_code)
+
+* **Description**: This field automatically sets the GL code for cash discounts to "510000". The value is fixed and cannot be modified by users.
+* **Field type**: formula
+* **Data type**: string
+* **Required**: false
+* **Exported**: true
+* **Hidden**: true

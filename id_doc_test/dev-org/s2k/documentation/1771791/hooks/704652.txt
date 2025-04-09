@@ -1,0 +1,19 @@
+### Assigning Labels (Preferred Vendor) (S2K PO) [704652]
+
+**Summary:** This extension automatically assigns or removes a specific label (ID: 94) to annotations based on the value of the "preferred_vendor_match" field, comparing it against configured conditions.
+
+**Logic:**
+- Checks the value of a specified field (preferred_vendor_match) against configured conditions
+- Adds a label (ID: 94) when the field value meets the "add_condition" criteria
+- Removes the label when the field value matches the "remove_condition" criteria
+- Supports various comparison operators (>, <, >=, <=, ==, !=) for numeric condition evaluation
+
+**Active Queues:**
+- S2K PO (1771791)
+
+**Events:**
+- annotation_content.initialize
+- annotation_content.updated
+
+**Related Extensions:**
+- Master Data Hub (S2K PO Preferred Vendor) (689103)

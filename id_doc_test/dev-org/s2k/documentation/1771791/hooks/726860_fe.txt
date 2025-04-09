@@ -1,0 +1,8 @@
+{
+  "Schema_id": null,
+  "Name of extension": "Business Rules Validation - S2K PO",
+  "Extension ID": 726860,
+  "INPUT": ["notes", "item_quantity_export", "item_quantity", "item_order_invoice_quantity_ratio_match"],
+  "OUTPUT": [],
+  "Description": "This extension automates compliance with business rules and enhances data validation processes for S2K Purchase Orders. It validates that either internal notes are provided or the exported item quantity does not exceed the item quantity multiplied by a configurable ratio. If this rule is violated, it displays an error message prompting users to note the buyer approving the variance before confirming."
+}

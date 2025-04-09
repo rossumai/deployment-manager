@@ -1,0 +1,11 @@
+### document_arrived_at (document_arrived_at)
+
+- **Description**: This field automatically records when a document was received in the system. It is not visible to users and cannot be manually edited. The value is populated by a system hook rather than being extracted from the document itself.
+
+- **Field type**: data
+- **Data type**: string
+- **Required**: No
+- **Exported**: No
+- **Hidden**: Yes
+
+**Source**: This field is populated by hook ID 748268.

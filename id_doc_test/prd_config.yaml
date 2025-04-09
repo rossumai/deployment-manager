@@ -1,0 +1,29 @@
+directories:
+  prod-org:
+    org_id: '354205'
+    api_base: https://us.api.rossum.ai/v1
+    subdirectories:
+      prod:
+        regex: ''
+  test-org:
+    org_id: '354206'
+    api_base: https://us.api.rossum.ai/v1
+    subdirectories:
+      test:
+        regex: ''
+  dev-org:
+    org_id: '354207'
+    api_base: https://us.api.rossum.ai/v1
+    subdirectories:
+      bol:
+        regex: BoL
+      nons2k:
+        regex: NON-S2K|Email Notifications
+      s2k:
+        regex: S2K PO
+      remittances:
+        regex: Remittances
+      po_confirmations:
+        regex: PO ACK
+      historical:
+        regex: Historical

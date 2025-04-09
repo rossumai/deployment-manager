@@ -1,0 +1,19 @@
+### Assigning Labels (S2K PO Inbox) (S2K PO) (701086)
+
+**Summary:** This extension automatically assigns or removes labels based on the value of the routing_flag field. It compares the field value against conditions to determine if label 189 should be added or removed.
+
+**Logic:**
+- Monitors the routing_flag field value and compares it against configured conditions
+- Adds label 189 when the field value matches the add_condition (non_s2k)
+- Removes label 189 when the field value matches the remove_condition (if specified)
+- Supports comparison operators (>, <, >=, <=, ==, !=) for numeric condition checking
+
+**Active Queues:**
+- S2K PO Inbox (1740142)
+
+**Events:**
+- annotation_content.updated
+- annotation_content.initialize
+
+**Related Extensions:**
+- None

@@ -1,0 +1,15 @@
+### Master Data Hub (S2K PO Preferred Vendor) (689103)
+
+**Summary:** This extension checks if a vendor is a preferred vendor by matching the selected vendor ID against a list of preferred vendors. When a match is found, it flags the vendor as preferred.
+
+**Logic:**
+
+| Configuration | Source dataset | Dataset fields | Target schema IDs | Select actions |
+|---------------|----------------|----------------|-------------------|----------------|
+| Preferred Vendors (find vendor ID in a dedicated list) | preferred_vendors | VENDOR CODE | preferred_vendor_match | No match: Select default value<br>One match: Select best match<br>Multiple matches: Select best match with warning message |
+
+**Active Queues:** S2K PO (1771791)
+
+**Related Extensions:**
+- Master Data Hub (S2K PO Vendor) (592634)
+- Master Data Hub (S2K PO PO & Receipt Matching) (593147)

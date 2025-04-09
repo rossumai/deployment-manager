@@ -1,0 +1,8 @@
+{
+  "Schema_id": null,
+  "Name of extension": "Date of receipt to Field (S2K PO)",
+  "Extension ID": 748268,
+  "INPUT": [],
+  "OUTPUT": ["document_arrived_at"],
+  "Description": "This extension takes the document arrival date from the payload and writes it to the document_arrived_at field. It runs when an annotation is initialized."
+}

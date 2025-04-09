@@ -1,0 +1,19 @@
+### Add Inventory Variances (S2K PO) (718139)
+
+**Summary:** Calculates price and quantity variances between purchase order and invoice line items. The extension compares invoice quantities against allowed quantities and invoice unit prices against PO unit prices.
+
+**Logic:**
+- Calculates unit price and quantity variances for each line item
+- Compares invoice quantities with maximum allowed quantities from PO
+- Applies quantity ratio adjustments when specified
+- Computes price variances by comparing invoice unit prices with PO unit prices
+- Sums up all variances and stores them in header fields (inventory_price_variances and inventory_quantity_variances)
+
+**Active Queues:**
+- S2K PO (1771791)
+
+**Events:**
+- annotation_content.export
+
+**Related Extensions:**
+- None

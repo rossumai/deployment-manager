@@ -1,0 +1,22 @@
+{
+  "id": 8611586,
+  "url": "https://us.api.rossum.ai/v1/email_templates/8611586",
+  "name": "Annotation status change - confirmed",
+  "queue": "https://us.api.rossum.ai/v1/queues/1771791",
+  "organization": "https://us.api.rossum.ai/v1/organizations/354207",
+  "subject": "Verified documents: {{ parent_email_subject }}",
+  "message": "<p>Dear sender,<br><br>Your documents have been checked by annotator.<br><br>{{ document_list }}<br><br>Regards</p>\n",
+  "type": "custom",
+  "enabled": false,
+  "automate": false,
+  "triggers": [
+    "https://us.api.rossum.ai/v1/triggers/6776827"
+  ],
+  "to": [
+    {
+      "email": "{{sender_email}}"
+    }
+  ],
+  "cc": [],
+  "bcc": []
+}

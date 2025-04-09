@@ -1,0 +1,8 @@
+{
+  "Schema_id": null,
+  "Name of extension": "Download Manual PO Number and Notes (S2K PO)",
+  "Extension ID": 703124,
+  "INPUT": [],
+  "OUTPUT": ["order_id_manual", "notes"],
+  "Description": "This extension retrieves the manual PO number and notes from the annotation metadata and assigns these values to the corresponding fields in the document. It runs when an annotation is initialized."
+}

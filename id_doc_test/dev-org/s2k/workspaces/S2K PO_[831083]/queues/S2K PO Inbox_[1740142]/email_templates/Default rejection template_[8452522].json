@@ -1,0 +1,20 @@
+{
+  "id": 8452522,
+  "url": "https://us.api.rossum.ai/v1/email_templates/8452522",
+  "name": "Default rejection template",
+  "queue": "https://us.api.rossum.ai/v1/queues/1740142",
+  "organization": "https://us.api.rossum.ai/v1/organizations/354207",
+  "subject": "Rejected document {{parent_email_subject}}",
+  "message": "<p>Dear sender,<br><br>The attached document has been rejected.<br><br><br>Best regards,<br>{{ user_name }}</p>\n",
+  "type": "rejection_default",
+  "enabled": true,
+  "automate": true,
+  "triggers": [],
+  "to": [
+    {
+      "email": "{{sender_email}}"
+    }
+  ],
+  "cc": [],
+  "bcc": []
+}

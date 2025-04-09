@@ -1,0 +1,15 @@
+### dropship_freight_from_lines (dropship_freight_from_lines)
+
+* **Description**: This field stores a numeric value representing freight costs calculated from line items for dropshipped orders. It's automatically populated and not intended for direct user modification.
+
+* **Field type**: data
+
+* **Data type**: number
+
+* **Required**: No
+
+* **Exported**: No
+
+* **Hidden**: Yes
+
+**Source Hook ID**: 712691

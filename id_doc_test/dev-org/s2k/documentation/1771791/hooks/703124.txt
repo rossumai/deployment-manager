@@ -1,0 +1,16 @@
+### Download Manual PO Number and Notes (S2K PO) (703124)
+
+**Summary:** Retrieves manual PO number and notes from the annotation metadata and sets them as field values in the document.
+
+**Logic:**
+- Extracts 'order_id_manual' and 'notes' values from the annotation metadata
+- Assigns these values to the corresponding fields in the document
+
+**Active Queues:**
+- S2K PO (1771791)
+
+**Events:**
+- annotation_content.initialize
+
+**Related Extensions:**
+- None

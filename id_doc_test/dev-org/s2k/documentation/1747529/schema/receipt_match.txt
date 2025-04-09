@@ -1,0 +1,13 @@
+### Receipt Match (receipt_match)
+
+- **Description**: This field is used to store information about whether a receipt matches with other data. It's a hidden field that doesn't appear in the user interface but is used by the system for data processing.
+
+- **Field type**: data
+
+- **Data type**: enum (string values)
+
+- **Required**: No
+
+- **Exported**: Yes
+
+- **Hidden**: Yes

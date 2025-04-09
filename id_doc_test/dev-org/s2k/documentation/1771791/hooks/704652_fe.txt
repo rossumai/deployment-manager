@@ -1,0 +1,8 @@
+{
+  "Schema_id": null,
+  "Name of extension": "Assigning Labels (Preferred Vendor) (S2K PO)",
+  "Extension ID": "704652",
+  "INPUT": ["preferred_vendor_match"],
+  "OUTPUT": [],
+  "Description": "This extension assigns or removes a specific label (with ID 94) to an annotation based on the value of the 'preferred_vendor_match' field. It compares the field value against configured conditions: if the value meets the 'add_condition', the label is added; if it matches the 'remove_condition', the label is removed. The extension supports various comparison operators (>, <, >=, <=, ==, !=) for numeric values."
+}

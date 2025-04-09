@@ -1,0 +1,18 @@
+### PO matching
+
+This configuration is designed to populate the "PO Number (Match)" field (schema_id: `order_match`).
+
+**Data Source:**
+- Dataset: `s2k_purchase_orders`
+
+**Query Process:**
+1. The configuration queries the `s2k_purchase_orders` dataset to find records where:
+   - The "PO Number" field matches the value in `{order_id_normalized}`
+   - The "PO Number" field is not empty
+
+**Result Handling:**
+- If no matching records are found: The default value (empty string with label "---") is selected
+- If exactly one matching record is found: The "PO Number" value from that record is selected
+- If multiple matching records are found: The "PO Number" value from the first record is selected
+
+The configuration maps the "PO Number" field from the dataset to the `order_match` schema field.

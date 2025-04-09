@@ -1,0 +1,15 @@
+### receipts_flag_extension (receipts_flag_extension)
+
+* **Description**: This field is used by an extension to store string data that is not directly extracted from the document. It serves as a flag related to receipts processing and is not predicted by the AI system.
+
+* **Field type**: data
+
+* **Data type**: string
+
+* **Required**: False
+
+* **Exported**: False
+
+* **Hidden**: False
+
+**Source Hook ID**: 771116

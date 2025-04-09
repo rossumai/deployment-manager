@@ -1,0 +1,132 @@
+{
+  "id": 670261,
+  "type": "webhook",
+  "name": "Master Data Hub (S2K PO Terms Matching)",
+  "url": "https://us.api.rossum.ai/v1/hooks/670261",
+  "description": "Enhance the extracted data with details from your master records.",
+  "settings": {
+    "configurations": [
+      {
+        "name": "Vendor Payment Terms Match",
+        "source": {
+          "dataset": "payment_terms",
+          "queries": [
+            {
+              "//": "Match from vendor master data",
+              "find": {
+                "Payment Terms": "{selected_vendor_terms_id}"
+              }
+            }
+          ]
+        },
+        "default": {
+          "label": "---",
+          "value": ""
+        },
+        "mapping": {
+          "dataset_key": "\"Payment Terms\"",
+          "label_template": "{\"Description\"}",
+          "target_schema_id": "vendor_terms_match"
+        },
+        "result_actions": {
+          "no_match_found": {
+            "select": "default"
+          },
+          "one_match_found": {
+            "select": "best_match"
+          },
+          "multiple_matches_found": {
+            "select": "best_match",
+            "message": {
+              "type": "warning",
+              "content": "Multiple matches found"
+            }
+          }
+        },
+        "additional_mappings": [
+          {
+            "dataset_key": "Description",
+            "target_schema_id": "vendor_terms_description"
+          },
+          {
+            "dataset_key": "\"Discount %\"",
+            "target_schema_id": "vendor_discount_size"
+          },
+          {
+            "dataset_key": "Days to Pay Discount",
+            "target_schema_id": "vendor_discount_period"
+          },
+          {
+            "dataset_key": "Day of Month to Discount",
+            "target_schema_id": "vendor_discount_day_of_month"
+          },
+          {
+            "dataset_key": "\"Discount Beginning Month C/N\"",
+            "target_schema_id": "vendor_discount_beginning_month"
+          },
+          {
+            "dataset_key": "Days to Pay Net",
+            "target_schema_id": "vendor_net_period"
+          },
+          {
+            "dataset_key": "Day of Month to Net",
+            "target_schema_id": "vendor_net_day_of_month"
+          },
+          {
+            "dataset_key": "\"Net Beginning Month C/N\"",
+            "target_schema_id": "vendor_net_beginning_month"
+          }
+        ]
+      }
+    ]
+  },
+  "active": true,
+  "events": [
+    "annotation_content.initialize",
+    "annotation_content.started",
+    "annotation_content.updated"
+  ],
+  "queues": [
+    "https://us.api.rossum.ai/v1/queues/1771791"
+  ],
+  "run_after": [
+    "https://us.api.rossum.ai/v1/hooks/592634",
+    "https://us.api.rossum.ai/v1/hooks/593147"
+  ],
+  "metadata": {},
+  "config": {
+    "private": true,
+    "schedule": {},
+    "app": null,
+    "payload_logging_enabled": false,
+    "timeout_s": 60,
+    "max_polling_time_s": 300,
+    "retry_count": 4,
+    "retry_after_polling_failure": true,
+    "insecure_ssl": false,
+    "client_ssl_certificate": null,
+    "retry_on_any_non_2xx": false
+  },
+  "test": {},
+  "sideload": [
+    "schemas"
+  ],
+  "settings_schema": null,
+  "secrets_schema": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "string"
+    }
+  },
+  "token_owner": "https://us.api.rossum.ai/v1/users/383208",
+  "extension_source": "rossum_store",
+  "guide": "<div>\r\n    <p>To manage and configure the behavior, use our configurator below.</p> \r\n    <p>Start by</p>\r\n    <ul>\r\n        <li>Selecting the queues that you want to use for this extension below</li>\r\n    </ul>\r\n    <p>Then open Master Data Hub and</p>\r\n    <ul>\r\n        <li>Import the dataset with Dataset Management</li>\r\n        <li>Create and set up a new configuration in Configurator</li>\r\n    </ul>\r\n    <p>For more information, take a look at our documentation <a href=\"https://rossum.ai/help/article/master-data-hub-extension\" target=\"_blank\">here</a>.</p>\r\n\r\n    <p><form action=\"https://us.app.rossum.ai/svc/master-data-hub/web/\" target=\"_blank\" rel=\"noopener noreferrer\">\r\n        <button type=\"submit\"style=\"\r\n            border: none;    \r\n            background: var(--color-primary);\r\n            border-radius: 4px;\r\n            padding: 6px 16px;\r\n            color: var(--white);\r\n            font-weight: 500;\"\r\n         >\r\n            Open configurator\r\n        </button>\r\n    </form></p>\r\n</div>",
+  "read_more_url": "https://elis.rossum.ai/svc/master-data-hub/api/docs",
+  "extension_image_url": "https://rossum.ai/help/wp-content/uploads/2024/01/Master-Data-Hub.png",
+  "token_lifetime_s": 7200,
+  "hook_template": "https://us.api.rossum.ai/v1/hook_templates/39",
+  "created_by": null,
+  "created_at": null,
+  "modified_by": "https://us.api.rossum.ai/v1/users/354857",
+  "modified_at": "2025-05-09T07:17:31.790241Z"
+}

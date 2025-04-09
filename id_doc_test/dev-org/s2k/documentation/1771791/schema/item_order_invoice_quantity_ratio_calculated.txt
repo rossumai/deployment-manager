@@ -1,0 +1,13 @@
+### Order Invoice Ratio (Calculated) (item_order_invoice_quantity_ratio_calculated)
+
+* **Description**: This field calculates the ratio between the matched quantity and the item quantity. If the item quantity is empty or zero, the result is 0. Otherwise, it divides the matched quantity by the item quantity and rounds to 2 decimal places. This helps measure how much of the ordered quantity has been matched/invoiced.
+
+* **Field type**: formula
+
+* **Data type**: number
+
+* **Required**: False
+
+* **Exported**: False
+
+* **Hidden**: True

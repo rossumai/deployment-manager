@@ -1,0 +1,8 @@
+{
+  "Schema_id": null,
+  "Name of extension": "Save confirmed_by Email (S2K PO)",
+  "Extension ID": 687183,
+  "INPUT": [],
+  "OUTPUT": ["confirmed_by"],
+  "Description": "This extension retrieves the email address of the user who exported the annotation and saves it to the 'confirmed_by' field. It uses the Rossum API to fetch user details based on the exported_by URL from the annotation payload."
+}

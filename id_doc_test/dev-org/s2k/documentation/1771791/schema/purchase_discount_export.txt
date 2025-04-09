@@ -1,0 +1,13 @@
+### purchase_discount_export (purchase_discount_export)
+
+* **description**: This field calculates the purchase discount amount as a negative number. It takes the value from `purchase_discount_from_lines` field (if available) and converts it to a negative number. If the source field is not available, it uses 0 as the default value.
+
+* **field type**: formula
+
+* **data type**: number
+
+* **required**: false
+
+* **exported**: false
+
+* **hidden**: true

@@ -1,0 +1,15 @@
+### Get Document ID into Schema (S2K PO) [687184]
+
+**Summary:** Captures the document ID from the incoming payload and stores it in the schema field "original_document_id" for future reference.
+
+**Logic:**
+- Extracts the document ID from the payload and assigns it to the "original_document_id" field in the schema
+
+**Active Queues:**
+- S2K PO (1771791)
+
+**Events:**
+- annotation_content.initialize
+
+**Related Extensions:**
+- None

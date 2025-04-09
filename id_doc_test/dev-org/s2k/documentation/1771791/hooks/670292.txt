@@ -1,0 +1,24 @@
+### Calculating Discounts (S2K PO) (670292)
+
+**Summary:** Analyzes payment terms text to extract discount information and payment schedules, storing the structured data in the document_terms_llm_guess field.
+
+**Logic:**
+- Extracts payment terms from the document
+- Parses the terms using an LLM to identify key payment information including:
+  - Days to pay net amount
+  - Days to get discount
+  - Day of month for payments
+  - Whether payments are from current or next month
+  - Discount percentage
+- Stores the structured JSON result in the document_terms_llm_guess field
+- Only processes if payment terms are present
+
+**Active Queues:**
+- S2K PO (1771791)
+
+**Events:**
+- annotation_content.updated
+- annotation_content.initialize
+
+**Related Extensions:**
+None

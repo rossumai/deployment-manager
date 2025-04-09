@@ -1,0 +1,1 @@
+This field, "PO Item Number (Match)", is populated from the main matching query. Please refer to the field with schema_id "item_order_match" for details on how this information is processed and matched.

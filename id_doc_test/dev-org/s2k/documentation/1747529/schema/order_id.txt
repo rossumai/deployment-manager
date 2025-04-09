@@ -1,0 +1,8 @@
+### PO Number (order_id)
+
+* **Description**: Purchase order identification.
+* **Field type**: captured
+* **Data type**: string
+* **Required**: False
+* **Exported**: True
+* **Hidden**: False

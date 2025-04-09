@@ -1,0 +1,34 @@
+### PO Line Matching
+
+This configuration populates the `item_order_match` field by matching purchase order line items from the `s2k_purchase_orders` dataset based on various criteria. The configuration runs only when `item_match_po_flag` is set to 'true'.
+
+The configuration executes a series of MongoDB queries in sequence, attempting to find a match for the current invoice line item against purchase order line items. The queries are executed in the following order:
+
+1. **Match by Override Dropdown Selection**: Looks for an exact match using the PO number (`order_id_normalized`) and an override item number (`item_order_id_override_normalized`).
+
+2. **Match by Item Number**: Finds PO lines where the PO number matches `order_id_normalized` and the item number matches `item_code_normalized`.
+
+3. **Match by Vendor Item Number**: Matches PO lines where the PO number matches `order_id_normalized` and the vendor item number matches `item_code_normalized`.
+
+4. **Match by memorized Vendor Item Number**: Looks up item code associations in the `associations_s2k_item_codes` collection to find matches between vendor item codes and PO item codes for the selected vendor (`selected_vendor_id`).
+
+5. **Match by Item Number in invoice description**: Finds PO lines where the PO number matches and the PO's item number appears in the invoice's `item_description`.
+
+6. **Match by memorized Vendor Item Number -> PO Item Number in invoice description**: Uses the associations collection to find PO lines where the memorized vendor item code appears in the invoice's `item_description`.
+
+7. **Match by invoice item code in PO description**: Finds PO lines where the invoice's `item_code_normalized` appears in the PO's "Description 1" field.
+
+8. **Match by memorized Vendor Item Number -> PO Item Number in PO description**: Uses the associations collection to find PO lines where the memorized vendor item code appears in the PO's "Description 1" field.
+
+9. **Match by description**: Uses fuzzy text matching to find PO lines where the "Description 1" field is similar to the invoice's `item_description`, with scoring and normalization to rank matches.
+
+10. **Match by PO only**: As a fallback, returns all PO lines that match the PO number (`order_id_normalized`).
+
+When a match is found, the field is populated with the value from the `dm_id` field, which is constructed as a concatenation of "Item Number", "PO Line Number", and in some cases the `item_description`.
+
+The result actions define the behavior based on the query results:
+- If no match is found, a warning message "No PO line match found" is displayed
+- If exactly one match is found, that match is selected
+- If multiple matches are found, the default value (empty string) is selected and a warning message "Multiple matches found" is displayed
+
+The label displayed to the user follows the template: "(S2K:[Item Number] ~ V:[Vendor Item Number]) [Description 1] (q: [Order Quantity], l: [PO Line Number])"

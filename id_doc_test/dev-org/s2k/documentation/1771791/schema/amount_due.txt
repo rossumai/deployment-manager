@@ -1,0 +1,8 @@
+### Invoice Amt (Captured) (amount_due)
+
+- **Description**: Final amount including tax to be paid after deducting all discounts and advances.
+- **Field type**: captured
+- **Data type**: number
+- **Required**: true
+- **Exported**: false
+- **Hidden**: false

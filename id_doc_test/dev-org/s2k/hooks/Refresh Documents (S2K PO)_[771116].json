@@ -1,0 +1,56 @@
+{
+  "id": 771116,
+  "type": "function",
+  "name": "Refresh Documents (S2K PO)",
+  "url": "https://us.api.rossum.ai/v1/hooks/771116",
+  "description": "",
+  "settings": {
+    "collection_name": "s2k_receipts"
+  },
+  "active": true,
+  "events": [
+    "invocation.manual"
+  ],
+  "queues": [
+    "https://us.api.rossum.ai/v1/queues/1771791"
+  ],
+  "run_after": [],
+  "metadata": {},
+  "config": {
+    "schedule": {
+      "cron": ""
+    },
+    "app": null,
+    "payload_logging_enabled": false,
+    "timeout_s": 60,
+    "max_polling_time_s": 300,
+    "retry_count": 4,
+    "retry_after_polling_failure": true,
+    "runtime": "python3.12",
+    "code": "from txscript import TxScript, default_to, substitute\nfrom rossum_api import ElisAPIClient, APIClientError\nimport asyncio\nimport requests\nimport json\n\ndef format_pipeline(order_id):\n    return  [\n              {\n                \"$addFields\": {\n                  \"PO Number\": {\n                    \"$toString\": \"$PO Number\"\n                  }\n                }\n              },\n              {\n                \"$match\": {\n                  \"PO Number\": order_id\n                }\n              }\n            ]\n          \n\ndef rossum_hook_request_handler(payload: dict) -> dict:\n    return asyncio.run(main(payload))\n\nasync def main(payload: dict) -> dict:\n    # init variables\n    token = payload[\"rossum_authorization_token\"]\n    settings = payload[\"settings\"]\n    base_url = payload[\"base_url\"]\n    collection_name = settings[\"collection_name\"]\n    ds_url = f\"{base_url}/svc/data-storage/api/v1\"\n    queue_ids= settings.get('queue_ids', [])\n    \n    client = get_rossum_client(payload)\n    \n    annotation_ids = []\n    async for annotation in client.list_all_annotations(queue='1771791', status='to_review,postponed'):\n        annotation_ids.append(annotation.id)\n        \n    for annotation_id in annotation_ids:\n        annotation_content = await client.request_json(method='GET', url=f'annotations/{annotation_id}/content')\n        \n        receipts_flag = find_by_schema_id(annotation_content['content'], 'receipts_flag')\n        #if not receipts_flag or receipts_flag[0]['content']['value'] == 'Received':\n        #    continue\n        \n        po_number = find_by_schema_id(annotation_content['content'], 'order_id_normalized')\n        if not po_number or not po_number[0]['content']['value']:\n            continue\n        \n        res = await find_in_data_storage_collection(collection_name, format_pipeline(po_number[0]['content']['value']), token, ds_url, {})\n        \n        if not res.get('result', []):\n            continue\n        \n        receipts_flag_extension = find_by_schema_id(annotation_content['content'], 'receipts_flag_extension')\n        \n        if not receipts_flag_extension or not receipts_flag_extension[0].get('id', None):\n            continue\n        \n        print(receipts_flag_extension[0] )\n        \n        updated_content = {**receipts_flag_extension[0]['content'], \"value\": \"true\" }\n        updated_operation = create_replace_operation(receipts_flag_extension[0], updated_content)\n        \n        annotation_content = await client.request_json(method='POST', url=f'annotations/{annotation_id}/content/operations', json={'operations': [updated_operation]})\n        \n    return {}\n    \nasync def find_in_data_storage_collection(collection_name, query, token, ds_url, sort):\n    payload = {\"collectionName\": collection_name, \"pipeline\": query, \"sort\": sort}\n    header = {\"Content-Type\": \"application/json\", \"Authorization\": f\"Bearer {token}\"}\n    \n    try:\n        req = await asyncio.to_thread(requests.post, url=f\"{ds_url}/data/aggregate\", json=payload, headers=header, timeout=20)\n    except Exception as ex:\n        return str(ex)\n\n    return json.loads(req.text)\n\ndef create_replace_operation(datapoint: dict, content: dict, validation_sources: list = []):\n    return {\n        \"op\": \"replace\",\n        \"id\": datapoint['id'],\n        \"value\": {\n            \"content\": content,\n            \"validation_sources\": validation_sources\n        },\n    }\n    \n    \ndef get_rossum_client(payload: dict):\n    rossum_client = ElisAPIClient(\n        token=get_auth_token_from_payload(payload),\n        base_url=payload[\"base_url\"] + \"/api/v1\",\n    )\n    return rossum_client\n\n\ndef get_auth_token_from_payload(payload: dict) -> str:\n    auth_token = payload.get(\"rossum_authorization_token\")\n    if not auth_token:\n        raise Exception(\n            f\"Authorization token not found in the payload. Configure Rossum API access at {payload['hook']}.\"\n        )\n    return auth_token\n    \n    \n\ndef find_by_schema_id(content, schema_id: str):\n    accumulator = []\n    for node in content:\n        if node[\"schema_id\"] == schema_id:\n            accumulator.append(node)\n        elif \"children\" in node:\n            accumulator.extend(find_by_schema_id(node[\"children\"], schema_id))\n\n    return accumulator",
+    "third_party_library_pack": "default",
+    "memory_size_mb": 256
+  },
+  "test": {
+    "savedInput": "{\n  \"request_id\": \"27a1acd6-3f63-4988-9733-7d7f3f5a06f9\",\n  \"timestamp\": \"2025-05-13T12:08:23.223191Z\",\n  \"hook\": \"https://us.api.rossum.ai/v1/hooks/771116\",\n  \"action\": \"scheduled\",\n  \"event\": \"invocation\",\n  \"rossum_authorization_token\": \"5c3c2adbaa74877089d7e9a78d6ff5f5c89c19b8\",\n  \"base_url\": \"https://us.app.rossum.ai\",\n  \"settings\": {\n    \"collection_name\": \"s2k_receipts\"\n  },\n  \"secrets\": {}\n}"
+  },
+  "sideload": [],
+  "settings_schema": null,
+  "secrets_schema": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "string"
+    }
+  },
+  "token_owner": "https://us.api.rossum.ai/v1/users/383208",
+  "extension_source": "custom",
+  "guide": "",
+  "read_more_url": null,
+  "extension_image_url": null,
+  "token_lifetime_s": null,
+  "hook_template": null,
+  "created_by": null,
+  "created_at": "2025-05-13T08:37:54.255897Z",
+  "modified_by": "https://us.api.rossum.ai/v1/users/176601",
+  "modified_at": "2025-05-17T09:55:11.269399Z"
+}

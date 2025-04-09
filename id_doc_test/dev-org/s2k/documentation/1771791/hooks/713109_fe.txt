@@ -1,0 +1,8 @@
+{
+  "Schema_id": "713109",
+  "Name of extension": "Save Invoice Item Code <> PO Item Code (S2K PO)",
+  "Extension ID": "713109",
+  "INPUT": ["item_order_id_match", "item_code_normalized", "selected_vendor_id", "item_description"],
+  "OUTPUT": [],
+  "Description": "This extension saves mapping associations between invoice item codes and PO item codes for S2K purchase orders. It triggers when an annotation status changes to confirmed, exported, or failed_export. The extension extracts specified fields from line items (item_order_id_match, item_code_normalized, selected_vendor_id, item_description) and stores them in a data storage collection called 'associations_s2k_item_codes'. It handles duplicate records based on configured natural keys and can be configured to keep the first/oldest record when duplicates are found."
+}

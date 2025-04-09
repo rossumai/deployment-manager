@@ -1,0 +1,8 @@
+{
+  "Schema_id": "645890",
+  "Name of extension": "Upload Fields from Inbox (S2K PO)",
+  "Extension ID": "645890",
+  "INPUT": ["order_id_manual", "notes", "order_id"],
+  "OUTPUT": ["bounding_boxes", "metadata"],
+  "Description": "This extension captures order ID, order ID manual, and notes data from a confirmed annotation and updates the annotation's metadata with these values. It specifically triggers when an annotation status changes to 'confirmed' and stores the captured data along with bounding box information in the annotation metadata."
+}

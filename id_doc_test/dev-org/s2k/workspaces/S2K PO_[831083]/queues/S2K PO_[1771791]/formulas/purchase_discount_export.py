@@ -1,0 +1,1 @@
+-abs(default_to(field.purchase_discount_from_lines, 0))

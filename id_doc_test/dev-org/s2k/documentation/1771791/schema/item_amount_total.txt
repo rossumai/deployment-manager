@@ -1,0 +1,13 @@
+### Total Amount (Captured) (item_amount_total)
+
+- **Description**: The total amount to be paid for all the items including the tax. Rule of thumb: total amount equals the item amount multiplied by the quantity.
+
+- **Field type**: datapoint
+
+- **Data type**: number
+
+- **Required**: No
+
+- **Exported**: No
+
+- **Hidden**: No

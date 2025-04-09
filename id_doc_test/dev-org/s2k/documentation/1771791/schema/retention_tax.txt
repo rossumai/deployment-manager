@@ -1,0 +1,8 @@
+### Retention Tax (retention_tax)
+
+* **description**: Represents the amount of tax withheld or retained from a payment.
+* **field type**: captured
+* **data type**: number
+* **required**: false
+* **exported**: true
+* **hidden**: false

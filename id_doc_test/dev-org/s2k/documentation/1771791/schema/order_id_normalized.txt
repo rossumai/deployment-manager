@@ -1,0 +1,13 @@
+### PO Number (Normalized) (order_id_normalized)
+
+* **Description**: This field automatically normalizes purchase order numbers. If a manual PO number is provided, it uses that; otherwise, it uses the original PO number. If the number is longer than 7 digits, it extracts only the last 7 digits from the number, displays a warning message, and blocks automation. This ensures consistent 7-digit PO number formatting.
+
+* **Field type**: formula
+
+* **Data type**: string
+
+* **Required**: false
+
+* **Exported**: false
+
+* **Hidden**: true

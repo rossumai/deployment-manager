@@ -1,0 +1,62 @@
+{
+  "id": 704652,
+  "type": "function",
+  "name": "Assigning Labels (Preferred Vendor) (S2K PO)",
+  "url": "https://us.api.rossum.ai/v1/hooks/704652",
+  "description": "",
+  "settings": {
+    "field": "preferred_vendor_match",
+    "label_id": "94",
+    "add_condition": "Y",
+    "remove_condition": ""
+  },
+  "active": true,
+  "events": [
+    "annotation_content.initialize",
+    "annotation_content.updated"
+  ],
+  "queues": [
+    "https://us.api.rossum.ai/v1/queues/1771791"
+  ],
+  "run_after": [
+    "https://us.api.rossum.ai/v1/hooks/689103"
+  ],
+  "metadata": {},
+  "config": {
+    "schedule": {
+      "cron": ""
+    },
+    "app": null,
+    "payload_logging_enabled": false,
+    "timeout_s": 30,
+    "max_polling_time_s": 300,
+    "retry_count": 4,
+    "retry_after_polling_failure": true,
+    "runtime": "python3.12",
+    "code": "import requests\nimport operator\nfrom rossum_python import *\n\n\ndef rossum_hook_request_handler(payload: dict) -> dict:\n    rossum = RossumPython.from_payload(payload)\n    settings = payload.get(\"settings\", {})\n    base_url = payload[\"base_url\"]\n    \n    try:\n        field = settings[\"field\"]\n        label_id = settings[\"label_id\"]\n        add_condition = settings[\"add_condition\"]\n        remove_condition = settings[\"remove_condition\"]\n    except KeyError as e:\n        rossum.show_error(f\"Missing required setting: {e}\")\n        return rossum.hook_response()\n    \n    operators = {\n        \">\": operator.gt,\n        \"<\": operator.lt,\n        \">=\": operator.ge,\n        \"<=\": operator.le,\n        \"==\": operator.eq,\n        \"!=\": operator.ne\n    }\n    \n    if hasattr(rossum.field, field):\n        value = getattr(rossum.field, field).value\n        \n        for op_symbol, op_func in operators.items():\n            if isinstance(add_condition, str) and add_condition.startswith(op_symbol):\n                if op_symbol in [\">\", \"<\", \">=\", \"<=\"]:\n                    try:\n                        value = float(value)\n                        threshold = float(add_condition[len(op_symbol):].strip())\n                    except ValueError:\n                        rossum.show_error(f\"Value or condition threshold could not be converted to float.\")\n                        return rossum.hook_response()\n                if op_func(value, threshold):\n                    print(value, threshold, op_symbol)\n                    modify_label(rossum, base_url, \"add\", label_id)\n                break\n        else:\n            \n            if value == add_condition:\n                \n                modify_label(rossum, base_url, \"add\", label_id)\n        \n        if value == remove_condition:\n            modify_label(rossum, base_url, \"remove\", label_id)\n            \n        \n    return {\"messages\": [], \"operations\": []}\n   \n    \ndef modify_label(rossum: RossumPython, base_url, operation: str, label_id: int) -> None:\n    body = {\n        \"operations\": {\n            operation: [f\"{base_url}/api/v1/labels/{label_id}\"]\n        },\n        \"objects\": {\n            \"annotations\": [rossum.annotation.url]\n        }\n    }\n    \n    auth = {\n        \"Authorization\": f\"Bearer {rossum.annotation._token}\"\n    }\n    \n    requests.post(f\"{base_url}/api/v1/labels/apply\", json=body, headers=auth)",
+    "third_party_library_pack": "default",
+    "memory_size_mb": 256
+  },
+  "test": {},
+  "sideload": [
+    "schemas"
+  ],
+  "settings_schema": null,
+  "secrets_schema": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "string"
+    }
+  },
+  "token_owner": "https://us.api.rossum.ai/v1/users/383208",
+  "extension_source": "custom",
+  "guide": null,
+  "read_more_url": null,
+  "extension_image_url": null,
+  "token_lifetime_s": null,
+  "hook_template": null,
+  "created_by": null,
+  "created_at": null,
+  "modified_by": "https://us.api.rossum.ai/v1/users/354857",
+  "modified_at": "2025-03-24T11:44:44.657479Z"
+}

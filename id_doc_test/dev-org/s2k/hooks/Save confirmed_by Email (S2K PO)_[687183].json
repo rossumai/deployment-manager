@@ -1,0 +1,54 @@
+{
+  "id": 687183,
+  "type": "function",
+  "name": "Save confirmed_by Email (S2K PO)",
+  "url": "https://us.api.rossum.ai/v1/hooks/687183",
+  "description": "",
+  "settings": {},
+  "active": true,
+  "events": [
+    "annotation_content.export"
+  ],
+  "queues": [
+    "https://us.api.rossum.ai/v1/queues/1771791"
+  ],
+  "run_after": [],
+  "metadata": {},
+  "config": {
+    "schedule": {
+      "cron": ""
+    },
+    "app": null,
+    "payload_logging_enabled": false,
+    "timeout_s": 30,
+    "max_polling_time_s": 300,
+    "retry_count": 4,
+    "retry_after_polling_failure": true,
+    "runtime": "python3.12",
+    "code": "from txscript import TxScript, default_to, substitute, is_empty\nfrom rossum.lib.api_client import RossumClient, RossumException\n\ndef rossum_hook_request_handler(payload: dict) -> dict:\n    t = TxScript.from_payload(payload)\n    rossum_client = get_rossum_client(payload)\n\n    confirmed_by_url = payload['annotation'].get('exported_by', \"\")\n    if not confirmed_by_url:\n        return t.hook_response()\n    \n    confirmed_by_id = confirmed_by_url.split(\"/\")[-1]\n    \n    try:\n        user = rossum_client.get_user(confirmed_by_id)\n        t.field.confirmed_by = user.get('email', \"unknown\")\n    except Exception as e:\n        print(e)\n        t.field.confirmed_by = \"unknown\"\n\n    return t.hook_response()\n    \ndef get_rossum_client(payload: dict) -> RossumClient:\n    rossum_client = RossumClient(None, payload[\"base_url\"] + \"/api/v1\")\n    rossum_client.token = get_auth_token_from_payload(payload)\n    return rossum_client\n\n\ndef get_auth_token_from_payload(payload: dict) -> str:\n    auth_token = payload.get(\"rossum_authorization_token\")\n    if not auth_token:\n        raise HookConfigurationError(\n            f\"Authorization token not found in the payload. Configure Rossum API access at {payload['hook']}.\"\n        )\n    return auth_token",
+    "third_party_library_pack": "default",
+    "memory_size_mb": 256
+  },
+  "test": {},
+  "sideload": [
+    "schemas"
+  ],
+  "settings_schema": null,
+  "secrets_schema": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "string"
+    }
+  },
+  "token_owner": "https://us.api.rossum.ai/v1/users/383208",
+  "extension_source": "custom",
+  "guide": null,
+  "read_more_url": null,
+  "extension_image_url": null,
+  "token_lifetime_s": null,
+  "hook_template": null,
+  "created_by": null,
+  "created_at": null,
+  "modified_by": "https://us.api.rossum.ai/v1/users/354857",
+  "modified_at": "2025-04-25T14:24:42.197736Z"
+}

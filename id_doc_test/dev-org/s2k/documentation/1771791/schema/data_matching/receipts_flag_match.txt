@@ -1,0 +1,17 @@
+### Receipt flag header matching
+
+This configuration is designed to populate the `receipts_flag_match` field by matching purchase order numbers from the `s2k_receipts` dataset.
+
+**Dataset**: `s2k_receipts`
+
+**Query Process**:
+- The configuration executes a query on the `s2k_receipts` dataset
+- It searches for records where the `PO Number` field matches the value in `{order_id_normalized}`
+- The `PO Number` value from the matching record is mapped to the `receipts_flag_match` field
+
+**Result Handling**:
+- If no match is found: The default value is used (empty string with label "---")
+- If one match is found: The `PO Number` value from the matching record is selected
+- If multiple matches are found: The first matching `PO Number` value is selected
+
+This configuration essentially flags whether a receipt exists in the system for a given order ID by populating the `receipts_flag_match` field with the matching PO number when found.

@@ -1,0 +1,15 @@
+### merchant_tax_from_lines (merchant_tax_from_lines)
+
+- **Description**: This field stores the total tax amount calculated from individual line items on an invoice. It is automatically populated by the system and not directly editable by users. The value is a numerical representation of the tax amount derived from line items.
+
+- **Field type**: data
+
+- **Data type**: number
+
+- **Required**: No
+
+- **Exported**: No
+
+- **Hidden**: Yes
+
+**Source Hook ID**: 712691

@@ -1,0 +1,8 @@
+{
+  "Schema_id": "670292",
+  "Name of extension": "Calculating Discounts (S2K PO)",
+  "Extension ID": "670292",
+  "INPUT": ["terms"],
+  "OUTPUT": ["document_terms_llm_guess"],
+  "Description": "This extension analyzes payment terms text from documents and extracts structured information about discount conditions. It uses an LLM to parse the payment terms and extract key values such as days to pay net amount, days to get discount, discount percentage, and related payment timing information. The extracted data is formatted as JSON and stored in the specified output field."
+}

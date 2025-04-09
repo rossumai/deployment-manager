@@ -1,0 +1,13 @@
+### dummy_sorting_flag (dummy_sorting_flag)
+
+* **Description**: This field always returns the value "1". It is used as a reference point for document sorting operations. Since it has a constant value, it provides a consistent basis for sorting logic.
+
+* **Field type**: formula
+
+* **Data type**: string
+
+* **Required**: false
+
+* **Exported**: false
+
+* **Hidden**: true

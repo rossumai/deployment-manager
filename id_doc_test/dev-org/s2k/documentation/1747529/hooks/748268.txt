@@ -1,0 +1,17 @@
+### Date of receipt to Field (S2K PO) (748268)
+
+**Summary:** Captures the document arrival date from the incoming document and assigns it to the document_arrived_at field in the annotation.
+
+**Logic:**
+- Extracts the arrival date from the document metadata in the payload
+- Assigns this timestamp to the document_arrived_at field in the annotation
+
+**Active Queues:**
+- S2K PO Inbox (1740142)
+- S2K PO Dropship (1747529)
+- S2K PO (1771791)
+
+**Events:**
+- annotation_content.initialize
+
+**Related Extensions:** None

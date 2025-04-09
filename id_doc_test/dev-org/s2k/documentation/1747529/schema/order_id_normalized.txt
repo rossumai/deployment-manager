@@ -1,0 +1,13 @@
+### PO Number (Normalized) (order_id_normalized)
+
+* **Description**: This field automatically extracts only the numeric characters from a purchase order number and keeps only the first 7 digits. It first checks if a manually entered order ID exists and uses that; otherwise, it uses the standard order ID field. All non-numeric characters (like letters, spaces, or special characters) are removed before returning the result.
+
+* **Field type**: formula
+
+* **Data type**: string
+
+* **Required**: false
+
+* **Exported**: false
+
+* **Hidden**: true

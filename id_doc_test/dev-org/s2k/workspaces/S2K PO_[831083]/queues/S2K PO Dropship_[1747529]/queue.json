@@ -1,0 +1,256 @@
+{
+  "id": 1747529,
+  "name": "S2K PO Dropship",
+  "url": "https://us.api.rossum.ai/v1/queues/1747529",
+  "workspace": "https://us.api.rossum.ai/v1/workspaces/831083",
+  "connector": null,
+  "hooks": [
+    "https://us.api.rossum.ai/v1/hooks/578954",
+    "https://us.api.rossum.ai/v1/hooks/578987",
+    "https://us.api.rossum.ai/v1/hooks/645890",
+    "https://us.api.rossum.ai/v1/hooks/748268"
+  ],
+  "webhooks": [
+    "https://us.api.rossum.ai/v1/webhooks/578954",
+    "https://us.api.rossum.ai/v1/webhooks/578987",
+    "https://us.api.rossum.ai/v1/webhooks/645890",
+    "https://us.api.rossum.ai/v1/webhooks/748268"
+  ],
+  "schema": "https://us.api.rossum.ai/v1/schemas/1687791",
+  "inbox": "https://us.api.rossum.ai/v1/inboxes/635473",
+  "session_timeout": "01:00:00",
+  "rir_url": null,
+  "rir_params": null,
+  "default_score_threshold": 0.975,
+  "automation_enabled": false,
+  "automation_level": "never",
+  "locale": "auto",
+  "metadata": {
+    "queueTemplate": "taxinvoiceus"
+  },
+  "settings": {
+    "columns": [
+      {
+        "schema_id": "document_id"
+      },
+      {
+        "schema_id": "order_id"
+      },
+      {
+        "schema_id": "date_due"
+      },
+      {
+        "schema_id": "amount_due"
+      },
+      {
+        "schema_id": "sender_name"
+      }
+    ],
+    "hide_export_button": false,
+    "accepted_mime_types": [
+      "image/*",
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/msword",
+      "application/vnd.ms-excel",
+      "application/zip"
+    ],
+    "suggested_edit": "suggest",
+    "automation": {
+      "automate_duplicates": true,
+      "automate_suggested_edit": false
+    },
+    "rejection_config": {
+      "enabled": true
+    },
+    "suggested_recipients_sources": [
+      {
+        "source": "email_header"
+      },
+      {
+        "source": "queue_mailing_history"
+      }
+    ],
+    "email_notifications": {
+      "recipient": null,
+      "unprocessable_attachments": false,
+      "postponed_annotations": false,
+      "deleted_annotations": false,
+      "email_with_no_attachments": true
+    },
+    "dashboard_customization": {
+      "all_documents": false,
+      "to_review": true,
+      "postponed": true,
+      "confirmed": true,
+      "exported": true,
+      "rejected": true,
+      "deleted": true,
+      "labels": true
+    },
+    "workflows": {
+      "enabled": false,
+      "bypass_workflows_allowed": false
+    },
+    "annotation_list_table": {
+      "columns": [
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 170.0,
+          "meta_name": "status"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 270.0,
+          "meta_name": "original_file_name"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 150.0,
+          "meta_name": "details"
+        },
+        {
+          "visible": false,
+          "column_type": "meta",
+          "width": 300.0,
+          "meta_name": "queue"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 250.0,
+          "meta_name": "labels"
+        },
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 170.0,
+          "schema_id": "document_id",
+          "data_type": "string"
+        },
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 170.0,
+          "schema_id": "order_id",
+          "data_type": "string"
+        },
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 170.0,
+          "schema_id": "date_due",
+          "data_type": "date"
+        },
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 170.0,
+          "schema_id": "amount_due",
+          "data_type": "number"
+        },
+        {
+          "visible": true,
+          "column_type": "schema",
+          "width": 170.0,
+          "schema_id": "sender_name",
+          "data_type": "string"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 150.0,
+          "meta_name": "created_at"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 150.0,
+          "meta_name": "modified_at"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 170.0,
+          "meta_name": "modifier"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 150.0,
+          "meta_name": "deleted_at"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 170.0,
+          "meta_name": "deleted_by"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 150.0,
+          "meta_name": "rejected_at"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 170.0,
+          "meta_name": "rejected_by"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 150.0,
+          "meta_name": "confirmed_at"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 170.0,
+          "meta_name": "confirmed_by"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 150.0,
+          "meta_name": "exported_at"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 170.0,
+          "meta_name": "exported_by"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 150.0,
+          "meta_name": "assigned_at"
+        },
+        {
+          "visible": true,
+          "column_type": "meta",
+          "width": 170.0,
+          "meta_name": "assignees"
+        }
+      ]
+    }
+  },
+  "use_confirmed_state": true,
+  "document_lifetime": null,
+  "dedicated_engine": null,
+  "generic_engine": "https://us.api.rossum.ai/v1/generic_engines/5",
+  "delete_after": null,
+  "status": "active",
+  "workflows": [],
+  "modified_by": "https://us.api.rossum.ai/v1/users/354857",
+  "modified_at": "2025-02-25T11:20:30.779262Z",
+  "engine": null,
+  "training_enabled": true,
+  "archive_enabled": false
+}

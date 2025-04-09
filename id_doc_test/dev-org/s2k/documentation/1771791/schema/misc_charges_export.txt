@@ -1,0 +1,8 @@
+### misc_charges_export (misc_charges_export)
+
+* **description**: This field calculates the miscellaneous charges amount. It first checks if the `misc_charges` field has a value. If it does, it uses that value (defaulting to 0 if the value is invalid). If `misc_charges` is not set, it uses the value from `misc_charges_from_lines` (defaulting to 0 if that value is invalid).
+* **field type**: formula
+* **data type**: number
+* **required**: false
+* **exported**: false
+* **hidden**: true

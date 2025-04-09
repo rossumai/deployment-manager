@@ -1,0 +1,13 @@
+### Internal Notes (notes)
+
+- **Description**: This field is used to store internal notes or comments related to the data entry. It allows users to add supplementary information that is not part of the original document but might be useful for internal reference or processing.
+
+- **Field type**: manual
+
+- **Data type**: string
+
+- **Required**: False
+
+- **Exported**: Not specified
+
+- **Hidden**: Not specified

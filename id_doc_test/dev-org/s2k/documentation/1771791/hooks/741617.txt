@@ -1,0 +1,13 @@
+### Master Data Hub (S2K PO) (DEPT Coding) (741617)
+
+**Summary**: This extension matches department codes by checking if the branch ID and GL code from the document match with records in the s2k_po_gl_codes dataset. It populates the item_dept_match field with the corresponding department code.
+
+**Logic**:
+
+| Configuration | Source dataset | Dataset fields | Target schema IDs | Select actions |
+|---------------|----------------|----------------|-------------------|----------------|
+| Dept matching | s2k_po_gl_codes | item_branch_id_normalized, item_gl_code_export | item_dept_match | No match: error message<br>One match: select best_match<br>Multiple matches: select default value |
+
+**Active Queues**: S2K PO (1771791)
+
+**Related Extensions**: Master Data Hub (S2K PO) (GL Coding) (689106)

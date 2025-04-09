@@ -1,0 +1,1 @@
+This field, "Vendor Terms: Day of Month Discount" (vendor_discount_day_of_month), is populated from the main matching query. Please refer to the definition of the "vendor_terms_match" field for more information about how this data is obtained and processed.

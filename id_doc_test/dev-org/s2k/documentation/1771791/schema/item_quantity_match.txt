@@ -1,0 +1,1 @@
+For the field `item_quantity_match`, please refer to the main matching query defined in the field with schema_id `item_order_match`. This field is populated from that matching query and represents the PO Quantity from the matched item.

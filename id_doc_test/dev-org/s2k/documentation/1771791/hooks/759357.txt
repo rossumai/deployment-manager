@@ -1,0 +1,19 @@
+### Freight Percentage Info Message (S2K PO) (759357)
+
+**Summary:** Calculates the freight percentage relative to the total amount due and displays an informational message. If the freight percentage exceeds 5%, it requires a note to be entered.
+
+**Logic:**
+- Calculates the percentage of freight costs relative to the total amount due
+- Displays an informational message showing the freight percentage
+- Shows an error message if the freight percentage is greater than 5% and no note has been provided
+
+**Active Queues:**
+- S2K PO (1771791)
+
+**Events:**
+- annotation_content.initialize
+- annotation_content.updated
+- annotation_content.started
+
+**Related Extensions:**
+- None

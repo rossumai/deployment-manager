@@ -1,0 +1,111 @@
+# Rossum Queue Documentation
+
+## Queue Overview
+
+| Queue Name | Queue ID | Workspace | Email Address |
+|------------|----------|-----------|--------------|
+| S2K PO Dropship | 1747529 | 831083 | s2k-dropship-8d0ec4@us.app.rossum.ai |
+
+### Queue Usage Description
+
+The S2K PO Dropship queue is designed to process purchase order documents with a focus on dropship orders. It captures purchase order information, matches it against existing PO data in the s2k_purchase_orders dataset, and identifies dropship orders. The queue allows for both automated processing and manual review of documents, with special handling for receipt matching and document arrival tracking. The queue is configured to display specific columns in the annotation list, including document ID, order ID, due date, amount due, and sender name.
+
+## Summary of Extensions
+
+1. **Master Data Hub (S2K PO Inbox & Dropship Matching) [578954]**: Matches extracted order IDs with PO Numbers stored in the s2k_purchase_orders dataset. When matches are found, it populates order_match and dropship_flag_match fields, enabling identification of dropship orders.
+
+2. **Upload Fields from Inbox (S2K PO) [645890]**: Captures order ID and notes data from confirmed annotations and stores them in the annotation metadata along with bounding box information. This extension triggers when an annotation status changes to "confirmed".
+
+3. **Date of receipt to Field (S2K PO) [748268]**: Captures the document arrival date from incoming documents and assigns it to the document_arrived_at field in the annotation. This helps track when documents were received by the system.
+
+## Summary of Fields
+
+| ID | Label | Description | Field Type | Data Type | Required/Optional | Visible/Hidden |
+|----|-------|-------------|------------|-----------|-------------------|----------------|
+| order_id | PO Number | Purchase order identification. | captured | string | Optional | Visible |
+| order_id_manual | PO Number (Manual) | Allows users to manually enter a Purchase Order number when not automatically detected or needs override. | manual | string | Optional | Visible |
+| order_id_normalized | PO Number (Normalized) | Automatically extracts only the numeric characters from a purchase order number and keeps only the first 7 digits. | formula | string | Optional | Hidden |
+| order_match | PO matching | Stores the matched PO Number from the s2k_purchase_orders dataset. | data | string | Optional | Visible |
+| receipt_match | Receipt Match | Stores information about whether a receipt matches with other data. | data | enum | Optional | Hidden |
+| notes | Notes | Reviewer's notes for adding additional information or comments about the document. | manual | string | Optional | Visible |
+| document_arrived_at | document_arrived_at | Automatically records when a document was received by the system. Populated by a system hook. | data | string | Optional | Hidden |
+| dummy_sorting_flag | dummy_sorting_flag | Always returns the value "1". Used as a reference point for document sorting operations. | formula | string | Optional | Hidden |
+
+ ## 4. Extensions documentation
+### Master Data Hub (S2K PO Inbox & Dropship Matching) (578954)
+
+**Summary**: This extension matches purchase order data by comparing the extracted order ID with PO Numbers stored in the s2k_purchase_orders dataset. When a match is found, it populates order_match and dropship_flag_match fields.
+
+**Logic**:
+
+| Configuration | Source dataset | Dataset fields | Target schema IDs | Select actions |
+|---------------|----------------|----------------|-------------------|----------------|
+| PO matching | s2k_purchase_orders | PO Number | order_match, dropship_flag_match | No match: default value<br>One match: best_match<br>Multiple matches: best_match |
+
+**Active Queues**:
+- S2K PO Inbox (1740142)
+- S2K PO Dropship (1747529)
+
+**Related Extensions**: None (no extensions listed in 'run_after' attribute)
+
+### Upload Fields from Inbox (S2K PO) [645890]
+
+**Summary:** This extension captures order ID and notes data from confirmed annotations and stores them in the annotation metadata along with bounding box information.
+
+**Logic:**
+- Triggers when an annotation status changes to "confirmed"
+- Extracts order_id_manual and notes values from the annotation content
+- Updates the annotation metadata with these values and bounding box information for order_id
+
+**Active Queues:**
+- S2K PO Inbox (1740142)
+- S2K PO Dropship (1747529)
+
+**Events:**
+- annotation_status.changed
+
+**Related Extensions:**
+- None
+
+I'll wait for you to provide the JSON documentation for the Rossum extension Document Sorting before generating the markdown documentation.
+
+### Date of receipt to Field (S2K PO) (748268)
+
+**Summary:** Captures the document arrival date from the incoming document and assigns it to the document_arrived_at field in the annotation.
+
+**Logic:**
+- Extracts the arrival date from the document metadata in the payload
+- Assigns this timestamp to the document_arrived_at field in the annotation
+
+**Active Queues:**
+- S2K PO Inbox (1740142)
+- S2K PO Dropship (1747529)
+- S2K PO (1771791)
+
+**Events:**
+- annotation_content.initialize
+
+**Related Extensions:** None
+
+
+
+ ## 5. Data matching fields
+### PO matching
+
+This configuration is designed to populate the "PO Number (Match)" field (schema_id: `order_match`).
+
+**Data Source:**
+- Dataset: `s2k_purchase_orders`
+
+**Query Process:**
+1. The configuration queries the `s2k_purchase_orders` dataset to find records where:
+   - The "PO Number" field matches the value in `{order_id_normalized}`
+   - The "PO Number" field is not empty
+
+**Result Handling:**
+- If no matching records are found: The default value (empty string with label "---") is selected
+- If exactly one matching record is found: The "PO Number" value from that record is selected
+- If multiple matching records are found: The "PO Number" value from the first record is selected
+
+The configuration maps the "PO Number" field from the dataset to the `order_match` schema field.
+

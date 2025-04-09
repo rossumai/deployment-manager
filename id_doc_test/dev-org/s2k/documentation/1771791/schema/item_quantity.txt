@@ -1,0 +1,13 @@
+### 🔢 Quantity (Captured) (item_quantity)
+
+- **Description**: Quantity of the item. This field captures the quantity of an item from the invoice using AI recognition.
+
+- **Field Type**: number
+
+- **Data Type**: number
+
+- **Required**: False
+
+- **Exported**: False
+
+- **Hidden**: False

@@ -1,0 +1,8 @@
+### Selected Vendor ID (selected_vendor_id)
+
+* **Description**: This field automatically captures the ID of the vendor that has been selected for the order. It gets its value directly from the `order_vendor_match` field.
+* **Field type**: formula
+* **Data type**: string
+* **Required**: false
+* **Exported**: true
+* **Hidden**: true

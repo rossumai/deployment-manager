@@ -1,0 +1,13 @@
+### Master Data Hub (S2K PO Vendor) (592634)
+
+**Summary:** This extension matches vendor information from invoices against a vendor database by using sender ID, name, address, and phone number. It attempts to find the best match through multiple query strategies with decreasing strictness.
+
+**Logic:**
+
+| Configuration | Source dataset | Dataset fields | Target schema IDs | Select actions |
+|---------------|----------------|----------------|-------------------|----------------|
+| Invoice vendor matching | vendors | Supplier Number, Name, Primary Address Street1, Primary Address Street2, Primary Address City, Phone Number | vendor_match, invoice_vendor_terms_match, vendor_name_match | No match: error message<br>One match: best_match<br>Multiple matches: best_match with warning message |
+
+**Active Queues:** S2K PO (1771791)
+
+**Related Extensions:** None (no extensions listed in 'run_after' attribute)

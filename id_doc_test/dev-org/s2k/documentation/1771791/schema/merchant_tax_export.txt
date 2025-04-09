@@ -1,0 +1,13 @@
+### merchant_tax_export (merchant_tax_export)
+
+* **Description**: This field calculates a tax value by checking if `merchant_tax` is set. If it is set, it uses that value (defaulting to 0 if null). If `merchant_tax` is not set, it uses `merchant_tax_from_lines` instead (defaulting to 0 if null).
+
+* **Field type**: formula
+
+* **Data type**: number
+
+* **Required**: false
+
+* **Exported**: false
+
+* **Hidden**: true

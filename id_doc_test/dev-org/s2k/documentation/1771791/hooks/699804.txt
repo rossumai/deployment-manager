@@ -1,0 +1,18 @@
+### Duplicate Handling (S2K PO) (699804)
+
+**Summary:** This extension detects duplicate purchase orders by comparing document date, amount due, vendor ID, document ID, and file hash. When duplicates are found, the system warns users and moves documents to postponed status.
+
+**Active Queues:** S2K PO (1771791)
+
+**Logic:**
+- **Detection Rules:** 
+  - Matches documents with identical date_issue, amount_due, selected_vendor_id, and document_id fields
+  - OR matches documents with identical file hash
+- **Scope:** Searches for duplicates within the queue across all statuses
+- **Actions on Duplicate Detection:**
+  - Displays warning message with duplicate IDs and detection date
+  - Forwards annotation to "postponed" status
+  - Marks document as duplicate
+  - Stops further automation
+
+**Related Extensions:** None

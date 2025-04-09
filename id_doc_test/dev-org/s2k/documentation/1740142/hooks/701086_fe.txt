@@ -1,0 +1,8 @@
+{
+  "Schema_id": null,
+  "Name of extension": "Assigning Labels (S2K PO Inbox) (S2K PO)",
+  "Extension ID": 701086,
+  "INPUT": ["routing_flag"],
+  "OUTPUT": [],
+  "Description": "This extension assigns or removes labels to annotations based on the value of a specified field. It compares the field value against conditions and adds a label when the add_condition is met, or removes a label when the remove_condition is met. The extension supports various comparison operators (>, <, >=, <=, ==, !=) for numeric values and exact matching for strings."
+}

@@ -1,0 +1,8 @@
+### ╰━ Due Date for Net (net_due_date)
+
+* **Description**: This field displays the due date for net payment. It pulls its value directly from the `vendor_net_due_date` field.
+* **Field type**: formula
+* **Data type**: date
+* **Required**: false
+* **Exported**: true
+* **Hidden**: false

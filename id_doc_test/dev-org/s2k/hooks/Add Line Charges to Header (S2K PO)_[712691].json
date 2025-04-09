@@ -1,0 +1,130 @@
+{
+  "id": 712691,
+  "type": "function",
+  "name": "Add Line Charges to Header (S2K PO)",
+  "url": "https://us.api.rossum.ai/v1/hooks/712691",
+  "description": "",
+  "settings": {
+    "charge_types": {
+      "rebate_from_lines": [
+        [
+          "",
+          "112650",
+          "0"
+        ]
+      ],
+      "freight_from_lines": [
+        [
+          "",
+          "530700",
+          "0"
+        ]
+      ],
+      "merchant_tax_from_lines": [
+        [
+          "525",
+          "113156",
+          "0"
+        ]
+      ],
+      "misc_charges_from_lines": [
+        [
+          "",
+          "530290",
+          "0"
+        ]
+      ],
+      "plate_charge_from_lines": [
+        [
+          "",
+          "500900",
+          "0"
+        ]
+      ],
+      "pallet_charge_from_lines": [
+        [
+          "",
+          "620340",
+          "10"
+        ]
+      ],
+      "retention_tax_from_lines": [
+        [
+          "525",
+          "213060",
+          "0"
+        ]
+      ],
+      "dropship_freight_from_lines": [
+        [
+          "",
+          "620110",
+          "20"
+        ]
+      ],
+      "purchase_discount_from_lines": [
+        [
+          "",
+          "510000",
+          "0"
+        ]
+      ],
+      "backhaul_allowance_from_lines": [
+        [
+          "",
+          "620115",
+          "20"
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "events": [
+    "annotation_content.updated",
+    "annotation_content.initialize"
+  ],
+  "queues": [
+    "https://us.api.rossum.ai/v1/queues/1771791"
+  ],
+  "run_after": [
+    "https://us.api.rossum.ai/v1/hooks/741617"
+  ],
+  "metadata": {},
+  "config": {
+    "schedule": {
+      "cron": ""
+    },
+    "app": null,
+    "payload_logging_enabled": false,
+    "timeout_s": 30,
+    "max_polling_time_s": 300,
+    "retry_count": 4,
+    "retry_after_polling_failure": true,
+    "runtime": "python3.12",
+    "code": "from txscript import TxScript, default_to, substitute, is_set, is_empty\nfrom copy import deepcopy\nimport dataclasses\n\ndef rossum_hook_request_handler(payload: dict) -> dict:\n    t = TxScript.from_payload(payload)\n\n    charge_types = payload.get('settings', {}).get(\"charge_types\", {})\n    \n    for charge_type, gl_codes in charge_types.items():\n        total_charge_value = 0\n        for row in t.field.line_items:\n            if not check_row_gl_in_list(row, gl_codes):\n                continue\n            total_charge_value += default_to(row.item_amount_total_export, 0)\n            \n        source_field = t.field._get_field(charge_type)\n        source_field.set_value(total_charge_value)\n        \n    return t.hook_response()\n    \ndef check_row_gl_in_list(row, gl_codes):\n    for branch, gl_code, dept in gl_codes:\n        if branch and branch != row.item_branch_id_export:\n            continue\n        if gl_code != row.item_gl_code_export:\n            continue\n        if dept != row.item_dept_export:\n            continue\n        return True\n    return False",
+    "third_party_library_pack": "default",
+    "memory_size_mb": 256
+  },
+  "test": {},
+  "sideload": [
+    "schemas"
+  ],
+  "settings_schema": null,
+  "secrets_schema": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "string"
+    }
+  },
+  "token_owner": "https://us.api.rossum.ai/v1/users/383208",
+  "extension_source": "custom",
+  "guide": null,
+  "read_more_url": null,
+  "extension_image_url": null,
+  "token_lifetime_s": null,
+  "hook_template": null,
+  "created_by": "https://us.api.rossum.ai/v1/users/354857",
+  "created_at": "2025-03-21T08:25:31.486596Z",
+  "modified_by": "https://us.api.rossum.ai/v1/users/354857",
+  "modified_at": "2025-05-19T12:06:53.930337Z"
+}

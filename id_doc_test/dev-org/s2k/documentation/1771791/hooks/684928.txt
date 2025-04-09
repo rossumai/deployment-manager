@@ -1,0 +1,17 @@
+### Add Discount Line (S2K PO) (684928)
+
+**Summary:** Calculates total discount from line items and creates or updates a virtual discount line with the negative total amount. The extension ensures proper accounting for discounts in S2K purchase orders.
+
+**Logic:**
+- Calculates the total discount by summing the absolute values of all discount amounts in line items
+- If a virtual discount line already exists, it removes it to avoid duplication
+- Creates a new virtual discount line with negative total discount amount if discounts exist
+- Sets specific GL code (510000) and department code (00) for the discount line
+- Uses the branch ID from existing line items for the discount line
+
+**Active Queues:** S2K PO (1771791)
+
+**Events:**
+- annotation_content.export
+
+**Related Extensions:** None

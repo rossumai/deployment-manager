@@ -1,0 +1,13 @@
+### Receipts Flag (receipts_flag)
+
+* **Description**: This field indicates whether receipts have been received. It will display "Received" if the `receipts_flag_extension` field is set to "true". Otherwise, it will display "No Receipts".
+
+* **Field type**: formula
+
+* **Data type**: string
+
+* **Required**: false
+
+* **Exported**: false
+
+* **Hidden**: true

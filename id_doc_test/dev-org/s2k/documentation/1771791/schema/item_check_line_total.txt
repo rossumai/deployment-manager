@@ -1,0 +1,13 @@
+### Check Line Total (item_check_line_total)
+
+* **Description**: This field validates if the line total amount matches the calculation of quantity multiplied by unit price. If there's a discrepancy greater than $0.01, it displays a warning message. The field ignores lines that don't have both an item amount and quantity (such as discount or freight lines).
+
+* **Field type**: formula
+
+* **Data type**: string
+
+* **Required**: false
+
+* **Exported**: false
+
+* **Hidden**: true

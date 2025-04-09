@@ -1,0 +1,8 @@
+### freight_export (freight_export)
+
+* **description**: This field calculates the freight cost value based on specific conditions. If the `freight` field has a value and the order is not a dropship (when `order_dropship_flag_match` is not "D"), then it uses the `freight` value. Otherwise, it uses the `freight_from_lines` value. If either selected value is not set, it defaults to 0.
+* **field type**: formula
+* **data type**: number
+* **required**: false
+* **exported**: false
+* **hidden**: true
