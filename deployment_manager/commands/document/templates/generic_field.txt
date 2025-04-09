@@ -2,10 +2,11 @@ Generate documentation for the following object representing a single field.
 
 {schema_id}
 
-generate the following description of the field to humans:
+generate a structured documentation of the field to humans:
 label
-type (string)
 ui_configuration.type (formula)
+type (string)
+description of the field logic
 required
 can_export
 hidden
