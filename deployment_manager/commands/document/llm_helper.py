@@ -11,7 +11,11 @@ MODEL_ID = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 class LLMHelper:
     def __init__(self):
         self.session = boto3.Session(profile_name="rossum-dev")
-        config = Config(max_pool_connections=100)
+        config = Config(
+            max_pool_connections=100,
+            read_timeout=120,
+            connect_timeout=20,
+        )
 
         self.bedrock_runtime = self.session.client(
             "bedrock-runtime", region_name="us-east-1", config=config
