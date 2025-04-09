@@ -3,6 +3,7 @@ import copy
 import boto3
 from botocore.config import Config
 import json
+import os
 
 
 MODEL_ID = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
@@ -10,7 +11,8 @@ MODEL_ID = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 
 class LLMHelper:
     def __init__(self):
-        self.session = boto3.Session(profile_name="rossum-dev")
+        profile_name = os.environ.get("AWS_PROFILE") or "rossum-dev"
+        self.session = boto3.Session(profile_name=profile_name)
         config = Config(
             max_pool_connections=100,
             read_timeout=120,
@@ -18,7 +20,7 @@ class LLMHelper:
         )
 
         self.bedrock_runtime = self.session.client(
-            "bedrock-runtime", region_name="us-east-1", config=config
+            "bedrock-runtime", region_name="us-west-2", config=config
         )
 
         self.payload_basis = {
