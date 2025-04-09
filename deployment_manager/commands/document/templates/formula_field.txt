@@ -1,10 +1,10 @@
-for the following object, can you return a description a human with no background in computer science would understand. hint: look into the formula key
+Generate documentation for the following object representing a single field.
+    - return a description a human with no background in computer science would understand. hint: look into the formula key and the code.
+    - this is a formula field - value calculated based on the provided code
 
 {schema_id}
 
-The output should be something like this: The formula checks if process_id is not empty, and if so, uses its value; otherwise, it checks if process_id_2 is not empty, and if so, uses its value; if both are empty, the output is an empty string.
-
-Do not forget to convey the following information
+generate the following description of the field to humans:
 label
 type (string)
 ui_configuration.type (formula)

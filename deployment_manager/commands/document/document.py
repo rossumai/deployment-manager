@@ -129,29 +129,43 @@ class DirectoryDocumentator:
         # TODO: true async IO operations
         # TODO: display progress / what is being documented
         # TODO: error handling
+        # TODO: cache objects by queue ID
 
         display_info(
             f"Documenting queue [green]{queue.get('name', 'unkonwn-queue')}[/green] ([purple]{queue.get('id', 'unknown-id')}[/purple])"
         )
 
-        # hooks = await find_hooks_for_queues(self.org_path, queues=[queue])
-        # await asyncio.gather(
-        #     *[self.limited_run(self.document_hook, hook) for hook in hooks]
-        # )
+        inbox_path = queue["path"].with_stem("inbox")
+        inbox = await read_json(inbox_path)
+        queue["email"] = inbox["email"]
 
-        # schema_path = queue["path"].with_stem("schema")
-        # schema = await read_json(schema_path)
-        # await self.document_schema_ids(schema)
+        hook_documentations_base_path = (
+            self.org_path / "documentation" / str(queue["id"]) / "hooks"
+        )
+        hooks = await find_hooks_for_queues(self.org_path, queues=[queue])
+        await asyncio.gather(
+            *[
+                self.limited_run(
+                    self.document_hook, hook, hook_documentations_base_path
+                )
+                for hook in hooks
+            ]
+        )
+
+        schema_documentations_base_path = (
+            self.org_path / "documentation" / str(queue["id"]) / "schema"
+        )
+        schema_path = queue["path"].with_stem("schema")
+        schema = await read_json(schema_path)
+        await self.document_schema_ids(schema, schema_documentations_base_path)
 
         template_path = Path(__file__).parent / "templates" / "queue.txt"
         template = await read_txt(template_path)
 
-        hook_documentations_base_path = self.org_path / "documentation" / "hooks"
         hook_documentations = ""
         async for hook_doc_path in hook_documentations_base_path.iterdir():
             hook_documentations += await read_txt(hook_doc_path) + "\n\n"
 
-        schema_documentations_base_path = self.org_path / "documentation" / "schema"
         schema_documentations = ""
         async for schema_doc_path in schema_documentations_base_path.iterdir():
             schema_documentations += await read_txt(schema_doc_path) + "\n\n"
@@ -163,16 +177,24 @@ class DirectoryDocumentator:
                 schema_documentations=schema_documentations,
             )
         )
+        queue_documentation += (
+            "\n\n ## 4. Extensions documentation" + hook_documentations
+        )
+
         self.queue_docs[queue["id"]] = queue_documentation
         await write_txt(
             self.org_path / "documentation" / "queue" / f"{queue['id']}.txt",
             queue_documentation,
         )
 
-    async def document_hook(self, hook: dict):
+    async def document_hook(self, hook: dict, base_path: Path):
         # TODO: what hook is it? choose template...
 
         # TODO: run after
+
+        hook_path = base_path / f"{hook['id']}.txt"
+        if await hook_path.exists():
+            return
 
         template_path = Path(__file__).parent / "templates" / "generic_extension.txt"
         template = await read_txt(template_path)
@@ -183,20 +205,25 @@ class DirectoryDocumentator:
 
         self.hook_docs[hook["id"]] = hook_documentation
         await write_txt(
-            self.org_path / "documentation" / "hooks" / f"{hook['id']}.txt",
+            hook_path,
             hook_documentation,
         )
 
-    async def document_schema_ids(self, schema: dict):
+    async def document_schema_ids(self, schema: dict, base_path: Path):
         datapoints = extract_datapoints(schema)
         await asyncio.gather(
             *[
-                self.limited_run(self.document_schema_id, datapoint)
+                self.limited_run(self.document_schema_id, datapoint, base_path)
                 for datapoint in datapoints
             ]
         )
 
-    async def document_schema_id(self, schema_id: dict):
+    async def document_schema_id(self, schema_id: dict, base_path: Path):
+        schema_id_path = base_path / f"{schema_id['id']}.txt"
+
+        if await schema_id_path.exists():
+            return
+
         # TODO: data-matching field recognize
         template = await self.get_template_for_schema_id(schema_id)
 
@@ -206,7 +233,7 @@ class DirectoryDocumentator:
 
         self.schema_id_docs[schema_id["id"]] = schema_id_documentation
         await write_txt(
-            self.org_path / "documentation" / "schema" / f"{schema_id['id']}.txt",
+            schema_id_path,
             schema_id_documentation,
         )
 
