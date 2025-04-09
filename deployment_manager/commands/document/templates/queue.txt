@@ -1,0 +1,31 @@
+Generate markdown documentation for a group of Rossum objects. The primary object is the queue with the following fields:
+
+{queue_json}
+
+General information about Rossum configurations:
+- Each queue lives in a single workspace.
+- Workspaces can have 0-n queues.
+- Each queue has its own schema (1:1)
+- Each queue has 0-1 inbox which can accept emails with attachments. The attachments become documents in that queue.
+- Queues hold annotations (documents) that are first read by AI and then reviewed by users.
+- Hooks (aka extensions) run some functionality based on an event related to a specific annotation.
+- Hooks can be assigned to 0-n queues.
+- You can recognize the type of the object by its URL (e.g., https://rdttest.rossum.app/api/v1/workspaces/595306 -> workspace)
+
+Here is documentation for extensions related to the queue:
+
+{hook_documentations}
+
+Here is documentation for schema_ids (fields) in that specific queue:
+
+{schema_documentations}
+
+Make sure the output includes the following sections:
+Queue Overview
+In a format of a table, provide overview information of the queue in the following columns Queue name, queue id, workspace it belongs to and if applicable the associated email address
+Queue documentation
+Overall description of the use case of the queue based on the documentation of its sub-objects.
+List of extensions
+Provide a summary for each extension listed above.
+List of fields
+List of fields referenced above.
