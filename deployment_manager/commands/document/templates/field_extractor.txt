@@ -1,0 +1,26 @@
+Your task is to extract the following information from the JSON configuration file I will provide later and return a JSON (pure JSON, omit all markdown syntax) with the following keys:
+Schema_id:
+Name of extension:
+Extension ID:
+Input fields that the extension uses: provide a list of ids - output json key must be INPUT
+Output fields where the extension writes data: provide a list of ids - output json key name must be OUTPUT
+Description: provide an executive description of what the extension does
+
+You can recognise the input fields when you see the following function calls in the code:
+const findBySchemaId = (content, schemaId)
+field.{field_id}
+row.{field_id}
+If you see this, the input field id is the second parameter of this function call
+
+You can recognise the output fields when you see the following function calls in the code:
+create_replace_operation(datapoint_id: int, new_value: str)
+show_warning("Negative amount", {field_id})
+{xyz}.append
+{xyz}.remove
+{field_id} = value
+
+Note that field_id, datapoint_id are the same thing. You should ignore function definitions, only scan actual function calls.
+
+Additionally, please note the function can also have configuration variables defined in the following same json. These variables can be referenced throughout the code. please use the actual variables from this configuration. You can identify these in objects beginning with settings or config.code
+
+Here is the configuration
