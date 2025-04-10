@@ -171,14 +171,15 @@ class DirectoryDocumentator:
         )
         schema_path = queue["path"].with_stem("schema")
         schema = await read_json(schema_path)
-        await self.document_schema_ids(schema, schema_documentations_base_path)
+        await self.document_schema_ids(schema, schema_documentations_base_path, hook_documentations_base_path)
 
         template_path = Path(__file__).parent / "templates" / "queue.txt"
         template = await read_txt(template_path)
 
         hook_documentations = ""
         async for hook_doc_path in hook_documentations_base_path.iterdir():
-            hook_documentations += await read_txt(hook_doc_path) + "\n\n"
+            if not str(hook_doc_path).endswith("_fe.txt"):
+                hook_documentations += await read_txt(hook_doc_path) + "\n\n"
 
         schema_documentations = ""
         async for schema_doc_path in schema_documentations_base_path.iterdir():
@@ -233,7 +234,7 @@ class DirectoryDocumentator:
             return
 
         template_path = Path(__file__).parent / "templates" / "generic_extension.txt"
-
+        template_path_fe = ""
         image_url = hook.get("extension_image_url", "") or ""
         hook_config_url = hook.get("config", {}).get("url", "") or ""
         if "Document-Sorting" in image_url:
@@ -250,6 +251,8 @@ class DirectoryDocumentator:
             )
         elif "custom-format-templating" in hook_config_url:
             template_path = Path(__file__).parent / "templates" / "mega.txt"
+        else:
+            template_path_fe = Path(__file__).parent / "templates" / "field_extractor.txt"
 
         template = (
             await read_txt(template_path)
@@ -266,6 +269,18 @@ class DirectoryDocumentator:
             hook_path,
             hook_documentation,
         )
+        if template_path_fe:
+            template = await read_txt(template_path_fe)
+            template += "\n\r" + str(hook)
+            hook_documentation = await self.model.run(
+                template
+            )
+
+            self.hook_docs[hook["id"]] = hook_documentation
+            await write_txt(
+                base_path / f"{hook['id']}_fe.txt",
+                hook_documentation,
+            )
 
     def format_map_after_section(self, hook: dict):
         run_after_urls = hook.get("run_after", [])
@@ -295,27 +310,26 @@ class DirectoryDocumentator:
                     )
         return queue_formatting
 
-    async def document_schema_ids(self, schema: dict, base_path: Path):
+    async def document_schema_ids(self, schema: dict, base_path: Path, hook_docs_base_path: Path):
         datapoints = extract_datapoints(schema)
         await asyncio.gather(
             *[
-                self.limited_run(self.document_schema_id, datapoint, base_path)
+                self.limited_run(self.document_schema_id, datapoint, base_path, hook_docs_base_path)
                 for datapoint in datapoints
             ]
         )
 
-    async def document_schema_id(self, schema_id: dict, base_path: Path):
+    async def document_schema_id(self, schema_id: dict, base_path: Path, hook_docs_base_path: Path):
         schema_id_path = base_path / f"{schema_id['id']}.txt"
 
         if await schema_id_path.exists():
             return
 
-        template, matching_configs = await self.get_template_for_schema_id(schema_id)
+        template, matching_configs = await self.get_template_for_schema_id(schema_id, hook_docs_base_path)
         template = template.format(schema_id=schema_id)
         if matching_configs:
-            template = template + "\n\r" + json.dumps(matching_configs)
+            template += "\n\r" + json.dumps(matching_configs)
             schema_id_path = base_path / "data_matching" / f"{schema_id['id']}.txt"
-
         schema_id_documentation = await self.model.run(template)
 
         self.schema_id_docs[schema_id["id"]] = schema_id_documentation
@@ -324,12 +338,13 @@ class DirectoryDocumentator:
             schema_id_documentation,
         )
 
-    async def get_template_for_schema_id(self, schema_id: dict):
+    async def get_template_for_schema_id(self, schema_id: dict, hook_docs_base_path: Path):
         type = get_datapoint_type(schema_id)
         template_path = Path(__file__).parent / "templates"
         matching_configs = []
         additional_mapping = False
         target_schema_id = ""
+        input_hook_ids = []
         match type:
             case "manual":
                 template_path = template_path / "generic_field.txt"
@@ -348,13 +363,24 @@ class DirectoryDocumentator:
                 elif additional_mapping:
                     template_path = template_path / "additional_mapping.txt"
                 else:
+                    async for hook_doc_path in hook_docs_base_path.iterdir():
+                        if str(hook_doc_path).endswith("_fe.txt"):
+                            hook_doc = await read_txt(hook_doc_path)
+                            try:
+                                hook_doc_json = json.loads(hook_doc)
+                                if schema_id_id in hook_doc_json.get("OUTPUT"):
+                                    input_hook_ids.append(hook_doc_json.get("Extension ID"))
+                            except:
+                                pass
                     template_path = template_path / "generic_field.txt"
             case _:
                 template_path = template_path / "formula_field.txt"
 
         template = await read_txt(template_path)
         if additional_mapping and target_schema_id:
-            template = template + target_schema_id
+            template += target_schema_id
+        if input_hook_ids:
+            template += f"\n\n The following list of hook IDs {input_hook_ids} is populating this value. Make sure the source hook ID is mentioned in a separate section at the end of the description."
         return template, matching_configs
 
 
