@@ -1,0 +1,12 @@
+Here is schema id context - this serves only as a field label
+{schema_id}
+
+Use the provided json definition and provide a description of how the value of the field that is referenced in the json config in mapping.target_schema_id is populated. Omit description of fields referenced in additional_section. The json definition has a following structure
+Source.dataset - name of the dataset that contains the data and is being queried
+Source.queries -  this is a list of individual mongoDB queries. The queries are started from top to bottom. Describe each query individually. Schema_ids are referenced in the query by its name being enclosed in {{}}, for example schema_id sender_name is referenced in the query as {{sender_name}}. If you find $match stage that matches on {{_id: “#”}} ignore it in your description and assume that the following query, which will be $unionWith, that its coll key contains the queried dataset. Omit describing maxEdits and prefixLength properties. Always list all dataset keys that are referenced.
+- Ignore $project and $limit stages
+Result_actions - this key defines what type of message and what is the selected value of the query result whenever the query returns 0, exactly 1 or more than one record. Select key means which value is selected, either the default value (in the config represented by select: default), or the first value (in the config represented by select: best_match) in the query result set.
+Action_condition - pythonic expression that if evaluated to true, the configuration and its queries are executed, otherwise its skipped
+If you are provided multiple top level objects that reference the same or different dataset, describe them both equally in sufficient detail.
+
+Here is MDH JSON config described above.
