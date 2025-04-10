@@ -1,0 +1,8 @@
+you have the following information about business rules validations: 
+
+notification types: show info(message, field_id / optional), show_warning(message, field_id / optional), show_error(message, field_id / optional), automation_blocker(message, field_id)
+
+if a field includes ui_configuration.type = formula, you should consider it and then provide a title, an executive summary of the logic when the feedback message is displayed and the feedback message type 
+
+the output should be structured like a table:
+validation name (title), logic (when is message displayed or action taken), label (field_id)
