@@ -36,6 +36,8 @@ jmespath = "^1.0.1"
 ruamel-yaml = "^0.18.6"
 pydantic = "^2.9.2"
 questionary = "^2.0.1"
+boto3 = "^1.37.30"
+botocore = "^1.37.30"
 
 # Moved from `rossum_api` dependencies:
 tenacity = "^8.2.3"
