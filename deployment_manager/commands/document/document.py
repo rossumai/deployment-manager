@@ -1,6 +1,8 @@
 import asyncio
+import json
 import click
 from anyio import Path
+from deployment_manager.commands.document.func import find_matching_configurations
 
 from deployment_manager.commands.deploy.subcommands.template.helpers import (
     find_hooks_for_queues,
@@ -72,10 +74,10 @@ class DirectoryDocumentator:
         self.hook_docs = {}
         self.schema_id_docs = {}
         self.queue_docs = {}
-
         self.hooks = []
 
     # TODO: naming...
+
     @property
     def org_path(self):
         return self.project_path / self.name
@@ -145,8 +147,8 @@ class DirectoryDocumentator:
         hook_documentations_base_path = (
             self.org_path / "documentation" / str(queue["id"]) / "hooks"
         )
-        self.hooks = await find_hooks_for_queues(self.org_path, queues=[queue])
-
+        hooks = await find_hooks_for_queues(self.org_path, queues=[queue])
+        self.hooks = hooks
         await asyncio.gather(
             *[
                 self.limited_run(
@@ -259,11 +261,12 @@ class DirectoryDocumentator:
             return
 
         # TODO: data-matching field recognize
-        template = await self.get_template_for_schema_id(schema_id)
+        template, matching_configs = await self.get_template_for_schema_id(schema_id)
+        template = template.format(schema_id=schema_id)
+        if matching_configs:
+            template = template + "\n\r" + json.dumps(matching_configs)
 
-        schema_id_documentation = await self.model.run(
-            template.format(schema_id=schema_id)
-        )
+        schema_id_documentation = await self.model.run(template)
 
         self.schema_id_docs[schema_id["id"]] = schema_id_documentation
         await write_txt(
@@ -273,8 +276,10 @@ class DirectoryDocumentator:
 
     async def get_template_for_schema_id(self, schema_id: dict):
         type = get_datapoint_type(schema_id)
-
         template_path = Path(__file__).parent / "templates"
+        matching_configs = []
+        additional_mapping = False
+        target_schema_id = ""
         match type:
             case "manual":
                 template_path = template_path / "generic_field.txt"
@@ -282,11 +287,24 @@ class DirectoryDocumentator:
                 template_path = template_path / "captured_field.txt"
             case "formula":
                 template_path = template_path / "formula_field.txt"
+            case "data":
+                schema_id_id = schema_id["id"]
+                matching_configs, additional_mapping, target_schema_id = find_matching_configurations(self.hooks, schema_id_id)
+                # print ("ID: " + str(schema_id_id) + "\n|matching configs: " + json.dumps(matching_configs) + "\n|addmappings: " + str(additional_mapping) + "\n|target_schema_id " + str(target_schema_id))
+                if matching_configs and not additional_mapping:
+                    template_path = template_path / "matched_field.txt"
+                elif additional_mapping:
+                    template_path = template_path / "additional_mapping.txt"
+                else:
+                    template_path = template_path / "generic_field.txt"
             case _:
                 template_path = template_path / "formula_field.txt"
 
-        return await read_txt(template_path)
-
+        template = await read_txt(template_path)
+        if additional_mapping and target_schema_id:
+            template = template + target_schema_id
+        return template, matching_configs
+    
 
 def extract_datapoints(obj):
     """Recursively yield all dicts with category='datapoint'."""
@@ -305,7 +323,4 @@ def get_datapoint_type(datapoint: dict):
         return None
     ui_cfg = datapoint.get("ui_configuration", {})
     dp_type = ui_cfg.get("type")
-
-    if dp_type == "data_matching":
-        return None
     return dp_type or "manual"
