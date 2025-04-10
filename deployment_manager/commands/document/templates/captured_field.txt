@@ -4,10 +4,11 @@ Generate documentation for the following object representing a single field.
 
 {schema_id}
 
-generate the following description of the field to humans:
-label
-type (string)
-ui_configuration.type (formula)
-required
-can_export
-hidden
+generate a structured documentation of the field to humans in markdown:
+label (schema_id) (h3 markdown)
+description: description of the field logic (bullet point)
+ui_configuration.type labelled as "field type": (for example: "formula") (bullet point)
+type labelled as "data type": (for example: "string") (bullet point)
+required: (boolean: bullet point)
+can_export labelled as "exported": (boolean: bullet point)
+hidden: (boolean, bullet point)
