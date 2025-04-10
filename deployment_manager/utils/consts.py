@@ -191,7 +191,7 @@ class Settings:
     DEPLOY_REVERT_COMMAND_NAME: str = "revert"
     DEPLOY_TEMPLATE_COMMAND_NAME: str = "template"
     DEPLOY_TEMPLATE_INIT_COMMAND_NAME: str = "init"
-    DOCUMENT_COMMAND_NAME: str = "document"
+    DOCUMENT_COMMAND_NAME: str = "docommando"
     HOOK_COMMAND_NAME: str = "hook"
     HOOK_PAYLOAD_COMMAND_NAME: str = "payload"
     HOOK_TEST_COMMAND_NAME: str = "test"
