@@ -361,6 +361,8 @@ class ObjectRelease(BaseModel):
 
     def remove_override_irrelevant_props(self, data):
         # These attribute either should not be compared or were already replaced via replace_dependency_url()
+        data.pop("created_by", None)
+        data.pop("created_at", None)
         data.pop("modified_by", None)
         data.pop("modified_at", None)
 
