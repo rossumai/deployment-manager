@@ -5,7 +5,14 @@ Generate markdown documentation for the Rossum extension Document Sorting.
 This DS is represented completely by this JSON, which I will insert later.
 Do not output anything before I will add the JSON documentation (the example below is only for your information).
 
-Return also list of related Extensions = hooks that are listed in ‘run_after’ attribute. Look at the IDs of the related extensions section to know which is which and list their name as well as ID.
+Return the following markdown sections
+Name of the extension (extension id) (h3 markdown)
+Summary: Executive a brief max 2 sentence description of the actual matching logic including fields which are used for the check
+Active Queues: Queues where the matching is active
+Logic: structured overview of the matching logic and resulting actions
+Active Queues: Queues where the matching is active
+Events: list of events on which events is the hook triggered (bullet point)
+Related Extensions: hooks that are listed in ‘run_after’ attribute. Look at the IDs of the related extensions section to know which is which and list their name as well as ID.
 
 **Background Information for Document Routing:**
 
