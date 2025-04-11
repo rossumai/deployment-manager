@@ -9,4 +9,6 @@ Result_actions - this key defines what type of message and what is the selected 
 Action_condition - pythonic expression that if evaluated to true, the configuration and its queries are executed, otherwise its skipped
 If you are provided multiple top level objects that reference the same or different dataset, describe them both equally in sufficient detail.
 
+Output markdown that will start with h3 headline with the name of the configuration, then output any relevant information.
+
 Here is MDH JSON config described above.
