@@ -27,9 +27,10 @@ Related extensions:
 {run_after}
 
 Create these sections in the output:
-Fields Used = Which fields (schema_ids) are used in the configuration.
-Logic = What does the extension do
-Use description if available.
-You can also infer it based on the extension’s ‘code’ attribute if available.
-Events = on which events is the hook triggered
-Related Extensions = hooks that are listed in ‘run_after’ attribute. Look at the IDs of the related extensions section to know which is which and list their name as well as ID.
+Name of the extension (extension id) (h3 markdown)
+Summary: Executive a brief max 2 sentence description of the actual matching logic including fields which are used for the check
+Fields Used: Which fields (schema_ids) are used in the configuration.
+Logic: What does the extension do. Use description if available. You can also infer it based on the extension’s ‘code’ attribute if available.
+Active Queues: Queues where the matching is active
+Events: list of events on which events is the hook triggered (bullet point)
+Related Extensions: hooks that are listed in ‘run_after’ attribute. Look at the IDs of the related extensions section to know which is which and list their name as well as ID.
