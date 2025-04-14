@@ -46,7 +46,7 @@ def create_deploy_file_template():
 # You can then use them in the objects by adding '<<: *anchor_name'
 
 # Update attributes of target organization with those from source organization
-{settings.DEPLOY_KEY_PATCH_TARGET_ORG}: true
+{settings.DEPLOY_KEY_PATCH_TARGET_ORG}: false
 
 workspaces:
 
