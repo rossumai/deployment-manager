@@ -1,6 +1,5 @@
 import asyncio
 from collections import defaultdict
-import os
 from typing import Optional
 from anyio import Path
 from pydantic import BaseModel
@@ -31,17 +30,13 @@ from deployment_manager.common.determine_path import determine_object_type_from_
 from deployment_manager.utils.consts import (
     CustomResource,
     display_error,
-    display_warning,
     settings,
 )
 
 from deployment_manager.common.git import get_changed_file_paths
 from deployment_manager.common.read_write import read_json, write_json
 from deployment_manager.utils.functions import (
-    detemplatize_name_id,
-    extract_id_from_url,
     find_all_object_paths,
-    templatize_name_id,
 )
 
 from rich.panel import Panel

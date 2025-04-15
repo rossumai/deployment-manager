@@ -151,7 +151,7 @@ async def create_deploy_template(
             mapping = await read_mapping(mapping_path=mapping_file_path)
             add_targets_from_mapping(mapping=mapping, deploy_file=yaml.data)
         except Exception as e:
-            display_error(f"Error while applying mapping ^", e)
+            display_error("Error while applying mapping ^", e)
 
     # Filename
     if interactive:

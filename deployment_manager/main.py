@@ -1,4 +1,4 @@
-import importlib
+import importlib.metadata
 import click
 
 from deployment_manager.commands.deploy.deploy import deploy

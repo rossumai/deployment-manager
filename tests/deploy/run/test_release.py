@@ -1,7 +1,6 @@
 # Take a JSON object / path and apply the release file to it
 # Check the changes to be deployed or mock the API request and check after that
 from copy import deepcopy
-import datetime
 import os
 from anyio import Path
 from pydantic import ValidationError
@@ -21,7 +20,7 @@ from deployment_manager.commands.deploy.subcommands.run.workspace_release import
 from deployment_manager.common.read_write import read_json, write_json
 from deployment_manager.utils.consts import Settings
 from deployment_manager.utils.functions import templatize_name_id
-from tests.conftest import TEST_DATA_PATH, tmp_path
+from tests.conftest import TEST_DATA_PATH
 
 TEST_DEPLOY_FILE_BASE_PATH = Path("tests/deploy/run/deploy_files")
 

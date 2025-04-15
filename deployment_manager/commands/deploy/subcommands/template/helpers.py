@@ -1,7 +1,6 @@
 from copy import deepcopy
 from itertools import zip_longest
 from typing import Any
-from deployment_manager.commands.deploy import deploy
 from deployment_manager.commands.deploy.subcommands.run.attribute_override import (
     create_regex_override_syntax,
 )
