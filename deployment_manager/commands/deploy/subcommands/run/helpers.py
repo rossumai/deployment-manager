@@ -109,10 +109,10 @@ def traverse_object(parent_object: dict | None, parent_key: str, value: Any):
 
 async def get_new_deploy_file_path(
     deploy_file_path: Path,
-    first_deploy: bool,
-    suffix: str = "_deployed",
+    create_with_suffix: bool,
+    suffix: str = "",
 ):
-    if first_deploy:
+    if create_with_suffix:
         after_deploy_file_path = deploy_file_path.with_stem(
             f"{deploy_file_path.stem}{suffix}"
         )

@@ -118,7 +118,7 @@ async def revert_release_file(
 
     after_revert_file_path = await get_new_deploy_file_path(
         deploy_file_path=deploy_file_path,
-        first_deploy=False,
+        create_with_suffix=False,
     )
     await yaml.save_to_file(after_revert_file_path)
 

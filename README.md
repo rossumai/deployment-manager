@@ -134,7 +134,7 @@ You will first see a plan of the deploy (what will be deployed, what are the cha
 
 If there is any error during the planning phase, you will see an error and the deploy will automatically abort. If there was an error during the execution phase, PRD will log the error and stop deploying. Any intermediate results (newly created targets) are stored in the deploy file.
 
-Once the `deploy` is finished, you will get a new file with a `_deployed` suffix. If you created new objects, their IDs will be on the right hand side. This file is created in case you wanted to keep using the original deploy file as a template. For future deploys, you should use the `_deployed` file since it will update the right objects, not create new ones again.
+Once the `deploy` is finished, your deploy file will be updated with new information. If you created new objects, their IDs will be on the right hand side.
 
 You can **update a previously existing deploy file** via:
 ```

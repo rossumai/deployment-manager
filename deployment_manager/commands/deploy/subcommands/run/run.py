@@ -227,7 +227,7 @@ async def deploy_release_file(
 
     after_deploy_file_path = await get_new_deploy_file_path(
         deploy_file_path=deploy_file_path,
-        first_deploy=first_deploy,
+        create_with_suffix=False,
     )
     await yaml.save_to_file(after_deploy_file_path)
 
@@ -246,7 +246,7 @@ async def deploy_release_file(
 
             reverse_deploy_file_path = await get_new_deploy_file_path(
                 deploy_file_path=deploy_file_path,
-                first_deploy=True,
+                create_with_suffix=True,
                 suffix="_reversed",
             )
             await reversed_yaml.save_to_file(reverse_deploy_file_path)
