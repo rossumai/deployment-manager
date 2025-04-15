@@ -6,6 +6,7 @@ This CLI tool aims to help users configure and manage projects on the Rossum pla
 
 ### Prerequisites
 - Python 3.12
+- GIT
 
 ### Linux/MacOS
 
@@ -31,6 +32,7 @@ pip install $LatestURL
 ```
 powershell -ExecutionPolicy Bypass -Command "& {Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/rossumai/deployment-manager/main/add_to_path.ps1' -OutFile add_to_path.ps1; & ./add_to_path.ps1}"
 ```
+3. Install GIT: https://git-scm.com/downloads/win
 
 If you encounter errors during the second step, please make sure you have Python installed from [https://www.python.org/downloads/windows/](https://www.python.org/downloads/windows/), not from MS Store.
 
