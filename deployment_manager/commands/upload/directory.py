@@ -127,10 +127,15 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             changes, self.project_path, self.client
         )
 
+        # Include files from all subdirs, the non-included subdir objects will be filtered out later
         if self.upload_all:
             await self.include_unmodified_files(changes)
 
         for op, path in changes:
+            # Deleted object cannot be read from a local path...
+            if op == GIT_CHARACTERS.DELETED:
+                continue
+
             data = await read_json(path)
             subdir = self.find_subdir_of_object(data)
             if not subdir:
@@ -181,9 +186,6 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             match changed_object.operation:
                 case GIT_CHARACTERS.CREATED | GIT_CHARACTERS.CREATED_STAGED:
                     requests.append(self.make_create_request(object=changed_object))
-                case GIT_CHARACTERS.DELETED:
-                    continue
-                    # requests.append(self.make_delete_request(object=changed_object))
                 case GIT_CHARACTERS.UPDATED | GIT_CHARACTERS.PARTIALLY_UPADTED:
                     requests.append(self.make_update_request(object=changed_object))
                 case _:
