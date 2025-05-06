@@ -77,6 +77,25 @@ def find_formula_fields_in_schema(node: Any) -> list[tuple[str, str]]:
     return formula_fields
 
 
+def find_fields_in_schema(node: Any) -> list[tuple[dict]]:
+    fields = []
+
+    def add_fields(node: dict):
+        if node["category"] == "datapoint":
+            return [node]
+        elif "children" in node:
+            return find_fields_in_schema(node["children"])
+        return []
+
+    if isinstance(node, list):
+        for subnode in node:
+            fields.extend(add_fields(subnode))
+    elif isinstance(node, dict):
+        fields.extend(add_fields(node))
+
+    return fields
+
+
 def create_custom_hook_code_path(hook_path: Path, hook: object):
     if hook.get("extension_source", "") != "rossum_store" and hook.get(
         "config", {}
