@@ -1,0 +1,11 @@
+name: Build and Release Deployment Manager
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+
+jobs:
+  call-release:
+    uses: ./.github/workflows/release.yml

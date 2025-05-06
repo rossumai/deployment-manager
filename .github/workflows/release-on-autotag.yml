@@ -1,0 +1,11 @@
+name: Build and Release Deployment Manager
+
+on:
+  workflow_run:
+    workflows: ["Auto Tag on Merge"]
+    types:
+      - completed
+
+jobs:
+  call-release:
+    uses: ./.github/workflows/release.yml

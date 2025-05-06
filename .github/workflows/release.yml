@@ -1,13 +1,7 @@
 name: Build and Release Deployment Manager
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
-  workflow_run:
-    workflows: ["Auto Tag on Merge"]
-    types:
-      - completed
+  workflow_call:
 
 jobs:
   build:
