@@ -168,7 +168,8 @@ class UploadOrganizationDirectory(OrganizationDirectory):
                 return
         except Exception as e:
             display_error(
-                f"Error while preparing objects to {settings.UPLOAD_COMMAND_NAME} for {self.display_label}: {str(e)}"
+                f"Error while preparing objects to {settings.UPLOAD_COMMAND_NAME} for {self.display_label}: {str(e)}",
+                e,
             )
             return
 
