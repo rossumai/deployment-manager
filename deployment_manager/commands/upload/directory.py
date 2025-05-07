@@ -1,5 +1,6 @@
 from anyio import Path
 from pydantic import BaseModel
+from deployment_manager.commands.upload.models import PushException
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
 from deployment_manager.commands.deploy.common.helpers import (
@@ -12,7 +13,7 @@ from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
     Credentials,
 )
 from deployment_manager.commands.upload.dependencies import (
-    evaluate_create_dependencies,
+    mark_unstaged_objects_as_updated,
     merge_formula_changes,
     merge_hook_changes,
 )
@@ -123,7 +124,7 @@ class UploadOrganizationDirectory(OrganizationDirectory):
         changes = await merge_hook_changes(changes, self.project_path)
         # changes = await evaluate_delete_dependencies(changes, org_path)
         changes = await merge_formula_changes(changes)
-        changes = await evaluate_create_dependencies(
+        changes = await mark_unstaged_objects_as_updated(
             changes, self.project_path, self.client
         )
 
@@ -166,9 +167,15 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             requests = await self.prepare_upload_requests()
             if not requests:
                 return
+        except PushException as e:
+            display_error(
+                f"Error while preparing objects to {settings.UPLOAD_COMMAND_NAME} for {self.display_label}: {str(e)}",
+            )
+            return
         except Exception as e:
             display_error(
-                f"Error while preparing objects to {settings.UPLOAD_COMMAND_NAME} for {self.display_label}: {str(e)}"
+                f"Error while preparing objects to {settings.UPLOAD_COMMAND_NAME} for {self.display_label}: {str(e)}",
+                e,
             )
             return
 
@@ -248,7 +255,7 @@ class UploadOrganizationDirectory(OrganizationDirectory):
 
     async def make_create_request(self, object: ChangedObject):
         try:
-            object["id"] = None
+            object.data["id"] = None
             result = await self.client._http_client.create(object.type, object.data)
 
             # Just to update the timestamp

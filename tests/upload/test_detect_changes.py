@@ -5,7 +5,11 @@ import pytest
 
 
 from deployment_manager.commands.download.saver import WorkspaceSaver
-from deployment_manager.commands.download.subdirectory import Subdirectory
+from deployment_manager.commands.download.subdirectory import (
+    SubdirectoriesDict,
+    Subdirectory,
+    create_subdir_configuration,
+)
 from deployment_manager.commands.upload.directory import (
     ChangedObject,
     UploadOrganizationDirectory,
@@ -120,10 +124,15 @@ async def test_detect_ignores_unincluded_subdir(
         upload_all=False,
         force=False,
         indexed_only=False,
-        subdirectories={
-            test_subdir.name: {"include": True, "object_ids": []},
-            prod_subdir.name: {"include": False, "object_ids": [workspace_json["id"]]},
-        },
+        subdirectories=create_subdir_configuration(
+            {
+                test_subdir.name: {"include": True, "object_ids": []},
+                prod_subdir.name: {
+                    "include": False,
+                    "object_ids": [workspace_json["id"]],
+                },
+            }
+        ),
         org_id=-1,
         api_base="https://example.com",
     )

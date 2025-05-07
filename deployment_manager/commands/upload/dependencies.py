@@ -12,10 +12,17 @@ from deployment_manager.common.read_write import (
     write_str,
 )
 from deployment_manager.common.schema import find_schema_id
-from deployment_manager.utils.consts import GIT_CHARACTERS, display_error, settings
+from deployment_manager.utils.consts import (
+    GIT_CHARACTERS,
+    display_error,
+    display_warning,
+    settings,
+)
 
 
 from anyio import Path
+
+from rossum_api.api_client import APIClientError
 
 
 def is_change_existing(change, changes):
@@ -140,7 +147,10 @@ async def merge_hook_changes(changes: list[tuple[str, Path]], org_path: Path):
     return merged_changes
 
 
-async def evaluate_create_dependencies(changes, org_path, client: ElisAPIClient):
+async def mark_unstaged_objects_as_updated(changes, org_path, client: ElisAPIClient):
+    """
+    Unstaged changes may be truly new objects or existing objects that were pulled and not yet committed. Change op-codes based on their existence on the remote.
+    """
     changes_updated = []
     for change in changes:
         path: Path
@@ -150,37 +160,53 @@ async def evaluate_create_dependencies(changes, org_path, client: ElisAPIClient)
         ) and path.suffix == ".json":
             object_path = org_path / path
             object = await read_json(object_path)
+
             id = object.get("id", None)
-            obj = None
-            if str(path).endswith("workspace.json"):
-                if id:
-                    obj = await client.retrieve_workspace(id)
-                if not obj and not is_change_existing(change, changes_updated):
-                    changes_updated.append(change)
-            elif str(path).endswith("queue.json"):
-                if id:
-                    obj = await client.retrieve_queue(id)
-                if not obj and not is_change_existing(change, changes_updated):
-                    changes_updated.append(change)
-            elif str(path.parent).endswith("hooks"):
-                if id:
-                    obj = await client.retrieve_hook(id)
-                if not obj and not is_change_existing(change, changes_updated):
-                    changes_updated.append(change)
-            elif str(path.parent).endswith("schemas"):
-                if id:
-                    obj = await client.retrieve_schema(id)
-                if not obj and not is_change_existing(change, changes_updated):
-                    changes_updated.append(change)
-            elif str(path).endswith("inbox.json") or str(path).endswith(
-                "organization.json"
-            ):
-                display_error(
-                    f"Creating organization or inbox is not supported. ({path})"
+            if not id:
+                display_warning(
+                    f"Skipping uncommitted object without ID: ({object_path})"
                 )
-            else:
-                if not is_change_existing(change, changes_updated):
-                    changes_updated.append(change)
+                continue
+
+            obj = None
+            is_non_creatable_object = False
+            object_type = ""
+
+            if str(path).endswith("workspace.json"):
+                object_type = "workspaces"
+            elif str(path).endswith("queue.json"):
+                object_type = "queues"
+            elif str(path.parent).endswith("hooks"):
+                object_type = "hooks"
+            elif str(path).endswith("schema.json"):
+                object_type = "schemas"
+            elif str(path).endswith("inbox.json"):
+                object_type = "inboxes"
+                is_non_creatable_object = True
+            elif str(path).endswith("organization.json"):
+                object_type = "organizations"
+                is_non_creatable_object = True
+
+            try:
+                obj = await client.request_json(method="GET", url=f"{object_type}/{id}")
+            # 404 may happen when looking for the object
+            except APIClientError as e:
+                if e.status_code != 404:
+                    raise e
+
+            # Object exists on remote -> this should really be an update, not create
+            if obj:
+                op = GIT_CHARACTERS.UPDATED
+                changes_updated.append((op, path))
+            elif is_non_creatable_object:
+                display_warning(
+                    f"Creating organization or inbox is not supported: ({path})"
+                )
+                continue
+            # Object does not exist on remote -> keep it as create
+            elif not is_change_existing(change, changes_updated):
+                changes_updated.append(change)
+        # Add back anything that does not have created git status op codes
         else:
             changes_updated.append(change)
 
