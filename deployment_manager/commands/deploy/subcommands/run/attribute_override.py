@@ -4,6 +4,12 @@ import subprocess
 import tempfile
 import jmespath
 
+from deployment_manager.common.determine_path import determine_object_type_from_url
+from deployment_manager.common.read_write import (
+    find_formula_fields_in_schema,
+    get_custom_hook_code,
+    hook_has_custom_code,
+)
 from rossum_api.api_client import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
@@ -155,7 +161,75 @@ class AttributeOverrider:
 
             return diff.stdout
 
-    def parse_diff(self, diff: str):
+    def create_hook_code_override_diff(self, before_object: dict, after_object: dict):
+        object_type = determine_object_type_from_url(after_object["url"])
+        if object_type != Resource.Hook or not hook_has_custom_code(after_object):
+            return
+
+        with tempfile.NamedTemporaryFile() as tf1, tempfile.NamedTemporaryFile() as tf2:
+            tf1.write(bytes(get_custom_hook_code(before_object), "UTF-8"))
+            tf2.write(bytes(get_custom_hook_code(after_object), "UTF-8"))
+            # Has to be manually seeked back to start
+            tf1.seek(0)
+            tf2.seek(0)
+
+            diff = subprocess.run(
+                ["diff", tf1.name, tf2.name, "-U" "3"],
+                capture_output=True,
+                text=True,
+            )
+
+            return diff.stdout
+
+    def create_formula_code_override_diffs(
+        self, before_object: dict, after_object: dict
+    ):
+        diffs = {}
+
+        object_type = determine_object_type_from_url(after_object["url"])
+        if object_type != Resource.Schema:
+            return diffs
+
+        before_formula_fields = find_formula_fields_in_schema(before_object["content"])
+        after_formula_fields = find_formula_fields_in_schema(after_object["content"])
+        after_field_ids = set(field_id for field_id, _ in after_formula_fields)
+        after_codes_map = {field_id: code for field_id, code in after_formula_fields}
+
+        for field_id, before_code in before_formula_fields:
+            # Ignore fields that were deleted - the schema diff will show that already
+            if field_id not in after_field_ids:
+                continue
+
+            with tempfile.NamedTemporaryFile() as tf1, tempfile.NamedTemporaryFile() as tf2:
+                tf1.write(bytes(before_code, "UTF-8"))
+                tf2.write(
+                    bytes(
+                        after_codes_map[field_id],
+                        "UTF-8",
+                    )
+                )
+
+                # Has to be manually seeked back to start
+                tf1.seek(0)
+                tf2.seek(0)
+
+                diff = subprocess.run(
+                    ["diff", tf1.name, tf2.name, "-U" "3"],
+                    capture_output=True,
+                    text=True,
+                )
+
+                if not diff.stdout:
+                    continue
+
+                diffs[field_id] = diff.stdout
+
+        return diffs
+
+    def parse_diff(self, diff: str = ""):
+        if not diff:
+            diff = ""
+
         colorized_lines = []
         split_lines = diff.splitlines()
         del split_lines[0:3]

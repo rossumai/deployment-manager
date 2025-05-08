@@ -7,7 +7,10 @@ from deployment_manager.commands.deploy.subcommands.run.object_release import (
     Target,
 )
 from deployment_manager.commands.deploy.subcommands.run.rule_release import RuleRelease
-from deployment_manager.common.read_write import read_formula_file
+from deployment_manager.common.read_write import (
+    create_formula_directory_path,
+    read_formula_file,
+)
 from deployment_manager.common.schema import find_schema_id
 from deployment_manager.utils.consts import display_error, settings
 
@@ -132,10 +135,8 @@ class SchemaRelease(ObjectRelease):
         """Checks if there is not newer code in the associated formula fields and uses that for release.
         The original schema file is not modified.
         """
-        formula_directory = (
-            self.path.parent
-            / f"{settings.FORMULA_DIR_NAME}{templatize_name_id(self.data['name'], self.data['id'])}"
-        )
+        formula_directory = create_formula_directory_path(self.path)
+
         if not await formula_directory.exists():
             return
 

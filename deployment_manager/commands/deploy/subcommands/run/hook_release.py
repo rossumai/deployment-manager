@@ -9,6 +9,7 @@ from deployment_manager.commands.deploy.subcommands.run.object_release import (
     Target,
 )
 
+from deployment_manager.common.read_write import create_custom_hook_code_path, hook_has_custom_code
 from deployment_manager.utils.consts import display_error, settings
 
 
@@ -211,10 +212,8 @@ class HookRelease(ObjectRelease):
         """Checks if there is not newer code in the associated file and uses that for release.
         The original hook file is not modified.
         """
-        if self.data.get("extension_source", "") != "rossum_store" and (
-            self.data.get("config", {}).get("code", None)
-        ):
-            suffix = ".py" if "python" in self.data["config"].get("runtime") else ".js"
-            code_path = self.path.with_suffix(suffix)
-            new_code = await code_path.read_text()
-            self.data["config"]["code"] = new_code
+        if hook_has_custom_code(self.data):
+            code_path = create_custom_hook_code_path(self.path, self.data)
+            if code_path:
+                new_code = await code_path.read_text()
+                self.data["config"]["code"] = new_code

@@ -317,7 +317,8 @@ class ObjectRelease(BaseModel):
         try:
             for target_index, target in enumerate(self.targets):
                 overriding_object = deepcopy(target)
-                self.remove_override_irrelevant_props(overriding_object.data)
+                diff_overriding_object_data = deepcopy(overriding_object.data)
+                self.remove_override_irrelevant_props(diff_overriding_object_data)
 
                 self.overrider.replace_ids_in_target_object(
                     target=overriding_object,
@@ -334,17 +335,41 @@ class ObjectRelease(BaseModel):
                     else:
                         overriden_object_data = deepcopy(self.data)
 
-                    self.remove_override_irrelevant_props(overriden_object_data)
+                    # Code diffs need some of the attributes
+                    diff_overriden_object_data = deepcopy(overriden_object_data)
+                    self.remove_override_irrelevant_props(diff_overriden_object_data)
 
                     diff = self.overrider.create_override_diff(
+                        diff_overriden_object_data, diff_overriding_object_data
+                    )
+
+                    hook_code_diff = self.overrider.create_hook_code_override_diff(
                         overriden_object_data, overriding_object.data
                     )
-                    if not diff:
-                        return
 
-                    colorized_diff = self.overrider.parse_diff(diff)
-                    message = f"Attribute override: {self.display_type} {self.create_source_to_target_string(overriding_object.data)}:\n{colorized_diff}"
-                    pprint(Panel(message))
+                    formula_code_diffs = (
+                        self.overrider.create_formula_code_override_diffs(
+                            overriden_object_data, overriding_object.data
+                        )
+                    )
+
+                    if diff:
+                        colorized_diff = self.overrider.parse_diff(diff)
+                        message = f"Attribute override: {self.display_type} {self.create_source_to_target_string(overriding_object.data)}:\n{colorized_diff}"
+                        pprint(Panel(message))
+
+                    if hook_code_diff:
+                        colorized_code_diff = self.overrider.parse_diff(hook_code_diff)
+                        message = f"Hook code diff: {self.display_type} {self.create_source_to_target_string(overriding_object.data)}:\n\n{colorized_code_diff}"
+                        pprint(Panel(message))
+
+                    for field_id, code_diff in formula_code_diffs.items():
+                        colorized_code_diff = self.overrider.parse_diff(code_diff)
+                        message = (
+                            f"[yellow]{field_id}[/yellow]:\n\n{colorized_code_diff}"
+                        )
+                        pprint(Panel(message))
+
                 else:
                     # Update only objects where there was a difference after override
                     await self.update_remote(
@@ -379,7 +404,11 @@ class ObjectRelease(BaseModel):
                 data.pop("creator", None)
             case Resource.Schema:
                 data.pop("queues", None)
+                self.remove_formula_fields_code(data.get("content", []))
+            case Resource.Inbox:
+                data.pop("queues", None)
             case Resource.Hook:
+                data.get("config", {}).pop("code", None)
                 data.pop("token_owner", None)
                 data.pop("guide", None)
                 data.pop("run_after", None)
@@ -397,6 +426,16 @@ class ObjectRelease(BaseModel):
                 data.pop("webhooks", None)
                 if not self.is_same_org_deploy:
                     remove_queue_attributes_for_cross_org(data)
+
+    def remove_formula_fields_code(self, node: dict):
+        if isinstance(node, list):
+            for subnode in node:
+                self.remove_formula_fields_code(subnode)
+        elif isinstance(node, dict):
+            if node["category"] == "datapoint" and node.get("formula", None):
+                node.pop("formula", None)
+            elif "children" in node:
+                return self.remove_formula_fields_code(node["children"])
 
 
 class EmptyObjectRelease(BaseModel):
