@@ -50,6 +50,7 @@ class QueueRelease(ObjectRelease):
     )
 
     schema_targets: dict[int, list] = []
+    inbox_targets: dict[int, list] = []
     workspace_targets: dict[int, list] = []
     hook_targets: dict[int, list] = []
 
@@ -212,6 +213,11 @@ class QueueRelease(ObjectRelease):
                 raise SubObjectException()
 
             await self.inbox_release.deploy()
+            self.inbox_targets = {
+                self.inbox_release.id: [
+                    target.data for target in self.inbox_release.targets if target.data
+                ]
+            }
 
             if self.inbox_release.deploy_failed:
                 raise SubObjectException()

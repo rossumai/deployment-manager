@@ -70,6 +70,7 @@ class ReleaseFile(BaseModel):
     source_org: Organization
     target_org: Organization
 
+    organization_release: OrganizationRelease = None
     workspaces: list[WorkspaceRelease] = []
     queues: list[QueueRelease] = []
     hooks: list[HookRelease] = []
@@ -106,9 +107,12 @@ class ReleaseFile(BaseModel):
         lookup_table = self.create_lookup_table()
 
         release_objects: list[ObjectRelease] = [
+            self.organization_release,
             *self.hooks,
             *self.workspaces,
             *self.queues,
+            *[queue.schema_release for queue in self.queues],
+            *[queue.inbox_release for queue in self.queues],
         ]
         await asyncio.gather(
             *[
@@ -118,13 +122,26 @@ class ReleaseFile(BaseModel):
         )
 
     def create_lookup_table(self):
+        # Nested structure by type is chosen because of potential target ID collisions (e.g., hoook and schema get the same ID)
         lookup_table = defaultdict(dict)
+        lookup_table[self.source_org.id][Resource.Organization] = [
+            dataclasses.asdict(self.target_org)
+        ]
+        # TODO: code hooks should get nicely formatted diff of code changes
         for source_id, targets in self.hook_targets.items():
             lookup_table[source_id][Resource.Hook] = targets
         for source_id, targets in self.workspace_targets.items():
             lookup_table[source_id][Resource.Workspace] = targets
         for source_id, targets in self.queue_targets.items():
             lookup_table[source_id][Resource.Queue] = targets
+
+        for queue in self.queues:
+            for source_id, targets in queue.schema_targets.items():
+                lookup_table[source_id][Resource.Schema] = targets
+
+            for source_id, targets in queue.inbox_targets.items():
+                lookup_table[source_id][Resource.Inbox] = targets
+
         return lookup_table
 
     def gather_targets(self, release_objects: list[ObjectRelease]):
@@ -137,14 +154,20 @@ class ReleaseFile(BaseModel):
 
     async def deploy_organization(self):
         try:
-            organization_release = OrganizationRelease(
+            self.organization_release = OrganizationRelease(
                 id=self.source_org.id,
                 name=self.source_org.name,
-                data=dataclasses.asdict(self.source_org),
+                base_path=str(self.source_dir_path.parent),
                 target_org=self.target_org,
-                plan_only=self.plan_only,
+            )
+            await self.organization_release.initialize(
+                auto_delete=self.auto_delete,
+                yaml=self.yaml,
                 client=self.client,
                 source_client=self.source_client,
+                plan_only=self.plan_only,
+                source_dir_path=self.source_dir_path,
+                is_same_org_deploy=self.is_same_org,
                 # When running initial deploy, there is no timestamp to check
                 last_deploy_timestamp=(
                     self.last_deployed_at
@@ -162,16 +185,16 @@ class ReleaseFile(BaseModel):
             if self.plan_only:
                 pprint(
                     Panel(
-                        f"{organization_release.create_source_to_target_string(dataclasses.asdict(self.target_org))}"
+                        f"{self.organization_release.create_source_to_target_string(dataclasses.asdict(self.target_org))}"
                     )
                 )
 
             if self.patch_target_org and not self.is_same_org:
-                await organization_release.deploy()
+                await self.organization_release.deploy()
                 self.ignore_timestamp_mismatches[Resource.Organization][
-                    organization_release.id
-                ] = organization_release.ignore_timestamp_mismatch
-                self.detect_deploy_phase_exceptions([organization_release])
+                    self.organization_release.id
+                ] = self.organization_release.ignore_timestamp_mismatch
+                self.detect_deploy_phase_exceptions([self.organization_release])
         except Exception as e:
             display_error("Error while deploying organization ^", e)
             raise e
