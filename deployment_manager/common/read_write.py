@@ -54,7 +54,7 @@ async def create_local_object(path: Path, object: dict):
         custom_hook_code_path = create_custom_hook_code_path(path, object)
         if custom_hook_code_path:
             await write_str(
-                custom_hook_code_path, object.get("config", {}).get("code", None)
+                custom_hook_code_path,
             )
 
 
@@ -96,14 +96,22 @@ def find_fields_in_schema(node: Any) -> list[tuple[dict]]:
     return fields
 
 
-def create_custom_hook_code_path(hook_path: Path, hook: object):
-    if hook.get("extension_source", "") != "rossum_store" and hook.get(
+def hook_has_custom_code(hook: dict):
+    return hook.get("extension_source", "") != "rossum_store" and hook.get(
         "config", {}
-    ).get("code", None):
+    ).get("code", None)
+
+
+def create_custom_hook_code_path(hook_path: Path, hook: dict):
+    if hook_has_custom_code(hook):
         hook_runtime = hook["config"].get("runtime")
         extension = ".py" if "python" in hook_runtime else ".js"
         return hook_path.with_suffix(extension)
     return None
+
+
+def get_custom_hook_code(hook: dict):
+    return hook.get("config", {}).get("code", "")
 
 
 def create_formula_directory_path(schema_path: Path):

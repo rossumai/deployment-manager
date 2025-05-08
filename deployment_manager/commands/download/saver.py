@@ -9,6 +9,7 @@ from deployment_manager.common.read_write import (
     create_formula_directory_path,
     create_formula_file,
     find_formula_fields_in_schema,
+    get_custom_hook_code,
     write_json,
     write_str,
 )
@@ -426,6 +427,4 @@ class HookSaver(ObjectSaver):
 
             custom_hook_code_path = create_custom_hook_code_path(object_path, hook)
             if custom_hook_code_path:
-                await write_str(
-                    custom_hook_code_path, hook.get("config", {}).get("code", None)
-                )
+                await write_str(custom_hook_code_path, get_custom_hook_code(hook))
