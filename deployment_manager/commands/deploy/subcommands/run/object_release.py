@@ -372,6 +372,11 @@ class ObjectRelease(BaseModel):
             data.pop(key, None)
 
         match self.type:
+            case Resource.Organization:
+                data.pop("workspaces", None)
+                data.pop("users", None)
+                data.pop("trial_expires_at", None)
+                data.pop("creator", None)
             case Resource.Schema:
                 data.pop("queues", None)
             case Resource.Hook:
