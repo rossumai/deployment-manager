@@ -12,7 +12,10 @@ from deployment_manager.commands.deploy.subcommands.run.helpers import (
 from deployment_manager.commands.deploy.subcommands.run.inbox_release import (
     InboxRelease,
 )
-from deployment_manager.commands.deploy.subcommands.run.models import SubObjectException
+from deployment_manager.commands.deploy.subcommands.run.models import (
+    SubObjectException,
+    Target,
+)
 from deployment_manager.commands.deploy.subcommands.run.object_release import (
     EmptyObjectRelease,
     ObjectRelease,
@@ -27,6 +30,7 @@ from deployment_manager.commands.deploy.subcommands.run.schema_release import (
 )
 from deployment_manager.commands.migrate.helpers import replace_dependency_url
 from deployment_manager.utils.consts import (
+    settings,
     QUEUE_ENGINE_ATTRIBUTES,
     display_error,
     display_warning,
@@ -43,6 +47,8 @@ class QueueRelease(ObjectRelease):
 
     ignore_all_deploy_warnings: bool = False
     ignore_deploy_warnings: bool = False
+
+    overwrite_ignored_fields: bool = False
 
     schema_release: SchemaRelease = Field(alias="schema")
     inbox_release: Optional[InboxRelease] = Field(
@@ -181,6 +187,10 @@ class QueueRelease(ObjectRelease):
                     source_id_target_pairs=self.hook_targets,
                     keep_hook_dependencies_without_equivalent=self.keep_hook_dependencies_without_equivalent,
                 )
+
+                if not self.overwrite_ignored_fields:
+                    # Ignore should preceed attribute override, so that override can win if it is defined
+                    await self.ignore_ai_fields(queue=queue_copy, target=target)
 
                 self.overrider.override_attributes_v2(
                     object=queue_copy, attribute_overrides=target.attribute_override
@@ -328,3 +338,24 @@ class QueueRelease(ObjectRelease):
                 return False
             raise e
         return True
+
+    async def ignore_ai_fields(self, queue: dict, target: Target):
+        # Object was not deployed to this target yet -> no AI fields to preserve in target
+        if not target.id:
+            return
+
+        try:
+            target_queue = await self.client.retrieve_queue(target.id)
+            queue["automation_enabled"] = target_queue.automation_enabled
+            queue["automation_level"] = target_queue.automation_level
+            queue["default_score_threshold"] = target_queue.default_score_threshold
+
+            queue.get("settings", {})["columns"] = target_queue.settings.get(
+                "columns", []
+            )
+            queue.get("settings", {})["annotation_list_table"] = (
+                target_queue.settings.get("annotation_list_table", {})
+            )
+
+        except Exception as e:
+            raise Exception(f"Error while ignoring queue AI fields") from e

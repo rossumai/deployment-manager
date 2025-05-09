@@ -7,7 +7,10 @@ from deployment_manager.commands.deploy.subcommands.run.object_release import (
     Target,
 )
 from deployment_manager.commands.deploy.subcommands.run.rule_release import RuleRelease
-from deployment_manager.common.read_write import read_formula_file
+from deployment_manager.common.read_write import (
+    find_fields_in_schema,
+    read_formula_file,
+)
 from deployment_manager.common.schema import find_schema_id
 from deployment_manager.utils.consts import display_error, settings
 
@@ -24,6 +27,9 @@ from deployment_manager.utils.functions import templatize_name_id
 class SchemaRelease(ObjectRelease):
     type: Resource = Resource.Schema
     name: str = ""
+
+    overwrite_ignored_fields: bool = False
+
     rule_releases: list[RuleRelease] = Field(default_factory=lambda: [], alias="rules")
 
     parent_queue: ObjectRelease = None
@@ -52,7 +58,9 @@ class SchemaRelease(ObjectRelease):
         parent_yaml_reference = self.parent_queue.yaml_reference
         return parent_yaml_reference.get("schema", {})
 
-    def prepare_object_copy_for_deploy(self, target: Target, target_queue: Target):
+    async def prepare_object_copy_for_deploy(
+        self, target: Target, target_queue: Target
+    ):
         schema_copy = deepcopy(self.data)
         override_copy = deepcopy(target.attribute_override)
 
@@ -66,6 +74,11 @@ class SchemaRelease(ObjectRelease):
 
         schema_copy["rules"] = []
         schema_copy["queues"] = []
+
+        if not self.overwrite_ignored_fields:
+            # Ignore should preceed attribute override, so that override can win if it is defined
+            await self.ignore_schema_ai_fields(schema=schema_copy, target=target)
+
         self.overrider.override_attributes_v2(
             object=schema_copy, attribute_overrides=override_copy
         )
@@ -79,7 +92,7 @@ class SchemaRelease(ObjectRelease):
                 target.index = target_index
 
                 target_queue = self.parent_queue.targets[target.index]
-                schema_copy = self.prepare_object_copy_for_deploy(
+                schema_copy = await self.prepare_object_copy_for_deploy(
                     target=target, target_queue=target_queue
                 )
 
@@ -148,3 +161,24 @@ class SchemaRelease(ObjectRelease):
 
             schema_id = find_schema_id(self.data["content"], formula_name)
             schema_id["formula"] = formula_code
+
+    async def ignore_schema_ai_fields(self, schema: dict, target: Target):
+        DEPLOY_IGNORED_SCHEMA_ATTRIBUTES = [("score_threshold", 1)]
+
+        # Object was not deployed to this target yet -> no AI fields to preserve in target
+        if not target.id:
+            return
+
+        try:
+            target_schema = await self.client.retrieve_schema(target.id)
+            schema_ids = find_fields_in_schema(schema['content'])
+
+            for schema_id in schema_ids:
+                target_schema_id = find_schema_id(target_schema.content, schema_id["id"])
+                if not target_schema_id:
+                    continue
+                for ignored_field, default_value in DEPLOY_IGNORED_SCHEMA_ATTRIBUTES:
+                    schema_id[ignored_field] = target_schema_id.get(ignored_field, default_value)
+
+        except Exception as e:
+            raise Exception(f"Error while ignoring schema AI fields") from e
