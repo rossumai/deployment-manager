@@ -21,6 +21,23 @@ You can install a specific version by changing the URL, for instance, to install
 pip install https://github.com/rossumai/deployment-manager/releases/download/v2.5.0/deployment_manager-2.5.0-py3-none-any.whl
 ```
 
+In case the installation steps above do not work for you, you can install the tool into a Python virtual environment and link it to your $PATH:
+```
+# Assuming you are in your HOME directory...
+mkdir .deployment-manager-venv
+cd deployment-manager-venv
+python3 -m venv .
+source bin/activate
+pip install $(curl -s https://api.github.com/repos/rossumai/deployment-manager/releases/latest | jq -r '.assets[].browser_download_url' | grep '.whl')
+
+
+nano ~/.zshrc
+# Add this to the end of the file
+export PATH="$PATH:$HOME/.deployment-manager-venv/bin"
+# After saving, restart via the following command:
+source ~/.zshrc  
+```
+
 ### Windows
 
 1. Install the latest version of tool via pip:
@@ -45,6 +62,7 @@ pip install https://github.com/rossumai/deployment-manager/releases/v2.0.1/downl
 
 ### Updating to a new version
 You can use the same command as for installing the tool the first time. `pip` will recognize that you are installing a newer version and uninstall the previous one automatically.
+
 
 ### Migration from v1
 
