@@ -18,7 +18,7 @@ pip install $(curl -s https://api.github.com/repos/rossumai/deployment-manager/r
 
 You can install a specific version by changing the URL, for instance, to install v2.0.1 (replace all the place where the version tag is referenced):
 ```
-pip install https://github.com/rossumai/deployment-manager/releases/v2.0.1/download/deployment_manager-v2.0.1-py3-none-any.whl
+pip install https://github.com/rossumai/deployment-manager/releases/download/v2.5.0/deployment_manager-2.5.0-py3-none-any.whl
 ```
 
 ### Windows
