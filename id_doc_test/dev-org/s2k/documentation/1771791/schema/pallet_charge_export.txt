@@ -1,8 +1,0 @@
-### pallet_charge_export (pallet_charge_export)
-
-* **description**: This field represents the pallet charge value, which is taken from the `pallet_charge_from_lines` field. If that field is empty or not available, the value defaults to 0.
-* **field type**: formula
-* **data type**: number
-* **required**: false
-* **exported**: false
-* **hidden**: true

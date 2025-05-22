@@ -1,3 +1,0 @@
-Based on the JSON definition provided, the `order_vendor_match` field is an enum type field that is populated from the main matching query. Instead of describing this field separately, you should refer to the field with schema_id `order_id_match`, which contains the main matching query definition.
-
-The `order_vendor_match` field is designed to store vendor information that matches with purchase orders, but its options are dynamically populated based on the matching logic defined in the `order_id_match` field.

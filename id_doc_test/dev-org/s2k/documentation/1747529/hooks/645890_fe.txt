@@ -1,8 +1,0 @@
-{
-  "Schema_id": "645890",
-  "Name of extension": "Upload Fields from Inbox (S2K PO)",
-  "Extension ID": "645890",
-  "INPUT": ["order_id_manual", "notes", "order_id"],
-  "OUTPUT": [],
-  "Description": "This extension captures specific fields (order_id_manual, notes, and order_id) from a confirmed annotation and updates the annotation's metadata with these values and bounding boxes. It triggers when an annotation status changes to 'confirmed' and stores the data in the annotation's metadata for further processing."
-}

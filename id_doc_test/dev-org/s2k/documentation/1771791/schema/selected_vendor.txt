@@ -1,8 +1,0 @@
-### Selected Vendor (selected_vendor)
-
-* **Description**: This field automatically sets the value to "from PO", indicating that the vendor information is derived from a Purchase Order.
-* **Field type**: formula
-* **Data type**: enum (string)
-* **Required**: false
-* **Exported**: true
-* **Hidden**: true

@@ -1,8 +1,0 @@
-{
-  "Schema_id": null,
-  "Name of extension": "Add Line Charges to Header (S2K PO)",
-  "Extension ID": 712691,
-  "INPUT": ["line_items", "item_amount_total_export", "item_branch_id_export", "item_gl_code_export", "item_dept_export"],
-  "OUTPUT": ["rebate_from_lines", "freight_from_lines", "merchant_tax_from_lines", "misc_charges_from_lines", "plate_charge_from_lines", "pallet_charge_from_lines", "retention_tax_from_lines", "dropship_freight_from_lines", "purchase_discount_from_lines", "backhaul_allowance_from_lines"],
-  "Description": "This extension aggregates line item charges from a purchase order and adds them to the header fields. It processes different charge types (like rebates, freight, taxes, etc.) by summing up the total amount for each charge type from matching line items based on branch ID, GL code, and department. The matching criteria are defined in the extension's configuration settings."
-}

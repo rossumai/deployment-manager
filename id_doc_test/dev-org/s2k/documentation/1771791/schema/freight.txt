@@ -1,8 +1,0 @@
-### Freight (freight)
-
-- **description**: Represents the cost associated with transporting goods or cargo.
-- **field type**: captured
-- **data type**: number
-- **required**: false
-- **exported**: true
-- **hidden**: false

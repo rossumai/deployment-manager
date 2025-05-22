@@ -1,8 +1,0 @@
-### Misc Charges (misc_charges)
-
-* **description**: Represents additional miscellaneous charges that are applied to the transaction or invoice
-* **field type**: captured
-* **data type**: number
-* **required**: false
-* **exported**: true
-* **hidden**: false

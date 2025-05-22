@@ -1,1 +1,0 @@
-This field, "Receipt File Seq Number (Match)", is populated from the main matching query. Please refer to the definition of the field with schema_id "item_receipt_id_match" for more information about how this matching data is generated and used.

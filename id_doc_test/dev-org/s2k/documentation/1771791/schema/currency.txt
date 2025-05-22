@@ -1,8 +1,0 @@
-### Currency (currency)
-
-- **description**: The currency which the invoice is to be paid in. Possible values: czk, dkk, eur, gbp, nok, sek, usd or other.
-- **field type**: captured
-- **data type**: enum
-- **required**: false
-- **exported**: true
-- **hidden**: true

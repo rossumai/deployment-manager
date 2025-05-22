@@ -1,8 +1,0 @@
-{
-  "Schema_id": "771116",
-  "Name of extension": "Refresh Documents (S2K PO)",
-  "Extension ID": "771116",
-  "INPUT": ["receipts_flag", "order_id_normalized", "receipts_flag_extension"],
-  "OUTPUT": ["receipts_flag_extension"],
-  "Description": "This extension checks annotations in review or postponed status for purchase orders. It looks for the order ID and queries a data storage collection named 's2k_receipts' to find matching records. When a match is found, it updates the 'receipts_flag_extension' field to 'true', indicating that the document has been refreshed with data from the storage system."
-}

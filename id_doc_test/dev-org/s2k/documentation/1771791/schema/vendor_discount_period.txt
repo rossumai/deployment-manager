@@ -1,1 +1,0 @@
-For information about the "Vendor Terms: Discount Period" field, please refer to the definition in the "vendor_terms_match" field. This field is populated from the main matching query defined there.

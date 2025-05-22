@@ -1,8 +1,0 @@
-{
-  "Schema_id": "",
-  "Name of extension": "Trigger Refresh (S2K PO)",
-  "Extension ID": "766700",
-  "INPUT": [],
-  "OUTPUT": [],
-  "Description": "This extension is a scheduled serverless function that runs every 10 minutes to trigger a refresh by invoking another hook specified by the hook_id setting. It uses the Rossum API client to make a POST request to the specified hook's invoke endpoint. The function doesn't directly manipulate any document fields but acts as a trigger for another process."
-}

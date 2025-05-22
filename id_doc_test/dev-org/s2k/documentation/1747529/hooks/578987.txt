@@ -1,1 +1,0 @@
-I'll wait for you to provide the JSON documentation for the Rossum extension Document Sorting before generating the markdown documentation.

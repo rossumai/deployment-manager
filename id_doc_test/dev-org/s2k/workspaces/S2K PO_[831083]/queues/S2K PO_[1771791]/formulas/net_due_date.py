@@ -1,1 +1,0 @@
-field.vendor_net_due_date

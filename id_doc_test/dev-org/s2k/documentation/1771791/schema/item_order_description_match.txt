@@ -1,1 +1,0 @@
-To understand the field `item_order_description_match`, please refer to the main matching query defined in the field with schema_id `item_order_match`. This field is populated from that main matching query and contains the PO Description match information.

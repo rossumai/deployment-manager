@@ -1,8 +1,0 @@
-{
-  "Schema_id": null,
-  "Name of extension": "Get Annotation ID into Schema (S2K PO)",
-  "Extension ID": 687199,
-  "INPUT": [],
-  "OUTPUT": ["annotation_id"],
-  "Description": "This extension captures the annotation ID from the payload and stores it in the schema field named 'annotation_id'. It runs when an annotation is initialized, making the annotation ID available for reference within the document processing workflow."
-}

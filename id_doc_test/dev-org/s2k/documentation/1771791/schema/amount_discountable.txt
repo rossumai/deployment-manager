@@ -1,8 +1,0 @@
-### Discountable Amount (amount_discountable)
-
-* **Description**: This field displays the amount that is eligible for discounting. It simply shows the same value as the "Amount Due Export" field.
-* **Field type**: formula
-* **Data type**: number
-* **Required**: false
-* **Exported**: true
-* **Hidden**: true

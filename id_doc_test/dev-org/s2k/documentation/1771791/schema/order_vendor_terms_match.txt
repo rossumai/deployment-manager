@@ -1,1 +1,0 @@
-This field, "PO Vendor Terms (Match)", is populated from the main matching query. Please refer to the definition of the field with schema_id "order_vendor_name_match" for more information about how this matching is performed.

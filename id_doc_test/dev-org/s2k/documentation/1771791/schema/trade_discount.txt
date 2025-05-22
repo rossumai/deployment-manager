@@ -1,8 +1,0 @@
-### Trade Discount (trade_discount)
-
-- **description**: Represents the discount amount given to customers based on their trade status or relationship with the supplier
-- **field type**: captured
-- **data type**: number
-- **required**: false
-- **exported**: true
-- **hidden**: false

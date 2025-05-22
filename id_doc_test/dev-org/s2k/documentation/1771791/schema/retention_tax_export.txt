@@ -1,8 +1,0 @@
-### retention_tax_export (retention_tax_export)
-
-* **description**: This field calculates a tax value for retention. It first checks if `retention_tax` is set. If it is, it uses that value (defaulting to 0 if null). Otherwise, it uses `retention_tax_from_lines` (defaulting to 0 if null).
-* **field type**: formula
-* **data type**: number
-* **required**: false
-* **exported**: false
-* **hidden**: true

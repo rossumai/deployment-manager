@@ -1,1 +1,0 @@
-This field (`item_receipt_uom_match`) is populated from the main matching query. Please refer to the definition in the field with schema_id `item_receipt_id_match` for more information about how this data is sourced and populated.
