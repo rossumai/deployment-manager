@@ -1,8 +1,0 @@
-### PO Number (order_id)
-
-* **Description**: Represents the purchase order identification extracted from the document.
-* **Field type**: captured
-* **Data type**: string
-* **Required**: false
-* **Exported**: true
-* **Hidden**: false

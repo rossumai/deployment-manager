@@ -1,8 +1,0 @@
-### Merchant Tax (merchant_tax)
-
-* **Description:** Represents the tax amount charged by the merchant, extracted from a document using OCR.
-* **Field type:** captured
-* **Data type:** number
-* **Required:** false
-* **Exported:** true
-* **Hidden:** false

@@ -243,6 +243,7 @@ def prepare_subqueue_deploy_file_object(
     return deploy_representation
 
 
+# TODO: generalize functions (also used in document.py and for deploy template, wrapper will create deploy objects)
 async def get_workspaces_from_user(
     source_path: Path,
     interactive: bool,

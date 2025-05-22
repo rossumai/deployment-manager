@@ -1,8 +1,0 @@
-### Rebate (rebate)
-
-* **Description**: Represents the monetary amount of discount or reduction in price offered to a customer.
-* **Field type**: captured
-* **Data type**: number
-* **Required**: false
-* **Exported**: true
-* **Hidden**: false

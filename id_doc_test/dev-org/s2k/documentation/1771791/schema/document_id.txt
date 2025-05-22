@@ -1,8 +1,0 @@
-### Invoice Number (document_id)
-
-* **Description**: The unique identifier assigned to an invoice, which helps in tracking and referencing the document within a system.
-* **Field Type**: captured
-* **Data Type**: string
-* **Required**: false
-* **Exported**: false
-* **Hidden**: false

@@ -1,1 +1,0 @@
-For information about the "Dropship Flag" field, please refer to the main matching query defined in the "order_match" field. This field is populated from that matching query and contains information about whether an order is flagged as a dropship order.

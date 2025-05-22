@@ -1,8 +1,0 @@
-{
-  "Schema_id": "645889",
-  "Name of extension": "Download PO BB into Schema (S2K PO)",
-  "Extension ID": "645889",
-  "INPUT": ["schema_id"],
-  "OUTPUT": ["datapoint"],
-  "Description": "This extension downloads purchase order bounding boxes into the schema. It processes metadata from bounding boxes, finds corresponding datapoints in the annotation content using schema IDs, and updates their content and validation sources. The function executes during annotation content initialization."
-}

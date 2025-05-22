@@ -1,8 +1,0 @@
-{
-  "Schema_id": null,
-  "Name of extension": "Freight Percentage Info Message (S2K PO)",
-  "Extension ID": 759357,
-  "INPUT": ["amount_due_export", "freight_export", "notes"],
-  "OUTPUT": ["notes"],
-  "Description": "This extension calculates the percentage of freight costs relative to the total amount due. It displays an informational message showing this percentage. If the freight percentage exceeds 5% and no notes are provided, it shows an error message requiring a note to be added."
-}

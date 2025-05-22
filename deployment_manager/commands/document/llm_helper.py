@@ -2,9 +2,15 @@ import asyncio
 import copy
 import boto3
 from botocore.config import Config
+from botocore.exceptions import (
+    UnauthorizedSSOTokenError,
+    NoCredentialsError,
+    ClientError,
+)
 import json
 import os
-
+import logging
+logging.getLogger("botocore.credentials").setLevel(logging.CRITICAL)
 
 MODEL_ID = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 
@@ -15,7 +21,7 @@ class LLMHelper:
         self.session = boto3.Session(profile_name=profile_name)
         config = Config(
             max_pool_connections=100,
-            read_timeout=120,
+            read_timeout=1200,
             connect_timeout=20,
         )
 
@@ -31,6 +37,8 @@ class LLMHelper:
         }
 
     async def run(self, prompt):
+        self.validate_credentials()
+
         payload = copy.deepcopy(self.payload_basis)
         payload["messages"] = [{"role": "user", "content": prompt}]
 
@@ -46,3 +54,18 @@ class LLMHelper:
             return generated_text
         except Exception as e:
             print(f"An error occurred: {e}")
+
+    def validate_credentials(self):
+        try:
+            sts = self.session.client("sts")
+            sts.get_caller_identity()
+        except UnauthorizedSSOTokenError:
+            raise RuntimeError(
+                "SSO credentials have expired. Run `aws sso login --profile rossum-dev`."
+            )
+        except NoCredentialsError:
+            raise RuntimeError(
+                "No AWS credentials found. Set AWS_PROFILE or configure SSO. Run `aws sso login --profile rossum-dev`."
+            )
+        except ClientError as e:
+            raise RuntimeError(f"Credential error: {e.response['Error']['Message']}")
