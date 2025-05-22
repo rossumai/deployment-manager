@@ -1,4 +1,6 @@
 import asyncio
+from codecs import ignore_errors
+from collections import defaultdict
 import json
 import subprocess
 import click
@@ -9,6 +11,10 @@ from deployment_manager.commands.deploy.subcommands.template.helpers import (
     find_hooks_for_queues,
     find_queue_paths_for_workspaces,
     find_ws_paths_for_dir,
+    get_dir_and_subdir_from_user,
+    get_hooks_from_user,
+    get_queues_from_user,
+    get_workspaces_from_user,
 )
 
 from deployment_manager.commands.document.llm_helper import LLMHelper
@@ -18,7 +24,12 @@ from deployment_manager.common.read_write import (
     read_txt,
     write_txt,
 )
-from deployment_manager.utils.consts import display_info, settings, display_warning
+from deployment_manager.utils.consts import (
+    display_error,
+    display_info,
+    settings,
+    display_warning,
+)
 
 from deployment_manager.utils.functions import (
     coro,
@@ -29,55 +40,83 @@ from deployment_manager.utils.functions import (
     name=settings.DOCUMENT_COMMAND_NAME,
     help="""Create documentation""",
 )
-@click.argument(
-    "destinations",
-    nargs=-1,
-    type=click.Path(path_type=Path),
+@click.option(
+    "--ignore-cache",
+    "-i",
+    help="Regenerate docs for all objects, even if they have a cached local documentation already.",
+    is_flag=True,
+    default=False,
 )
 @coro
 async def generate_documentation_wrapper(
-    destinations: tuple[Path],
-    project_path: Path = None,
+    project_path: Path = None, ignore_cache: bool = False
 ):
-    await generate_documentation(destinations=destinations, project_path=project_path)
+    await generate_documentation(project_path=project_path, ignore_cache=ignore_cache)
 
 
-async def generate_documentation(destinations: tuple[Path], project_path: Path):
-    if not destinations:
-        display_warning(
-            f"No destinations specified to {settings.DOWNLOAD_COMMAND_NAME}."
-        )
-        return
-
+async def generate_documentation(project_path: Path, ignore_cache: bool):
     if not project_path:
         project_path = Path("./")
 
-    for destination in destinations:
-        if not await (project_path / destination).exists():
-            display_warning(
-                f"Directory {project_path / destination} does not exist - skipping."
-            )
-            continue
+    source_dir_and_subdir = await get_dir_and_subdir_from_user(
+        project_path=project_path, type="source"
+    )
 
-        documentator = DirectoryDocumentator(
-            dir_subdir=str(destination), project_path=project_path
-        )
-        await documentator.document_organization()
+    source_path = project_path / source_dir_and_subdir
+
+    deploy_file_workspaces, selected_ws_paths = await get_workspaces_from_user(
+        source_path=source_path,
+        interactive=True,
+    )
+
+    if not selected_ws_paths:
+        return
+
+    deploy_file_queues, selected_queues = await get_queues_from_user(
+        deploy_ws_paths=[ws.parent for ws in selected_ws_paths],
+        interactive=True,
+    )
+
+    if not selected_queues:
+        return
+
+    # Currently, hook selection is entirely driven by a specific queue
+    # selected_hooks, unselected_hooks = await get_hooks_from_user(
+    #     source_path=source_path,
+    #     queues=selected_queues,
+    #     interactive=True,
+    # )
+
+    documentator = DirectoryDocumentator(
+        dir_subdir=source_dir_and_subdir,
+        project_path=project_path,
+        queues=selected_queues,
+        ignore_cache=ignore_cache,
+    )
+    await documentator.document_queues()
 
 
 class DirectoryDocumentator:
-    def __init__(self, dir_subdir: str, project_path: Path):
+    def __init__(
+        self,
+        dir_subdir: str,
+        queues: list[dict],
+        project_path: Path,
+        ignore_cache: bool,
+    ):
         self.name = dir_subdir
         self.project_path = project_path
         self.model = LLMHelper()
         self.semaphore = asyncio.Semaphore(10)
 
+        self.ignore_cache = ignore_cache
+
         self.hook_docs = {}
-        self.schema_id_docs = {}
+        self.schema_id_docs = defaultdict(dict)
         self.queue_docs = {}
 
-        self.hooks = []
-        self.queues = []
+        self.hooks: list[dict]
+        self.queues: list[dict] = queues
 
     # TODO: naming...
 
@@ -85,107 +124,113 @@ class DirectoryDocumentator:
     def org_path(self):
         return self.project_path / self.name
 
+    def hook_documentations_base_path(self, queue_id: str):
+        return self.org_path / "documentation" / str(queue_id) / "hooks"
+
+    def schema_documentations_base_path(self, queue_id: str):
+        return self.org_path / "documentation" / str(queue_id) / "schema"
+
     async def limited_run(self, func, *args, **kwargs):
         async with self.semaphore:
             return await func(*args, **kwargs)
 
-    async def document_organization(self):
-        # Collect objects
-        self.queues = await self.gather_queues()
+    async def document_queues(self):
+        try:
+            for queue in self.queues:
+                await self.document_queue_with_context(queue)
 
-        # TODO: allow multiple subdirs
+            # TODO: Allow to run only second/third stage
 
-        # TODO: queues without hooks - error?
-        # TODO: allow documenting individual queues
+            await self.document_use_case()
+        except RuntimeError as e:
+            display_error(str(e))
 
-        for queue in self.queues:
-            await self.document_queue(queue)
-            # !!!! remove
-            break
+    async def document_use_case(self):
+        display_info(f"Documenting use case.")
 
-        # Check if the doc for an object is not already created
-        # (Allow to run only second/third stage)
+        use_case_path = self.org_path / "documentation" / "use_case.txt"
+        if await use_case_path.exists() and not self.ignore_cache:
+            return
 
-        # Run for individual objects
-        # Decide which template to use
-        # Populate field
-        # helper = LLMHelper()
+        use_case_template_path = Path(__file__).parent / "templates" / "use_case.txt"
+        use_case_template = await read_txt(use_case_template_path)
 
-        # Merge for each queue
+        queue_documentations = ""
+        for queue_documentation in self.queue_docs.values():
+            queue_documentations += queue_documentation + "\n\n"
 
-    async def gather_queues(self):
-        project_config = await read_prd_project_config(self.project_path)
+        use_case_documentation = await self.model.run(
+            use_case_template.format(
+                queue_documentations=queue_documentations,
+            )
+        )
 
-        # org = project_config.get("directories", {}).get(self.name)
-        # subdirs = org.get("subdirectories", {})
+        await write_txt(
+            self.org_path / "documentation" / "use_case.txt",
+            use_case_documentation,
+        )
 
-        # workspace_paths = []
-        # for subdir in subdirs:
-        # subdir_workspaces = await find_ws_paths_for_dir(self.org_path / subdir)
-        # workspace_paths.extend(subdir_workspaces)
-
-        workspace_paths = await find_ws_paths_for_dir(self.org_path)
-        queue_paths = await find_queue_paths_for_workspaces(workspace_paths)
-        queues = []
-
-        for queue_path in queue_paths:
-            queue = await read_json(queue_path)
-            queue["path"] = queue_path
-            queues.append(queue)
-
-        return queues
-
-    async def document_queue(self, queue: dict):
-        # TODO: skip what is cached in local folder
+    async def document_queue_with_context(self, queue: dict):
         # TODO: true async IO operations
         # TODO: display progress / what is being documented
         # TODO: error handling
         # TODO: static analysis for any data schema_id
         # TODO: postprocessing to unify headlines and formatting?
 
+        # TODO: document sorting should be included in the target queue too (not just source)
+
+        # TODO: spot bedrock authorization error before calling run()
+
         display_info(
             f"Documenting queue [green]{queue.get('name', 'unkonwn-queue')}[/green] ([purple]{queue.get('id', 'unknown-id')}[/purple])"
         )
 
+        # TODO: queue caching check
+
+        # Document inbox's email without having to pass in the whole inbox object to the LLM
         inbox_path = queue["path"].with_stem("inbox")
         inbox = await read_json(inbox_path)
         queue["email"] = inbox["email"]
 
-        hook_documentations_base_path = (
-            self.org_path / "documentation" / str(queue["id"]) / "hooks"
-        )
         hooks = await find_hooks_for_queues(self.org_path, queues=[queue])
         self.hooks = hooks
         await asyncio.gather(
             *[
                 self.limited_run(
-                    self.document_hook, hook, hook_documentations_base_path
+                    self.document_hook,
+                    hook,
+                    self.hook_documentations_base_path(queue["id"]),
                 )
                 for hook in self.hooks
             ]
         )
 
+        # TODO:
         # await self.visualize_extensions_chain()
 
-        schema_documentations_base_path = (
-            self.org_path / "documentation" / str(queue["id"]) / "schema"
-        )
         schema_path = queue["path"].with_stem("schema")
         schema = await read_json(schema_path)
         await self.document_schema_ids(
-            schema, schema_documentations_base_path, hook_documentations_base_path
+            queue["id"],
+            schema,
+            self.schema_documentations_base_path(queue["id"]),
+            self.hook_documentations_base_path(queue["id"]),
         )
 
-        template_path = Path(__file__).parent / "templates" / "queue.txt"
-        template = await read_txt(template_path)
+        await self.document_queue(queue=queue)
 
+    async def document_queue(self, queue: dict):
         hook_documentations = ""
-        async for hook_doc_path in hook_documentations_base_path.iterdir():
+        async for hook_doc_path in self.hook_documentations_base_path(
+            queue["id"]
+        ).iterdir():
             if not str(hook_doc_path).endswith("_fe.txt"):
                 hook_documentations += await read_txt(hook_doc_path) + "\n\n"
 
         schema_documentations = ""
-        async for schema_doc_path in schema_documentations_base_path.iterdir():
+        async for schema_doc_path in self.schema_documentations_base_path(
+            queue["id"]
+        ).iterdir():
             if await schema_doc_path.is_file() and schema_doc_path.suffix == ".txt":
                 schema_documentations += await read_txt(schema_doc_path) + "\n\n"
 
@@ -204,13 +249,15 @@ class DirectoryDocumentator:
                 await read_txt(data_matching_doc_path) + "\n\n"
             )
 
+        queue_template_path = Path(__file__).parent / "templates" / "queue.txt"
+        queue_template = await read_txt(queue_template_path)
+
         queue_documentation = await self.model.run(
-            template.format(
+            queue_template.format(
                 queue_json=queue,
                 hook_documentations=hook_documentations,
-                schema_documentations=schema_documentations
-                + "\n"
-                + data_matching_documentations,
+                schema_documentations=schema_documentations,
+                data_matching_documentations=data_matching_documentations,
             )
         )
         queue_documentation += (
@@ -227,14 +274,18 @@ class DirectoryDocumentator:
             queue_documentation,
         )
 
-    async def document_hook(self, hook: dict, base_path: Path):
-        run_after = self.format_map_after_section(hook)
+    async def document_hook(self, hook: dict, base_doc_path: Path):
+        hook_path = base_doc_path / f"{hook['id']}.txt"
+        if await hook_path.exists() and not self.ignore_cache:
+            return
+
+        display_info(
+            f"Documenting hook [green]{hook.get('name', 'unkonwn-hook')}[/green] ([purple]{hook.get('id', 'unknown-id')}[/purple])"
+        )
+
+        run_after = self.format_run_after_section(hook)
 
         queue_names = self.format_queue_names_section(hook)
-
-        hook_path = base_path / f"{hook['id']}.txt"
-        if await hook_path.exists():
-            return
 
         template_path = Path(__file__).parent / "templates" / "generic_extension.txt"
         template_path_fe = ""
@@ -281,11 +332,11 @@ class DirectoryDocumentator:
 
             self.hook_docs[hook["id"]] = hook_documentation
             await write_txt(
-                base_path / f"{hook['id']}_fe.txt",
+                base_doc_path / f"{hook['id']}_fe.txt",
                 hook_documentation,
             )
 
-    def format_map_after_section(self, hook: dict):
+    def format_run_after_section(self, hook: dict):
         run_after_urls = hook.get("run_after", [])
         run_after_formatting = ""
 
@@ -314,13 +365,21 @@ class DirectoryDocumentator:
         return queue_formatting
 
     async def document_schema_ids(
-        self, schema: dict, base_path: Path, hook_docs_base_path: Path
+        self, queue_id, schema: dict, base_path: Path, docs_base_path: Path
     ):
+        display_info(
+            f"Documenting schema [green]{schema.get('name', 'unkonwn-schema')}[/green] ([purple]{schema.get('id', 'unknown-id')}[/purple])"
+        )
+
         datapoints = extract_datapoints(schema)
         await asyncio.gather(
             *[
                 self.limited_run(
-                    self.document_schema_id, datapoint, base_path, hook_docs_base_path
+                    self.document_schema_id,
+                    queue_id,
+                    datapoint,
+                    base_path,
+                    docs_base_path,
                 )
                 for datapoint in datapoints
             ]
@@ -344,11 +403,10 @@ class DirectoryDocumentator:
         )
 
     async def document_schema_id(
-        self, schema_id: dict, base_path: Path, hook_docs_base_path: Path
+        self, queue_id: str, schema_id: dict, base_path: Path, hook_docs_base_path: Path
     ):
         schema_id_path = base_path / f"{schema_id['id']}.txt"
-
-        if await schema_id_path.exists():
+        if await schema_id_path.exists() and not self.ignore_cache:
             return
 
         template, matching_configs = await self.get_template_for_schema_id(
@@ -360,7 +418,7 @@ class DirectoryDocumentator:
             schema_id_path = base_path / "data_matching" / f"{schema_id['id']}.txt"
         schema_id_documentation = await self.model.run(template)
 
-        self.schema_id_docs[schema_id["id"]] = schema_id_documentation
+        self.schema_id_docs[queue_id][schema_id["id"]] = schema_id_documentation
         await write_txt(
             schema_id_path,
             schema_id_documentation,

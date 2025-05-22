@@ -1,0 +1,22 @@
+Generate markdown documentation for an overall Rossum use case (e.g., PO-backed invoices). The use case consists of several queues whose documentation you can find below.
+
+General information about Rossum configurations:
+- Each queue lives in a single workspace.
+- Workspaces can have 0-n queues.
+- Each queue has its own schema (1:1)
+- Each queue has 0-1 inbox which can accept emails with attachments. The attachments become documents in that queue.
+- Queues hold annotations (documents) that are first read by AI and then reviewed by users.
+- Hooks (aka extensions) run some functionality based on an event related to a specific annotation.
+- Hooks can be assigned to 0-n queues.
+- Hooks can be chained to run one after another.
+- You can recognize the type of the object by its URL (e.g., https://rdttest.rossum.app/api/v1/workspaces/595306 -> workspace)
+- Queues can be "chained" together by using a "document sorting" extension. The configuration of the extension has a "source" and "target" queue.
+
+Here is documentation for the individual queues:
+
+{queue_documentations}
+
+Make sure the output includes ONLY the following sections (do not output anything else):
+Use Case Overview (h1 markdown)
+- In a format of a table, provide all queues used in this use case and basic information about them.
+- A few paragraphs about how the use case works based on the queue documentations you were provided with.
