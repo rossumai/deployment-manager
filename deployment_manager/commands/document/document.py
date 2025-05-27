@@ -17,7 +17,12 @@ from deployment_manager.commands.deploy.subcommands.template.helpers import (
     get_workspaces_from_user,
 )
 
-from deployment_manager.commands.document.llm_helper import LLMHelper
+from deployment_manager.commands.document.llm_helper import (
+    MODEL_ID,
+    MODEL_PRICING_MAP,
+    LLMHelper,
+    ModelResponse,
+)
 from deployment_manager.common.read_write import (
     read_json,
     read_prd_project_config,
@@ -33,6 +38,7 @@ from deployment_manager.utils.consts import (
 
 from deployment_manager.utils.functions import (
     coro,
+    extract_id_from_url,
 )
 
 
@@ -55,6 +61,8 @@ async def generate_documentation_wrapper(
 
 
 async def generate_documentation(project_path: Path, ignore_cache: bool):
+    LLMHelper().validate_credentials()
+
     if not project_path:
         project_path = Path("./")
 
@@ -111,9 +119,10 @@ class DirectoryDocumentator:
 
         self.ignore_cache = ignore_cache
 
-        self.hook_docs = {}
-        self.schema_id_docs = defaultdict(dict)
-        self.queue_docs = {}
+        self.hook_docs: dict[ModelResponse] = {}
+        self.schema_id_docs: dict[dict[ModelResponse]] = defaultdict(dict)
+        self.queue_docs: dict[ModelResponse] = {}
+        self.use_case_doc: ModelResponse = {}
 
         self.hooks: list[dict]
         self.queues: list[dict] = queues
@@ -124,13 +133,48 @@ class DirectoryDocumentator:
     def org_path(self):
         return self.project_path / self.name
 
-    def hook_documentations_base_path(self, queue_id: str):
-        return self.org_path / "documentation" / str(queue_id) / "hooks"
+    @property
+    def hook_documentations_base_path(self):
+        return self.org_path / "documentation" / "hooks"
 
     def schema_documentations_base_path(self, queue_id: str):
         return self.org_path / "documentation" / str(queue_id) / "schema"
 
-    async def limited_run(self, func, *args, **kwargs):
+    @property
+    def templates_base_path(self):
+        return Path(__file__).parent / "templates"
+
+    @property
+    def queue_documentations_base_path(self):
+        return self.org_path / "documentation" / "queues"
+
+    @property
+    def use_case_documentations_base_path(self):
+        return self.org_path / "documentation"
+
+    def calculate_tokens_used(self):
+        input_tokens, output_tokens = 0, 0
+
+        for hook in self.hook_docs.values():
+            input_tokens += hook.input_tokens
+            output_tokens += hook.output_tokens
+
+        for schema in self.schema_id_docs.values():
+            for schema_id_doc in schema.values():
+                input_tokens += schema_id_doc.input_tokens
+                output_tokens += schema_id_doc.output_tokens
+
+        for queue in self.queue_docs.values():
+            input_tokens += queue.input_tokens
+            output_tokens += queue.output_tokens
+
+        if self.use_case_doc:
+            input_tokens += self.use_case_doc.input_tokens
+            output_tokens += self.use_case_doc.output_tokens
+
+        return input_tokens, output_tokens
+
+    async def _limited_run(self, func, *args, **kwargs):
         async with self.semaphore:
             return await func(*args, **kwargs)
 
@@ -142,50 +186,54 @@ class DirectoryDocumentator:
             # TODO: Allow to run only second/third stage
 
             await self.document_use_case()
+
+            input_tokens_total, output_tokens_total = self.calculate_tokens_used()
+            price_total = self.model.calculate_pricing(
+                input_tokens=input_tokens_total, output_tokens=output_tokens_total
+            )
+            display_info(
+                f"Documentation finished.\nInput tokens used:{input_tokens_total}\nOutput tokens used:{output_tokens_total}\nPricing: {price_total} $"
+            )
         except RuntimeError as e:
             display_error(str(e))
 
     async def document_use_case(self):
         display_info(f"Documenting use case.")
 
-        use_case_path = self.org_path / "documentation" / "use_case.txt"
+        use_case_path = self.use_case_documentations_base_path / "use_case.txt"
         if await use_case_path.exists() and not self.ignore_cache:
             return
 
-        use_case_template_path = Path(__file__).parent / "templates" / "use_case.txt"
+        use_case_template_path = self.templates_base_path / "use_case.txt"
         use_case_template = await read_txt(use_case_template_path)
 
         queue_documentations = ""
         for queue_documentation in self.queue_docs.values():
-            queue_documentations += queue_documentation + "\n\n"
+            queue_documentations += queue_documentation.text + "\n\n"
 
         use_case_documentation = await self.model.run(
             use_case_template.format(
                 queue_documentations=queue_documentations,
             )
         )
+        self.use_case_doc = use_case_documentation
 
         await write_txt(
-            self.org_path / "documentation" / "use_case.txt",
-            use_case_documentation,
+            self.use_case_documentations_base_path / "use_case.txt",
+            use_case_documentation.text,
         )
 
     async def document_queue_with_context(self, queue: dict):
         # TODO: true async IO operations
-        # TODO: display progress / what is being documented
         # TODO: error handling
         # TODO: static analysis for any data schema_id
         # TODO: postprocessing to unify headlines and formatting?
 
         # TODO: document sorting should be included in the target queue too (not just source)
 
-        # TODO: spot bedrock authorization error before calling run()
-
         display_info(
             f"Documenting queue [green]{queue.get('name', 'unkonwn-queue')}[/green] ([purple]{queue.get('id', 'unknown-id')}[/purple])"
         )
-
-        # TODO: queue caching check
 
         # Document inbox's email without having to pass in the whole inbox object to the LLM
         inbox_path = queue["path"].with_stem("inbox")
@@ -196,10 +244,10 @@ class DirectoryDocumentator:
         self.hooks = hooks
         await asyncio.gather(
             *[
-                self.limited_run(
+                self._limited_run(
                     self.document_hook,
                     hook,
-                    self.hook_documentations_base_path(queue["id"]),
+                    self.hook_documentations_base_path,
                 )
                 for hook in self.hooks
             ]
@@ -214,16 +262,27 @@ class DirectoryDocumentator:
             queue["id"],
             schema,
             self.schema_documentations_base_path(queue["id"]),
-            self.hook_documentations_base_path(queue["id"]),
+            self.hook_documentations_base_path,
         )
 
-        await self.document_queue(queue=queue)
+        await self.document_queue(
+            queue=queue, base_doc_path=self.queue_documentations_base_path
+        )
 
-    async def document_queue(self, queue: dict):
+    async def document_queue(self, queue: dict, base_doc_path: Path):
+        queue_path = base_doc_path / f"{queue['id']}.txt"
+        if await queue_path.exists() and not self.ignore_cache:
+            return
+
+        queue_hook_ids = [
+            str(extract_id_from_url(url)) for url in queue.get("hooks", [])
+        ]
         hook_documentations = ""
-        async for hook_doc_path in self.hook_documentations_base_path(
-            queue["id"]
-        ).iterdir():
+        async for hook_doc_path in self.hook_documentations_base_path.iterdir():
+            hook_id = hook_doc_path.stem
+            if hook_id not in queue_hook_ids:
+                continue
+
             if not str(hook_doc_path).endswith("_fe.txt"):
                 hook_documentations += await read_txt(hook_doc_path) + "\n\n"
 
@@ -260,28 +319,29 @@ class DirectoryDocumentator:
                 data_matching_documentations=data_matching_documentations,
             )
         )
-        queue_documentation += (
+
+        queue_documentation.text += (
             "\n\n ## 4. Extensions documentation\n" + hook_documentations
         )
 
-        queue_documentation += (
+        queue_documentation.text += (
             "\n\n ## 5. Data matching fields\n" + data_matching_documentations
         )
 
         self.queue_docs[queue["id"]] = queue_documentation
         await write_txt(
-            self.org_path / "documentation" / "queue" / f"{queue['id']}.txt",
-            queue_documentation,
+            base_doc_path / f"{queue['id']}.txt",
+            queue_documentation.text,
         )
 
     async def document_hook(self, hook: dict, base_doc_path: Path):
-        hook_path = base_doc_path / f"{hook['id']}.txt"
-        if await hook_path.exists() and not self.ignore_cache:
-            return
-
         display_info(
             f"Documenting hook [green]{hook.get('name', 'unkonwn-hook')}[/green] ([purple]{hook.get('id', 'unknown-id')}[/purple])"
         )
+
+        hook_path = base_doc_path / f"{hook['id']}.txt"
+        if await hook_path.exists() and not self.ignore_cache:
+            return
 
         run_after = self.format_run_after_section(hook)
 
@@ -323,7 +383,7 @@ class DirectoryDocumentator:
         self.hook_docs[hook["id"]] = hook_documentation
         await write_txt(
             hook_path,
-            hook_documentation,
+            hook_documentation.text,
         )
         if template_path_fe:
             template = await read_txt(template_path_fe)
@@ -333,7 +393,7 @@ class DirectoryDocumentator:
             self.hook_docs[hook["id"]] = hook_documentation
             await write_txt(
                 base_doc_path / f"{hook['id']}_fe.txt",
-                hook_documentation,
+                hook_documentation.text,
             )
 
     def format_run_after_section(self, hook: dict):
@@ -374,7 +434,7 @@ class DirectoryDocumentator:
         datapoints = extract_datapoints(schema)
         await asyncio.gather(
             *[
-                self.limited_run(
+                self._limited_run(
                     self.document_schema_id,
                     queue_id,
                     datapoint,
@@ -405,23 +465,25 @@ class DirectoryDocumentator:
     async def document_schema_id(
         self, queue_id: str, schema_id: dict, base_path: Path, hook_docs_base_path: Path
     ):
-        schema_id_path = base_path / f"{schema_id['id']}.txt"
-        if await schema_id_path.exists() and not self.ignore_cache:
-            return
-
         template, matching_configs = await self.get_template_for_schema_id(
             schema_id, hook_docs_base_path
         )
         template = template.format(schema_id=schema_id)
+        schema_id_path = base_path / f"{schema_id['id']}.txt"
+
         if matching_configs:
             template += "\n\r" + json.dumps(matching_configs)
             schema_id_path = base_path / "data_matching" / f"{schema_id['id']}.txt"
+
+        if await schema_id_path.exists() and not self.ignore_cache:
+            return
+
         schema_id_documentation = await self.model.run(template)
 
         self.schema_id_docs[queue_id][schema_id["id"]] = schema_id_documentation
         await write_txt(
             schema_id_path,
-            schema_id_documentation,
+            schema_id_documentation.text,
         )
 
     async def get_template_for_schema_id(

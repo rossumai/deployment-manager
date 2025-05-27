@@ -1,5 +1,6 @@
 import asyncio
 import copy
+from dataclasses import dataclass
 import boto3
 from botocore.config import Config
 from botocore.exceptions import (
@@ -10,9 +11,21 @@ from botocore.exceptions import (
 import json
 import os
 import logging
+
 logging.getLogger("botocore.credentials").setLevel(logging.CRITICAL)
 
 MODEL_ID = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+
+MODEL_PRICING_MAP = {
+    "us.anthropic.claude-3-7-sonnet-20250219-v1:0": {"input": 0.003, "output": 0.015}
+}
+
+
+@dataclass
+class ModelResponse:
+    text: str
+    input_tokens: int
+    output_tokens: int
 
 
 class LLMHelper:
@@ -36,9 +49,13 @@ class LLMHelper:
             "top_p": 0.9,
         }
 
-    async def run(self, prompt):
-        self.validate_credentials()
+    def calculate_pricing(self, input_tokens, output_tokens):
+        # Assumes Claude 3.7 pricing
+        return (input_tokens / 1000) * MODEL_PRICING_MAP[MODEL_ID]["input"] + (
+            output_tokens / 1000
+        ) * MODEL_PRICING_MAP[MODEL_ID]["output"]
 
+    async def run(self, prompt) -> ModelResponse:
         payload = copy.deepcopy(self.payload_basis)
         payload["messages"] = [{"role": "user", "content": prompt}]
 
@@ -47,11 +64,16 @@ class LLMHelper:
                 modelId=MODEL_ID, body=json.dumps(payload)
             )
             response_body = json.loads(response["body"].read())
-            return response_body["content"][0]["text"]
+            usage = response_body["usage"]
+
+            return ModelResponse(
+                text=response_body["content"][0]["text"],
+                input_tokens=usage["input_tokens"],
+                output_tokens=usage["output_tokens"],
+            )
 
         try:
-            generated_text = await asyncio.to_thread(blocking_call)
-            return generated_text
+            return await asyncio.to_thread(blocking_call)
         except Exception as e:
             print(f"An error occurred: {e}")
 
