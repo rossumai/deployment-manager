@@ -8,6 +8,7 @@ from deployment_manager.commands.download.download import (
     download_project_wrapper,
 )
 from deployment_manager.commands.initialize import init_project
+from deployment_manager.commands.llm_chat.llm_chat import llm_chat_wrapper
 from deployment_manager.commands.purge.purge import purge_object_types_wrapper
 from deployment_manager.commands.upload.upload import upload_project_wrapper
 
@@ -22,6 +23,7 @@ main.add_command(init_project)
 main.add_command(deploy)
 main.add_command(hook)
 main.add_command(generate_documentation_wrapper)
+main.add_command(llm_chat_wrapper)
 main.add_command(purge_object_types_wrapper)
 main.add_command(upload_project_wrapper)
 

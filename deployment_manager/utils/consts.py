@@ -192,6 +192,7 @@ class Settings:
     DEPLOY_TEMPLATE_COMMAND_NAME: str = "template"
     DEPLOY_TEMPLATE_INIT_COMMAND_NAME: str = "init"
     DOCUMENT_COMMAND_NAME: str = "docommando"
+    LLM_CHAT_COMMAND_NAME: str = "llm-chat"
     HOOK_COMMAND_NAME: str = "hook"
     HOOK_PAYLOAD_COMMAND_NAME: str = "payload"
     HOOK_TEST_COMMAND_NAME: str = "test"
@@ -201,6 +202,8 @@ class Settings:
     CONFIG_KEY_ORG_ID = "org_id"
     CONFIG_KEY_DIRECTORIES = "directories"
     CONFIG_KEY_SUBDIRECTORIES = "subdirectories"
+
+    DOCUMENTATION_FOLDER_NAME = 'documentation'
 
     # Pull consts
     DOWNLOAD_KEY_ORG_ID = "org_id"

@@ -10,3 +10,7 @@ id_doc_test
 temp_project
 .vscode
 **/.DS_Store
+
+**/credentials.json
+**/credentials.yaml
+**/deploy_secrets/

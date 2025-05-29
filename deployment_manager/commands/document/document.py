@@ -135,10 +135,10 @@ class DirectoryDocumentator:
 
     @property
     def hook_documentations_base_path(self):
-        return self.org_path / "documentation" / "hooks"
+        return self.org_path / settings.DOCUMENTATION_FOLDER_NAME / "hooks"
 
     def schema_documentations_base_path(self, queue_id: str):
-        return self.org_path / "documentation" / str(queue_id) / "schema"
+        return self.org_path / settings.DOCUMENTATION_FOLDER_NAME / str(queue_id) / "schema"
 
     @property
     def templates_base_path(self):
@@ -146,11 +146,11 @@ class DirectoryDocumentator:
 
     @property
     def queue_documentations_base_path(self):
-        return self.org_path / "documentation" / "queues"
+        return self.org_path / settings.DOCUMENTATION_FOLDER_NAME / "queues"
 
     @property
     def use_case_documentations_base_path(self):
-        return self.org_path / "documentation"
+        return self.org_path / settings.DOCUMENTATION_FOLDER_NAME
 
     def calculate_tokens_used(self):
         input_tokens, output_tokens = 0, 0
@@ -300,13 +300,15 @@ class DirectoryDocumentator:
             / "schema"
             / "data_matching"
         )
+
         data_matching_documentations = ""
-        async for (
-            data_matching_doc_path
-        ) in data_matching_documentations_base_path.iterdir():
-            data_matching_documentations += (
-                await read_txt(data_matching_doc_path) + "\n\n"
-            )
+        if await data_matching_documentations_base_path.exists():
+            async for (
+                data_matching_doc_path
+            ) in data_matching_documentations_base_path.iterdir():
+                data_matching_documentations += (
+                    await read_txt(data_matching_doc_path) + "\n\n"
+                )
 
         queue_template_path = Path(__file__).parent / "templates" / "queue.txt"
         queue_template = await read_txt(queue_template_path)
