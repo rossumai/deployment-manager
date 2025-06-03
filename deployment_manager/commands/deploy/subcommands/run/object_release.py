@@ -174,7 +174,8 @@ class ObjectRelease(BaseModel):
         remote_object = await self.get_remote_object(remote_object_id)
         try:
             remote_modified_at = remote_object.get("modified_at", "")
-            if not remote_modified_at:
+            # Both timestamps are needed for a meaningful comparison
+            if not remote_modified_at or not last_deploy_timestamp:
                 return True
             remote_timestamp = datetime.fromisoformat(remote_modified_at)
             deploy_timestamp = datetime.fromisoformat(last_deploy_timestamp)
