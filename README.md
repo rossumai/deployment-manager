@@ -356,6 +356,7 @@ PRD handles the following edge cases:
 3. For both cases, if there are multiple target equivalents, their count is compared to the count of "siblings" of the current object:
     - If this count is equal (e.g., releasing 2 `queues`, each with its own version of `hooks), each sibiling object gets its own target equivalent (based on the index)
     - If the count is not equal, all siblings get the first target equivalent as their dependency.
+**4. If the target object has any extra "dangling" dependencies (e.g., production queue has one extra hook) that do not have a source equivalent, these will be maintained automatically.**
 
 ##### 2. Implicit ID override = replacing IDs in `settings` and `metadata`
 
