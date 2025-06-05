@@ -227,6 +227,8 @@ class Settings:
     DEPLOY_KEY_UNSELECTED_HOOK_IDS = "unselected_hooks"
     DEPLOY_KEY_PATCH_TARGET_ORG = "patch_target_org"
 
+    DEPLOY_IGNORED_SCHEMA_ATTRIBUTES = [("score_threshold", 1)]
+
     DEPLOY_KEY_WORKSPACES = "workspaces"
     DEPLOY_KEY_QUEUES = "queues"
     DEPLOY_KEY_SCHEMA = "schema"

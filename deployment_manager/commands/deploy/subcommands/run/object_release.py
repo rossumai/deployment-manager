@@ -316,9 +316,16 @@ class ObjectRelease(BaseModel):
     async def implicit_override_targets(self, lookup_table: LookupTable):
         try:
             for target_index, target in enumerate(self.targets):
+
+                # ! Previous code was implicitly relying on some attributes being removed, not just in diff comparison
+                # e.g., hook.queues=[] was set before updating/creating it, queue.hooks then assigns hooks
+                # But if we send out hook.queues during ID override, the hooks will get unassigned
+                # TODO: keep current override_irrelevant function for what should not get sent (do not touch what was replaced by replace dep url)
+                # TODO: create a modified version of the function to apply to diffing
+
+                # Object that is being sent into Rossum
                 overriding_object = deepcopy(target)
-                diff_overriding_object_data = deepcopy(overriding_object.data)
-                self.remove_override_irrelevant_props(diff_overriding_object_data)
+                self.remove_override_irrelevant_props(overriding_object.data)
 
                 self.overrider.replace_ids_in_target_object(
                     target=overriding_object,
@@ -328,48 +335,7 @@ class ObjectRelease(BaseModel):
                 )
 
                 if self.plan_only:
-                    # When updating, take the real remote object
-                    # The diff comparison will then show only overrides that are not on the remote already (not all overrides from source)
-                    if target.id and not self.check_plan_object_id(target.id):
-                        overriden_object_data = await self.get_remote_object(target.id)
-                    else:
-                        overriden_object_data = deepcopy(self.data)
-
-                    # Code diffs need some of the attributes
-                    diff_overriden_object_data = deepcopy(overriden_object_data)
-                    self.remove_override_irrelevant_props(diff_overriden_object_data)
-
-                    diff = self.overrider.create_override_diff(
-                        diff_overriden_object_data, diff_overriding_object_data
-                    )
-
-                    hook_code_diff = self.overrider.create_hook_code_override_diff(
-                        overriden_object_data, overriding_object.data
-                    )
-
-                    formula_code_diffs = (
-                        self.overrider.create_formula_code_override_diffs(
-                            overriden_object_data, overriding_object.data
-                        )
-                    )
-
-                    if diff:
-                        colorized_diff = self.overrider.parse_diff(diff)
-                        message = f"Attribute override: {self.display_type} {self.create_source_to_target_string(overriding_object.data)}:\n{colorized_diff}"
-                        pprint(Panel(message))
-
-                    if hook_code_diff:
-                        colorized_code_diff = self.overrider.parse_diff(hook_code_diff)
-                        message = f"Hook code diff: {self.display_type} {self.create_source_to_target_string(overriding_object.data)}:\n\n{colorized_code_diff}"
-                        pprint(Panel(message))
-
-                    for field_id, code_diff in formula_code_diffs.items():
-                        colorized_code_diff = self.overrider.parse_diff(code_diff)
-                        message = (
-                            f"[yellow]{field_id}[/yellow]:\n\n{colorized_code_diff}"
-                        )
-                        pprint(Panel(message))
-
+                    await self.display_planned_diffs(target=target)
                 else:
                     # Update only objects where there was a difference after override
                     await self.update_remote(
@@ -384,7 +350,86 @@ class ObjectRelease(BaseModel):
                 "ID override failed, see error details above."
             ) from None
 
+    async def display_planned_diffs(self, overriding_object: Target):
+        # Object that is displayed as diff
+        diff_overriding_object_data = deepcopy(overriding_object.data)
+        self.remove_diff_irrelevant_props(diff_overriding_object_data)
+
+        # When updating, take the real remote object
+        # The diff comparison will then show only overrides that are not on the remote already (not all overrides from source)
+        if overriding_object.id and not self.check_plan_object_id(overriding_object.id):
+            overriden_object_data = await self.get_remote_object(overriding_object.id)
+        else:
+            overriden_object_data = deepcopy(self.data)
+
+        # Code diffs need some of the attributes retained - use the original for that
+        diff_overriden_object_data = deepcopy(overriden_object_data)
+        self.remove_diff_irrelevant_props(diff_overriden_object_data)
+
+        diff = self.overrider.create_override_diff(
+            diff_overriden_object_data, diff_overriding_object_data
+        )
+
+        hook_code_diff = self.overrider.create_hook_code_override_diff(
+            overriden_object_data, overriding_object.data
+        )
+
+        formula_code_diffs = self.overrider.create_formula_code_override_diffs(
+            overriden_object_data, overriding_object.data
+        )
+
+        if diff:
+            colorized_diff = self.overrider.parse_diff(diff)
+            message = f"Attribute override: {self.display_type} {self.create_source_to_target_string(overriding_object.data)}:\n{colorized_diff}"
+            pprint(Panel(message))
+
+        if hook_code_diff:
+            colorized_code_diff = self.overrider.parse_diff(hook_code_diff)
+            message = f"Hook code diff: {self.display_type} {self.create_source_to_target_string(overriding_object.data)}:\n\n{colorized_code_diff}"
+            pprint(Panel(message))
+
+        for field_id, code_diff in formula_code_diffs.items():
+            colorized_code_diff = self.overrider.parse_diff(code_diff)
+            message = f"[yellow]{field_id}[/yellow]:\n\n{colorized_code_diff}"
+            pprint(Panel(message))
+
     def remove_override_irrelevant_props(self, data):
+        """
+        Deletes attributes that should not be part of the update override payload (e.g., hook.queues is empty from the deploy process, by removing it, we keep whatever deploy assigned)
+        """
+        data.pop("created_by", None)
+        data.pop("created_at", None)
+        data.pop("modified_by", None)
+        data.pop("modified_at", None)
+
+        # These keys are not pulled locally and are read-only - no point sending them back to Rossum
+        ignored_keys_for_type = settings.IGNORED_KEYS.get(self.type, [])
+        for key in ignored_keys_for_type:
+            data.pop(key, None)
+
+        match self.type:
+            case Resource.Schema:
+                data.pop("queues", None)
+            case Resource.Hook:
+                data.pop("token_owner", None)
+                data.pop("run_after", None)
+                data.pop("queues", None)
+            case Resource.Workspace:
+                data.pop("queues", None)
+                data.pop("organization", None)
+            case Resource.Queue:
+                data.pop("workspace", None)
+                data.pop("inbox", None)
+                data.pop("schema", None)
+                data.pop("hooks", None)
+                data.pop("webhooks", None)
+                if not self.is_same_org_deploy:
+                    remove_queue_attributes_for_cross_org(data)
+
+    def remove_diff_irrelevant_props(self, data):
+        """
+        Deletes attributes that should not be shown in the diff (even if they are theoretically part of the payload).
+        """
         # These attribute either should not be compared or were already replaced via replace_dependency_url()
         data.pop("created_by", None)
         data.pop("created_at", None)
@@ -398,32 +443,25 @@ class ObjectRelease(BaseModel):
 
         match self.type:
             case Resource.Organization:
-                data.pop("workspaces", None)
                 data.pop("users", None)
                 data.pop("trial_expires_at", None)
                 data.pop("creator", None)
             case Resource.Schema:
-                data.pop("queues", None)
                 self.remove_formula_fields_code(data.get("content", []))
+                self.remove_schema_ignored_attributes(data.get("content", []))
             case Resource.Inbox:
-                data.pop("queues", None)
+                # Email will always be different and cannot be edited
+                data.pop("email", None)
             case Resource.Hook:
+                # Code is displayed separately, this would just show one huge string
                 data.get("config", {}).pop("code", None)
                 data.pop("token_owner", None)
-                data.pop("guide", None)
-                data.pop("run_after", None)
-                data.pop("queues", None)
             case Resource.Workspace:
-                data.pop("queues", None)
-                data.pop("organization", None)
+                ...
             case Resource.Queue:
-                data.pop("users", None)
-                data.pop("counts", None)
-                data.pop("workspace", None)
+                # Should be ignored because we do not send it (Elis API does not accept inbox assignment)
+                # If not ignored, it would look like we are unassigning the inbox
                 data.pop("inbox", None)
-                data.pop("schema", None)
-                data.pop("hooks", None)
-                data.pop("webhooks", None)
                 if not self.is_same_org_deploy:
                     remove_queue_attributes_for_cross_org(data)
 
@@ -436,6 +474,17 @@ class ObjectRelease(BaseModel):
                 node.pop("formula", None)
             elif "children" in node:
                 return self.remove_formula_fields_code(node["children"])
+
+    def remove_schema_ignored_attributes(self, node: dict):
+        if isinstance(node, list):
+            for subnode in node:
+                self.remove_schema_ignored_attributes(subnode)
+        elif isinstance(node, dict):
+            if node["category"] == "datapoint":
+                for field, _ in settings.DEPLOY_IGNORED_SCHEMA_ATTRIBUTES:
+                    node.pop(field, None)
+            elif "children" in node:
+                return self.remove_schema_ignored_attributes(node["children"])
 
 
 class EmptyObjectRelease(BaseModel):

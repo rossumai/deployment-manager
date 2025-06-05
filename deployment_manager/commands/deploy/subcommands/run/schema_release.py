@@ -73,7 +73,9 @@ class SchemaRelease(ObjectRelease):
             else:
                 schema_copy["name"] = self.name
 
-        schema_copy["rules"] = []
+        # Do not define the empty list, it just shows unncessarily in the list
+        if schema_copy.get('rules', []):
+            schema_copy["rules"] = []
         schema_copy["queues"] = []
 
         if not self.overwrite_ignored_fields:
@@ -162,7 +164,6 @@ class SchemaRelease(ObjectRelease):
             schema_id["formula"] = formula_code
 
     async def ignore_schema_ai_fields(self, schema: dict, target: Target):
-        DEPLOY_IGNORED_SCHEMA_ATTRIBUTES = [("score_threshold", 1)]
 
         # Object was not deployed to this target yet -> no AI fields to preserve in target
         if not target.id:
@@ -170,14 +171,21 @@ class SchemaRelease(ObjectRelease):
 
         try:
             target_schema = await self.client.retrieve_schema(target.id)
-            schema_ids = find_fields_in_schema(schema['content'])
+            schema_ids = find_fields_in_schema(schema["content"])
 
             for schema_id in schema_ids:
-                target_schema_id = find_schema_id(target_schema.content, schema_id["id"])
+                target_schema_id = find_schema_id(
+                    target_schema.content, schema_id["id"]
+                )
                 if not target_schema_id:
                     continue
-                for ignored_field, default_value in DEPLOY_IGNORED_SCHEMA_ATTRIBUTES:
-                    schema_id[ignored_field] = target_schema_id.get(ignored_field, default_value)
+                for (
+                    ignored_field,
+                    default_value,
+                ) in settings.DEPLOY_IGNORED_SCHEMA_ATTRIBUTES:
+                    schema_id[ignored_field] = target_schema_id.get(
+                        ignored_field, default_value
+                    )
 
         except Exception as e:
             raise Exception(f"Error while ignoring schema AI fields") from e

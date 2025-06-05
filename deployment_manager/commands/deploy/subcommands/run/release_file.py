@@ -114,6 +114,18 @@ class ReleaseFile(BaseModel):
             *[queue.schema_release for queue in self.queues],
             *[queue.inbox_release for queue in self.queues],
         ]
+
+        # TODO: simulate how dependency URLs were changed
+        # Currently everything gets assigned by the queues
+        # During planning, after objects were "deployed" (source copied over), stuff like org.workspaces is empty.
+        # Add a step where for each object type and some of the attributes, we:
+        # 1. Fetch the real target object if it exists. If not, keep the source one from planning and replace IDs in selected attributes via lookups (dummy IDs, but that's OK)
+        # 2a. For selected attributes, iterate over the right TARGET object type (e.g., workspace.queues -> iterate over target queues) and check that the target object is assigned to the parent object (e.g., queue assigned to the current workspace). If not, remove it from attribute of parent (remove queue URL from workspace.queues)
+        # 2b. Then go over the child object type again (e.g., queue.workspace) and check if they don't have that parent in their parent attribute (queue.workspace for a specific workspace). If yes, add them if they are missing (this will cover new objects added or reassigned)
+
+
+        # During real deploy, we store the target, but only after deploying it, so something like hook.queues is empty. Then queue.hooks changed that, but we never refetch that hook target again.
+
         await asyncio.gather(
             *[
                 release_object.implicit_override_targets(lookup_table)
@@ -127,7 +139,6 @@ class ReleaseFile(BaseModel):
         lookup_table[self.source_org.id][Resource.Organization] = [
             dataclasses.asdict(self.target_org)
         ]
-        # TODO: code hooks should get nicely formatted diff of code changes
         for source_id, targets in self.hook_targets.items():
             lookup_table[source_id][Resource.Hook] = targets
         for source_id, targets in self.workspace_targets.items():

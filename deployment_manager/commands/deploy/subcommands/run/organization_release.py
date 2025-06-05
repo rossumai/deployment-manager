@@ -27,6 +27,7 @@ class OrganizationRelease(ObjectRelease):
 
             org_copy = deepcopy(self.data)
             org_copy["name"] = self.target_org.name
+            org_copy['workspaces'] = []
 
             result = await self.update_remote(
                 target_object=org_copy, target=self.targets[0]
