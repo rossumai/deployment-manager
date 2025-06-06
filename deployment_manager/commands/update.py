@@ -43,7 +43,7 @@ async def update_application():
             return
     elif current_version > latest_version:
         if not await questionary.confirm(
-            f"You currently have newer version installed ({current_version} then the latest release available to download {latest_version}. Do you want to install {latest_version}?",
+            f"You currently have newer version installed ({current_version}) then the latest release available to download ({latest_version}). Do you want to install {latest_version}?",
             default=False,
         ).ask_async():
             return
