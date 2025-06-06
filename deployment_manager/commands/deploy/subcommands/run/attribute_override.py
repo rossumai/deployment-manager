@@ -171,8 +171,7 @@ class AttributeOverrider:
             after_object["id"] = after_object_id
             after_object["url"] = after_object_url
 
-            this_diff = diff.stdout
-            return this_diff + code_diff
+            return diff.stdout + code_diff
 
     def parse_diff(self, diff: str):
         colorized_lines = []
