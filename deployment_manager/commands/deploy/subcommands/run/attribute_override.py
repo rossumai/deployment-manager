@@ -1,3 +1,4 @@
+import difflib
 import json
 import re
 import subprocess
@@ -149,22 +150,13 @@ class AttributeOverrider:
             before_code = before_code.splitlines()
             after_code = after_code.splitlines()
 
-            with tempfile.NamedTemporaryFile() as code1, tempfile.NamedTemporaryFile() as code2:
-                code1.write(bytes(json.dumps(before_code, indent=2), "UTF-8"))
-                code2.write(bytes(json.dumps(after_code, indent=2), "UTF-8"))
+            code_diff = difflib.unified_diff(before_code, after_code, fromfile="before", tofile="after", lineterm="")
+            code_diff = "\n".join(list(code_diff))
 
-                code_diff = subprocess.run(
-                    ["diff", code1.name, code2.name, "-U", "3"],
-                    capture_output=True,
-                    text=True,  # Decode stdout/stderr as text
-                )
-
-                code_diff = code_diff.stdout
-                if code_diff:
-                    code_diff = f"{'*'*80}\nconfig.code diff:\n{'*'*80}\n{code_diff}"
+            if code_diff:
+                code_diff = f"{'*'*80}\nconfig.code diff:\n{'*'*80}\n{code_diff}"
 
         with tempfile.NamedTemporaryFile() as tf1, tempfile.NamedTemporaryFile() as tf2:
-
             tf1.write(bytes(json.dumps(before_object, indent=2), "UTF-8"))
             tf2.write(bytes(json.dumps(after_object, indent=2), "UTF-8"))
             # Has to be manually seeked back to start
