@@ -137,8 +137,34 @@ class AttributeOverrider:
         after_object_url = after_object.pop("url", None)
         before_object.pop("id", None)
         before_object.pop("url", None)
+        before_code = before_object.get("config", {}).get("code", "")
+        after_code = after_object.get("config", {}).get("code", "")
+        code_diff = ""
+
+        if before_code and after_code:
+            # codes will be compared separately
+            del before_object["config"]["code"]
+            del after_object["config"]["code"]
+
+            before_code = before_code.splitlines()
+            after_code = after_code.splitlines()
+
+            with tempfile.NamedTemporaryFile() as code1, tempfile.NamedTemporaryFile() as code2:
+                code1.write(bytes(json.dumps(before_code, indent=2), "UTF-8"))
+                code2.write(bytes(json.dumps(after_code, indent=2), "UTF-8"))
+
+                code_diff = subprocess.run(
+                    ["diff", code1.name, code2.name, "-U", "3"],
+                    capture_output=True,
+                    text=True,  # Decode stdout/stderr as text
+                )
+
+                code_diff = code_diff.stdout
+                if code_diff:
+                    code_diff = f"{'*'*80}\nconfig.code diff:\n{'*'*80}\n{code_diff}"
 
         with tempfile.NamedTemporaryFile() as tf1, tempfile.NamedTemporaryFile() as tf2:
+
             tf1.write(bytes(json.dumps(before_object, indent=2), "UTF-8"))
             tf2.write(bytes(json.dumps(after_object, indent=2), "UTF-8"))
             # Has to be manually seeked back to start
@@ -153,12 +179,17 @@ class AttributeOverrider:
             after_object["id"] = after_object_id
             after_object["url"] = after_object_url
 
-            return diff.stdout
+            this_diff = diff.stdout
+            return this_diff + code_diff
 
     def parse_diff(self, diff: str):
         colorized_lines = []
-        split_lines = diff.splitlines()
-        del split_lines[0:3]
+        split_lines = []
+
+        for line in diff.splitlines():
+            if line.startswith("--- ") or line.startswith("+++ ") or (line.startswith("@@ ") and line.endswith(" @@")):
+                continue
+            split_lines.append(line)
 
         for index, line in enumerate(split_lines):
             if line.startswith("-"):
