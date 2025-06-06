@@ -1,3 +1,4 @@
+import difflib
 import json
 import re
 import subprocess
@@ -137,6 +138,23 @@ class AttributeOverrider:
         after_object_url = after_object.pop("url", None)
         before_object.pop("id", None)
         before_object.pop("url", None)
+        before_code = before_object.get("config", {}).get("code", "")
+        after_code = after_object.get("config", {}).get("code", "")
+        code_diff = ""
+
+        if before_code and after_code:
+            # codes will be compared separately
+            del before_object["config"]["code"]
+            del after_object["config"]["code"]
+
+            before_code = before_code.splitlines()
+            after_code = after_code.splitlines()
+
+            code_diff = difflib.unified_diff(before_code, after_code, fromfile="before", tofile="after", lineterm="")
+            code_diff = "\n".join(list(code_diff))
+
+            if code_diff:
+                code_diff = f"{'*'*80}\nconfig.code diff:\n{'*'*80}\n{code_diff}"
 
         with tempfile.NamedTemporaryFile() as tf1, tempfile.NamedTemporaryFile() as tf2:
             tf1.write(bytes(json.dumps(before_object, indent=2), "UTF-8"))
@@ -153,12 +171,16 @@ class AttributeOverrider:
             after_object["id"] = after_object_id
             after_object["url"] = after_object_url
 
-            return diff.stdout
+            return diff.stdout + code_diff
 
     def parse_diff(self, diff: str):
         colorized_lines = []
-        split_lines = diff.splitlines()
-        del split_lines[0:3]
+        split_lines = []
+
+        for line in diff.splitlines():
+            if line.startswith("--- ") or line.startswith("+++ ") or (line.startswith("@@ ") and line.endswith(" @@")):
+                continue
+            split_lines.append(line)
 
         for index, line in enumerate(split_lines):
             if line.startswith("-"):
