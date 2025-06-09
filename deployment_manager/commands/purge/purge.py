@@ -89,17 +89,16 @@ async def purge_object_types_wrapper(object_types, dir, subdir, deploy_file):
     release_file = await deploy_file.read_text()
     yaml = DeployYaml(release_file)
     dir, subdir = yaml.data["source_dir"].split("/")
-    object_ids = []
     for object_type in object_types:
         for object in yaml.data.get(object_type, []):
             object_types_ids[object_type].append(object["id"])
     await purge_object_types(
-        object_types_ids=object_types_ids, selected_dir=dir, selected_subdirs=[subdir], purged_object_ids=object_ids
+        object_types_ids=object_types_ids, selected_dir=dir, selected_subdirs=[subdir]
     )
 
 
 async def purge_object_types(
-    object_types_ids: dict[str, list[int]], client: ElisAPIClient = None, project_path: Path = None, selected_dir=None, selected_subdirs=None, purged_object_ids=None
+    object_types_ids: dict[str, list[int]], client: ElisAPIClient = None, project_path: Path = None, selected_dir=None, selected_subdirs=None
 ):
     try:
         if not object_types_ids.keys():
