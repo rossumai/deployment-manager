@@ -48,8 +48,8 @@ class ObjectSaver(BaseModel):
             subdir = self.find_subdir_of_object(object)
             if not subdir:
                 if object.get("status") == "deletion_requested":
-                    # If the object is marked for deletion, we bypass user selection
-                    # Instead, a dummy subdirectory is used to prevent its children from being processed
+                    # If the object has status deletion_requested, we bypass user selection
+                    # Instead, a dummy subdirectory with include=False is used to prevent its children from being downloaded
                     subdir = Subdirectory(name="_skipped_assets", include=False)
                 else:
                     self.objects_without_subdir.append(object)
