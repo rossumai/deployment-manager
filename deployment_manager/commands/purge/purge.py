@@ -118,7 +118,7 @@ async def purge_object_types(
                     nonexisting_subdirs.append(selected_subdir)
             if nonexisting_subdirs:
                 display_warning(
-                    f"Subdir(s) `{'`, `'.join(nonexisting_subdirs)}` not found. Please specify existing subdirectories with --subdir or remove the parameter."
+                    f"Subdir(s) `{'`, `'.join(nonexisting_subdirs)}` not found in dir {selected_dir}. Please specify existing subdirectories with --subdir or remove the parameter."
                 )
                 return
 
