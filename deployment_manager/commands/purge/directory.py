@@ -142,7 +142,7 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
                 subdir.include = subdir_name in self.selected_subdirs
             await self.find_object_ids_for_subdirs()
             await self.get_remote_objects_by_type()
-            if any(i for i in self.purged_object_types_ids.values()):
+            if any(self.purged_object_types_ids.values()):
                 # using explicit ids to delete
                 self.keep_only_objects_with_explicit_ids()
             self.keep_only_objects_of_included_subdirs()
