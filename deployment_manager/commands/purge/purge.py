@@ -11,7 +11,7 @@ from deployment_manager.commands.deploy.common.helpers import (
     get_directory_from_config,
 )
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
-    get_url_and_credentials,
+    get_url_and_credentials, DeployYaml,
 )
 
 from deployment_manager.commands.purge.directory import (
@@ -60,20 +60,49 @@ Deletes all objects in Rossum based on IDs in the mappping file. This operation 
     default=None,
     help='Subdirectory where objects will be purged. You can enter multiple subdirectories divided by ","',
 )
+@click.option(
+    "--deploy_file",
+    "-f",
+    type=click.Path(path_type=Path, exists=True),
+    help="You can specific a path to deploy template file, which sources will be purged"
+)
 @coro
-async def purge_object_types_wrapper(object_types, dir, subdir):
+async def purge_object_types_wrapper(object_types, dir, subdir, deploy_file):
     # To be able to run the command progammatically without the CLI decorators
+    if settings.ALL_OBJECTS in object_types:
+        object_types = ALL_OBJECT_TYPES
 
+    object_types_ids = {object_type: [] for object_type in object_types}
+
+    if deploy_file and (dir or subdir):
+        display_warning(
+            "Cannot use --deploy_file (-f) with --dir (-d) or --subdir (-s)."
+        )
+        return
+
+    if not deploy_file:
+        await purge_object_types(
+            object_types_ids=object_types_ids, selected_dir=dir, selected_subdirs=subdir.split(",") if subdir else None
+        )
+        return
+
+    release_file = await deploy_file.read_text()
+    yaml = DeployYaml(release_file)
+    dir, subdir = yaml.data["source_dir"].split("/")
+    object_ids = []
+    for object_type in object_types:
+        for object in yaml.data.get(object_type, []):
+            object_types_ids[object_type].append(object["id"])
     await purge_object_types(
-        object_types=object_types, selected_dir=dir, selected_subdirs=subdir.split(",") if subdir else None
+        object_types_ids=object_types_ids, selected_dir=dir, selected_subdirs=[subdir], purged_object_ids=object_ids
     )
 
 
 async def purge_object_types(
-    object_types: list[str], client: ElisAPIClient = None, project_path: Path = None, selected_dir=None, selected_subdirs=None
+    object_types_ids: dict[str, list[int]], client: ElisAPIClient = None, project_path: Path = None, selected_dir=None, selected_subdirs=None, purged_object_ids=None
 ):
     try:
-        if not object_types:
+        if not object_types_ids.keys():
             display_warning(
                 f"No object types specified to {settings.PURGE_COMMAND_NAME}."
             )
@@ -149,7 +178,7 @@ async def purge_object_types(
             project_path=project_path,
             name=org_name,
             org_id=org_id,
-            purged_object_types=object_types,
+            purged_object_types_ids=object_types_ids,
             selected_subdirs=selected_subdirs,
             subdirectories=directory_in_config.get(
                 settings.CONFIG_KEY_SUBDIRECTORIES, {}
