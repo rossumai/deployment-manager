@@ -1,6 +1,7 @@
 import asyncio
 import dataclasses
 import json
+from collections import defaultdict
 from typing import Any
 from anyio import Path
 from rich import print
@@ -11,6 +12,9 @@ from ruamel.yaml import YAML
 
 from deployment_manager.utils.consts import settings
 from deployment_manager.common.determine_path import determine_object_type_from_path
+
+
+WRITE_LOCKS = defaultdict(asyncio.Lock)
 
 
 async def write_json(
@@ -43,8 +47,8 @@ async def process_separate_key(path, object_, key):
     dir_subdir = path.parents[-3]  # path to dir/subdir
     separate_file = dir_subdir/settings.SEPARATE_KEYS_FILE_NAME  # file is saved in root for each subdirectory
 
-    # avoid simultaneous write
-    async with asyncio.Lock():
+    # avoid simultaneous write to the same file
+    async with WRITE_LOCKS[path]:
         if await separate_file.exists():
             with open(separate_file, "r", encoding="utf-8") as f:
                 separate_data = json.load(f)
