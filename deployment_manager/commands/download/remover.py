@@ -10,7 +10,7 @@ from deployment_manager.common.read_write import (
     create_custom_hook_code_path,
     create_formula_directory_path,
     find_formula_fields_in_schema,
-    read_json,
+    read_object_from_json,
 )
 from deployment_manager.utils.consts import (
     CustomResource,
@@ -38,7 +38,7 @@ class ObjectRemover(BaseModel):
     @staticmethod
     async def construct_remover(object_path: Path, id_objects_map, **kwargs):
 
-        local_object = await read_json(object_path)
+        local_object = await read_object_from_json(object_path)
         url, id = local_object.get("url", ""), local_object.get("id", "")
         # Clearly not a Rossum object, just ignore
         if not url or not id:

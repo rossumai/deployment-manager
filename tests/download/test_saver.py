@@ -5,7 +5,7 @@ import io
 
 from deployment_manager.commands.download.saver import WorkspaceSaver
 from deployment_manager.commands.download.subdirectory import Subdirectory
-from deployment_manager.common.read_write import read_json
+from deployment_manager.common.read_write import read_object_from_json
 from deployment_manager.utils.functions import templatize_name_id
 
 
@@ -112,7 +112,7 @@ async def test_save_workspace_fresh(
     object_path = workspace_saver.construct_object_path(
         subdir=test_subdir, object=workspace_json
     )
-    saved_object = await read_json(object_path)
+    saved_object = await read_object_from_json(object_path)
     assert saved_object == workspace_json
 
 
@@ -171,7 +171,7 @@ async def test_get_subdir_from_user(
     object_path = workspace_saver.construct_object_path(
         subdir=test_subdir, object=workspace_json
     )
-    saved_object = await read_json(object_path)
+    saved_object = await read_object_from_json(object_path)
     assert saved_object == workspace_json
 
 

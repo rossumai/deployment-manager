@@ -25,7 +25,7 @@ from deployment_manager.commands.deploy.subcommands.run.reverse_override import 
     reverse_source_target_in_yaml,
 )
 from deployment_manager.commands.download.download import download_destinations
-from deployment_manager.common.read_write import read_json
+from deployment_manager.common.read_write import read_object_from_json
 from deployment_manager.utils.consts import (
     display_error,
     display_info,
@@ -74,7 +74,7 @@ async def deploy_release_file(
     if not await source_org_path.exists():
         display_error(f'Could not find organization.json under "{source_org_path}"')
         return
-    source_org_dict = await read_json(source_org_path)
+    source_org_dict = await read_object_from_json(source_org_path)
     source_org = Organization(
         **{
             k: v
@@ -101,7 +101,7 @@ async def deploy_release_file(
 
     target_org_path: Path = project_path / target_org_name / "organization.json"
     if await target_org_path.exists():
-        target_org_dict = await read_json(target_org_path)
+        target_org_dict = await read_object_from_json(target_org_path)
         target_org = Organization(
             **{
                 k: v

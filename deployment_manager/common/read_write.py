@@ -17,7 +17,7 @@ from deployment_manager.common.determine_path import determine_object_type_from_
 WRITE_LOCKS = defaultdict(asyncio.Lock)
 
 
-async def write_json(
+async def write_object_to_json(
     path: Path, object: dict, type: Resource = None, log_message: str = ""
 ):
     if dataclasses.is_dataclass(object):
@@ -82,7 +82,7 @@ async def write_str(path: Path, code: str):
 
 async def create_local_object(path: Path, object: dict):
     object_type = determine_object_type_from_path(path)
-    await write_json(path, object, object_type)
+    await write_object_to_json(path, object, object_type)
     if object_type == Resource.Schema:
         formula_fields = find_formula_fields_in_schema(object["content"])
         if formula_fields:
@@ -155,7 +155,7 @@ async def create_formula_file(path: Path, code: str):
     await write_str(path, code)
 
 
-async def read_json(path: Path) -> dict:
+async def read_object_from_json(path: Path) -> dict:
     object_ = json.loads(await path.read_text())
 
     # extend object with data from separate file
