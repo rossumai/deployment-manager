@@ -21,8 +21,7 @@ async def write_json(
     if path.parent:
         await path.parent.mkdir(parents=True, exist_ok=True)
     if type:
-        ignored_keys = settings.IGNORED_KEYS.get(type)
-        if ignored_keys:
+        if ignored_keys := settings.IGNORED_KEYS.get(type):
             for key in ignored_keys:
                 if key in object:
                     del object[key]
@@ -41,9 +40,10 @@ async def process_separate_key(path, object_, key):
     if len(path.parents) < 3:
         # outside subdirectory, shouldn't happen
         return
-    dir_subdir = path.parents[-3]
-    separate_file = dir_subdir/settings.SEPARATE_KEYS_FILE_NAME
+    dir_subdir = path.parents[-3]  # path to dir/subdir
+    separate_file = dir_subdir/settings.SEPARATE_KEYS_FILE_NAME  # file is saved in root for each subdirectory
 
+    # avoid simultaneous write
     async with asyncio.Lock():
         if await separate_file.exists():
             with open(separate_file, "r", encoding="utf-8") as f:
@@ -53,7 +53,7 @@ async def process_separate_key(path, object_, key):
 
         current_level = separate_data
 
-        # loop works with separate_data reference
+        # saving new value of the key to the file structure
         for part in path.parts[2:]:
             if part not in current_level or not isinstance(current_level[part], dict):
                 current_level[part] = {}
@@ -63,6 +63,7 @@ async def process_separate_key(path, object_, key):
         try:
             with open(separate_file, "w", encoding="utf-8") as f:
                 json.dump(separate_data, f, indent=4)
+            # remove from original object only if it was written into separate file successfully
             del object_[key]
         except Exception as e:
             print(f"Error: Failed to write to '{separate_file}': {e}")
@@ -150,7 +151,6 @@ async def create_formula_file(path: Path, code: str):
     await write_str(path, code)
 
 
-# TODO rename function
 async def read_json(path: Path) -> dict:
     object_ = json.loads(await path.read_text())
 
@@ -158,18 +158,19 @@ async def read_json(path: Path) -> dict:
     if len(path.parents) < 3:
         # outside subdirectory
         return object_
-    dir_subdir = path.parents[-3]
-    separate_file = dir_subdir/settings.SEPARATE_KEYS_FILE_NAME
+    dir_subdir = path.parents[-3]  # path to dir/subdir
+    separate_file = dir_subdir / settings.SEPARATE_KEYS_FILE_NAME  # file is saved in root for each subdirectory
     if await separate_file.exists():
         with open(separate_file, "r") as f:
             separate_data = json.load(f)
 
-            # iterate further from subdirectory (excluded)
+            # iterate deeper into the object until the filename is found
             for separate_data_key in path.parts[2:]:
                 separate_data = separate_data.get(separate_data_key)
                 if not separate_data:
                     return object_
             if separate_data:
+                # join separate data into the object
                 object_.update(separate_data)
     return object_
 
