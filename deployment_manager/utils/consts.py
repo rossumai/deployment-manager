@@ -244,6 +244,9 @@ class Settings:
         Resource.Hook: ["status"],
     }
 
+    SEPARATE_KEYS_FILE_NAME: str = "separate_data.json"
+    SEPARATE_KEYS: tuple = ("modified_at",)
+
     FORMULA_DIR_NAME: str = "formulas"
     RULES_DIR_NAME: str = "rules"
     EMAIL_TEMPLATES_DIR_NAME: str = "email_templates"

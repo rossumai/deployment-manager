@@ -1,3 +1,4 @@
+import asyncio
 import dataclasses
 import json
 from typing import Any
@@ -25,11 +26,44 @@ async def write_json(
             for key in ignored_keys:
                 if key in object:
                     del object[key]
+        if separate_keys := settings.SEPARATE_KEYS:
+            for key in separate_keys:
+                if key in object:
+                    await process_separate_key(path, object, key)
+                    del object[key]
     with open(path, "w") as wf:
         json.dump(object, wf, indent=2)
 
     if log_message:
         print(log_message)
+
+
+async def process_separate_key(path, local_file, key):
+    if len(path.parents) < 3:
+        # outside subdirectory
+        return object
+    dir_subdir = path.parents[-3]
+    separate_file = dir_subdir/settings.SEPARATE_KEYS_FILE_NAME
+    async with asyncio.Lock():
+        if await separate_file.exists():
+            with open(separate_file, "r", encoding="utf-8") as f:
+                separate_data = json.load(f)
+        else:
+            separate_data = {}
+
+        current_level = separate_data
+
+        for part in path.parts[2:]:
+            if part not in current_level or not isinstance(current_level[part], dict):
+                current_level[part] = {}
+            current_level = current_level[part] # Move to the next nested level
+        current_level[key] = local_file[key]
+
+        try:
+            with open(separate_file, "w", encoding="utf-8") as f:
+                json.dump(separate_data, f, indent=4)
+        except Exception as e:
+            print(f"Error: Failed to write to '{separate_file}': {e}")
 
 
 async def write_str(path: Path, code: str):
@@ -114,8 +148,28 @@ async def create_formula_file(path: Path, code: str):
     await write_str(path, code)
 
 
+# TODO rename function
 async def read_json(path: Path) -> dict:
-    return json.loads(await path.read_text())
+    object = json.loads(await path.read_text())
+
+    # extend object with data from separate file
+    if len(path.parents) < 3:
+        # outside subdirectory
+        return object
+    dir_subdir = path.parents[-3]
+    separate_file = dir_subdir/settings.SEPARATE_KEYS_FILE_NAME
+    if await separate_file.exists():
+        with open(separate_file, "r") as f:
+            separate_data = json.load(f)
+
+            # iterate further from subdirectory (excluded)
+            for separate_data_key in path.parts[2:]:
+                separate_data = separate_data.get(separate_data_key)
+                if not separate_data:
+                    return object
+            if separate_data:
+                object.update(separate_data)
+    return object
 
 
 async def write_yaml(path: Path, object: dict):
