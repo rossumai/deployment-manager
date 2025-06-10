@@ -70,7 +70,7 @@ async def update_application():
         )
 
 
-async def get_latest_version() -> (str, str):
+async def get_latest_version() -> tuple[str | None, str | None]:
     repo_owner = settings.GITHUB_DEPLOYMENT_MANAGER_REPO_OWNER
     repo_name = settings.GITHUB_DEPLOYMENT_MANAGER_REPO_NAME
     api_url = settings.GITHUB_DEFAULT_LATEST_RELEASE_URL.format(
