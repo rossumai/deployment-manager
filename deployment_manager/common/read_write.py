@@ -3,6 +3,8 @@ import dataclasses
 import json
 from collections import defaultdict
 from typing import Any
+
+import aiofiles
 from anyio import Path
 from rich import print
 from rossum_api.api_client import Resource
@@ -32,7 +34,8 @@ async def write_object_to_json(
         if separate_keys := settings.SEPARATE_KEYS:
             for key in separate_keys:
                 if key in object:
-                    await process_separate_key(path, object, key)
+                    await write_separate_key(path, object, key)
+                    del object[key]
     with open(path, "w") as wf:
         json.dump(object, wf, indent=2)
 
@@ -40,12 +43,12 @@ async def write_object_to_json(
         print(log_message)
 
 
-async def process_separate_key(path, object_, key):
+async def write_separate_key(path, object_, key):
     if len(path.parents) < 3:
         # outside subdirectory, shouldn't happen
         return
-    dir_subdir = path.parents[-3]  # path to dir/subdir
-    separate_file = dir_subdir/settings.SEPARATE_KEYS_FILE_NAME  # file is saved in root for each subdirectory
+    subdir_path = path.parents[-3]  # path to dir/subdir
+    separate_file = subdir_path / settings.SEPARATE_KEYS_FILE_NAME  # file is saved in root for each subdirectory
 
     # avoid simultaneous write to the same file
     async with WRITE_LOCKS[path]:
@@ -67,8 +70,6 @@ async def process_separate_key(path, object_, key):
         try:
             with open(separate_file, "w", encoding="utf-8") as f:
                 json.dump(separate_data, f, indent=4)
-            # remove from original object only if it was written into separate file successfully
-            del object_[key]
         except Exception as e:
             print(f"Error: Failed to write to '{separate_file}': {e}")
 
@@ -157,13 +158,17 @@ async def create_formula_file(path: Path, code: str):
 
 async def read_object_from_json(path: Path) -> dict:
     object_ = json.loads(await path.read_text())
+    await read_separate_object_data(path, object_)
+    return object_
 
+
+async def read_separate_object_data(path, object_):
     # extend object with data from separate file
     if len(path.parents) < 3:
         # outside subdirectory
-        return object_
-    dir_subdir = path.parents[-3]  # path to dir/subdir
-    separate_file = dir_subdir / settings.SEPARATE_KEYS_FILE_NAME  # file is saved in root for each subdirectory
+        return
+    subdir_path = path.parents[-3]
+    separate_file = subdir_path / settings.SEPARATE_KEYS_FILE_NAME  # file is saved in root for each subdirectory
     if await separate_file.exists():
         with open(separate_file, "r") as f:
             separate_data = json.load(f)
@@ -172,11 +177,11 @@ async def read_object_from_json(path: Path) -> dict:
             for separate_data_key in path.parts[2:]:
                 separate_data = separate_data.get(separate_data_key)
                 if not separate_data:
-                    return object_
+                    return
             if separate_data:
                 # join separate data into the object
                 object_.update(separate_data)
-    return object_
+    return
 
 
 async def write_yaml(path: Path, object: dict):
