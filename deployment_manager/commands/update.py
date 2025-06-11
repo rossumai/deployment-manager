@@ -22,8 +22,8 @@ Updates deployment-manager with the lastest version from github
 async def update_application():
     latest_whl_url, latest_version = await get_latest_version()
 
-    if not latest_whl_url:
-        display_error("No latest version found in github repository.")
+    if not latest_whl_url or not latest_version:
+        display_error(f"No latest version found in github repository. (Found url: {latest_whl_url}, version: {latest_version})")
         return
 
     current_version = parse_version(importlib.metadata.version("deployment-manager"))
