@@ -140,7 +140,7 @@ def replace_list_of_dependency_urls(
             display_warning(
                 f'Dependency "{dependency}"[{source_index}] for object "{object.get('id', 'no-ID')}" was not changed to a target counterpart because none was found.'
             )
-
+    # TODO
     # Target queues can have 'dangling' hooks that exist only on target, these should not be overwritten.
     if target_object:
         for target_dependency_url in target_object[dependency]:
