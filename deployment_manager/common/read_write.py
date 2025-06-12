@@ -1,6 +1,8 @@
+import asyncio
 import dataclasses
 import json
 from typing import Any
+
 from anyio import Path
 from rich import print
 from rossum_api.api_client import Resource
@@ -12,7 +14,10 @@ from deployment_manager.utils.consts import settings
 from deployment_manager.common.determine_path import determine_object_type_from_path
 
 
-async def write_json(
+SEPARATE_FILE_LOCK = asyncio.Lock()
+
+
+async def write_object_to_json(
     path: Path, object: dict, type: Resource = None, log_message: str = ""
 ):
     if dataclasses.is_dataclass(object):
@@ -20,16 +25,51 @@ async def write_json(
     if path.parent:
         await path.parent.mkdir(parents=True, exist_ok=True)
     if type:
-        ignored_keys = settings.IGNORED_KEYS.get(type)
-        if ignored_keys:
+        if ignored_keys := settings.IGNORED_KEYS.get(type):
             for key in ignored_keys:
                 if key in object:
+                    del object[key]
+        if separate_keys := settings.SEPARATE_KEYS:
+            for key in separate_keys:
+                if key in object:
+                    await write_separate_key(path, object, key)
                     del object[key]
     with open(path, "w") as wf:
         json.dump(object, wf, indent=2)
 
     if log_message:
         print(log_message)
+
+
+async def write_separate_key(path, object_, key):
+    if len(path.parents) < 3:
+        # outside subdirectory, shouldn't happen
+        return
+    subdir_path = path.parents[-3]  # path to dir/subdir
+    separate_file = subdir_path / settings.SEPARATE_KEYS_FILE_NAME  # file is saved in root for each subdirectory
+
+    # avoid simultaneous write to the same file
+    async with SEPARATE_FILE_LOCK:
+        if await separate_file.exists():
+            with open(separate_file, "r", encoding="utf-8") as f:
+                separate_data = json.load(f)
+        else:
+            separate_data = {}
+
+        current_level = separate_data
+
+        # saving new value of the key to the file structure
+        for part in path.parts[2:]:
+            if part not in current_level or not isinstance(current_level[part], dict):
+                current_level[part] = {}
+            current_level = current_level[part]
+        current_level[key] = object_[key]
+
+        try:
+            with open(separate_file, "w", encoding="utf-8") as f:
+                json.dump(separate_data, f, indent=4)
+        except Exception as e:
+            print(f"Error: Failed to write to '{separate_file}': {e}")
 
 
 async def write_str(path: Path, code: str):
@@ -41,7 +81,7 @@ async def write_str(path: Path, code: str):
 
 async def create_local_object(path: Path, object: dict):
     object_type = determine_object_type_from_path(path)
-    await write_json(path, object, object_type)
+    await write_object_to_json(path, object, object_type)
     if object_type == Resource.Schema:
         formula_fields = find_formula_fields_in_schema(object["content"])
         if formula_fields:
@@ -114,8 +154,34 @@ async def create_formula_file(path: Path, code: str):
     await write_str(path, code)
 
 
-async def read_json(path: Path) -> dict:
-    return json.loads(await path.read_text())
+async def read_object_from_json(path: Path) -> dict:
+    object_ = json.loads(await path.read_text())
+    await read_separate_object_data(path, object_)
+    return object_
+
+
+async def read_separate_object_data(path, object_):
+    # extend object with data from separate file
+    if len(path.parents) < 3:
+        # outside subdirectory
+        return
+    subdir_path = path.parents[-3]
+    separate_file = subdir_path / settings.SEPARATE_KEYS_FILE_NAME  # file is saved in root for each subdirectory
+    if await separate_file.exists():
+        separate_data = {}
+        # locking the file while reading to be sure other process won't write in the meantime
+        async with SEPARATE_FILE_LOCK:
+            with open(separate_file, "r") as f:
+                separate_data = json.load(f)
+        # iterate deeper into the object until the filename is found
+        for separate_data_key in path.parts[2:]:
+            separate_data = separate_data.get(separate_data_key)
+            if not separate_data:
+                return
+        if separate_data:
+            # join separate data into the object
+            object_.update(separate_data)
+    return
 
 
 async def write_yaml(path: Path, object: dict):

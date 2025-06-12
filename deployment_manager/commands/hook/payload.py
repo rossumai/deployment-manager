@@ -11,7 +11,7 @@ from deployment_manager.commands.hook.helpers import (
     load_hook_object,
 )
 from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
-from deployment_manager.common.read_write import write_json
+from deployment_manager.common.read_write import write_object_to_json
 from deployment_manager.utils.consts import display_error, display_warning
 
 STATUS_REQUIRING_EVENTS = ["annotation_status", "annotation_content"]
@@ -34,7 +34,7 @@ async def generate_and_save_hook_payload(
             default_text="Name for the payload JSON file",
         )
 
-        await write_json(path=payload_filename, object=payload)
+        await write_object_to_json(path=payload_filename, object=payload)
     except Exception as e:
         display_error("Error while generating hook payload {} ^", e)
 

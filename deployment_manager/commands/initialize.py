@@ -34,6 +34,7 @@ async def init_project(name: Path):
         "\n**/credentials.json",
         f"\n**/{settings.CREDENTIALS_FILENAME}",
         f"\n**/{settings.DEFAULT_DEPLOY_SECRETS_PARENT}/",
+        f"\n**/**/{settings.SEPARATE_KEYS_FILE_NAME}",
     ]
 
     git_ignore_contents = (

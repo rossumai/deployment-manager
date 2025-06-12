@@ -12,7 +12,7 @@ from deployment_manager.commands.hook.helpers import (
     load_hook_object,
 )
 from deployment_manager.commands.hook.payload import generate_hook_payload
-from deployment_manager.common.read_write import read_json
+from deployment_manager.common.read_write import read_object_from_json
 from deployment_manager.utils.consts import display_error
 from deployment_manager.utils.functions import detemplatize_name_id
 
@@ -42,7 +42,7 @@ async def test_hook(
             if not payload:
                 return
         else:
-            payload = await read_json(path=payload_path)
+            payload = await read_object_from_json(path=payload_path)
 
         hook = await load_hook_object(hook_path=hook_path)
         if not hook:

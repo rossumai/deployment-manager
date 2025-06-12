@@ -8,7 +8,7 @@ from deployment_manager.common.determine_path import (
     determine_object_type_from_url,
 )
 from deployment_manager.common.read_write import (
-    read_json,
+    read_object_from_json,
 )
 from deployment_manager.utils.consts import display_warning, settings
 
@@ -35,7 +35,7 @@ async def should_write_object(
     parent_dir_reference: "DownloadOrganizationDirectory",
 ):
     if await path.exists():
-        local_file = await read_json(path)
+        local_file = await read_object_from_json(path)
 
         object_type = determine_object_type_from_url(local_file.get("url", ""))
         # Queues might have their hooks attribute changed. Same for schema.rules

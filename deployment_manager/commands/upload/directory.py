@@ -22,7 +22,7 @@ from deployment_manager.common.determine_path import (
     determine_object_type_from_url,
 )
 from deployment_manager.common.modified_at import check_modified_timestamp
-from deployment_manager.common.read_write import read_json, write_json
+from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
 from deployment_manager.utils.consts import (
     GIT_CHARACTERS,
     display_error,
@@ -137,7 +137,7 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             if op == GIT_CHARACTERS.DELETED:
                 continue
 
-            data = await read_json(path)
+            data = await read_object_from_json(path)
             subdir = self.find_subdir_of_object(data)
             if not subdir:
                 display_warning(f"No subdir found for path: {path}, skipping.")
@@ -236,7 +236,7 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             )
 
             # Just to update the timestamp
-            await write_json(
+            await write_object_to_json(
                 object.path,
                 result,
                 object.type,
@@ -259,7 +259,7 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             result = await self.client._http_client.create(object.type, object.data)
 
             # Just to update the timestamp
-            await write_json(
+            await write_object_to_json(
                 object.path,
                 result,
                 object.type,

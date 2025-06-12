@@ -1,7 +1,7 @@
 from anyio import Path
 import re
 
-from deployment_manager.common.read_write import read_json
+from deployment_manager.common.read_write import read_object_from_json
 from deployment_manager.utils.consts import display_error
 
 
@@ -9,7 +9,7 @@ async def load_hook_object(hook_path: Path):
     try:
         if hook_path.suffix != ".json":
             raise Exception(f"Incorrect suffix for {hook_path}")
-        return await read_json(hook_path)
+        return await read_object_from_json(hook_path)
     except Exception as e:
         display_error(f"Error while loading hook with path {hook_path}: {e}")
 

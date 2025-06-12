@@ -17,7 +17,7 @@ from deployment_manager.commands.deploy.subcommands.run.release_file import Rele
 from deployment_manager.commands.deploy.subcommands.run.workspace_release import (
     WorkspaceRelease,
 )
-from deployment_manager.common.read_write import read_json, write_json
+from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
 from deployment_manager.utils.consts import Settings
 from deployment_manager.utils.functions import templatize_name_id
 from tests.conftest import TEST_DATA_PATH
@@ -36,7 +36,7 @@ TEST_SUBDIR_NAME = "test"
 
 @pytest_asyncio.fixture(scope="function")
 async def basic_ws_project_path(tmp_path):
-    data = await read_json(TEST_DATA_PATH / "workspace.json")
+    data = await read_object_from_json(TEST_DATA_PATH / "workspace.json")
     tmp_ws_path = (
         tmp_path
         / TEST_DIR_NAME
@@ -45,13 +45,13 @@ async def basic_ws_project_path(tmp_path):
         / templatize_name_id(data["name"], data["id"])
         / "workspace.json"
     )
-    await write_json(tmp_ws_path, data)
+    await write_object_to_json(tmp_ws_path, data)
     return Path(tmp_path)
 
 
 @pytest_asyncio.fixture(scope="function")
 async def basic_queue_project_path(tmp_path):
-    queue_data = await read_json(TEST_DATA_PATH / "queue" / "queue.json")
+    queue_data = await read_object_from_json(TEST_DATA_PATH / "queue" / "queue.json")
     tmp_queue_path = (
         tmp_path
         / TEST_DIR_NAME
@@ -62,22 +62,22 @@ async def basic_queue_project_path(tmp_path):
         / templatize_name_id(queue_data["name"], queue_data["id"])
     )
 
-    await write_json(tmp_queue_path / "queue.json", queue_data)
-    await write_json(
+    await write_object_to_json(tmp_queue_path / "queue.json", queue_data)
+    await write_object_to_json(
         tmp_queue_path / "inbox.json",
-        await read_json(TEST_DATA_PATH / "queue" / "inbox.json"),
+        await read_object_from_json(TEST_DATA_PATH / "queue" / "inbox.json"),
     )
-    await write_json(
+    await write_object_to_json(
         tmp_queue_path / "schema.json",
-        await read_json(TEST_DATA_PATH / "queue" / "schema.json"),
+        await read_object_from_json(TEST_DATA_PATH / "queue" / "schema.json"),
     )
     return Path(tmp_path)
 
 
 @pytest_asyncio.fixture(scope="function")
 async def ws_and_queue_project_path(tmp_path):
-    ws_data = await read_json(TEST_DATA_PATH / "workspace.json")
-    queue_data = await read_json(TEST_DATA_PATH / "queue" / "queue.json")
+    ws_data = await read_object_from_json(TEST_DATA_PATH / "workspace.json")
+    queue_data = await read_object_from_json(TEST_DATA_PATH / "queue" / "queue.json")
 
     ws_data["queues"] = [queue_data["url"]]
     queue_data["workspace"] = [ws_data["url"]]
@@ -90,18 +90,18 @@ async def ws_and_queue_project_path(tmp_path):
         / templatize_name_id(ws_data["name"], ws_data["id"])
         / "workspace.json"
     )
-    await write_json(tmp_ws_path, ws_data)
+    await write_object_to_json(tmp_ws_path, ws_data)
 
     tmp_queue_path = (
         tmp_ws_path.parent
         / "queues"
         / templatize_name_id(queue_data["name"], queue_data["id"])
     )
-    await write_json(tmp_queue_path / "queue.json", queue_data)
+    await write_object_to_json(tmp_queue_path / "queue.json", queue_data)
 
-    await write_json(
+    await write_object_to_json(
         tmp_queue_path / "schema.json",
-        await read_json(TEST_DATA_PATH / "queue" / "schema.json"),
+        await read_object_from_json(TEST_DATA_PATH / "queue" / "schema.json"),
     )
     return Path(tmp_path)
 
@@ -448,13 +448,13 @@ async def test_ws_has_target_queues_and_queues_have_target_ws(
     mock_api_client = AsyncMock()
     release_file.client = mock_api_client
 
-    ws_object = await read_json(
+    ws_object = await read_object_from_json(
         source_dir_path
         / "workspaces"
         / templatize_name_id(deploy_file_ws_object["name"], deploy_file_ws_object["id"])
         / "workspace.json"
     )
-    schema_object = await read_json(
+    schema_object = await read_object_from_json(
         Path(deploy_file_queue_object[Settings.DEPLOY_KEY_BASE_PATH])
         / "queues"
         / templatize_name_id(
@@ -462,7 +462,7 @@ async def test_ws_has_target_queues_and_queues_have_target_ws(
         )
         / "schema.json"
     )
-    queue_object = await read_json(
+    queue_object = await read_object_from_json(
         Path(deploy_file_queue_object[Settings.DEPLOY_KEY_BASE_PATH])
         / "queues"
         / templatize_name_id(
