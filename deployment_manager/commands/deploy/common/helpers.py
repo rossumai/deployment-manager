@@ -1,5 +1,7 @@
 from pydantic import HttpUrl, ValidationError
 import questionary
+
+from deployment_manager.common.questionary_functions import ask_async_with_interruption
 from rossum_api import APIClientError, ElisAPIClient
 from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
     Credentials,
@@ -93,10 +95,10 @@ async def get_token_from_cred_file(org_path: Path, api_url: str):
 async def get_api_url_from_user(type: str = "Rossum", default: str = ""):
     if default is None:
         default = ""
-    api_url = await questionary.text(
+    api_url = await ask_async_with_interruption(questionary.text(
         f"What is the {type} API URL (e.g., {settings.DEPLOY_DEFAULT_TARGET_URL}):",
         default=default,
-    ).ask_async()
+    ))
 
     try:
         HttpUrl(api_url)
