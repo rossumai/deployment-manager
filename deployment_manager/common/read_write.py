@@ -1,10 +1,8 @@
 import asyncio
 import dataclasses
 import json
-from collections import defaultdict
 from typing import Any
 
-import aiofiles
 from anyio import Path
 from rich import print
 from rossum_api.api_client import Resource
@@ -16,7 +14,7 @@ from deployment_manager.utils.consts import settings
 from deployment_manager.common.determine_path import determine_object_type_from_path
 
 
-WRITE_LOCKS = defaultdict(asyncio.Lock)
+SEPARATE_FILE_LOCK = asyncio.Lock()
 
 
 async def write_object_to_json(
@@ -51,7 +49,7 @@ async def write_separate_key(path, object_, key):
     separate_file = subdir_path / settings.SEPARATE_KEYS_FILE_NAME  # file is saved in root for each subdirectory
 
     # avoid simultaneous write to the same file
-    async with WRITE_LOCKS[path]:
+    async with SEPARATE_FILE_LOCK:
         if await separate_file.exists():
             with open(separate_file, "r", encoding="utf-8") as f:
                 separate_data = json.load(f)
@@ -171,7 +169,9 @@ async def read_separate_object_data(path, object_):
     separate_file = subdir_path / settings.SEPARATE_KEYS_FILE_NAME  # file is saved in root for each subdirectory
     if await separate_file.exists():
         with open(separate_file, "r") as f:
-            separate_data = json.load(f)
+            # locking the file while reading to be sure
+            async with SEPARATE_FILE_LOCK:
+                separate_data = json.load(f)
 
             # iterate deeper into the object until the filename is found
             for separate_data_key in path.parts[2:]:
