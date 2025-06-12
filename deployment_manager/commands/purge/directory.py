@@ -145,7 +145,9 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
         try:
             pprint(
                 Panel(
-                    f"Running {settings.PURGE_COMMAND_NAME} in [green]{self.name}[/green] ([purple]{self.org_id}[/purple])"
+                    f"Running {settings.PURGE_COMMAND_NAME} in [green]{self.name}[/green] ([purple]{self.org_id}[/purple]).\n"
+                    f"Removing [red]{'[/red], [red]'.join(self.purged_object_types)}[/red] "
+                    f"from subdir(s) [red]{'[/red], [red]'.join(self.selected_subdirs)}[/red]."
                 )
             )
             for object in self.objects:
