@@ -5,6 +5,8 @@ from typing import Optional
 from anyio import Path
 from pydantic import Field
 import questionary
+
+from deployment_manager.common.read_write import read_json
 from rossum_api import APIClientError
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     remove_queue_attributes_for_cross_org,
@@ -150,6 +152,7 @@ class QueueRelease(ObjectRelease):
                     dependency="workspace",
                     source_id_target_pairs=self.workspace_targets,
                 )
+                new_workspace_id = queue_copy["workspace"].split("/")[-1]
 
                 if previous_workspace_url == queue_copy["workspace"] and not target.id:
                     raise Exception(
@@ -171,12 +174,15 @@ class QueueRelease(ObjectRelease):
                     )
 
                 # Both should be updated, otherwise Elis API uses 'webhooks' in case of a mismatch even though it is deprecated
+                # We need full target object to be able to handle 'dangling' hooks
+                target_object = await self.find_target_object(target, new_workspace_id)
                 replace_dependency_url(
                     object=queue_copy,
                     target_index=target_index,
                     target_objects_count=target_objects_count,
                     dependency="hooks",
                     source_id_target_pairs=self.hook_targets,
+                    target_object=target_object,
                     keep_hook_dependencies_without_equivalent=self.keep_hook_dependencies_without_equivalent,
                 )
                 replace_dependency_url(
@@ -185,6 +191,7 @@ class QueueRelease(ObjectRelease):
                     target_objects_count=target_objects_count,
                     dependency="webhooks",
                     source_id_target_pairs=self.hook_targets,
+                    target_object=target_object,
                     keep_hook_dependencies_without_equivalent=self.keep_hook_dependencies_without_equivalent,
                 )
 
@@ -234,6 +241,30 @@ class QueueRelease(ObjectRelease):
                 e,
             )
             self.deploy_failed = True
+
+    async def find_target_object(self, target: Target, new_workspace_id):
+        workspaces_dir = Path(self.yaml.data["target_dir"])/"workspaces"
+        workspace = None
+        if await workspaces_dir.exists() and await workspaces_dir.is_dir():
+            async for folder in workspaces_dir.iterdir():
+                if f"_[{new_workspace_id}]" in folder.name:
+                    workspace = folder
+                    break
+        if not workspace:
+            return None
+        queues_dir = workspace/self.type.value
+        queue = None
+        if await queues_dir.exists() and await queues_dir.is_dir():
+            async for folder in queues_dir.iterdir():
+                if f"_[{target.id}]" in folder.name:
+                    queue = folder
+                    break
+        if not queue:
+            return None
+        queue_json = queue/"queue.json"
+        if await queue_json.is_file():
+            return await read_json(queue_json)
+        return None
 
     async def verify_subobjects_have_same_target_count(self):
         mismatch_found = False
