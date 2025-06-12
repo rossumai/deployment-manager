@@ -48,7 +48,8 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
 
     client: ElisAPIClient
     selected_subdirs: list[str]
-    purged_object_types: list[str]
+    # dict with object types as keys and optional explicit list of ids to purge
+    purged_object_types_ids: dict[str, list[int]]
 
     objects: list[dict] = []
 
@@ -67,10 +68,7 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
         ) or not len(self.subdirectories.keys())
 
     async def get_remote_objects_by_type(self):
-        object_types = self.purged_object_types
-        if settings.ALL_OBJECTS in self.purged_object_types:
-            object_types = ALL_OBJECT_TYPES
-
+        object_types = self.purged_object_types_ids.keys()
         object_types = sorted(
             object_types, key=lambda x: OBJECT_PRIORITIES.get(x, float("inf"))
         )
@@ -83,6 +81,16 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
                 self.objects.extend(
                     await self.download_objects_by_type(type=object_type_as_enum)
                 )
+
+
+    def keep_only_objects_with_explicit_ids(self):
+        # this method is used when purging from deploy template. It will filter only those objects present in template
+        keep_objects = []
+        for object in self.objects:
+            if object["id"] in self.purged_object_types_ids[object["type"].value]:
+                keep_objects.append(object)
+        self.objects = keep_objects
+
 
     def keep_only_objects_of_included_subdirs(self):
         kept_objects = []
@@ -134,6 +142,9 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
                 subdir.include = subdir_name in self.selected_subdirs
             await self.find_object_ids_for_subdirs()
             await self.get_remote_objects_by_type()
+            if any(self.purged_object_types_ids.values()):
+                # using explicit ids to delete
+                self.keep_only_objects_with_explicit_ids()
             self.keep_only_objects_of_included_subdirs()
         except Exception as e:
             display_error(
@@ -146,7 +157,7 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
             pprint(
                 Panel(
                     f"Running {settings.PURGE_COMMAND_NAME} in [green]{self.name}[/green] ([purple]{self.org_id}[/purple]).\n"
-                    f"Removing [red]{'[/red], [red]'.join(self.purged_object_types)}[/red] "
+                    f"Removing [red]{'[/red], [red]'.join(self.purged_object_types_ids.keys())}[/red] "
                     f"from subdir(s) [red]{'[/red], [red]'.join(self.selected_subdirs)}[/red]."
                 )
             )
