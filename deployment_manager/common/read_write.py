@@ -168,19 +168,19 @@ async def read_separate_object_data(path, object_):
     subdir_path = path.parents[-3]
     separate_file = subdir_path / settings.SEPARATE_KEYS_FILE_NAME  # file is saved in root for each subdirectory
     if await separate_file.exists():
-        with open(separate_file, "r") as f:
-            # locking the file while reading to be sure
-            async with SEPARATE_FILE_LOCK:
+        separate_data = {}
+        # locking the file while reading to be sure other process won't write in the meantime
+        async with SEPARATE_FILE_LOCK:
+            with open(separate_file, "r") as f:
                 separate_data = json.load(f)
-
-            # iterate deeper into the object until the filename is found
-            for separate_data_key in path.parts[2:]:
-                separate_data = separate_data.get(separate_data_key)
-                if not separate_data:
-                    return
-            if separate_data:
-                # join separate data into the object
-                object_.update(separate_data)
+        # iterate deeper into the object until the filename is found
+        for separate_data_key in path.parts[2:]:
+            separate_data = separate_data.get(separate_data_key)
+            if not separate_data:
+                return
+        if separate_data:
+            # join separate data into the object
+            object_.update(separate_data)
     return
 
 
