@@ -17,7 +17,6 @@ from deployment_manager.utils.functions import coro
 
 # TODO: tools
 # TODO: differentiate objects for the LLM (annotations vs hooks, etc.)
-# Fetch annotation
 # Look up something in master data
 # Fetch object (how to determine type?)
 # Fetch hook logs by annotation_id or hook_id
@@ -29,7 +28,7 @@ async def query_llm(solver: ConversationSolver, input: str):
 
 @click.command(
     name=settings.LLM_CHAT_COMMAND_NAME,
-    help="""Create documentation""",
+    help="""Chat with Rossum-knowledgeable AI""",
 )
 @coro
 async def llm_chat_wrapper(project_path: Path = None):
@@ -52,6 +51,7 @@ async def llm_chat_wrapper(project_path: Path = None):
     solver = ConversationSolver(creds=creds, project_path=project_path, dir_name='dev-org', subdir_name='s2k')
     await solver.initialize()
 
+    print("Welcome to the Rossum Assistant! Type 'exit' to quit.")
     while True:
         try:
             user_input = await session.prompt_async("You> ", multiline=False)
@@ -60,9 +60,11 @@ async def llm_chat_wrapper(project_path: Path = None):
                 print("Goodbye!")
                 break
 
-            # Call your LLM (async)
-            response = await query_llm(solver, user_input)
-            print(f"AI> {response}")
+            print("AI> ", end="", flush=True) # Start printing AI response on the same line
+            # Consume the streamed response
+            async for chunk in solver.stream_call(user_input):
+                print(chunk, end="", flush=True) # Print each chunk immediately without a newline
+            print() # Print a final newline after the AI response is complete
 
         except (EOFError, KeyboardInterrupt):
             print("\nExiting.")
