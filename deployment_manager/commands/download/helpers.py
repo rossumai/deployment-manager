@@ -1,4 +1,6 @@
 import shutil
+import subprocess
+import sys
 from typing import Any
 from anyio import Path
 import questionary
@@ -10,7 +12,7 @@ from deployment_manager.common.determine_path import (
 from deployment_manager.common.read_write import (
     read_json,
 )
-from deployment_manager.utils.consts import display_warning, settings
+from deployment_manager.utils.consts import display_warning, settings, display_info
 
 
 def replace_code_paths(file_paths: list[Path]):
@@ -57,19 +59,38 @@ async def should_write_object(
                 and not parent_dir_reference.ignore_changed_file_warnings
             ):
                 display_warning(
-                    f"File [green]{path}[/green] has local unversioned changes [white](local: {local_timestamp} | remote: {remote_timestamp})[/white]."
+                    f"You have some local unversioned changes. "
                 )
-                user_answer = await questionary.text(
-                    message="Should the remote version overwrite the local one?",
-                    instruction="(y/n/yy)",
-                ).ask_async()
-                # Disable warnings for all other queues
-                if user_answer.casefold() == "yy":
-                    parent_dir_reference.ignore_changed_file_warnings = True
+                if await questionary.confirm(
+                    message="Do you want to merge local changes with remote?",
+                    default=True,
+                ).ask_async():
+                    directory = path.parts[0]
+                    # stash, pull, commit, stash pop
+                    subprocess.run(["git", "stash", "push", directory], capture_output=True, text=True, check=True)
+                    subprocess.run(["prd2", "pull", directory, "-s", "1"], capture_output=True, text=True, check=True)
+                    subprocess.run(["git", "commit", "-am", "commit"], capture_output=True, text=True, check=True)
+                    subprocess.run(["git", "stash", "pop"], capture_output=True, text=True, check=False)
+                    display_info(
+                        "Remote changes have been pulled and your local changes have been merged. You may need to resolve conflicts now."
+                    )
+                    sys.exit()  # exit the app, pull was already made in the subprocess
+                else:
+                    display_warning(
+                        f"File [green]{path}[/green] has local unversioned changes [white](local: {local_timestamp} | remote: {remote_timestamp})[/white]."
+                    )
+                    user_answer = await questionary.text(
+                        message="Should the remote version overwrite the local one?",
+                        instruction="(y/n/yy)",
+                    ).ask_async()
+                    # Disable warnings for all other queues
+                    if user_answer.casefold() == "yy":
+                        parent_dir_reference.ignore_changed_file_warnings = True
 
-                return user_answer == "y" or user_answer == "yy"
+                    return user_answer == "y" or user_answer == "yy"
 
             return True
+        return False
 
     else:
         return True
