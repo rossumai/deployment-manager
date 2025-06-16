@@ -138,7 +138,12 @@ class DirectoryDocumentator:
         return self.org_path / settings.DOCUMENTATION_FOLDER_NAME / "hooks"
 
     def schema_documentations_base_path(self, queue_id: str):
-        return self.org_path / settings.DOCUMENTATION_FOLDER_NAME / str(queue_id) / "schema"
+        return (
+            self.org_path
+            / settings.DOCUMENTATION_FOLDER_NAME
+            / str(queue_id)
+            / "schema"
+        )
 
     @property
     def templates_base_path(self):
@@ -237,8 +242,11 @@ class DirectoryDocumentator:
 
         # Document inbox's email without having to pass in the whole inbox object to the LLM
         inbox_path = queue["path"].with_stem("inbox")
-        inbox = await read_json(inbox_path)
-        queue["email"] = inbox["email"]
+        if await inbox_path.exists():
+            inbox = await read_json(inbox_path)
+            queue["email"] = inbox["email"]
+        else:
+            queue["email"] = "no-inbox"
 
         hooks = await find_hooks_for_queues(self.org_path, queues=[queue])
         self.hooks = hooks
