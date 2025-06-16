@@ -22,6 +22,7 @@ from deployment_manager.commands.document.llm_helper import (
     MODEL_PRICING_MAP,
     LLMHelper,
     ModelResponse,
+    display_tokens_and_cost,
 )
 from deployment_manager.common.read_write import (
     read_json,
@@ -196,8 +197,11 @@ class DirectoryDocumentator:
             price_total = self.model.calculate_pricing(
                 input_tokens=input_tokens_total, output_tokens=output_tokens_total
             )
-            display_info(
-                f"Documentation finished.\nInput tokens used:{input_tokens_total}\nOutput tokens used:{output_tokens_total}\nPricing: {price_total} $"
+            display_tokens_and_cost(
+                message="Documentation finished.",
+                input_tokens_total=input_tokens_total,
+                output_tokens_total=output_tokens_total,
+                price_total=price_total,
             )
         except RuntimeError as e:
             display_error(str(e))

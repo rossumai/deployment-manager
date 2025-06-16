@@ -12,6 +12,8 @@ import json
 import os
 import logging
 
+from deployment_manager.utils.consts import display_info
+
 logging.getLogger("botocore.credentials").setLevel(logging.CRITICAL)
 
 MODEL_ID = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
@@ -19,6 +21,14 @@ MODEL_ID = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 MODEL_PRICING_MAP = {
     "us.anthropic.claude-3-7-sonnet-20250219-v1:0": {"input": 0.003, "output": 0.015}
 }
+
+
+def display_tokens_and_cost(
+    message: str, input_tokens_total: int, output_tokens_total: int, price_total: float
+):
+    display_info(
+        f"{message}\nInput tokens used: {input_tokens_total}\nOutput tokens used: {output_tokens_total}\nPricing: {price_total} $"
+    )
 
 
 @dataclass
@@ -49,7 +59,8 @@ class LLMHelper:
             "top_p": 0.9,
         }
 
-    def calculate_pricing(self, input_tokens, output_tokens):
+    @classmethod
+    def calculate_pricing(cls, input_tokens, output_tokens):
         # Assumes Claude 3.7 pricing
         return (input_tokens / 1000) * MODEL_PRICING_MAP[MODEL_ID]["input"] + (
             output_tokens / 1000

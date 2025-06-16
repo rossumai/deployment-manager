@@ -1,17 +1,18 @@
+import dataclasses
 from anyio import Path
 from langchain_aws import AmazonKnowledgeBasesRetriever, ChatBedrockConverse
 from langchain_core.tools import tool
 import json
 from typing import AsyncGenerator
-from langchain_core.messages import (
-    AIMessage,
-    ToolMessage,
-)
-
+from langchain_core.messages import AIMessage, ToolMessage, HumanMessage, SystemMessage
+from langchain_core.messages.utils import count_tokens_approximately
 import httpx
 from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
     Credentials,
 )
+from langchain.memory import ConversationSummaryBufferMemory
+
+from deployment_manager.commands.document.llm_helper import MODEL_ID
 from deployment_manager.utils.consts import display_error
 from deployment_manager.utils.functions import (
     extract_id_from_url,
@@ -23,26 +24,36 @@ from deployment_manager.utils.consts import (
 )
 
 
+def find_by_schema_id(content: list, schema_id: str) -> list:
+    accumulator = []
+    for node in content:
+        if node["schema_id"] == schema_id:
+            accumulator.append(node)
+        elif "children" in node:
+            accumulator.extend(find_by_schema_id(node["children"], schema_id))
+
+    return accumulator
+
+
 class ConversationSolver:
-    messages = [
-        (
-            "system",
-            (
-                "You are an assistant advising on problems with the Rossum platform."
-                "Answer questions with the help of the provided tools."
-                "You also have access to a knowledge base including the whole Rossum API reference."
-                "If you don't have a specific tool, you can try search the API reference and then make use the generic Rossum API request tool."
-                "Here are some Rossum-related things to always keep in mind:"
-                "- The JSON objects are nested: workspace has queues, queue has a schema, etc. If you need to find something about a queue, the information might therefore be on a different but related object."
-            ),
-        )
-    ]
+    system_prompt_content = (
+        "You are an assistant advising on problems with the Rossum platform."
+        "Answer questions with the help of the provided tools."
+        "You also have access to a knowledge base including the whole Rossum API reference."
+        "If you don't have a specific tool, you can try search the API reference and then make use the generic Rossum API request tool."
+        "Here are some Rossum-related things to always keep in mind:"
+        "- The JSON objects are nested: workspace has queues, queue has a schema, etc. If you need to find something about a queue, the information might therefore be on a different but related object."
+        "- If the user references some name of field (e.g., 'PO Number'), you should first look into the schema of the queue to understand what the schema_id is because that is what Rossum uses internally."
+    )
 
     region = "us-west-2"
     knowledge_base_id = "49SUNSDQCQ"
     profile_name = "rossum-dev"
 
     show_debug = False
+
+    total_input_tokens = 0
+    total_output_tokens = 0
 
     def _debug_print(self, message: str):
         if self.show_debug:
@@ -58,7 +69,7 @@ class ConversationSolver:
         self.subdir_name = subdir_name
 
         self.llm = ChatBedrockConverse(
-            model="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+            model=MODEL_ID,
             endpoint_url="https://bedrock-runtime.us-west-2.amazonaws.com/",
             region_name=self.region,
             credentials_profile_name=self.profile_name,
@@ -69,6 +80,20 @@ class ConversationSolver:
             region_name=self.region,
             credentials_profile_name=self.profile_name,
             retrieval_config={"vectorSearchConfiguration": {"numberOfResults": 4}},
+        )
+
+        # This memory automatically summarizes older parts of the conversation to
+        # keep the total token count within the specified limit.
+        self.memory = ConversationSummaryBufferMemory(
+            llm=self.llm,
+            max_token_limit=20_000,  # Max tokens for the conversation buffer (adjust as needed)
+            memory_key="chat_history",  # The key under which memory variables are stored
+            return_messages=True,  # Ensure messages are returned as LangChain BaseMessage objects
+        )
+        # --- Add the initial system message to the memory's chat history ---
+        # This ensures the system instructions are always part of the context.
+        self.memory.chat_memory.add_message(
+            SystemMessage(content=self.system_prompt_content)
         )
 
         self.tools = self.setup_tools()
@@ -101,6 +126,7 @@ class ConversationSolver:
         return object_jsons
 
     def setup_tools(self):
+        # TODO: count tokens and return meaningful error to LLM if it went overboard (e.g., 50k)
         @tool
         async def make_rossum_api_request(method: str, url: str, body: dict = None):
             """Calls Rossum API with the passed in parameters.
@@ -189,11 +215,33 @@ class ConversationSolver:
             """
             try:
                 annotation = await self.client.request_json(
-                    method="GET", url=f"annotations/{id}", sideloads=["content"]
+                    method="GET", url=f"annotations/{id}"
                 )
                 return annotation
             except Exception as e:
                 display_error(f"Error while getting annotation: {e}")
+                return None
+
+        @tool
+        async def get_document_content(schema_ids: list[str], annotation_id: int):
+            """Returns specificed schema_ids (datapoints) of the document with the specified ID
+
+            Args:
+                schema_ids: list of schema_ids to return
+                annotation_id: ID of the document
+            """
+            try:
+                annotation_content = await self.client.request_json(
+                    method="GET", url=f"annotations/{annotation_id}/content"
+                )
+                found_schema_ids = {}
+                for schema_id in schema_ids:
+                    found_schema_ids[schema_id] = find_by_schema_id(
+                        annotation_content["content"], schema_id
+                    )
+                return found_schema_ids
+            except Exception as e:
+                display_error(f"Error while getting annotation content: {e}")
                 return None
 
         @tool
@@ -216,6 +264,7 @@ class ConversationSolver:
         return [
             make_rossum_api_request,
             get_document,
+            get_document_content,
             get_use_case_documentation,
             get_local_object_json,
             get_remote_hook_json,
@@ -224,10 +273,30 @@ class ConversationSolver:
         ]
 
     async def stream_call(self, user_input: str) -> AsyncGenerator[str, None]:
-        self.messages.append(("human", user_input))
+        # Add the new human message to the memory's chat history.
+        # The memory will automatically manage summarization based on max_token_limit.
+        self.memory.chat_memory.add_user_message(user_input)
 
         while True:
-            llm_stream = self.llm_with_tools.astream(self.messages)
+            # Retrieve the current conversation messages from memory.
+            # This list includes the initial system message, any summarized history,
+            # and the most recent messages, all trimmed to the max_token_limit.
+            messages_for_llm = self.memory.load_memory_variables({})[
+                self.memory.memory_key
+            ]
+
+            # Calculate input tokens for the current turn, which is the entire message history
+            current_input_tokens = count_tokens_approximately(messages_for_llm)
+            self.total_input_tokens += current_input_tokens
+
+            self._debug_print(
+                f"DEBUG: Current turn input tokens: {current_input_tokens}"
+            )
+            self._debug_print(
+                f"DEBUG: Total input tokens so far: {self.total_input_tokens}"
+            )
+
+            llm_stream = self.llm_with_tools.astream(messages_for_llm)
 
             self._debug_print("\n--- Starting LLM Astream ---")
             try:
@@ -235,7 +304,8 @@ class ConversationSolver:
                 full_ai_message_chunk = first_chunk  # Initialize with the first chunk
             except StopAsyncIteration:
                 self._debug_print("DEBUG: LLM returned no content or tool calls.")
-                self.messages.append(AIMessage(content=""))
+                # If LLM returns nothing, add an empty AI message to history to keep turns consistent
+                self.memory.chat_memory.add_ai_message("")
                 break
 
             # Yield content from the first chunk immediately
@@ -275,7 +345,17 @@ class ConversationSolver:
                 content=full_ai_message_chunk.content,
                 tool_calls=full_ai_message_chunk.tool_calls,
             )
-            self.messages.append(final_ai_message_for_history)
+            self.memory.chat_memory.add_message(final_ai_message_for_history)
+
+            # Calculate output tokens for the AI's response (only the new message)
+            ai_response_tokens = count_tokens_approximately(
+                [final_ai_message_for_history]
+            )
+            self.total_output_tokens += ai_response_tokens
+            self._debug_print(f"DEBUG: AI response output tokens: {ai_response_tokens}")
+            self._debug_print(
+                f"DEBUG: Total output tokens so far: {self.total_output_tokens}"
+            )
 
             self._debug_print(
                 f"DEBUG: Final AIMessage for history (full content): {final_ai_message_for_history.content}"
@@ -304,8 +384,9 @@ class ConversationSolver:
                         f"DEBUG: Malformed tool call found: {tool_call}. Skipping."
                     )
                     yield f"--- Tool Error: Malformed tool call received: {tool_call} ---\n\n"
-                    self.messages.append(
-                        AIMessage(content=f"Malformed tool call: {tool_call}")
+                    # Add an AI message to memory to inform the LLM about the malformed tool call
+                    self.memory.chat_memory.add_ai_message(
+                        f"Malformed tool call: {tool_call}"
                     )
                     continue
 
@@ -327,21 +408,24 @@ class ConversationSolver:
                             if isinstance(tool_output, (dict, list))
                             else str(tool_output)
                         )
-                        self.messages.append(
-                            ToolMessage(
-                                content=tool_output_str,
-                                tool_call_id=tool_id,
-                            )
+
+                        tool_message = ToolMessage(
+                            content=tool_output_str,
+                            tool_call_id=tool_id,
                         )
+                        self.memory.chat_memory.add_message(tool_message)
+
                         yield f"--- Tool output: {tool_output_str[:200]}{'...' if len(tool_output_str) > 200 else ''} ---\n\n"
                     except Exception as e:
                         error_msg = f"Error executing tool {tool_name}: {e}"
                         yield f"--- Tool Error: {error_msg} ---\n\n"
-                        self.messages.append(
-                            ToolMessage(content=error_msg, tool_call_id=tool_id)
+                        error_tool_message = ToolMessage(
+                            content=error_msg, tool_call_id=tool_id
                         )
+                        self.memory.chat_memory.add_message(error_tool_message)
                 else:
                     error_msg = f"Tool '{tool_name}' not found. This might indicate the model hallucinated a tool or the tool definition is missing."
                     yield f"--- Tool Error: {error_msg} ---\n\n"
-                    self.messages.append(AIMessage(content=error_msg))
+                    error_ai_message = AIMessage(content=error_msg)
+                    self.memory.chat_memory.add_ai_message(error_ai_message)
                     break

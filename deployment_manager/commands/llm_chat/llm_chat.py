@@ -3,7 +3,10 @@ import click
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
 
-from deployment_manager.commands.document.llm_helper import LLMHelper
+from deployment_manager.commands.document.llm_helper import (
+    LLMHelper,
+    display_tokens_and_cost,
+)
 from deployment_manager.commands.llm_chat.helpers import ConversationSolver
 from deployment_manager.utils.consts import (
     display_error,
@@ -21,7 +24,11 @@ from deployment_manager.utils.functions import coro
 # Look up something in master data
 # Fetch object (how to determine type?)
 # Fetch hook logs by annotation_id or hook_id
-
+# TODO: instruct to check your answer and assumptions against knowledge base
+# TODO: generalize data storage URL
+# TODO: instruct to check that pasted annotation is not in the queue that is documented
+# TODO: context limits: big document contents + whole docs
+# TODO: limit how long it talks to iself
 
 async def query_llm(solver: ConversationSolver, input: str):
     return await solver.call(input)
@@ -89,3 +96,16 @@ async def llm_chat_wrapper(destination: str, project_path: Path = None):
         except (EOFError, KeyboardInterrupt):
             print("\nExiting.")
             break
+        except Exception as e:
+            display_error(f"Unexpected error: {e}", e)
+            break
+
+    price_total = LLMHelper.calculate_pricing(
+        input_tokens=solver.total_input_tokens, output_tokens=solver.total_output_tokens
+    )
+    display_tokens_and_cost(
+        message='Chat finished.',
+        input_tokens_total=solver.total_input_tokens,
+        output_tokens_total=solver.total_output_tokens,
+        price_total=price_total,
+    )
