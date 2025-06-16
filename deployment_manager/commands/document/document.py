@@ -334,6 +334,12 @@ class DirectoryDocumentator:
             )
         )
 
+        await write_txt(
+            base_doc_path
+            / f"{queue['id']}_{settings.DOCUMENTATION_INTERNAL_SUFFIX}.txt",
+            queue_documentation.text,
+        )
+
         queue_documentation.text += (
             "\n\n ## 4. Extensions documentation\n" + hook_documentations
         )

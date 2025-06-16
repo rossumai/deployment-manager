@@ -19,15 +19,14 @@ from deployment_manager.common.read_write import read_prd_project_config
 from deployment_manager.utils.functions import coro
 
 
-# TODO: tools
+# TODO: count summarization LLM tokens
+
 # TODO: differentiate objects for the LLM (annotations vs hooks, etc.)
 # Look up something in master data
 # Fetch object (how to determine type?)
 # Fetch hook logs by annotation_id or hook_id
-# TODO: instruct to check your answer and assumptions against knowledge base
 # TODO: generalize data storage URL
 # TODO: instruct to check that pasted annotation is not in the queue that is documented
-# TODO: context limits: big document contents + whole docs
 # TODO: limit how long it talks to iself
 
 async def query_llm(solver: ConversationSolver, input: str):
