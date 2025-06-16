@@ -6,6 +6,7 @@ from prompt_toolkit.history import InMemoryHistory
 from deployment_manager.commands.document.llm_helper import LLMHelper
 from deployment_manager.commands.llm_chat.helpers import ConversationSolver
 from deployment_manager.utils.consts import (
+    display_error,
     settings,
 )
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
@@ -30,10 +31,21 @@ async def query_llm(solver: ConversationSolver, input: str):
     name=settings.LLM_CHAT_COMMAND_NAME,
     help="""Chat with Rossum-knowledgeable AI""",
 )
+@click.argument(
+    "destination",
+    nargs=1,
+    type=str,
+)
 @coro
-async def llm_chat_wrapper(project_path: Path = None):
+async def llm_chat_wrapper(destination: str, project_path: Path = None):
     if not project_path:
         project_path = Path("./")
+
+    try:
+        dir_name, subdir_name = destination.split("/")
+    except Exception as e:
+        display_error(f"Invalid destination '{destination}'")
+        return
 
     LLMHelper().validate_credentials()
 
@@ -42,13 +54,17 @@ async def llm_chat_wrapper(project_path: Path = None):
 
     # TODO: Integrate with a prd project
     prd_config = await read_prd_project_config(project_path=project_path)
-    creds = await get_url_and_credentials(
-        project_path=project_path, org_name="dev-org", yaml_data=prd_config
-    )
-    # api_url = await get_api_url_from_user()
-    # token = await get_token_from_user()
 
-    solver = ConversationSolver(creds=creds, project_path=project_path, dir_name='dev-org', subdir_name='s2k')
+    creds = await get_url_and_credentials(
+        project_path=project_path, org_name=dir_name, yaml_data=prd_config
+    )
+
+    solver = ConversationSolver(
+        creds=creds,
+        project_path=project_path,
+        dir_name=dir_name,
+        subdir_name=subdir_name,
+    )
     await solver.initialize()
 
     print("Welcome to the Rossum Assistant! Type 'exit' to quit.")
@@ -60,11 +76,15 @@ async def llm_chat_wrapper(project_path: Path = None):
                 print("Goodbye!")
                 break
 
-            print("AI> ", end="", flush=True) # Start printing AI response on the same line
+            print(
+                "AI> ", end="", flush=True
+            )  # Start printing AI response on the same line
             # Consume the streamed response
             async for chunk in solver.stream_call(user_input):
-                print(chunk, end="", flush=True) # Print each chunk immediately without a newline
-            print() # Print a final newline after the AI response is complete
+                print(
+                    chunk, end="", flush=True
+                )  # Print each chunk immediately without a newline
+            print()  # Print a final newline after the AI response is complete
 
         except (EOFError, KeyboardInterrupt):
             print("\nExiting.")

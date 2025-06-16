@@ -8,6 +8,7 @@ from langchain_core.messages import (
     ToolMessage,
 )
 
+import httpx
 from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
     Credentials,
 )
@@ -103,7 +104,7 @@ class ConversationSolver:
         @tool
         async def make_rossum_api_request(method: str, url: str, body: dict = None):
             """Calls Rossum API with the passed in parameters.
-            The API Bearer token will be automatically included
+            The API Bearer token will be automatically included.
 
             Args:
                 method: HTTP verb to use (GET/POST/PUT/PATCH/...)
@@ -117,6 +118,34 @@ class ConversationSolver:
                 return await self.client.request_json(method=method, url=url, json=body)
             except Exception as e:
                 display_error(f"Error while making request to Rossum API: {e}")
+                return str(e)
+
+        @tool
+        async def make_data_storage_request(collection_name: str, pipeline: list[dict]):
+            """Calls Data Storage API with a MongoDB aggregation pipeline.
+            The API Bearer token will be automatically included.
+
+            Args:
+                collection_name: Name of MongoDB collection to query
+                pipeline: the aggregation pipeline to be used
+
+            Returns:
+                JSON objects from MongoDB
+            """
+            try:
+                async with httpx.AsyncClient() as client:
+                    req = await client.post(
+                        url="https://us.app.rossum.ai/svc/data-storage/api/v1/data/aggregate",
+                        headers={
+                            "Authorization": f"Bearer {self.client._http_client.token}"
+                        },
+                        json={"collectionName": collection_name, "pipeline": pipeline},
+                    )
+                    req.raise_for_status()
+                    return req.json()
+                return await self.client.request_json()
+            except Exception as e:
+                display_error(f"Error while making request to DataStorage API: {e}")
                 return str(e)
 
         @tool
@@ -191,6 +220,7 @@ class ConversationSolver:
             get_local_object_json,
             get_remote_hook_json,
             search_knowledge_base,
+            make_data_storage_request,
         ]
 
     async def stream_call(self, user_input: str) -> AsyncGenerator[str, None]:
