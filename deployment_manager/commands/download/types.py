@@ -1,9 +1,15 @@
 # types.py - Shared Interfaces to Break Circular Imports
+import subprocess
 from typing import Optional, TYPE_CHECKING
 from pydantic import BaseModel
 import re
 from anyio import Path
 import questionary
+
+from deployment_manager.commands.download.helpers import get_pull_decision
+from deployment_manager.common.git import PullStrategy
+from deployment_manager.common.read_write import write_json
+from deployment_manager.utils.consts import display_warning
 from rossum_api.api_client import Resource
 
 from rich import print as pprint
@@ -83,7 +89,61 @@ class ObjectSaver(BaseModel):
 
     def construct_object_path(self, subdir: Subdirectory, object: dict) -> Path: ...
 
-    async def save_downloaded_object(self): ...
+    async def save(self, hook, object_path) -> list[Path] | None:
+        await write_json(
+            object_path,
+            hook,
+            self.type,
+            log_message=f"Pulled {self.display_type} {object_path}",
+        )
+
+    async def save_downloaded_object(self, object: dict, subdir: Subdirectory):
+        object_path = self.construct_object_path(subdir, object)
+        if not object_path:
+            return
+        if self.download_all:
+            await self.save(object, object_path)
+            return
+
+        pull_strategy = await get_pull_decision(
+            object_path, object, self.changed_files, self.parent_dir_reference
+        )
+
+        if pull_strategy == PullStrategy.overwrite:
+            await self.save(object, object_path)
+            return
+
+        if pull_strategy == PullStrategy.skip:
+            return
+
+        if pull_strategy == PullStrategy.merge:
+            await self.merge(object, object_path)
+
+    async def merge(self, object, object_path):
+        # stash, pull, commit, stash pop
+        subprocess.run(["git", "stash", "push", str(object_path)], capture_output=True, text=True, check=True)
+        additional_paths = await self.save(object, object_path)
+        if not additional_paths:
+            additional_paths = []
+        elif not isinstance(additional_paths, list):
+            additional_paths = [additional_paths]
+
+        for file in [object_path] + additional_paths:
+            subprocess.run(["git", "add", file], capture_output=True, text=True, check=True)
+        subprocess.run(["git", "commit", "-m", f"commit {object_path}"], capture_output=True, text=True, check=True)
+        merge_result = subprocess.run(["git", "stash", "pop"], capture_output=True, text=True, check=False)
+        if merge_result.returncode != 0:
+            display_warning(
+                "There is a merge conflict while pulling remote to your local changes. Solve it using git before continuing. Watch out that the 'local' and 'remote' changes are swapped in this situation.")
+            while True:
+                await questionary.confirm(
+                    "Press enter after solving the conflict", default=True
+                ).ask_async()
+                status = subprocess.run(["git", "status"], capture_output=True, text=True, check=True)
+                if "Unmerged paths" in status.stdout:
+                    display_warning("There are still unsolved changes.")
+                else:
+                    break
 
     def find_subdir_of_object(self, object: dict):
         if len(self.subdirs) == 1:
