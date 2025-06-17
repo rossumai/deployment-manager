@@ -33,7 +33,7 @@ from deployment_manager.utils.consts import (
     settings,
 )
 
-from deployment_manager.common.git import get_changed_file_paths
+from deployment_manager.common.git import get_changed_file_paths, PullStrategy
 from deployment_manager.common.read_write import read_json, write_json
 from deployment_manager.utils.functions import (
     find_all_object_paths,
@@ -95,7 +95,8 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
 
     download_all: bool = False
     skip_objects_without_subdir: bool = False
-    ignore_changed_file_warnings: bool = False
+    ignore_changed_file_warnings: bool = False  # TODO delete
+    pull_strategy: PullStrategy | None = None
 
     workspace_saver: Optional["WorkspaceSaver"] = None
     queue_saver: Optional["QueueSaver"] = None

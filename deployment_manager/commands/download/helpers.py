@@ -4,6 +4,8 @@ import sys
 from typing import Any
 from anyio import Path
 import questionary
+
+from deployment_manager.common.git import PullStrategy
 from rossum_api.api_client import Resource
 
 from deployment_manager.common.determine_path import (
@@ -29,6 +31,61 @@ def replace_code_paths(file_paths: list[Path]):
 
     return replaced_paths
 
+
+async def get_pull_decision(
+    path: Path,
+    remote_object: Any,
+    changed_files: list,
+    parent_dir_reference: "DownloadOrganizationDirectory",
+) -> PullStrategy:
+    if await path.exists():
+        local_file = await read_json(path)
+
+        object_type = determine_object_type_from_url(local_file.get("url", ""))
+        # Queues might have their hooks attribute changed. Same for schema.rules
+        # This does not update the timestamp in the DB because this change is only done on hooks entities.
+        if (
+            (local_timestamp := local_file.get("modified_at", ""))
+            != (remote_timestamp := remote_object.get("modified_at", ""))
+            or (
+                object_type == Resource.Queue
+                and local_file.get("hooks", []) != remote_object.get("hooks", [])
+            )
+            or (
+                object_type == Resource.Schema
+                and local_file.get("rules", []) != remote_object.get("rules", [])
+            )
+        ):
+            # there are some changes in remote
+            if path in changed_files:
+                # there are some local changes, we need to solve it
+                if parent_dir_reference.pull_strategy == PullStrategy.ask or parent_dir_reference.pull_strategy is None:
+                    display_warning(
+                        f"File [green]{path}[/green] has local unversioned changes [white](local: {local_timestamp} | remote: {remote_timestamp})[/white]."
+                    )
+                    strategy = await questionary.text(
+                        message="How do you want to handle TODO?",
+                        instruction="(skip/overwrite/merge)",
+                    ).ask_async()
+                    strategy = PullStrategy(strategy)
+                    if parent_dir_reference.pull_strategy is None:
+                        all_ = await questionary.confirm(
+                            message=f"Do you want to apply it to all TODO for {'TODO typ'}?",
+                            default=True
+                        ).ask_async()
+                        if all_:
+                            parent_dir_reference.pull_strategy = strategy
+                        else:
+                            parent_dir_reference.pull_strategy = PullStrategy.ask
+
+                    return strategy
+                return parent_dir_reference.pull_strategy
+            # there are no local changes, just pull remote
+            return PullStrategy.overwrite
+        # no need to pull, there are no remote changes
+        return PullStrategy.skip
+    # local file not found, we just write
+    return PullStrategy.overwrite
 
 async def should_write_object(
     path: Path,
@@ -59,38 +116,19 @@ async def should_write_object(
                 and not parent_dir_reference.ignore_changed_file_warnings
             ):
                 display_warning(
-                    f"You have some local unversioned changes. "
+                    f"File [green]{path}[/green] has local unversioned changes [white](local: {local_timestamp} | remote: {remote_timestamp})[/white]."
                 )
-                if await questionary.confirm(
-                    message="Do you want to merge local changes with remote?",
-                    default=True,
-                ).ask_async():
-                    directory = path.parts[0]
-                    # stash, pull, commit, stash pop
-                    subprocess.run(["git", "stash", "push", directory], capture_output=True, text=True, check=True)
-                    subprocess.run(["prd2", "pull", directory, "-s", "1"], capture_output=True, text=True, check=True)
-                    subprocess.run(["git", "commit", "-am", "commit"], capture_output=True, text=True, check=True)
-                    subprocess.run(["git", "stash", "pop"], capture_output=True, text=True, check=False)
-                    display_info(
-                        "Remote changes have been pulled and your local changes have been merged. You may need to resolve conflicts now."
-                    )
-                    sys.exit()  # exit the app, pull was already made in the subprocess
-                else:
-                    display_warning(
-                        f"File [green]{path}[/green] has local unversioned changes [white](local: {local_timestamp} | remote: {remote_timestamp})[/white]."
-                    )
-                    user_answer = await questionary.text(
-                        message="Should the remote version overwrite the local one?",
-                        instruction="(y/n/yy)",
-                    ).ask_async()
-                    # Disable warnings for all other queues
-                    if user_answer.casefold() == "yy":
-                        parent_dir_reference.ignore_changed_file_warnings = True
+                user_answer = await questionary.text(
+                    message="Should the remote version overwrite the local one?",
+                    instruction="(y/n/yy)",
+                ).ask_async()
+                # Disable warnings for all other queues
+                if user_answer.casefold() == "yy":
+                    parent_dir_reference.ignore_changed_file_warnings = True
 
-                    return user_answer == "y" or user_answer == "yy"
+                return user_answer == "y" or user_answer == "yy"
 
             return True
-        return False
 
     else:
         return True
