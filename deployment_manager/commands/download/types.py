@@ -89,14 +89,6 @@ class ObjectSaver(BaseModel):
 
     def construct_object_path(self, subdir: Subdirectory, object: dict) -> Path: ...
 
-    async def save(self, hook, object_path) -> list[Path] | None:
-        await write_json(
-            object_path,
-            hook,
-            self.type,
-            log_message=f"Pulled {self.display_type} {object_path}",
-        )
-
     async def save_downloaded_object(self, object: dict, subdir: Subdirectory):
         object_path = self.construct_object_path(subdir, object)
         if not object_path:
@@ -118,6 +110,14 @@ class ObjectSaver(BaseModel):
 
         if pull_strategy == PullStrategy.merge:
             await self.merge(object, object_path)
+
+    async def save(self, hook, object_path) -> list[Path] | None:
+        await write_json(
+            object_path,
+            hook,
+            self.type,
+            log_message=f"Pulled {self.display_type} {object_path}",
+        )
 
     async def merge(self, object, object_path):
         # stash, pull, commit, stash pop
