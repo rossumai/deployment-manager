@@ -130,7 +130,9 @@ class ObjectSaver(BaseModel):
 
         for file in [object_path] + additional_paths:
             subprocess.run(["git", "add", file], capture_output=True, text=True, check=True)
-        subprocess.run(["git", "commit", "-m", f"commit {object_path}"], capture_output=True, text=True, check=True)
+        commit = subprocess.run(["git", "commit", "-m", f"commit {object_path}"], capture_output=True, text=True, check=False)
+        if commit.returncode != 0:
+            display_warning(commit.stderr)
         merge_result = subprocess.run(["git", "stash", "pop"], capture_output=True, text=True, check=False)
         if merge_result.returncode != 0:
             display_warning(

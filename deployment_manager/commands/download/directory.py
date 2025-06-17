@@ -18,7 +18,7 @@ from deployment_manager.commands.download.helpers import (
     delete_empty_folders,
     delete_empty_formula_dir,
     replace_code_paths,
-    should_write_object,
+    should_write_object, get_pull_decision,
 )
 from deployment_manager.commands.download.remover import ObjectRemover
 from deployment_manager.commands.download.saver import EmailTemplateSaver, HookSaver, InboxSaver, QueueSaver, RuleSaver, SchemaSaver, WorkspaceSaver
@@ -287,19 +287,29 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
 
     async def download_and_save_organization_object(self):
         try:
-            organization = await self.client._http_client.fetch_one(
+            object = await self.client._http_client.fetch_one(
                 Resource.Organization, self.org_id
             )
-            org_file_path = self.project_path / self.name / "organization.json"
-            if self.download_all or await should_write_object(
-                org_file_path, organization, self.changed_files, self
-            ):
-                await write_json(
-                    org_file_path,
-                    organization,
-                    Resource.Organization,
-                    log_message=f"Pulled {org_file_path}.",
-                )
+            object_path = self.project_path / self.name / "organization.json"
+            if not object_path:
+                return
+            if self.download_all:
+                await self.save(object, object_path)
+                return
+
+            pull_strategy = await get_pull_decision(
+                object_path, object, self.changed_files
+            )
+
+            if pull_strategy == PullStrategy.overwrite:
+                await self.save(object, object_path)
+                return
+
+            if pull_strategy == PullStrategy.skip:
+                return
+
+            if pull_strategy == PullStrategy.merge:
+                await self.merge(object, object_path)
         except APIClientError as e:
             if e.status_code == 404:
                 raise DownloadException(

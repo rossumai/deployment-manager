@@ -36,7 +36,7 @@ async def get_pull_decision(
     path: Path,
     remote_object: Any,
     changed_files: list,
-    parent_dir_reference: "DownloadOrganizationDirectory",
+    parent_dir_reference: "DownloadOrganizationDirectory" = None,
 ) -> PullStrategy:
     if await path.exists():
         local_file = await read_json(path)
@@ -59,7 +59,7 @@ async def get_pull_decision(
             # there are some changes in remote
             if path in changed_files:
                 # there are some local changes, we need to solve it
-                if parent_dir_reference.pull_strategy == PullStrategy.ask or parent_dir_reference.pull_strategy is None:
+                if not parent_dir_reference or parent_dir_reference.pull_strategy == PullStrategy.ask or parent_dir_reference.pull_strategy is None:
                     display_warning(
                         f"File [green]{path}[/green] has local unversioned changes [white](local: {local_timestamp} | remote: {remote_timestamp})[/white]."
                     )
@@ -68,7 +68,7 @@ async def get_pull_decision(
                         instruction="(skip/overwrite/merge)",
                     ).ask_async()
                     strategy = PullStrategy(strategy)
-                    if parent_dir_reference.pull_strategy is None:
+                    if parent_dir_reference and parent_dir_reference.pull_strategy is None:
                         all_ = await questionary.confirm(
                             message=f"Do you want to apply it to all TODO for {'TODO typ'}?",
                             default=True
