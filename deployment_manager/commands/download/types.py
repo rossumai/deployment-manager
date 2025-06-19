@@ -37,6 +37,7 @@ class ObjectSaver(BaseModel):
     changed_files: list
     download_all: bool = False
     skip_objects_without_subdir: bool = False
+    files_to_commit: None | list = []
 
     objects_without_subdir: list[dict] = []
     subdirs_by_object_id: dict[int, str] = {}
@@ -50,6 +51,7 @@ class ObjectSaver(BaseModel):
         return f'"[green]{name}[/green] ([purple]{id}[/purple])"'
 
     async def save_downloaded_objects(self):
+        were_not_commited = []
         for object in self.objects:
             subdir = self.find_subdir_of_object(object)
             if not subdir:
@@ -61,6 +63,29 @@ class ObjectSaver(BaseModel):
 
             self.subdirs_by_object_id[object["id"]] = subdir
             await self.save_downloaded_object(object, subdir)
+
+        if self.files_to_commit:
+            for not_commited in self.files_to_commit:
+                subprocess.run(["git", "add", not_commited], capture_output=True, text=True, check=True)
+            subprocess.run(["git", "commit", "-m", "commit"])
+
+
+        if self.parent_dir_reference.pull_strategy == PullStrategy.merge:
+            # we need to pop local changes
+            merge_result = subprocess.run(["git", "stash", "pop"], capture_output=True, text=True, check=False)
+            if merge_result.returncode != 0:
+                display_warning(
+                    "There is a merge conflict while pulling remote to your local changes. Solve it using git before continuing. Watch out that the 'local' and 'remote' changes are swapped in this situation.")
+                while True:
+                    await questionary.confirm(
+                        "Press enter after solving the conflict", default=True
+                    ).ask_async()
+                    status = subprocess.run(["git", "status"], capture_output=True, text=True, check=True)
+                    if "Unmerged paths" in status.stdout:
+                        display_warning("There are still unsolved changes.")
+                    else:
+                        break
+
 
         await self.handle_objects_without_subdir()
 
@@ -94,7 +119,13 @@ class ObjectSaver(BaseModel):
         if not object_path:
             return
         if self.download_all:
-            await self.save(object, object_path)
+            additional_paths = await self.save(object, object_path)
+            if not additional_paths:
+                additional_paths = []
+            elif not isinstance(additional_paths, list):
+                additional_paths = [additional_paths]
+            for file in [object_path] + additional_paths:
+                self.files_to_commit.append(file)
             return
 
         pull_strategy = await get_pull_decision(
@@ -102,7 +133,13 @@ class ObjectSaver(BaseModel):
         )
 
         if pull_strategy == PullStrategy.overwrite:
-            await self.save(object, object_path)
+            additional_paths = await self.save(object, object_path)
+            if not additional_paths:
+                additional_paths = []
+            elif not isinstance(additional_paths, list):
+                additional_paths = [additional_paths]
+            for file in [object_path] + additional_paths:
+                self.files_to_commit.append(file)
             return
 
         if pull_strategy == PullStrategy.skip:
@@ -121,31 +158,46 @@ class ObjectSaver(BaseModel):
 
     async def merge(self, object, object_path):
         # stash, pull, commit, stash pop
-        subprocess.run(["git", "stash", "push", str(object_path)], capture_output=True, text=True, check=True)
-        additional_paths = await self.save(object, object_path)
-        if not additional_paths:
-            additional_paths = []
-        elif not isinstance(additional_paths, list):
-            additional_paths = [additional_paths]
+        if self.parent_dir_reference.pull_strategy == PullStrategy.merge:
+            # merging all files. Stash all, pull, then stash pop all the changes at once.
+            # this block is ran only once after selecting the strategy, because there won't be any other conflicts
+            subprocess.run(["git", "stash", "push", str(object_path.parent)], capture_output=True, text=True, check=True)
+            additional_paths = await self.save(object, object_path)
+            if not additional_paths:
+                additional_paths = []
+            elif not isinstance(additional_paths, list):
+                additional_paths = [additional_paths]
+            for file in [object_path] + additional_paths:
+                self.files_to_commit.append(file)
+            return
 
-        for file in [object_path] + additional_paths:
-            subprocess.run(["git", "add", file], capture_output=True, text=True, check=True)
-        commit = subprocess.run(["git", "commit", "-m", f"commit {object_path}"], capture_output=True, text=True, check=False)
-        if commit.returncode != 0:
-            display_warning(commit.stderr)
-        merge_result = subprocess.run(["git", "stash", "pop"], capture_output=True, text=True, check=False)
-        if merge_result.returncode != 0:
-            display_warning(
-                "There is a merge conflict while pulling remote to your local changes. Solve it using git before continuing. Watch out that the 'local' and 'remote' changes are swapped in this situation.")
-            while True:
-                await questionary.confirm(
-                    "Press enter after solving the conflict", default=True
-                ).ask_async()
-                status = subprocess.run(["git", "status"], capture_output=True, text=True, check=True)
-                if "Unmerged paths" in status.stdout:
-                    display_warning("There are still unsolved changes.")
-                else:
-                    break
+        else:
+            # merging just one file
+            subprocess.run(["git", "stash", "push", str(object_path)], capture_output=True, text=True, check=True)
+            additional_paths = await self.save(object, object_path)
+            if not additional_paths:
+                additional_paths = []
+            elif not isinstance(additional_paths, list):
+                additional_paths = [additional_paths]
+
+            for file in [object_path] + additional_paths:
+                subprocess.run(["git", "add", file], capture_output=True, text=True, check=True)
+            commit = subprocess.run(["git", "commit", "-m", f"commit {object_path}"], capture_output=True, text=True, check=False)
+            if commit.returncode != 0:
+                display_warning(commit.stderr)
+            merge_result = subprocess.run(["git", "stash", "pop"], capture_output=True, text=True, check=False)
+            if merge_result.returncode != 0:
+                display_warning(
+                    "There is a merge conflict while pulling remote to your local changes. Solve it using git before continuing. Watch out that the 'local' and 'remote' changes are swapped in this situation.")
+                while True:
+                    await questionary.confirm(
+                        "Press enter after solving the conflict", default=True
+                    ).ask_async()
+                    status = subprocess.run(["git", "status"], capture_output=True, text=True, check=True)
+                    if "Unmerged paths" in status.stdout:
+                        display_warning("There are still unsolved changes.")
+                    else:
+                        break
 
     def find_subdir_of_object(self, object: dict):
         if len(self.subdirs) == 1:
