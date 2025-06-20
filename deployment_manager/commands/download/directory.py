@@ -18,7 +18,7 @@ from deployment_manager.commands.download.helpers import (
     delete_empty_folders,
     delete_empty_formula_dir,
     replace_code_paths,
-    should_write_object, get_pull_decision,
+    should_write_object, get_pull_decision, get_changed_files,
 )
 from deployment_manager.commands.download.remover import ObjectRemover
 from deployment_manager.commands.download.saver import EmailTemplateSaver, HookSaver, InboxSaver, QueueSaver, RuleSaver, SchemaSaver, WorkspaceSaver
@@ -110,10 +110,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
         if not self.project_path:
             self.project_path = Path(".")
 
-        changed_files = get_changed_file_paths(self.org_path)
-        changed_files = list(map(lambda x: x[1], changed_files))
-        changed_files = replace_code_paths(changed_files)
-        self.changed_files = changed_files
+        self.changed_files = await get_changed_files(self.org_path)
 
         if not self.client:
             token = await get_token(
@@ -298,7 +295,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 return
 
             pull_strategy = await get_pull_decision(
-                object_path, object, self.changed_files
+                object_path, object, self.changed_files, "Organization"
             )
 
             if pull_strategy == PullStrategy.overwrite:

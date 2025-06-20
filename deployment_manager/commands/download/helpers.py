@@ -5,7 +5,7 @@ from typing import Any
 from anyio import Path
 import questionary
 
-from deployment_manager.common.git import PullStrategy
+from deployment_manager.common.git import PullStrategy, get_changed_file_paths
 from rossum_api.api_client import Resource
 
 from deployment_manager.common.determine_path import (
@@ -32,11 +32,22 @@ def replace_code_paths(file_paths: list[Path]):
     return replaced_paths
 
 
+
+async def get_changed_files(org_path):
+    changed_files = get_changed_file_paths(org_path)
+    changed_files = list(map(lambda x: x[1], changed_files))
+    changed_files = replace_code_paths(changed_files)
+    return changed_files
+
+
+
 async def get_pull_decision(
     path: Path,
     remote_object: Any,
     changed_files: list,
+    type: str,
     parent_dir_reference: "DownloadOrganizationDirectory" = None,
+
 ) -> PullStrategy:
     if await path.exists():
         local_file = await read_json(path)
@@ -64,13 +75,13 @@ async def get_pull_decision(
                         f"File [green]{path}[/green] has local unversioned changes [white](local: {local_timestamp} | remote: {remote_timestamp})[/white]."
                     )
                     strategy = await questionary.text(
-                        message="How do you want to handle TODO?",
+                        message="How do you want to handle conflicts?",
                         instruction="(skip/overwrite/merge)",
                     ).ask_async()
                     strategy = PullStrategy(strategy)
                     if parent_dir_reference and parent_dir_reference.pull_strategy is None:
                         all_ = await questionary.confirm(
-                            message=f"Do you want to apply it to all TODO for {'TODO typ'}?",
+                            message=f"Do you want to apply it to all conflicts for {type}?",
                             default=True
                         ).ask_async()
                         if all_:

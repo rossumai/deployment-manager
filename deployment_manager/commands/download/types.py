@@ -6,7 +6,7 @@ import re
 from anyio import Path
 import questionary
 
-from deployment_manager.commands.download.helpers import get_pull_decision
+from deployment_manager.commands.download.helpers import get_pull_decision, get_changed_files
 from deployment_manager.common.git import PullStrategy
 from deployment_manager.common.read_write import write_json
 from deployment_manager.utils.consts import display_warning
@@ -128,7 +128,7 @@ class ObjectSaver(BaseModel):
             return
 
         pull_strategy = await get_pull_decision(
-            object_path, object, self.changed_files, self.parent_dir_reference
+            object_path, object, self.changed_files, self.type.name, self.parent_dir_reference
         )
 
         if pull_strategy == PullStrategy.overwrite:
@@ -161,6 +161,7 @@ class ObjectSaver(BaseModel):
             # merging all files. Stash all, pull, then stash pop all the changes at once.
             # this block is ran only once after selecting the strategy, because there won't be any other conflicts
             subprocess.run(["git", "stash", "push", str(object_path.parent)], capture_output=True, text=True, check=True)
+            self.changed_files = await get_changed_files(self.base_path)
             additional_paths = await self.save(object, object_path)
             if not additional_paths:
                 additional_paths = []
@@ -168,7 +169,6 @@ class ObjectSaver(BaseModel):
                 additional_paths = [additional_paths]
             for file in [object_path] + additional_paths:
                 self.files_to_commit.append(file)
-            self.changed_files = []
             return
 
         else:
