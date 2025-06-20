@@ -67,7 +67,6 @@ class ObjectSaver(BaseModel):
         if self.files_to_commit:
             for not_commited in self.files_to_commit:
                 subprocess.run(["git", "add", not_commited], capture_output=True, text=True, check=True)
-            subprocess.run(["git", "commit", "-m", "commit"])
 
 
         if self.parent_dir_reference.pull_strategy == PullStrategy.merge:
@@ -169,6 +168,7 @@ class ObjectSaver(BaseModel):
                 additional_paths = [additional_paths]
             for file in [object_path] + additional_paths:
                 self.files_to_commit.append(file)
+            self.changed_files = []
             return
 
         else:
@@ -182,9 +182,6 @@ class ObjectSaver(BaseModel):
 
             for file in [object_path] + additional_paths:
                 subprocess.run(["git", "add", file], capture_output=True, text=True, check=True)
-            commit = subprocess.run(["git", "commit", "-m", f"commit {object_path}"], capture_output=True, text=True, check=False)
-            if commit.returncode != 0:
-                display_warning(commit.stderr)
             merge_result = subprocess.run(["git", "stash", "pop"], capture_output=True, text=True, check=False)
             if merge_result.returncode != 0:
                 display_warning(
