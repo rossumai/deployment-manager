@@ -1,8 +1,16 @@
+import enum
 import subprocess
 
 from anyio import Path
 
 from deployment_manager.utils.consts import GIT_CHARACTERS
+
+
+class PullStrategy(enum.Enum):
+    skip = "skip"  # skip pull and keep local
+    overwrite = "overwrite"  # just pull remote and overwrite
+    merge = "merge"
+    ask = "ask"  # always ask
 
 
 def get_changed_file_paths(

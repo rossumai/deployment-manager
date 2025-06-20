@@ -1,7 +1,11 @@
 import shutil
+import subprocess
+import sys
 from typing import Any
 from anyio import Path
 import questionary
+
+from deployment_manager.common.git import PullStrategy, get_changed_file_paths
 from rossum_api.api_client import Resource
 
 from deployment_manager.common.determine_path import (
@@ -10,7 +14,7 @@ from deployment_manager.common.determine_path import (
 from deployment_manager.common.read_write import (
     read_json,
 )
-from deployment_manager.utils.consts import display_warning, settings
+from deployment_manager.utils.consts import display_warning, settings, display_info
 
 
 def replace_code_paths(file_paths: list[Path]):
@@ -27,6 +31,72 @@ def replace_code_paths(file_paths: list[Path]):
 
     return replaced_paths
 
+
+
+async def get_changed_files(org_path):
+    changed_files = get_changed_file_paths(org_path)
+    changed_files = list(map(lambda x: x[1], changed_files))
+    changed_files = replace_code_paths(changed_files)
+    return changed_files
+
+
+
+async def get_pull_decision(
+    path: Path,
+    remote_object: Any,
+    changed_files: list,
+    type: str,
+    parent_dir_reference: "DownloadOrganizationDirectory" = None,
+
+) -> PullStrategy:
+    if await path.exists():
+        local_file = await read_json(path)
+
+        object_type = determine_object_type_from_url(local_file.get("url", ""))
+        # Queues might have their hooks attribute changed. Same for schema.rules
+        # This does not update the timestamp in the DB because this change is only done on hooks entities.
+        if (
+            (local_timestamp := local_file.get("modified_at", ""))
+            != (remote_timestamp := remote_object.get("modified_at", ""))
+            or (
+                object_type == Resource.Queue
+                and local_file.get("hooks", []) != remote_object.get("hooks", [])
+            )
+            or (
+                object_type == Resource.Schema
+                and local_file.get("rules", []) != remote_object.get("rules", [])
+            )
+        ):
+            # there are some changes in remote
+            if path in changed_files:
+                # there are some local changes, we need to solve it
+                if not parent_dir_reference or parent_dir_reference.pull_strategy == PullStrategy.ask or parent_dir_reference.pull_strategy is None:
+                    display_warning(
+                        f"File [green]{path}[/green] has local unversioned changes [white](local: {local_timestamp} | remote: {remote_timestamp})[/white]."
+                    )
+                    strategy = await questionary.text(
+                        message="How do you want to handle conflicts?",
+                        instruction="(skip/overwrite/merge)",
+                    ).ask_async()
+                    strategy = PullStrategy(strategy)
+                    if parent_dir_reference and parent_dir_reference.pull_strategy is None:
+                        all_ = await questionary.confirm(
+                            message=f"Do you want to apply it to all conflicts for {type}?",
+                            default=True
+                        ).ask_async()
+                        if all_:
+                            parent_dir_reference.pull_strategy = strategy
+                        else:
+                            parent_dir_reference.pull_strategy = PullStrategy.ask
+
+                    return strategy
+                return parent_dir_reference.pull_strategy
+            # there are no local changes, just pull remote
+            return PullStrategy.overwrite
+        # no need to pull, there are no remote changes
+        return PullStrategy.skip
+    # local file not found, we just write
+    return PullStrategy.overwrite
 
 async def should_write_object(
     path: Path,

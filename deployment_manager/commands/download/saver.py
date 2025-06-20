@@ -1,8 +1,13 @@
+import subprocess
+
+import questionary
 from anyio import Path
 from pydantic import BaseModel
+
+from deployment_manager.common.git import PullStrategy
 from rossum_api.api_client import Resource
 
-from deployment_manager.commands.download.helpers import should_write_object
+from deployment_manager.commands.download.helpers import should_write_object, get_pull_decision
 from deployment_manager.commands.download.types import ObjectSaver
 from deployment_manager.common.read_write import (
     create_custom_hook_code_path,
@@ -37,18 +42,6 @@ class WorkspaceSaver(ObjectSaver):
             / "workspace.json"
         )
         return object_path
-
-    async def save_downloaded_object(self, workspace: dict, subdir: Subdirectory):
-        object_path = self.construct_object_path(subdir=subdir, object=workspace)
-        if self.download_all or await should_write_object(
-            object_path, workspace, self.changed_files, self.parent_dir_reference
-        ):
-            await write_json(
-                object_path,
-                workspace,
-                self.type,
-                log_message=f"Pulled {self.display_type} {object_path}",
-            )
 
 
 class QueueSaver(ObjectSaver):
@@ -87,20 +80,6 @@ class QueueSaver(ObjectSaver):
             / "queue.json"
         )
         return object_path
-
-    async def save_downloaded_object(self, queue: dict, subdir: Subdirectory):
-        object_path = self.construct_object_path(subdir=subdir, queue=queue)
-        if not object_path:
-            return
-        if self.download_all or await should_write_object(
-            object_path, queue, self.changed_files, self.parent_dir_reference
-        ):
-            await write_json(
-                object_path,
-                queue,
-                self.type,
-                log_message=f"Pulled {self.display_type} {object_path}",
-            )
 
     def find_workspace_for_queue(self, queue: dict):
         for ws in self.workspaces:
@@ -152,20 +131,7 @@ class EmailTemplateSaver(QueueSaver):
         if not email_template.get("queue", None):
             return
 
-        object_path = self.construct_object_path(
-            subdir=subdir, email_template=email_template
-        )
-        if not object_path:
-            return
-        if self.download_all or await should_write_object(
-            object_path, email_template, self.changed_files, self.parent_dir_reference
-        ):
-            await write_json(
-                object_path,
-                email_template,
-                self.type,
-                log_message=f"Pulled {self.display_type} {object_path}",
-            )
+        return await super().save_downloaded_object(email_template, subdir)
 
 
 class InboxSaver(QueueSaver):
@@ -207,18 +173,7 @@ class InboxSaver(QueueSaver):
         if not inbox.get("queues", []):
             return
 
-        object_path = self.construct_object_path(subdir=subdir, inbox=inbox)
-        if not object_path:
-            return
-        if self.download_all or await should_write_object(
-            object_path, inbox, self.changed_files, self.parent_dir_reference
-        ):
-            await write_json(
-                object_path,
-                inbox,
-                self.type,
-                log_message=f"Pulled {self.display_type} {object_path}",
-            )
+        return await super().save_downloaded_object(inbox, subdir)
 
 
 class SchemaSaver(QueueSaver):
@@ -282,24 +237,13 @@ class SchemaSaver(QueueSaver):
         )
         return object_path
 
-    async def save_downloaded_object(self, schema: dict, subdir: Subdirectory):
-        object_path = self.construct_object_path(subdir=subdir, schema=schema)
-        if not object_path:
-            return
-        if self.download_all or await should_write_object(
-            object_path, schema, self.changed_files, self.parent_dir_reference
-        ):
-            await write_json(
-                object_path,
-                schema,
-                self.type,
-                log_message=f"Pulled {self.display_type} {object_path}",
-            )
-
-            formula_saver = FormulaSaver(
-                parent_schema_path=object_path, parent_schema=schema
-            )
-            await formula_saver.save_downloaded_objects()
+    async def save(self, schema: dict, subdir: Subdirectory):
+        await super().save(schema, subdir)
+        object_path = self.construct_object_path(subdir, schema)
+        formula_saver = FormulaSaver(
+            parent_schema_path=object_path, parent_schema=schema
+        )
+        await formula_saver.save_downloaded_objects()
 
 
 class FormulaSaver(BaseModel):
@@ -383,20 +327,6 @@ class RuleSaver(SchemaSaver):
         )
         return object_path
 
-    async def save_downloaded_object(self, rule: dict, subdir: Subdirectory):
-        object_path = self.construct_object_path(subdir=subdir, rule=rule)
-        if not object_path:
-            return
-        if self.download_all or await should_write_object(
-            object_path, rule, self.changed_files, self.parent_dir_reference
-        ):
-            await write_json(
-                object_path,
-                rule,
-                self.type,
-                log_message=f"Pulled {self.display_type} {object_path}",
-            )
-
 
 class HookSaver(ObjectSaver):
     type: Resource = Resource.Hook
@@ -410,22 +340,13 @@ class HookSaver(ObjectSaver):
         )
         return object_path
 
-    async def save_downloaded_object(self, hook: dict, subdir: Subdirectory):
-        object_path = self.construct_object_path(subdir=subdir, hook=hook)
-        if not object_path:
-            return
-        if self.download_all or await should_write_object(
-            object_path, hook, self.changed_files, self.parent_dir_reference
-        ):
-            await write_json(
-                object_path,
-                hook,
-                self.type,
-                log_message=f"Pulled {self.display_type} {object_path}",
-            )
+    async def save(self, hook, object_path) -> list[Path] | None:
+        await super().save(hook, object_path)
 
-            custom_hook_code_path = create_custom_hook_code_path(object_path, hook)
-            if custom_hook_code_path:
-                await write_str(
-                    custom_hook_code_path, hook.get("config", {}).get("code", None)
-                )
+        custom_hook_code_path = create_custom_hook_code_path(object_path, hook)
+        if custom_hook_code_path:
+            await write_str(
+                custom_hook_code_path, hook.get("config", {}).get("code", None)
+            )
+            return [custom_hook_code_path]
+        return None

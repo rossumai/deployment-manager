@@ -18,7 +18,7 @@ from deployment_manager.commands.download.helpers import (
     delete_empty_folders,
     delete_empty_formula_dir,
     replace_code_paths,
-    should_write_object,
+    should_write_object, get_pull_decision, get_changed_files,
 )
 from deployment_manager.commands.download.remover import ObjectRemover
 from deployment_manager.commands.download.saver import EmailTemplateSaver, HookSaver, InboxSaver, QueueSaver, RuleSaver, SchemaSaver, WorkspaceSaver
@@ -33,7 +33,7 @@ from deployment_manager.utils.consts import (
     settings,
 )
 
-from deployment_manager.common.git import get_changed_file_paths
+from deployment_manager.common.git import get_changed_file_paths, PullStrategy
 from deployment_manager.common.read_write import read_json, write_json
 from deployment_manager.utils.functions import (
     find_all_object_paths,
@@ -95,7 +95,8 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
 
     download_all: bool = False
     skip_objects_without_subdir: bool = False
-    ignore_changed_file_warnings: bool = False
+    ignore_changed_file_warnings: bool = False  # TODO delete
+    pull_strategy: PullStrategy | None = None
 
     workspace_saver: Optional["WorkspaceSaver"] = None
     queue_saver: Optional["QueueSaver"] = None
@@ -109,10 +110,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
         if not self.project_path:
             self.project_path = Path(".")
 
-        changed_files = get_changed_file_paths(self.org_path)
-        changed_files = list(map(lambda x: x[1], changed_files))
-        changed_files = replace_code_paths(changed_files)
-        self.changed_files = changed_files
+        self.changed_files = await get_changed_files(self.org_path)
 
         if not self.client:
             token = await get_token(
@@ -286,19 +284,29 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
 
     async def download_and_save_organization_object(self):
         try:
-            organization = await self.client._http_client.fetch_one(
+            object = await self.client._http_client.fetch_one(
                 Resource.Organization, self.org_id
             )
-            org_file_path = self.project_path / self.name / "organization.json"
-            if self.download_all or await should_write_object(
-                org_file_path, organization, self.changed_files, self
-            ):
-                await write_json(
-                    org_file_path,
-                    organization,
-                    Resource.Organization,
-                    log_message=f"Pulled {org_file_path}.",
-                )
+            object_path = self.project_path / self.name / "organization.json"
+            if not object_path:
+                return
+            if self.download_all:
+                await self.save(object, object_path)
+                return
+
+            pull_strategy = await get_pull_decision(
+                object_path, object, self.changed_files, "Organization"
+            )
+
+            if pull_strategy == PullStrategy.overwrite:
+                await self.save(object, object_path)
+                return
+
+            if pull_strategy == PullStrategy.skip:
+                return
+
+            if pull_strategy == PullStrategy.merge:
+                await self.merge(object, object_path)
         except APIClientError as e:
             if e.status_code == 404:
                 raise DownloadException(
