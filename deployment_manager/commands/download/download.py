@@ -155,6 +155,7 @@ async def download_destinations(
             if stashed:
                 subprocess.run(["git", "add", "-u"])
                 pop = subprocess.run(["git", "stash", "pop"], capture_output=True, text=True, check=False)
+                stashed = False
                 if pop.returncode != 0:
                     display_info('You need to solve local conflicts using git now.\nWatch out that local and remote changes are swapped at this point (pulling "remote" changes from stash to "local" rep from the server)')
 
