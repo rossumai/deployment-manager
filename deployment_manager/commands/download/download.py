@@ -14,7 +14,7 @@ from deployment_manager.common.upload_download_setup import (
     expand_destinations,
     mark_subdirectories_to_include,
 )
-from deployment_manager.utils.consts import display_error, display_warning, settings
+from deployment_manager.utils.consts import display_error, display_warning, settings, display_info
 from deployment_manager.utils.functions import (
     coro,
 )
@@ -34,6 +34,13 @@ In case the directory already exists, it first deletes its contents and then dow
     "destinations",
     nargs=-1,
     type=click.Path(path_type=Path),
+)
+@click.option(
+    "--rebase",
+    "-r",
+    default=False,
+    is_flag=True,
+    help="Merge local changes with remote changes using git",
 )
 @click.option(
     "--commit",
@@ -66,6 +73,7 @@ In case the directory already exists, it first deletes its contents and then dow
 # To be able to run the command progammatically without the CLI decorators
 async def download_project_wrapper(
     destinations: tuple[Path],
+    rebase: bool = False,
     commit: bool = False,
     message: str = "",
     all: bool = False,
@@ -77,6 +85,7 @@ async def download_project_wrapper(
         commit=commit,
         download_all=all,
         skip_objects_without_subdir=skip_objects_without_subdir,
+        rebase=rebase,
     )
 
 
@@ -87,6 +96,7 @@ async def download_destinations(
     commit_message: str = "",
     download_all: bool = False,
     skip_objects_without_subdir: bool = False,
+    rebase: bool = False,
 ):
     if not destinations:
         display_warning(
@@ -133,18 +143,35 @@ async def download_destinations(
             if not await subdir_path.exists():
                 os.makedirs(subdir_path, exist_ok=True)
 
+        stashed = False
         try:
+            if rebase:
+                # first stash local changes, so there won't be any conflicts during pull
+                stash = subprocess.run(["git", "stash"], capture_output=True, text=True, check=True)
+                if stash.stdout.startswith("Saved "):
+                    # there were some local changes stasthed
+                    stashed = True
             await org_dir_config.download_organization()
+            if stashed:
+                subprocess.run(["git", "add", "-u"])
+                pop = subprocess.run(["git", "stash", "pop"], capture_output=True, text=True, check=False)
+                if pop.returncode != 0:
+                    display_info('You need to solve local conflicts using git now.\nWatch out that local and remote changes are swapped at this point (pulling "remote" changes from stash to "local" rep from the server)')
+
+
         except Exception as e:
             display_error(
                 f"Error during the {settings.DOWNLOAD_COMMAND_NAME} of {org_dir_config.display_label}: {e}",
                 e,
             )
+            if stashed:
+                subprocess.run(["git", "stash", "pop"], check=False)
+
 
     # TODO: test with deleting objects
     # TODO: test just empty org file (subdirs should not be required then
     # TODO: org_path assumption test
 
-    if commit:
+    if commit and not rebase:
         subprocess.run(["git", "add", "."])
         subprocess.run(["git", "commit", "-m", commit_message])
