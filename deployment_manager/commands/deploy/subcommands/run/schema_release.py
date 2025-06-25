@@ -78,7 +78,7 @@ class SchemaRelease(ObjectRelease):
         if not self.overwrite_ignored_fields:
             # Ignore should preceed attribute override, so that override can win if it is defined
             await self.ignore_schema_ai_fields(schema=schema_copy, target=target)
-
+        # TODO
         self.overrider.override_attributes_v2(
             object=schema_copy, attribute_overrides=override_copy
         )
