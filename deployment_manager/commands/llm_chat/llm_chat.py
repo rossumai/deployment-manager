@@ -19,8 +19,6 @@ from deployment_manager.common.read_write import read_prd_project_config
 from deployment_manager.utils.functions import coro
 
 
-# TODO: count summarization LLM tokens
-
 # TODO: differentiate objects for the LLM (annotations vs hooks, etc.)
 # Fetch hook logs by annotation_id or hook_id
 #
