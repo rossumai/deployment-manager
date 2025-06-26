@@ -62,7 +62,8 @@ async def generate_documentation_wrapper(
 
 
 async def generate_documentation(project_path: Path, ignore_cache: bool):
-    LLMHelper().validate_credentials()
+    if not LLMHelper().validate_credentials():
+        return
 
     if not project_path:
         project_path = Path("./")

@@ -12,7 +12,7 @@ import json
 import os
 import logging
 
-from deployment_manager.utils.consts import display_info
+from deployment_manager.utils.consts import display_error, display_info
 
 logging.getLogger("botocore.credentials").setLevel(logging.CRITICAL)
 
@@ -92,13 +92,17 @@ class LLMHelper:
         try:
             sts = self.session.client("sts")
             sts.get_caller_identity()
+            return True
         except UnauthorizedSSOTokenError:
-            raise RuntimeError(
+            display_error(
                 "SSO credentials have expired. Run `aws sso login --profile rossum-dev`."
             )
+            return False
         except NoCredentialsError:
-            raise RuntimeError(
+            display_error(
                 "No AWS credentials found. Set AWS_PROFILE or configure SSO. Run `aws sso login --profile rossum-dev`."
             )
+            return False
         except ClientError as e:
-            raise RuntimeError(f"Credential error: {e.response['Error']['Message']}")
+            display_error(f"Credential error: {e.response['Error']['Message']}")
+            return False

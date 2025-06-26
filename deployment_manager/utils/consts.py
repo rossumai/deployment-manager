@@ -203,8 +203,8 @@ class Settings:
     CONFIG_KEY_DIRECTORIES = "directories"
     CONFIG_KEY_SUBDIRECTORIES = "subdirectories"
 
-    DOCUMENTATION_FOLDER_NAME = 'documentation'
-    DOCUMENTATION_INTERNAL_SUFFIX = 'internal'
+    DOCUMENTATION_FOLDER_NAME = "documentation"
+    DOCUMENTATION_INTERNAL_SUFFIX = "internal"
 
     # Pull consts
     DOWNLOAD_KEY_ORG_ID = "org_id"

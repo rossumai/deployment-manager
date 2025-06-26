@@ -54,7 +54,8 @@ class ConversationSolver:
         "- If the question or subproblem is generic about Rossum, you should always check your understanding against the knoelwedge base before answering."
         "- The knowledge base includes the whole Rossum API reference."
         "- If you don't have a specific tool, you can try search the API reference and then make use the generic Rossum API request tool."
-        "- The JSON objects are nested: workspace has queues, queue has a schema, etc. If you need to find something about a queue, the information might therefore be on a different but related object."
+        "- Rossum objects are nested in the following way: workspace has queues, queue has a schema, etc. If you need to find something about a queue, the information might therefore be on a different but related object."
+        "- Your context window is limited and you should not call the API to list many objects at once (e.g., all /hooks?queue_id=333). If you can, request objects one by one (e.g., look at queue.hooks and then ask about each in turn)."
         "- If the user references some name of field (e.g., 'PO Number'), you should first look into the schema of the queue to understand what the schema_id is because that is what Rossum uses internally."
     )
 
@@ -81,6 +82,18 @@ class ConversationSolver:
             / settings.DOCUMENTATION_FOLDER_NAME
         )
 
+    @property
+    def data_storage_api_url(self):
+        COMMON_SUFFIX = "/svc/data-storage/api/v1"
+        if "us.api.rossum.ai" in self.client._http_client.base_url:
+            return "https://us.app.rossum.ai" + COMMON_SUFFIX
+        elif "api.elis.rossum.ai" in self.client._http_client.base_url:
+            return "https://elis.rossum.ai" + COMMON_SUFFIX
+        else:
+            return (
+                self.client._http_client.base_url.replace("/api/v1", "") + COMMON_SUFFIX
+            )
+
     def _debug_print(self, message: str):
         if self.show_debug:
             print(message)
@@ -99,6 +112,13 @@ class ConversationSolver:
             endpoint_url=self.endpoint_url,
             region_name=self.region,
             credentials_profile_name=self.profile_name,
+        )
+
+        self.summary_llm = ChatBedrockConverse(
+            model="us.anthropic.claude-3-haiku-20240307-v1:0",  # Use a cheaper/faster model for summarization if preferred
+            endpoint_url=self.llm.endpoint_url,
+            region_name=self.llm.region_name,
+            credentials_profile_name=self.llm.credentials_profile_name,
         )
 
         self.bedrock_kb_retriever = AmazonKnowledgeBasesRetriever(
@@ -175,7 +195,7 @@ class ConversationSolver:
             try:
                 async with httpx.AsyncClient() as client:
                     req = await client.post(
-                        url="https://us.app.rossum.ai/svc/data-storage/api/v1/data/aggregate",
+                        url=self.data_storage_api_url + "/data/aggregate",
                         headers={
                             "Authorization": f"Bearer {self.client._http_client.token}"
                         },
@@ -327,19 +347,16 @@ class ConversationSolver:
             yield f"--- Your input was too long ({user_input_tokens} tokens) and has been summarized to fit the conversation memory. ---\n\n"
             try:
                 # Use a separate LLM call to summarize the user's input
-                summary_llm = ChatBedrockConverse(
-                    model="us.anthropic.claude-3-haiku-20240307-v1:0",  # Use a cheaper/faster model for summarization if preferred
-                    endpoint_url=self.llm.endpoint_url,
-                    region_name=self.llm.region_name,
-                    credentials_profile_name=self.llm.credentials_profile_name,
-                )
                 summary_prompt = f"Summarize the following text concisely to fit within {max_allowed_for_single_message} tokens, retaining all key information:\n\n{user_input}"
-                summary_result = await summary_llm.ainvoke(
+                summary_result = await self.summary_llm.ainvoke(
                     [HumanMessage(content=summary_prompt)]
                 )
+
                 user_input_message = HumanMessage(content=summary_result.content)
+                current_input_tokens = self._get_messages_tokens([user_input_message])
+                self.total_input_tokens += current_input_tokens
                 self._debug_print(
-                    f"DEBUG: User input summarized to {self._get_messages_tokens([user_input_message])} tokens."
+                    f"DEBUG: User input summarized to {current_input_tokens} tokens."
                 )
             except Exception as e:
                 self._debug_print(
@@ -484,19 +501,22 @@ class ConversationSolver:
                             yield f"--- Tool output was too long ({tool_output_tokens} tokens) and has been summarized to fit the conversation memory. ---\n\n"
                             try:
                                 # Use a separate LLM call to summarize the tool's output
-                                summary_llm = ChatBedrockConverse(
-                                    model="anthropic.claude-3-haiku-20240307-v1:0",  # Cheaper/faster model for summarization
-                                    endpoint_url=self.llm.endpoint_url,
-                                    region_name=self.llm.region_name,
-                                    credentials_profile_name=self.llm.credentials_profile_name,
-                                )
                                 summary_prompt = f"Summarize the following tool output concisely to fit within {max_allowed_for_single_message} tokens, retaining all key information:\n\n{tool_output_str}"
-                                summary_result = await summary_llm.ainvoke(
+                                summary_result = await self.summary_llm.ainvoke(
                                     [HumanMessage(content=summary_prompt)]
                                 )
                                 tool_output_str = summary_result.content
+                                tool_message = ToolMessage(
+                                    content=tool_output_str,
+                                    tool_call_id=tool_id,
+                                )
+
+                                current_input_tokens = self._get_messages_tokens(
+                                    [tool_message]
+                                )
+
                                 self._debug_print(
-                                    f"DEBUG: Tool output summarized to {self._get_messages_tokens([ToolMessage(content=tool_output_str, tool_call_id=tool_id)])} tokens."
+                                    f"DEBUG: Tool output summarized to {current_input_tokens} tokens."
                                 )
                             except Exception as e:
                                 self._debug_print(

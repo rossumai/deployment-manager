@@ -22,10 +22,8 @@ from deployment_manager.utils.functions import coro
 # TODO: count summarization LLM tokens
 
 # TODO: differentiate objects for the LLM (annotations vs hooks, etc.)
-# Look up something in master data
-# Fetch object (how to determine type?)
 # Fetch hook logs by annotation_id or hook_id
-# TODO: generalize data storage URL
+#
 # TODO: instruct to check that pasted annotation is not in the queue that is documented
 # TODO: limit how long it talks to iself
 
@@ -53,7 +51,8 @@ async def llm_chat_wrapper(destination: str, project_path: Path = None):
         display_error(f"Invalid destination '{destination}'")
         return
 
-    LLMHelper().validate_credentials()
+    if not LLMHelper().validate_credentials():
+        return
 
     history = InMemoryHistory()
     session = PromptSession(history=history)
