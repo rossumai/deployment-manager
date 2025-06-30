@@ -29,7 +29,8 @@ async def update_application():
     current_version = parse_version(importlib.metadata.version("deployment-manager"))
     latest_version = parse_version(latest_version)
 
-    if str(current_version) == "0.0.0":
+    if str(current_version) == "0.0.0" or current_version.is_devrelease:
+        # 0.0.0 if installed via poetry, is_devrelease==True if pip is used
         if not await questionary.confirm(
             f"You probably installed deployment-manager project locally from source. Do you really want to update to a latest release {latest_version}?",
             default=False,
