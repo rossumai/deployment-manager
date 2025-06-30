@@ -244,8 +244,8 @@ class Settings:
         Resource.Hook: ["status"],
     }
 
-    SEPARATE_KEYS_FILE_NAME: str = "separate_data.json"
-    SEPARATE_KEYS: tuple = ("modified_at",)
+    NON_VERSIONED_ATTRIBUTES_FILE_NAME: str = "non_versioned_object_attributes.json"
+    NON_VERSIONED_ATTRIBUTES: tuple = ("modified_at",)
 
     FORMULA_DIR_NAME: str = "formulas"
     RULES_DIR_NAME: str = "rules"

@@ -14,7 +14,7 @@ from deployment_manager.utils.consts import settings
 from deployment_manager.common.determine_path import determine_object_type_from_path
 
 
-SEPARATE_FILE_LOCK = asyncio.Lock()
+NON_VERSIONED_ATTRIBUTES_FILE_LOCK = asyncio.Lock()
 
 
 async def write_object_to_json(
@@ -25,15 +25,18 @@ async def write_object_to_json(
     if path.parent:
         await path.parent.mkdir(parents=True, exist_ok=True)
     if type:
+        # IGNORED_KEYS are thrown away completely
         if ignored_keys := settings.IGNORED_KEYS.get(type):
             for key in ignored_keys:
                 if key in object:
                     del object[key]
-        if separate_keys := settings.SEPARATE_KEYS:
-            for key in separate_keys:
+        # NON_VERSIONED_ATTRIBUTES are saved in separate file
+        if non_versioned_keys := settings.NON_VERSIONED_ATTRIBUTES:
+            for key in non_versioned_keys:
                 if key in object:
-                    await write_separate_key(path, object, key)
-                    del object[key]
+                    non_versioned_key_written = await write_non_versioned_attribute(path, object, key)
+                    if non_versioned_key_written:
+                        del object[key]
     with open(path, "w") as wf:
         json.dump(object, wf, indent=2)
 
@@ -41,24 +44,31 @@ async def write_object_to_json(
         print(log_message)
 
 
-async def write_separate_key(path, object_, key):
+async def write_non_versioned_attribute(path, object_, key):
     if len(path.parents) < 3:
-        # outside subdirectory, shouldn't happen
-        return
-    subdir_path = path.parents[-3]  # path to dir/subdir
-    separate_file = subdir_path / settings.SEPARATE_KEYS_FILE_NAME  # file is saved in root for each subdirectory
+        # outside subdirectory
+        return False
+
+    # path.parents is a list of full paths which are parents for the current file from closest to furthest
+    # path.parents example: if we have a file a/b/c/d/e.txt, Path(e.txt).parents would be [a/b/c/d, a/b/c, a/b, a, .]
+    # `non_versioned_attributes` file we need to find is always saved on org/suborg level
+    # That's why it's always -3. then, we can load org/suborg/non_versioned_object_attributes.json
+    subdir_path = path.parents[-3]  # path to dir/subdir, or organization/suborganization
+    non_versioned_attributes_file = subdir_path / settings.NON_VERSIONED_ATTRIBUTES_FILE_NAME  # file is saved in root for each subdirectory
 
     # avoid simultaneous write to the same file
-    async with SEPARATE_FILE_LOCK:
-        if await separate_file.exists():
-            with open(separate_file, "r", encoding="utf-8") as f:
-                separate_data = json.load(f)
+    async with NON_VERSIONED_ATTRIBUTES_FILE_LOCK:
+        if await non_versioned_attributes_file.exists():
+            with open(non_versioned_attributes_file, "r", encoding="utf-8") as f:
+                non_versioned_data = json.load(f)
         else:
-            separate_data = {}
+            non_versioned_data = {}
 
-        current_level = separate_data
-
-        # saving new value of the key to the file structure
+        # Saving new value of the key to the non_versioned file structure
+        # Example: path.parts[2:] is ["c", "d", "e", "f"], key is KEY and current_level[KEY] is VALUE.
+        # This loop will result in writing a following value into non_versioned_data: {c: {d: {e: {f: {KEY: VALUE}}}}}
+        # It benefits from how references are used in python.
+        current_level = non_versioned_data
         for part in path.parts[2:]:
             if part not in current_level or not isinstance(current_level[part], dict):
                 current_level[part] = {}
@@ -66,10 +76,12 @@ async def write_separate_key(path, object_, key):
         current_level[key] = object_[key]
 
         try:
-            with open(separate_file, "w", encoding="utf-8") as f:
-                json.dump(separate_data, f, indent=4)
+            with open(non_versioned_attributes_file, "w", encoding="utf-8") as f:
+                json.dump(non_versioned_data, f, indent=4)
+            return True
         except Exception as e:
-            print(f"Error: Failed to write to '{separate_file}': {e}")
+            print(f"Error: Failed to write to '{non_versioned_attributes_file}': {e}")
+        return False
 
 
 async def write_str(path: Path, code: str):
@@ -156,31 +168,36 @@ async def create_formula_file(path: Path, code: str):
 
 async def read_object_from_json(path: Path) -> dict:
     object_ = json.loads(await path.read_text())
-    await read_separate_object_data(path, object_)
+    await read_non_versioned_attribute_data(path, object_)
     return object_
 
 
-async def read_separate_object_data(path, object_):
+async def read_non_versioned_attribute_data(path, object_):
     # extend object with data from separate file
     if len(path.parents) < 3:
         # outside subdirectory
         return
-    subdir_path = path.parents[-3]
-    separate_file = subdir_path / settings.SEPARATE_KEYS_FILE_NAME  # file is saved in root for each subdirectory
-    if await separate_file.exists():
-        separate_data = {}
+
+    # fore more clarity of how this works, read comments in the `write_non_versioned_attribute` function
+    subdir_path = path.parents[-3] # path to dir/subdir, or organization/suborganization
+    non_versioned_attributes_file = subdir_path / settings.NON_VERSIONED_ATTRIBUTES_FILE_NAME  # file is saved in root for each subdirectory
+    if await non_versioned_attributes_file.exists():
+        non_versioned_data = {}
         # locking the file while reading to be sure other process won't write in the meantime
-        async with SEPARATE_FILE_LOCK:
-            with open(separate_file, "r") as f:
-                separate_data = json.load(f)
-        # iterate deeper into the object until the filename is found
-        for separate_data_key in path.parts[2:]:
-            separate_data = separate_data.get(separate_data_key)
-            if not separate_data:
+        async with NON_VERSIONED_ATTRIBUTES_FILE_LOCK:
+            with open(non_versioned_attributes_file, "r") as f:
+                non_versioned_data = json.load(f)
+
+        # fore more clarity of how this works, read the comment before the writing loop in the `write_non_versioned_attribute` function
+        # this function does the opposite and reads the data from the separate file, and results in having the full object in memory
+        for path_part in path.parts[2:]:
+            # iterate deeper into the object until the filename is found
+            non_versioned_data = non_versioned_data.get(path_part)
+            if not non_versioned_data:
                 return
-        if separate_data:
-            # join separate data into the object
-            object_.update(separate_data)
+        if non_versioned_data:
+            # join non_versioned data into the object
+            object_.update(non_versioned_data)
     return
 
 
