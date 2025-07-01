@@ -1,3 +1,5 @@
+import os
+
 from anyio import Path
 
 import questionary
@@ -27,7 +29,7 @@ from deployment_manager.utils.consts import (
 from deployment_manager.utils.functions import (
     coro,
 )
-
+from rossum_api.api_client import Resource
 
 PURGE_OBJECT_TYPES = [
     *ALL_OBJECT_TYPES,
@@ -66,13 +68,17 @@ Deletes all objects in Rossum based on IDs in the mappping file. This operation 
     type=click.Path(path_type=Path, exists=True),
     help="You can specific a path to deploy template file, which sources will be purged"
 )
+@click.option(
+    "--deploy_file_type",
+    "-t",
+    type=click.Choice(choices=("source", "target", "both")),
+    help="If purging by deploy_file, you need to specify whether you want to purge source, target, or both"
+)
 @coro
-async def purge_object_types_wrapper(object_types, dir, subdir, deploy_file):
+async def purge_object_types_wrapper(object_types, dir, subdir, deploy_file, deploy_file_type):
     # To be able to run the command progammatically without the CLI decorators
     if settings.ALL_OBJECTS in object_types:
         object_types = ALL_OBJECT_TYPES
-
-    object_types_ids = {object_type: [] for object_type in object_types}
 
     if deploy_file and (dir or subdir):
         display_warning(
@@ -80,21 +86,65 @@ async def purge_object_types_wrapper(object_types, dir, subdir, deploy_file):
         )
         return
 
-    if not deploy_file:
-        await purge_object_types(
-            object_types_ids=object_types_ids, selected_dir=dir, selected_subdirs=subdir.split(",") if subdir else None
-        )
+    if deploy_file:
+        if not deploy_file_type:
+            display_warning(
+                "You need to use --deploy_file (-f) with --deploy_file_type (-t)"
+            )
+            return
+
+        await purge_by_deploy_file(object_types, deploy_file, deploy_file_type)
         return
 
+    object_types_ids = {object_type: [] for object_type in object_types}
+    await purge_object_types(
+        object_types_ids=object_types_ids, selected_dir=dir, selected_subdirs=subdir.split(",") if subdir else None
+    )
+
+
+async def purge_by_deploy_file(object_types, deploy_file, deploy_file_type):
+    # purging by deploy file
     release_file = await deploy_file.read_text()
     yaml = DeployYaml(release_file)
-    dir, subdir = yaml.data["source_dir"].split("/")
-    for object_type in object_types:
-        for object in yaml.data.get(object_type, []):
-            object_types_ids[object_type].append(object["id"])
-    await purge_object_types(
-        object_types_ids=object_types_ids, selected_dir=dir, selected_subdirs=[subdir]
-    )
+    if deploy_file_type in ["source", "both"]:
+        source_object_types_ids = {object_type: [] for object_type in object_types}
+        dir, subdir = yaml.data["source_dir"].split("/")
+        for object_type in object_types:
+            for object in yaml.data.get(object_type, []):
+                source_object_types_ids[object_type].append(object["id"])
+        await purge_object_types(
+            object_types_ids=source_object_types_ids, selected_dir=dir, selected_subdirs=[subdir]
+        )
+    if deploy_file_type in ["target", "both"]:
+        target_object_types_ids = {object_type: [] for object_type in object_types}
+        dir, subdir = yaml.data["target_dir"].split("/")
+        for object_type in object_types:
+            for object in yaml.data.get(object_type, []):
+                for target in object.get("targets", []):
+                    if target_id := target.get("id"):
+                        target_object_types_ids[object_type].append(target_id)
+        await purge_object_types(
+            object_types_ids=target_object_types_ids, selected_dir=dir, selected_subdirs=[subdir]
+        )
+    if deploy_file_type in ["source", "both"]:
+        # if purging source (or both), delete the whole template
+        os.remove(deploy_file)
+    elif deploy_file_type == "target":
+        # if purging target, delete the ids from template
+        # deployment_manager.commands.deploy.subcommands.run.object_release.ObjectRelease.update_targets
+        for object_type in object_types:
+            for o_ix, object in enumerate(yaml.data.get(object_type, [])):
+                for t_ix, target in enumerate(object.get("targets", [])):
+                    if target.get("id") in target_object_types_ids[object_type]:
+                        yaml.data[object_type][o_ix]["targets"][t_ix]["id"] = None
+                if object_type == Resource.Queue.value:
+                    for additional_type in ["schema", "inbox"]:
+                        for t_ix, _ in enumerate(object.get("targets", [])):
+                            yaml.data[object_type][o_ix][additional_type]["targets"][t_ix]["id"] = None
+        await yaml.save_to_file(deploy_file)
+
+
+    # if target and not source, remove target ids
 
 
 async def purge_object_types(
