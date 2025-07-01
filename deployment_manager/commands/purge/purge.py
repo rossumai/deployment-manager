@@ -89,8 +89,8 @@ async def purge_object_types(
 
         if selected_dir:
             # dir selected as parameter, we need to check whether it exists
-            dir_cadidates = await get_dir_candidates(project_path=project_path, config=config)
-            if selected_dir not in dir_cadidates:
+            dir_candidates = await get_dir_candidates(project_path=project_path, config=config)
+            if selected_dir not in dir_candidates:
                 display_warning(
                     f"Dir `{selected_dir}` not found. Please specify existing directory with --dir or remove the parameter."
                 )
