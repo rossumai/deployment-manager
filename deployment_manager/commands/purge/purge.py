@@ -1,3 +1,5 @@
+import os
+
 from anyio import Path
 
 import questionary
@@ -11,7 +13,7 @@ from deployment_manager.commands.deploy.common.helpers import (
     get_directory_from_config,
 )
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
-    get_url_and_credentials,
+    get_url_and_credentials, DeployYaml,
 )
 
 from deployment_manager.commands.purge.directory import (
@@ -27,7 +29,7 @@ from deployment_manager.utils.consts import (
 from deployment_manager.utils.functions import (
     coro,
 )
-
+from rossum_api.api_client import Resource
 
 PURGE_OBJECT_TYPES = [
     *ALL_OBJECT_TYPES,
@@ -60,20 +62,98 @@ Deletes all objects in Rossum based on IDs in the mappping file. This operation 
     default=None,
     help='Subdirectory where objects will be purged. You can enter multiple subdirectories divided by ","',
 )
+@click.option(
+    "--deploy_file",
+    "-f",
+    type=click.Path(path_type=Path, exists=True),
+    help="You can specific a path to deploy template file, which sources will be purged"
+)
+@click.option(
+    "--deploy_file_type",
+    "-t",
+    type=click.Choice(choices=("source", "target", "both")),
+    help="If purging by deploy_file, you need to specify whether you want to purge source, target, or both"
+)
 @coro
-async def purge_object_types_wrapper(object_types, dir, subdir):
+async def purge_object_types_wrapper(object_types, dir, subdir, deploy_file, deploy_file_type):
     # To be able to run the command progammatically without the CLI decorators
+    if settings.ALL_OBJECTS in object_types:
+        object_types = ALL_OBJECT_TYPES
 
+    if deploy_file and (dir or subdir):
+        display_warning(
+            "Cannot use --deploy_file (-f) with --dir (-d) or --subdir (-s)."
+        )
+        return
+
+    if deploy_file:
+        if not deploy_file_type:
+            display_warning(
+                "You need to use --deploy_file (-f) with --deploy_file_type (-t)"
+            )
+            return
+
+        await purge_by_deploy_file(object_types, deploy_file, deploy_file_type)
+        return
+
+    object_types_ids = {object_type: [] for object_type in object_types}
     await purge_object_types(
-        object_types=object_types, selected_dir=dir, selected_subdirs=subdir.split(",") if subdir else None
+        object_types_ids=object_types_ids, selected_dir=dir, selected_subdirs=subdir.split(",") if subdir else None
     )
 
 
+async def purge_by_deploy_file(object_types, deploy_file, deploy_file_type):
+    # purging by deploy file
+    release_file = await deploy_file.read_text()
+    yaml = DeployYaml(release_file)
+    if deploy_file_type in ["source", "both"]:
+        # purging source objects
+        source_object_types_ids = {object_type: [] for object_type in object_types}
+        dir, subdir = yaml.data["source_dir"].split("/")
+        for object_type in object_types:
+            for object in yaml.data.get(object_type, []):
+                source_object_types_ids[object_type].append(object["id"])
+        await purge_object_types(
+            object_types_ids=source_object_types_ids, selected_dir=dir, selected_subdirs=[subdir]
+        )
+
+    if deploy_file_type in ["target", "both"]:
+        # purging target objects
+        target_object_types_ids = {object_type: [] for object_type in object_types}
+        dir, subdir = yaml.data["target_dir"].split("/")
+        for object_type in object_types:
+            for object in yaml.data.get(object_type, []):
+                for target in object.get("targets", []):
+                    if target_id := target.get("id"):
+                        target_object_types_ids[object_type].append(target_id)
+        await purge_object_types(
+            object_types_ids=target_object_types_ids, selected_dir=dir, selected_subdirs=[subdir]
+        )
+
+    # cleanup of the deploy file we used to purge objects
+    if deploy_file_type in ["source", "both"]:
+        # if purging source (or both), delete the whole template file
+        os.remove(deploy_file)
+
+    elif deploy_file_type == "target":
+        # if purging target, delete the ids from template
+        for object_type in object_types:
+            for o_ix, object in enumerate(yaml.data.get(object_type, [])):
+                for t_ix, target in enumerate(object.get("targets", [])):
+                    if target.get("id") in target_object_types_ids[object_type]:
+                        yaml.data[object_type][o_ix]["targets"][t_ix]["id"] = None
+                if object_type == Resource.Queue.value:
+                    for additional_type in ["schema", "inbox"]:
+                        for t_ix, _ in enumerate(object.get("targets", [])):
+                            yaml.data[object_type][o_ix][additional_type]["targets"][t_ix]["id"] = None
+        await yaml.save_to_file(deploy_file)
+
+
 async def purge_object_types(
-    object_types: list[str], client: ElisAPIClient = None, project_path: Path = None, selected_dir=None, selected_subdirs=None
+    object_types_ids: dict[str, list[int]], client: ElisAPIClient = None, project_path: Path = None, selected_dir=None, selected_subdirs=None
 ):
     try:
-        if not object_types:
+        if not object_types_ids.keys():
             display_warning(
                 f"No object types specified to {settings.PURGE_COMMAND_NAME}."
             )
@@ -149,7 +229,7 @@ async def purge_object_types(
             project_path=project_path,
             name=org_name,
             org_id=org_id,
-            purged_object_types=object_types,
+            purged_object_types_ids=object_types_ids,
             selected_subdirs=selected_subdirs,
             subdirectories=directory_in_config.get(
                 settings.CONFIG_KEY_SUBDIRECTORIES, {}
