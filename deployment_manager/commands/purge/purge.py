@@ -134,9 +134,9 @@ async def purge_by_deploy_file(object_types, deploy_file, deploy_file_type):
     if deploy_file_type in ["source", "both"]:
         # if purging source (or both), delete the whole template file
         os.remove(deploy_file)
+
     elif deploy_file_type == "target":
         # if purging target, delete the ids from template
-        # deployment_manager.commands.deploy.subcommands.run.object_release.ObjectRelease.update_targets
         for object_type in object_types:
             for o_ix, object in enumerate(yaml.data.get(object_type, [])):
                 for t_ix, target in enumerate(object.get("targets", [])):
@@ -147,9 +147,6 @@ async def purge_by_deploy_file(object_types, deploy_file, deploy_file_type):
                         for t_ix, _ in enumerate(object.get("targets", [])):
                             yaml.data[object_type][o_ix][additional_type]["targets"][t_ix]["id"] = None
         await yaml.save_to_file(deploy_file)
-
-
-    # if target and not source, remove target ids
 
 
 async def purge_object_types(
