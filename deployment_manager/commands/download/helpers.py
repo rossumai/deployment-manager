@@ -81,6 +81,7 @@ async def delete_objects_non_versioned_attributes(path: Path):
     # this method deletes the object's data in non_versioned_attributes file
 
     if len(path.parents) < 3:
+        # outside subdirectory, no non_versioned_attribute allowed at this level
         return
 
     subdir_path: Path = path.parents[-3] ## path to dir/subdir, resp. org/suborg

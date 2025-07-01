@@ -46,7 +46,7 @@ async def write_object_to_json(
 
 async def write_non_versioned_attribute(path, object_, key):
     if len(path.parents) < 3:
-        # outside subdirectory
+        # outside subdirectory, no non_versioned_attribute allowed at this level
         return False
 
     # path.parents is a list of full paths which are parents for the current file from closest to furthest
@@ -174,8 +174,9 @@ async def read_object_from_json(path: Path) -> dict:
 
 async def read_non_versioned_attribute_data(path, object_):
     # extend object with data from separate file
+
     if len(path.parents) < 3:
-        # outside subdirectory
+        # outside subdirectory, no non_versioned_attribute allowed at this level
         return
 
     # fore more clarity of how this works, read comments in the `write_non_versioned_attribute` function
