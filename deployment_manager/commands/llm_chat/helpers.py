@@ -265,6 +265,44 @@ class ConversationSolver:
             return "no such extension documented"
 
         @tool
+        async def get_extension_logs(
+            extension_id: int,
+            request_id: str = None,
+            annotation_id: int = None,
+            log_level: str = None,
+            queue_id: int = None,
+            search: str = None,
+        ):
+            """
+            Returns logs of a specific Rossum extension (hook).
+
+            Args:
+                extension_id: ID of the extension
+                request_id: [Optional] filter out only logs for this correlation ID
+                annotation_id: [Optional] comma-separated string of annotation IDs to which the logs should be related to
+                log_level: [Optional] comma-separated string of log levels (INFO, WARNING, ERROR)
+                queue_id [Optional] comma-separated string of queue IDs to which the logs should be related to
+                search [Optional] full-text filter across log entry fields
+
+            """
+            try:
+                return await self.client.request_json(
+                    method="GET",
+                    url="hooks/logs",
+                    params={
+                        "hook": extension_id,
+                        "request_id": request_id,
+                        "annotation": annotation_id,
+                        "queue": queue_id,
+                        "log_level": log_level,
+                        "search": search,
+                    },
+                )
+            except Exception as e:
+                display_error(f"Error while getting logs: {e}")
+                return None
+
+        @tool
         async def get_document(id: int):
             """Returns JSON of the document (annotation) with the specified ID
 
@@ -325,6 +363,7 @@ class ConversationSolver:
             get_document_content,
             get_queue_documentation,
             get_extension_documentation,
+            get_extension_logs,
             get_local_object_json,
             get_remote_hook_json,
             search_knowledge_base,
