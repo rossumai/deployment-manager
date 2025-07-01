@@ -94,9 +94,9 @@ async def delete_objects_non_versioned_attributes(path: Path):
 
             # searching for the key in json
             parent = data
-            for key in file_path_parts_from_subdir[:-1]:  # Go up to the second-to-last key
-                if key in parent:
-                    parent = parent[key]
+            for path_part in file_path_parts_from_subdir[:-1]:  # Go up to the second-to-last key. For the last one, del will be called later.
+                if path_part in parent:
+                    parent = parent[path_part]
                 else:
                     return
 
