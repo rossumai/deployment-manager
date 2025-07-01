@@ -87,30 +87,31 @@ async def delete_objects_non_versioned_attributes(path: Path):
     subdir_path: Path = path.parents[-3] ## path to dir/subdir, resp. org/suborg
     file_path_parts_from_subdir: tuple[str, ...] = path.parts[2:] # parts of path from dir/subdir, in list
     non_versioned_file = subdir_path/settings.NON_VERSIONED_ATTRIBUTES_FILE_NAME
-    async with NON_VERSIONED_ATTRIBUTES_FILE_LOCK:
-        with open(non_versioned_file, 'r') as f:
-            data = json.load(f)
+    if await non_versioned_file.exists():
+        async with NON_VERSIONED_ATTRIBUTES_FILE_LOCK:
+            with open(non_versioned_file, 'r') as f:
+                data = json.load(f)
 
-        # searching for the key in json
-        parent = data
-        for key in file_path_parts_from_subdir[:-1]:  # Go up to the second-to-last key
-            if key in parent:
-                parent = parent[key]
+            # searching for the key in json
+            parent = data
+            for key in file_path_parts_from_subdir[:-1]:  # Go up to the second-to-last key
+                if key in parent:
+                    parent = parent[key]
+                else:
+                    return
+
+            # The last key in the list is the one to delete
+            key_to_delete = file_path_parts_from_subdir[-1]
+
+            # Delete the key from the parent dictionary
+            if key_to_delete in parent:
+                del parent[key_to_delete]
             else:
                 return
 
-        # The last key in the list is the one to delete
-        key_to_delete = file_path_parts_from_subdir[-1]
-
-        # Delete the key from the parent dictionary
-        if key_to_delete in parent:
-            del parent[key_to_delete]
-        else:
-            return
-
-        # if the key was found and deleted, write updated non_versioned_attributes file
-        with open(non_versioned_file, 'w') as f:
-            json.dump(data, f, indent=4)
+            # if the key was found and deleted, write updated non_versioned_attributes file
+            with open(non_versioned_file, 'w') as f:
+                json.dump(data, f, indent=4)
 
 
 async def delete_empty_folders(root: Path):
