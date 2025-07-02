@@ -573,6 +573,44 @@ async def get_attribute_overrides_from_user():
         )
     return overrides
 
+async def get_global_attribute_overrides_from_user():
+    override_options = [
+        settings.DEPLOY_KEY_WORKSPACES,
+        settings.DEPLOY_KEY_QUEUES,
+        settings.DEPLOY_KEY_HOOKS,
+    ]
+    overrides = []
+    while await questionary.confirm(
+        "Do you want to add a global regex attribute override?", default=True
+    ).ask_async():
+        override_objects = await questionary.checkbox(
+            "Select objects:",
+            choices=[questionary.Choice(title=option) for option in override_options],
+        ).ask_async()
+        override_attribute = await questionary.text(
+            "Input attribute/JMESPath:"
+        ).ask_async()
+        # TODO: escaping test
+        override_source_regex = await questionary.text(
+            "Input source REGEX to override (empty value will be understood as 'replace everything'):"
+        ).ask_async()
+        override_target = await questionary.text(
+            "Input new STRING (e.g., 'PROD'):"
+        ).ask_async()
+
+        overrides.append(
+            AttributeOverride(
+                object_types=override_objects,
+                attribute=override_attribute,
+                value=(
+                    create_regex_override_syntax(override_source_regex, override_target)
+                    if override_source_regex
+                    else override_target
+                ),
+            )
+        )
+    return overrides
+
 
 async def get_secrets_from_user(deploy_file_object: dict, previous_secrets_file: dict):
     hooks = deploy_file_object.get(settings.DEPLOY_KEY_HOOKS, [])

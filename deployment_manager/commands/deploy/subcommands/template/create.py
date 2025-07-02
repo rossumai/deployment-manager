@@ -15,7 +15,7 @@ from deployment_manager.commands.deploy.subcommands.template.helpers import (
     get_queues_from_user,
     get_dir_and_subdir_from_user,
     get_secrets_from_user,
-    get_workspaces_from_user,
+    get_workspaces_from_user, get_global_attribute_overrides_from_user,
 )
 from deployment_manager.common.mapping import read_mapping
 from deployment_manager.common.read_write import read_json, write_json
@@ -142,6 +142,12 @@ async def create_deploy_template(
     # Global attribute overrides
     if interactive:
         overrides = await get_attribute_overrides_from_user()
+        for override in overrides:
+            add_override_to_deploy_file_objects(override, deploy_file_object)
+
+    # Global attribute overrides
+    if False and interactive:
+        overrides = await get_global_attribute_overrides_from_user()
         for override in overrides:
             add_override_to_deploy_file_objects(override, deploy_file_object)
 

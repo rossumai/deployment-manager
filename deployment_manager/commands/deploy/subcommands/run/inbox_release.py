@@ -76,7 +76,7 @@ class InboxRelease(ObjectRelease):
             )
         # TODO
         self.overrider.override_attributes_v2(
-            object=inbox_copy, attribute_overrides=override_copy
+            object=inbox_copy, attribute_overrides=override_copy, global_overrides=target.attribute_override
         )
 
         return inbox_copy
