@@ -178,7 +178,7 @@ async def download_destinations(
                         status = subprocess.run(["git", "status"], capture_output=True, text=True, check=True)
 
                     if await questionary.confirm(
-                        "Conflicts were solved successfully. Do you want to automatically push and commit those files where conflict occurred?"
+                        "Conflicts were solved successfully. Do you want to automatically push those files where conflict occurred? (recommended)", default=True
                     ).ask_async():
                         # need to import here to avoid circular imports
                         from deployment_manager.commands.upload.upload import upload_destinations
