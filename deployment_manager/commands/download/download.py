@@ -1,12 +1,13 @@
 import os
 import subprocess
+
+import questionary
 from anyio import Path
 
 import click
 from deployment_manager.commands.download.directory import (
     DownloadOrganizationDirectory,
 )
-
 
 from deployment_manager.common.read_write import read_prd_project_config
 from deployment_manager.common.upload_download_setup import (
@@ -158,7 +159,39 @@ async def download_destinations(
                 pop = subprocess.run(["git", "stash", "pop"], capture_output=True, text=True, check=False)
                 stashed = False
                 if pop.returncode != 0:
-                    display_warning("You need to solve local conflicts using git now.\nCurrent = pulled from remote vs Incoming = your local-only changes.")
+                    all_unmerged_files = set()
+                    status = subprocess.run(["git", "status"], capture_output=True, text=True, check=True)
+                    while True:
+                        if "Unmerged paths" not in status.stdout:
+                            break
+                        currently_unmerged_changes = []
+                        for line in status.stdout.splitlines():
+                            if "both modified:" in line:
+                                filename = line.replace("both modified:", "").strip()
+                                currently_unmerged_changes.append(filename)
+                                all_unmerged_files.add(filename)
+                        display_warning(
+                            f"You need to solve local conflicts using git. Current = pulled from remote vs. Incoming = your local-only changes.\n{'_'*80}"
+                            f"\nUnmerged files:\n{'\n'.join(currently_unmerged_changes)}")
+                        await questionary.confirm(
+                            "Press enter after solving the conflict", default=True
+                        ).ask_async()
+                        status = subprocess.run(["git", "status"], capture_output=True, text=True, check=True)
+
+                    if await questionary.confirm(
+                        "Conflicts were solved successfully. Do you want to automatically push and commit those files where conflict occurred?"
+                    ).ask_async():
+                        # need to import here to avoid circular imports
+                        from deployment_manager.commands.upload.upload import upload_destinations
+                        await upload_destinations(
+                            destinations=(org_dir_config.org_path, ),
+                            include_only_files=[Path(i) for i in all_unmerged_files],
+                            show_commit_message=False
+                        )
+                    else:
+                        display_info(f"Important: Do not forget to run `prd2 push` after solving conflicts, before commiting the files locally.\n{'_'*80}"
+                                     f"Files with merged changes which need to be pushed before commiting:\n{'\n'.join(all_unmerged_files)}")
+
 
 
         except Exception as e:
