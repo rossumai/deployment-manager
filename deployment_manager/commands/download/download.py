@@ -145,6 +145,7 @@ async def download_destinations(
                 os.makedirs(subdir_path, exist_ok=True)
 
         stashed = False
+
         try:
             if rebase:
                 # first stash local changes, so there won't be any conflicts during pull
@@ -161,9 +162,7 @@ async def download_destinations(
                 if pop.returncode != 0:
                     all_unmerged_files = set()
                     status = subprocess.run(["git", "status"], capture_output=True, text=True, check=True)
-                    while True:
-                        if "Unmerged paths" not in status.stdout:
-                            break
+                    while "Unmerged paths" in status.stdout:
                         currently_unmerged_changes = []
                         for line in status.stdout.splitlines():
                             if "both modified:" in line:
