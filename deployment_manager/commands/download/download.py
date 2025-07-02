@@ -147,7 +147,7 @@ async def download_destinations(
         try:
             if rebase:
                 # first stash local changes, so there won't be any conflicts during pull
-                stash = subprocess.run(["git", "stash"], capture_output=True, text=True, check=True)
+                stash = subprocess.run(["git", "stash", "-u"], capture_output=True, text=True, check=True)
                 if stash.stdout.startswith("Saved "):
                     # there were some local changes stashed
                     stashed = True
