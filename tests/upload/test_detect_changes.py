@@ -14,7 +14,7 @@ from deployment_manager.commands.upload.directory import (
     ChangedObject,
     UploadOrganizationDirectory,
 )
-from deployment_manager.common.read_write import write_json
+from deployment_manager.common.read_write import write_object_to_json
 from deployment_manager.utils.consts import GIT_CHARACTERS
 from deployment_manager.utils.functions import templatize_name_id
 from tests.upload.utils import initialize_git_repo
@@ -63,7 +63,7 @@ async def test_detect_subdir(
     initialize_git_repo(tmp_path)
 
     workspace_json["name"] = "Testing change"
-    await write_json(object_path, workspace_json)
+    await write_object_to_json(object_path, workspace_json)
 
     upload_dir = UploadOrganizationDirectory(
         name=TEST_ORG_NAME,
@@ -115,7 +115,7 @@ async def test_detect_ignores_unincluded_subdir(
     initialize_git_repo(tmp_path)
 
     workspace_json["name"] = "Testing change"
-    await write_json(object_path, workspace_json)
+    await write_object_to_json(object_path, workspace_json)
 
     upload_dir = UploadOrganizationDirectory.model_construct(
         name=TEST_ORG_NAME,

@@ -34,7 +34,7 @@ from deployment_manager.utils.consts import (
 )
 
 from deployment_manager.common.git import get_changed_file_paths
-from deployment_manager.common.read_write import read_json, write_json
+from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
 from deployment_manager.utils.functions import (
     find_all_object_paths,
 )
@@ -79,7 +79,7 @@ class OrganizationDirectory(BaseModel):
 
             object_ids = set()
             for object_path in object_paths:
-                object = await read_json(object_path)
+                object = await read_object_from_json(object_path)
                 object_id = object.get("id", None)
                 if object_id:
                     object_ids.add(object_id)
@@ -293,7 +293,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             if self.download_all or await should_write_object(
                 org_file_path, organization, self.changed_files, self
             ):
-                await write_json(
+                await write_object_to_json(
                     org_file_path,
                     organization,
                     Resource.Organization,

@@ -244,6 +244,9 @@ class Settings:
         Resource.Hook: ["status"],
     }
 
+    NON_VERSIONED_ATTRIBUTES_FILE_NAME: str = "non_versioned_object_attributes.json"
+    NON_VERSIONED_ATTRIBUTES: tuple = ("modified_at",)
+
     FORMULA_DIR_NAME: str = "formulas"
     RULES_DIR_NAME: str = "rules"
     EMAIL_TEMPLATES_DIR_NAME: str = "email_templates"
