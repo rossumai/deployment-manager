@@ -51,7 +51,13 @@ class WorkspaceRelease(ObjectRelease):
                 request = self.upload(target_object=ws_copy, target=target)
                 release_requests.append(request)
 
-            results = await asyncio.gather(*release_requests)
+            if self.plan_only:
+                results = []
+                # Run sequentially when planning because user may have to input things in the CLI
+                for request in release_requests:
+                    results.append(await request)
+            else:
+                results = await asyncio.gather(*release_requests)
 
             self.update_targets(results)
         except Exception as e:
