@@ -153,6 +153,7 @@ async def download_destinations(
                     stashed = True
             await org_dir_config.download_organization()
             if stashed:
+                # adding updated files to be able to pop from stash and resolve the conflicts if any
                 subprocess.run(["git", "add", "-u"])
                 pop = subprocess.run(["git", "stash", "pop"], capture_output=True, text=True, check=False)
                 stashed = False
