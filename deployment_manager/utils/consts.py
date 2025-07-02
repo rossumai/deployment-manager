@@ -248,6 +248,10 @@ class Settings:
     RULES_DIR_NAME: str = "rules"
     EMAIL_TEMPLATES_DIR_NAME: str = "email_templates"
 
+    GITHUB_DEFAULT_LATEST_RELEASE_URL = "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
+    GITHUB_DEPLOYMENT_MANAGER_REPO_OWNER = "rossumai"
+    GITHUB_DEPLOYMENT_MANAGER_REPO_NAME = "deployment-manager"
+
     @property
     def SOURCE_API_URL(self):
         return self.SOURCE_API_BASE.rstrip("/")
