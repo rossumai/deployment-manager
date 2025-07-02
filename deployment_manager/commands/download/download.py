@@ -149,7 +149,7 @@ async def download_destinations(
                 # first stash local changes, so there won't be any conflicts during pull
                 stash = subprocess.run(["git", "stash"], capture_output=True, text=True, check=True)
                 if stash.stdout.startswith("Saved "):
-                    # there were some local changes stasthed
+                    # there were some local changes stashed
                     stashed = True
             await org_dir_config.download_organization()
             if stashed:
@@ -157,7 +157,7 @@ async def download_destinations(
                 pop = subprocess.run(["git", "stash", "pop"], capture_output=True, text=True, check=False)
                 stashed = False
                 if pop.returncode != 0:
-                    display_info('You need to solve local conflicts using git now.\nWatch out that local and remote changes are swapped at this point (pulling "remote" changes from stash to "local" rep from the server)')
+                    display_warning("You need to solve local conflicts using git now.\nCurrent = pulled from remote vs Incoming = your local-only changes.")
 
 
         except Exception as e:
