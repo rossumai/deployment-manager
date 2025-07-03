@@ -30,7 +30,7 @@ async def generate_and_save_hook_payload(
         project_path = get_project_path_from_hook_path(hook_path=hook_path)
         payload_filename = await get_filepath_from_user(
             project_path=project_path,
-            default=f"payloads/payload_{hook_path.stem}.json",
+            default=str(Path(f"payloads/payload_{hook_path.stem}.json")),
             default_text="Name for the payload JSON file",
         )
 
