@@ -5,7 +5,7 @@ from deployment_manager.utils.consts import CustomResource
 
 
 def determine_object_type_from_path(path: Path) -> Resource:
-    split_path = str(path).split("/")
+    split_path = str(path).split("/") # TODO
     type = split_path[-2] if len(split_path) > 1 else path.stem + "s"
     allowed_types = set(resource.value for resource in Resource)
     if type in allowed_types:

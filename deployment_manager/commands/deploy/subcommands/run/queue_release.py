@@ -152,7 +152,7 @@ class QueueRelease(ObjectRelease):
                     dependency="workspace",
                     source_id_target_pairs=self.workspace_targets,
                 )
-                new_workspace_id = queue_copy["workspace"].split("/")[-1]
+                new_workspace_id = queue_copy["workspace"].split("/")[-1] # TODO
 
                 if previous_workspace_url == queue_copy["workspace"] and not target.id:
                     raise Exception(

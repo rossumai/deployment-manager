@@ -79,7 +79,7 @@ async def create_deploy_template(
     source_url = deploy_file_object.get(settings.DEPLOY_KEY_SOURCE_URL, "")
     if not source_url:
         source_url = await get_api_url_from_config(
-            base_path=org_path, org_name=source_dir_and_subdir.split("/")[0]
+            base_path=org_path, org_name=source_dir_and_subdir.split("/")[0] # TODO
         )
     if interactive or not source_url:
         source_url = await get_api_url_from_user(
@@ -94,7 +94,7 @@ async def create_deploy_template(
     target_url = deploy_file_object.get(settings.DEPLOY_KEY_TARGET_URL, "")
     if not target_url and target_dir_and_subdir:
         target_url = await get_api_url_from_config(
-            base_path=org_path, org_name=target_dir_and_subdir.split("/")[0]
+            base_path=org_path, org_name=target_dir_and_subdir.split("/")[0] # TODO
         )
     if interactive or not target_url:
         target_url = await get_api_url_from_user(
@@ -155,8 +155,8 @@ async def create_deploy_template(
 
     # Filename
     if interactive:
-        source_subdir_name = source_dir_and_subdir.split("/")[1]
-        target_subdir_name = target_dir_and_subdir.split("/")
+        source_subdir_name = source_dir_and_subdir.split("/")[1] # TODO
+        target_subdir_name = target_dir_and_subdir.split("/") # TODO
         default_deploy_name = f"{source_subdir_name}_{target_subdir_name[1] if len(target_subdir_name) > 1 else "NA"}.yaml"
         deploy_filepath = await get_filepath_from_user(
             org_path,
