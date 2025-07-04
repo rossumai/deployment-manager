@@ -231,6 +231,7 @@ class AttributeOverrider:
         self,
         object: dict,
         attribute_overrides: dict,
+        global_overrides: dict = None,
     ) -> dict:
         if not object:
             raise Exception(
@@ -243,6 +244,54 @@ class AttributeOverrider:
                 key_query=key,
                 new_value=value,
             )
+        if isinstance(global_overrides, dict):
+            for key, value in global_overrides.items():
+                self.override_attribute_global(
+                    object=object,
+                    key_query=key,
+                    new_value=value,
+                )
+
+    def override_attribute_global(
+        self,
+        object: dict,
+        key_query: str,
+        new_value: str,
+    ):
+        def override_str(data, search_string, replace_string):
+            if isinstance(data, dict):
+                return {k: override_str(v, search_string, replace_string) for k, v in data.items()}
+            elif isinstance(data, list):
+                return [override_str(elem, search_string, replace_string) for elem in data]
+            elif isinstance(data, str):
+                return re.sub(search_string, replace_string, data)
+            else:
+                return data
+
+        parent, key = parse_parent_and_key(key_query)
+
+        search = perform_search(parent, object)
+
+        for override_parent in search:
+            # The attribute (key) might not be on all parent objects (e.g., configurations[*].queue_ids)
+            if key not in override_parent:
+                continue
+
+            if isinstance(new_value, str):
+                source_regex, new_value = parse_regex_attribute_override(new_value)
+
+                if not source_regex:
+                    override_parent[key] = new_value
+                else:
+                    pattern = re.compile(source_regex)
+                    override_parent[key] = override_str(override_parent[key], pattern, new_value)
+
+            # Overwriting dicts -> merge keys, overwrite only the provided ones
+            elif isinstance(new_value, dict):
+                override_parent[key] = {**override_parent[key], **new_value}
+            # Overwriting lists and any other values -> replace the whole list
+            else:
+                override_parent[key] = new_value
 
 
 def create_regex_override_syntax(source: str, target: str):

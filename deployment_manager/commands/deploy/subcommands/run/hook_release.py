@@ -63,7 +63,7 @@ class HookRelease(ObjectRelease):
                     )
 
                 self.overrider.override_attributes_v2(
-                    object=hook_copy, attribute_overrides=target.attribute_override
+                    object=hook_copy, attribute_overrides=target.attribute_override, global_overrides=target.global_override
                 )
 
                 request = self.upload(target_object=hook_copy, target=target)
