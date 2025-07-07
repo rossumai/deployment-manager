@@ -201,6 +201,16 @@ class AttributeOverrider:
         key_query: str,
         new_value: str,
     ):
+        def override(data, search_string, replace_string):
+            if isinstance(data, dict):
+                return {k: override(v, search_string, replace_string) for k, v in data.items()}
+            elif isinstance(data, list):
+                return [override(elem, search_string, replace_string) for elem in data]
+            elif isinstance(data, str):
+                return re.sub(search_string, replace_string, data)
+            else:
+                return data
+
         parent, key = parse_parent_and_key(key_query)
 
         search = perform_search(parent, object)
@@ -217,9 +227,7 @@ class AttributeOverrider:
                     override_parent[key] = new_value
                 else:
                     pattern = re.compile(source_regex)
-                    override_parent[key] = re.sub(
-                        pattern, new_value, override_parent[key]
-                    )
+                    override_parent[key] = override(override_parent[key], pattern, new_value)
             # Overwriting dicts -> merge keys, overwrite only the provided ones
             elif isinstance(new_value, dict):
                 override_parent[key] = {**override_parent[key], **new_value}
