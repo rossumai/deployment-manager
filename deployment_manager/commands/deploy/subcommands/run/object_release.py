@@ -17,7 +17,7 @@ from deployment_manager.commands.deploy.subcommands.run.models import (
     Target,
     TargetWithDefault,
 )
-from deployment_manager.common.read_write import read_json
+from deployment_manager.common.read_write import read_object_from_json
 from rich import print as pprint
 from rich.panel import Panel
 
@@ -114,7 +114,7 @@ class ObjectRelease(BaseModel):
         self.overrider = AttributeOverrider(type=self.type, plan_only=self.plan_only)
 
         try:
-            self.data = await read_json(self.path)
+            self.data = await read_object_from_json(self.path)
         except Exception:
             raise PathNotFoundException(
                 f"Could not load object data from: [green]{self.path}[/green]. Is the object name in deploy file in-sync with its local path?"

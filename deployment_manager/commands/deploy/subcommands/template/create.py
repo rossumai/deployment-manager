@@ -18,7 +18,7 @@ from deployment_manager.commands.deploy.subcommands.template.helpers import (
     get_workspaces_from_user, get_global_attribute_overrides_from_user,
 )
 from deployment_manager.common.mapping import read_mapping
-from deployment_manager.common.read_write import read_json, write_json
+from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
 from deployment_manager.utils.consts import display_error, display_info, settings
 
 from rich import print as pprint
@@ -181,7 +181,7 @@ async def create_deploy_template(
         secrets_file_path
         and await (secrets_file_path := Path(secrets_file_path)).exists()
     ):
-        previous_secrets_file = await read_json(secrets_file_path)
+        previous_secrets_file = await read_object_from_json(secrets_file_path)
     else:
         secrets_file_path = None
         previous_secrets_file = {}
@@ -205,7 +205,7 @@ async def create_deploy_template(
                 ),
             )
 
-        await write_json(secrets_file_path, secrets)
+        await write_object_to_json(secrets_file_path, secrets)
 
     deploy_file_object[settings.DEPLOY_KEY_SECRETS_PATH] = str(secrets_file_path)
 

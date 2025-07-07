@@ -4,7 +4,7 @@ from typing import Any
 from deployment_manager.commands.deploy.subcommands.run.attribute_override import (
     create_regex_override_syntax,
 )
-from deployment_manager.common.read_write import read_json, read_prd_project_config
+from deployment_manager.common.read_write import read_object_from_json, read_prd_project_config
 from pydantic import BaseModel
 import questionary
 from anyio import Path
@@ -65,7 +65,7 @@ async def prepare_choices(
     choices = []
 
     for path in paths:
-        object = await read_json(path)
+        object = await read_object_from_json(path)
         name, id = object.get("name", ""), object.get("id", "")
         if not id:
             continue
@@ -150,7 +150,7 @@ async def get_dir_and_subdir_from_user(
 async def find_hooks_for_queues(source_path: Path, queues: list[dict]):
     hook_paths = await find_all_hook_paths_in_destination(source_path)
     all_hooks = [
-        {**await read_json(hook_path), "path": hook_path} for hook_path in hook_paths
+        {**await read_object_from_json(hook_path), "path": hook_path} for hook_path in hook_paths
     ]
     found_hook_ids = set()
     found_hooks = []
@@ -345,7 +345,7 @@ async def get_schema_for_queue(queue: dict, previous_queues_by_id: dict):
         )
         return
 
-    schema_object = await read_json(schema_path)
+    schema_object = await read_object_from_json(schema_path)
 
     previous_schema = previous_queues_by_id.get(queue["id"], {}).get(
         settings.DEPLOY_KEY_SCHEMA, {}
@@ -373,7 +373,7 @@ async def get_rules_for_schema(queue: dict, schema: dict, previous_queues_by_id:
     )
     deploy_rule_objects = []
     for rule_path in await find_rule_paths_for_dir(rules_path):
-        rule_object = await read_json(rule_path)
+        rule_object = await read_object_from_json(rule_path)
 
         previous_rule = find_rule(rules=previous_rules, rule_id=rule_object["id"])
         deploy_rule_object = prepare_subqueue_deploy_file_object(
@@ -395,7 +395,7 @@ async def get_inbox_for_queue(queue: dict, previous_queues_by_id: dict):
     if not (await inbox_path.exists()):
         return
 
-    inbox_object = await read_json(inbox_path)
+    inbox_object = await read_object_from_json(inbox_path)
 
     previous_inbox = previous_queues_by_id.get(queue["id"], {}).get(
         settings.DEPLOY_KEY_INBOX, {}

@@ -1,8 +1,11 @@
+import json
 import os
 import shutil
 from typing import Any
 from anyio import Path
 from pydantic import BaseModel
+
+from deployment_manager.commands.download.helpers import delete_objects_non_versioned_attributes
 from rossum_api.api_client import Resource
 
 from deployment_manager.common.determine_path import determine_object_type_from_url
@@ -10,11 +13,13 @@ from deployment_manager.common.read_write import (
     create_custom_hook_code_path,
     create_formula_directory_path,
     find_formula_fields_in_schema,
-    read_json,
+    read_object_from_json,
+    NON_VERSIONED_ATTRIBUTES_FILE_LOCK
 )
 from deployment_manager.utils.consts import (
     CustomResource,
     display_warning,
+    settings,
 )
 from deployment_manager.commands.download.subdirectory import (
     Subdirectory,
@@ -38,7 +43,7 @@ class ObjectRemover(BaseModel):
     @staticmethod
     async def construct_remover(object_path: Path, id_objects_map, **kwargs):
 
-        local_object = await read_json(object_path)
+        local_object = await read_object_from_json(object_path)
         url, id = local_object.get("url", ""), local_object.get("id", "")
         # Clearly not a Rossum object, just ignore
         if not url or not id:
@@ -87,6 +92,7 @@ class ObjectRemover(BaseModel):
             f"Deleting {self.display_type} that no longer exists in Rossum, was renamed, or its parent object moved elsewhere: [green]{self.local_path}[/green]"
         )
         os.remove(self.local_path)
+        await delete_objects_non_versioned_attributes(self.local_path)
 
 
 class SchemaRemover(ObjectRemover):
