@@ -200,7 +200,7 @@ class QueueRelease(ObjectRelease):
                     await self.ignore_ai_fields(queue=queue_copy, target=target)
 
                 self.overrider.override_attributes_v2(
-                    object=queue_copy, attribute_overrides=target.attribute_override, global_overrides=target.global_override
+                    object=queue_copy, attribute_overrides=target.attribute_override
                 )
 
                 request = self.upload(target_object=queue_copy, target=target)

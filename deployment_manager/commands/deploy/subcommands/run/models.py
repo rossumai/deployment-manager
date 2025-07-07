@@ -11,7 +11,6 @@ class Target(BaseModel):
     )
     data: dict = {}
     attribute_override: dict = {}
-    global_override: dict = {}
     index: int = 0
 
 

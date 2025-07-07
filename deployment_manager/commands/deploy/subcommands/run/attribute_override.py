@@ -231,7 +231,6 @@ class AttributeOverrider:
         self,
         object: dict,
         attribute_overrides: dict,
-        global_overrides: dict = None,
     ) -> dict:
         if not object:
             raise Exception(
@@ -244,13 +243,6 @@ class AttributeOverrider:
                 key_query=key,
                 new_value=value,
             )
-        if isinstance(global_overrides, dict):
-            for key, value in global_overrides.items():
-                self.override_attribute_global(
-                    object=object,
-                    key_query=key,
-                    new_value=value,
-                )
 
     def override_attribute_global(
         self,

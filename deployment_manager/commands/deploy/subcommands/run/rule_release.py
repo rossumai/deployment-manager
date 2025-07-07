@@ -77,7 +77,7 @@ class RuleRelease(ObjectRelease):
                     raise Exception(
                         f'Cannot create target for {self.display_type} "{rule_copy['name']} ({rule_copy['id']})" - there is no target schema to use it with.'
                     )
-                # TODO
+
                 self.overrider.override_attributes_v2(
                     object=rule_copy, attribute_overrides=override_copy
                 )

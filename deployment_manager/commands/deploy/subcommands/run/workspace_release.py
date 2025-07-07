@@ -45,7 +45,7 @@ class WorkspaceRelease(ObjectRelease):
                 ws_copy["queues"] = []
                 ws_copy["organization"] = self.target_org_url
                 self.overrider.override_attributes_v2(
-                    object=ws_copy, attribute_overrides=target.attribute_override, global_overrides=target.global_override
+                    object=ws_copy, attribute_overrides=target.attribute_override
                 )
 
                 request = self.upload(target_object=ws_copy, target=target)
