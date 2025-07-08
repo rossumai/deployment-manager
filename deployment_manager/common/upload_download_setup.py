@@ -48,7 +48,7 @@ def expand_destinations(
             )
 
         else:
-            expanded_destinations.append(str(destination))
+            expanded_destinations.append(destination)
 
     return expanded_destinations
 
