@@ -1,9 +1,5 @@
-import random
-
-import questionary
 from anyio import Path
 from pydantic import BaseModel
-from rich import print as pprint
 
 from rossum_api.api_client import Resource
 
