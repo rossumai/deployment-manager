@@ -1,5 +1,10 @@
+import random
+
+import questionary
 from anyio import Path
 from pydantic import BaseModel
+from rich import print as pprint
+
 from rossum_api.api_client import Resource
 
 from deployment_manager.commands.download.helpers import should_write_object
@@ -147,6 +152,14 @@ class EmailTemplateSaver(QueueSaver):
             / f'{templatize_name_id(email_template["name"], email_template["id"])}.json'
         )
         return object_path
+
+    def _get_subdir_from_user_message(self, object):
+        message = super()._get_subdir_from_user_message(object)
+
+        queue = self.find_queue(object)
+        if queue:
+            return message + f", for [yellow]queue[/yellow]: {self.display_label(queue['name'], queue['id'])}"
+        return message
 
     async def save_downloaded_object(self, email_template: dict, subdir: Subdirectory):
         if not email_template.get("queue", None):
