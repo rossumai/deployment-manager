@@ -1,17 +1,17 @@
-from copy import deepcopy
 from anyio import Path
+import anyio
 from pydantic import ValidationError
 import questionary
 from dataclasses import fields
+from deployment_manager.commands.deploy.subcommands.run.deploy_orchestrator.deploy_orchestrator import (
+    DeployOrchestrator,
+)
+from deployment_manager.commands.deploy.subcommands.run.merge.state import DeployState
+from deployment_manager.commands.deploy.subcommands.run.models import DeployException
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.models.organization import Organization
 
-from deployment_manager.commands.deploy.subcommands.run.object_release import (
-    DeployException,
-)
-from deployment_manager.commands.deploy.subcommands.run.release_file import (
-    ReleaseFile,
-)
+
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
     check_required_keys,
@@ -44,8 +44,6 @@ async def deploy_release_file(
     commit: bool = False,
     commit_message: str = "",
 ):
-    first_deploy = True
-
     release_file = await deploy_file_path.read_text()
     yaml = DeployYaml(release_file)
     if not check_required_keys(yaml.data):
@@ -53,6 +51,15 @@ async def deploy_release_file(
 
     if not project_path:
         project_path = Path("./")
+
+    # Ensure backwards compatibility with deploy files without deploy state file or path
+    deploy_state_file_path = yaml.data.get(settings.DEPLOY_KEY_STATE_PATH, "")
+    deploy_state_file_path = await DeployState.ensure_deploy_state_file(
+        path=anyio.Path(deploy_state_file_path or ""),
+        base_path=project_path,
+        deploy_file_path=anyio.Path(deploy_file_path),
+    )
+    yaml.data[settings.DEPLOY_KEY_STATE_PATH] = str(deploy_state_file_path)
 
     source_dir_subdir = yaml.data[settings.DEPLOY_KEY_SOURCE_DIR]
     source_org_name = source_dir_subdir.split("/")[0]
@@ -109,7 +116,6 @@ async def deploy_release_file(
                 if k in {f.name for f in fields(Organization)}
             }
         )
-
     else:
         target_org_choices = []
         async for org in target_client.list_all_organizations():
@@ -122,8 +128,9 @@ async def deploy_release_file(
             target_org = target_org_choices[0].value
 
     source_dir_path = project_path / Path(source_dir_subdir)
+
     try:
-        release = ReleaseFile(
+        release = DeployOrchestrator(
             **yaml.data,
             client=target_client,
             source_client=source_client,
@@ -132,18 +139,6 @@ async def deploy_release_file(
             source_org=source_org,
             target_org=target_org,
             plan_only=False,
-            force_deploy=force,
-            auto_delete=auto_delete,
-        )
-        planned_release = ReleaseFile(
-            **deepcopy(yaml.data),
-            client=target_client,
-            source_client=source_client,
-            source_dir_path=source_dir_path,
-            yaml=deepcopy(yaml),
-            source_org=source_org,
-            target_org=target_org,
-            plan_only=True,
             force_deploy=force,
             auto_delete=auto_delete,
         )
@@ -157,7 +152,6 @@ async def deploy_release_file(
                 raise DeployException(
                     f"Target org ID in deploy file ({release.deployed_org_id}) is not the same as the selected target org ({target_org.id}). Please check your configuration."
                 )
-            first_deploy = False
             await target_client.retrieve_organization(release.deployed_org_id)
         except APIClientError as e:
             if e.status_code == 404:
@@ -172,16 +166,13 @@ async def deploy_release_file(
             return
 
     try:
-        await planned_release.deploy_organization()
+        await release.initialize_deploy_objects()
 
-        await planned_release.deploy_hooks()
-        await planned_release.migrate_hook_dependency_graph()
+        await release.initialize_target_objects()
 
-        await planned_release.deploy_workspaces()
+        await release.compare_object_versions()
 
-        await planned_release.deploy_queues()
-
-        await planned_release.apply_implicit_id_override()
+        await release.show_deploy_plan()
     except DeployException as e:
         display_error(f"Planning failed: {e}")
         return
@@ -197,28 +188,21 @@ async def deploy_release_file(
         return
 
     # Take what the user inputted (or the same if user input not applicable)
-    yaml.data[settings.DEPLOY_KEY_TOKEN_OWNER] = planned_release.token_owner_id
-    update_ignore_flags_in_yaml(yaml.data, planned_release.queue_ignore_warnings)
-    release.token_owner_id = planned_release.token_owner_id
-    release.hook_templates = planned_release.hook_templates
-    release.ignore_timestamp_mismatches = planned_release.ignore_timestamp_mismatches
+    yaml.data[settings.DEPLOY_KEY_TOKEN_OWNER] = release.token_owner_id
+    update_ignore_flags_in_yaml(yaml.data, release.queue_ignore_warnings)
 
     deploy_error = False
     try:
-        await release.deploy_organization()
+        await release.run_deploy(is_first=True)
 
-        await release.deploy_hooks()
-        await release.migrate_hook_dependency_graph()
+        await release.run_deploy(is_first=False)
 
-        await release.deploy_workspaces()
-
-        await release.deploy_queues()
-
-        await release.apply_implicit_id_override()
-    except Exception:
+        await release.save_deploy_state()
+    except Exception as e:
         deploy_error = True
         display_error(
-            "Encountered error during deploy, see logs above. Saving intermediary results."
+            "Encountered error during deploy, see logs above. Saving intermediary results.",
+            e,
         )
 
     # To conform with the Elis API modified_at format

@@ -216,7 +216,9 @@ class Settings:
     DEPLOY_DEFAULT_TARGET_URL = "https://my-org.rossum.app/api/v1"
     DEFAULT_DEPLOY_PARENT = "deploy_files"
     DEFAULT_DEPLOY_SECRETS_PARENT = "deploy_secrets"
+    DEFAULT_DEPLOY_STATE_PARENT = "deploy_states"
     DEPLOY_KEY_SECRETS_PATH = "secrets_file"
+    DEPLOY_KEY_STATE_PATH = "deploy_state_file"
     DEPLOY_KEY_TARGETS = "targets"
     DEPLOY_KEY_OVERRIDES = "attribute_override"
     DEPLOY_KEY_DEPLOYED_ORG_ID = "deployed_org_id"
@@ -244,19 +246,35 @@ class Settings:
     DELETE_PRINT_STR: str = "[red]DELETE[/red]"
     PLAN_PRINT_STR: str = "[bold]PLAN:[/bold]"
 
-    IGNORED_KEYS: dict = {
+    NON_VERSIONED_KEYS_PER_OBJECT: dict = {
         Resource.Queue: ["counts", "users"],
         Resource.Hook: ["status"],
     }
 
     NON_VERSIONED_ATTRIBUTES_FILE_NAME: str = "non_versioned_object_attributes.json"
     NON_VERSIONED_ATTRIBUTES: tuple = ("modified_at",)
+    DEPLOY_NON_DIFFED_KEYS: dict = {
+        Resource.Inbox: ["email"],
+        Resource.Hook: ["guide", "status"],
+        Resource.Organization: [
+            "organization_group",
+            "users",
+            "creator",
+            "trial_expires_at",
+        ],
+    }
+    # Non-diffed only if cross-org
+    DEPLOY_CROSS_ORG_NON_DIFFED_KEYS: dict = {
+        Resource.Queue: ["workflows", *QUEUE_ENGINE_ATTRIBUTES]
+    }
 
     FORMULA_DIR_NAME: str = "formulas"
     RULES_DIR_NAME: str = "rules"
     EMAIL_TEMPLATES_DIR_NAME: str = "email_templates"
 
-    GITHUB_DEFAULT_LATEST_RELEASE_URL = "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
+    GITHUB_DEFAULT_LATEST_RELEASE_URL = (
+        "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
+    )
     GITHUB_SPECIFIC_RELEASE_URL = "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/{version_tag}"
     GITHUB_DEPLOYMENT_MANAGER_REPO_OWNER = "rossumai"
     GITHUB_DEPLOYMENT_MANAGER_REPO_NAME = "deployment-manager"

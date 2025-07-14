@@ -17,7 +17,8 @@ from deployment_manager.commands.deploy.subcommands.run.models import (
     Target,
     TargetWithDefault,
 )
-from deployment_manager.common.read_write import read_object_from_json
+from deployment_manager.commands.deploy.subcommands.run.merge.state import DeployState
+from deployment_manager.common.read_write import read_json
 from rich import print as pprint
 from rich.panel import Panel
 
@@ -43,34 +44,21 @@ class DeployException(Exception): ...
 
 
 # TODO: document methods
-class ObjectRelease(BaseModel):
+class DeployObject(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
     id: int
     name: str
     type: Resource
-    base_path: str = None
 
-    yaml: DeployYaml = None
+    release_file_reference: "ReleaseOrchestrator" = None
     yaml_reference: dict = None
     data: dict = None
-
-    client: ElisAPIClient = None
-    source_client: ElisAPIClient = None
-
-    plan_only: bool = False
-    force_deploy: bool = False
-    auto_delete: bool = False
-    is_same_org_deploy: bool = False
 
     initialize_failed: bool = False
     deploy_failed: bool = False
 
-    last_deploy_timestamp: str = ""
-    ignore_timestamp_mismatches: dict[Resource | CustomResource, dict[int, bool]] = (
-        defaultdict(dict)
-    )
     ignore_timestamp_mismatch: bool = False
 
     targets: list[TargetWithDefault] = []
@@ -80,47 +68,26 @@ class ObjectRelease(BaseModel):
 
     overrider: AttributeOverrider = None
 
-    async def initialize(
-        self,
-        yaml,
-        client,
-        source_client,
-        source_dir_path,
-        auto_delete=False,
-        plan_only=False,
-        force_deploy=False,
-        is_same_org_deploy=False,
-        ignore_timestamp_mismatches: dict = {},
-        last_deploy_timestamp="",
-    ):
-        # Base path is defined in the config itself for some objects (queues), for others, it needs to be added
-        if not self.base_path:
-            self.base_path = source_dir_path
-        self.yaml = yaml
+    async def initialize_from_release_file(self, release_file: "ReleaseOrchestrator"):
+        self.release_file_reference = release_file
         self.yaml_reference = self.get_object_in_yaml()
 
-        self.auto_delete = auto_delete
-        self.plan_only = plan_only
-        self.force_deploy = force_deploy
-        self.is_same_org_deploy = is_same_org_deploy
-
-        self.ignore_timestamp_mismatches = ignore_timestamp_mismatches
         self.ignore_timestamp_mismatch = (
-            force_deploy
-            or ignore_timestamp_mismatches.get(self.type, {}).get(self.id, False)
+            self.release_file_reference.force_deploy
+            or self.release_file_reference.ignore_timestamp_mismatches.get(
+                self.type, {}
+            ).get(self.id, False)
         )
-        self.last_deploy_timestamp = last_deploy_timestamp
 
         self.overrider = AttributeOverrider(type=self.type, plan_only=self.plan_only)
 
-        try:
-            self.data = await read_object_from_json(self.path)
-        except Exception:
-            raise PathNotFoundException(
-                f"Could not load object data from: [green]{self.path}[/green]. Is the object name in deploy file in-sync with its local path?"
-            ) from None
-        self.client = client
-        self.source_client = source_client
+        if not self.data:
+            try:
+                self.data = await read_json(self.path)
+            except Exception:
+                raise PathNotFoundException(
+                    f"Could not load object data from: [green]{self.path}[/green]. Is the object name in deploy file in-sync with its local path?"
+                ) from None
 
     async def deploy(self):
         """Creates/updates the object in the Elis API"""
@@ -129,7 +96,7 @@ class ObjectRelease(BaseModel):
     @property
     def path(self) -> Path:
         return (
-            Path(self.base_path)
+            Path(self.release_file_reference.base_path)
             / self.type.value
             / f"{templatize_name_id(self.name, self.id)}.json"
         )
@@ -151,7 +118,7 @@ class ObjectRelease(BaseModel):
         return False
 
     def get_object_in_yaml(self):
-        objects = self.yaml.data.get(self.type.value, [])
+        objects = self.release_file_reference.yaml.data.get(self.type.value, [])
         for object in objects:
             if object.get("id", None) == self.id:
                 return object
@@ -181,7 +148,7 @@ class ObjectRelease(BaseModel):
             deploy_timestamp = datetime.fromisoformat(last_deploy_timestamp)
             if remote_timestamp > deploy_timestamp:
                 display_error(
-                    f"Timestamp of remote target {self.display_type} {remote_object.get('name', 'no-name')} [purple]({remote_object.get('id', 'no-id')})[/purple] is newer than last deploy [white](remote: {remote_modified_at} | deploy_file: {self.last_deploy_timestamp})[/white]"
+                    f"Timestamp of remote target {self.display_type} {remote_object.get('name', 'no-name')} [purple]({remote_object.get('id', 'no-id')})[/purple] is newer than last deploy [white](remote: {remote_modified_at} | deploy_file: {self.last_deployed_at})[/white]"
                 )
                 return False
             return True
@@ -239,7 +206,7 @@ class ObjectRelease(BaseModel):
                 result["id"] = result_id
             else:
                 result = await self.client._http_client.create(self.type, target_object)
-                self.last_deploy_timestamp = generate_deploy_timestamp()
+                self.last_deployed_at = generate_deploy_timestamp()
             pprint(
                 f"{settings.PLAN_PRINT_STR if self.plan_only else ''} {settings.CREATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}."
             )
@@ -263,7 +230,7 @@ class ObjectRelease(BaseModel):
                 if (
                     not self.ignore_timestamp_mismatch
                     and not await self.check_modified_timestamps_equal(
-                        self.last_deploy_timestamp, target.id
+                        self.last_deployed_at, target.id
                     )
                 ):
                     if await questionary.confirm(
@@ -279,7 +246,7 @@ class ObjectRelease(BaseModel):
                     resource=self.type, id_=target.id, data=target_object
                 )
                 # Important for the ID override phase (deploy file still the old one and the remote just got updated)
-                self.last_deploy_timestamp = result.get(
+                self.last_deployed_at = result.get(
                     "modified_at", generate_deploy_timestamp()
                 )
             pprint(
