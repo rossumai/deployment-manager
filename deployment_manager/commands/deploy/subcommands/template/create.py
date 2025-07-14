@@ -170,27 +170,27 @@ async def create_deploy_template(
         deploy_filepath = input_file_path
 
     # Deploy secrets
-    secrets_file_path = deploy_file_object.get(settings.DEPLOY_KEY_SECRETS_PATH, None)
+    secrets_file_path = deploy_file_object.get(settings.DEPLOY_KEY_SECRETS_PATH, "")
     if (
         secrets_file_path
         and await (secrets_file_path := Path(secrets_file_path)).exists()
     ):
         previous_secrets_file = await read_object_from_json(secrets_file_path)
     else:
-        secrets_file_path = None
+        secret_file_path = None
         previous_secrets_file = {}
     if (
         interactive
         and await questionary.confirm(
-            f"Do you wish to {'update' if secrets_file_path else 'create'} secrets file?"
+            f"Do you wish to {'update' if secret_file_path else 'create'} secrets file?"
         ).ask_async()
     ):
         secrets = await get_secrets_from_user(
             deploy_file_object,
             previous_secrets_file=(previous_secrets_file),
         )
-        if not secrets_file_path:
-            secrets_file_path = await get_filepath_from_user(
+        if not secret_file_path:
+            secret_file_path = await get_filepath_from_user(
                 org_path,
                 default=(
                     settings.DEFAULT_DEPLOY_SECRETS_PARENT
@@ -201,7 +201,22 @@ async def create_deploy_template(
 
         await write_object_to_json(secrets_file_path, secrets)
 
-    deploy_file_object[settings.DEPLOY_KEY_SECRETS_PATH] = str(secrets_file_path)
+    deploy_file_object[settings.DEPLOY_KEY_SECRETS_PATH] = str(secret_file_path)
+
+    # Deploy state
+    state_file_path = deploy_file_object.get(settings.DEPLOY_KEY_STATE_PATH, "")
+
+    if interactive and not state_file_path:
+        state_file_path = await get_filepath_from_user(
+            org_path,
+            default=(
+                settings.DEFAULT_DEPLOY_STATE_PARENT
+                + "/"
+                + f"{deploy_filepath.stem}.json"
+            ),
+        )
+
+    deploy_file_object[settings.DEPLOY_KEY_STATE_PATH] = str(state_file_path)
 
     await yaml.save_to_file(deploy_filepath)
 
