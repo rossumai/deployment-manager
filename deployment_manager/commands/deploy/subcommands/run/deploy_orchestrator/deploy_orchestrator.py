@@ -34,13 +34,12 @@ from deployment_manager.commands.deploy.subcommands.run.helpers import (
 )
 
 from deployment_manager.commands.deploy.subcommands.run.models import (
+    DeployException,
     LookupTable,
     ReverseLookupTable,
-)
-from deployment_manager.commands.deploy.subcommands.run.object_release import (
-    DeployException,
     Target,
 )
+
 
 from deployment_manager.commands.deploy.subcommands.run.merge.state import (
     DeployState,

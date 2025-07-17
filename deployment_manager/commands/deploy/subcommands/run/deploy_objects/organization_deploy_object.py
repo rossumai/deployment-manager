@@ -2,10 +2,8 @@ from anyio import Path
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
     DeployObject,
 )
-from deployment_manager.commands.deploy.subcommands.run.object_release import (
-    Target,
-)
 
+from deployment_manager.commands.deploy.subcommands.run.models import Target
 from rossum_api.api_client import Resource
 
 
