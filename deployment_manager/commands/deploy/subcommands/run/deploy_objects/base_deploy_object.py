@@ -9,6 +9,7 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.deploy_di
     DeployObjectDiffer,
 )
 from deployment_manager.commands.deploy.subcommands.run.merge.detect_reference import (
+    ReferenceDetectionStatus,
     detect_reference_with_type,
 )
 from deployment_manager.commands.deploy.subcommands.run.merge.merge import (
@@ -28,26 +29,19 @@ if TYPE_CHECKING:
     )
 
 from copy import deepcopy
-from datetime import datetime
 
 from pydantic import BaseModel
-import questionary
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.reference_replace import (
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.reference_replacer import (
     ReferenceReplacer,
 )
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     create_object_label,
-    generate_deploy_timestamp,
-    remove_queue_attributes_for_cross_org,
 )
 from deployment_manager.commands.deploy.subcommands.run.models import (
-    DeployException,
-    LookupTable,
     NonExistentObjectException,
     PathNotFoundException,
     Target,
     TargetWithDefault,
-    TimestampMismatchException,
 )
 from deployment_manager.common.read_write import read_json, write_json
 from rich import print as pprint
@@ -60,12 +54,11 @@ from rossum_api import APIClientError
 from rossum_api.api_client import Resource
 
 from deployment_manager.utils.consts import display_error, display_warning, settings
-from deployment_manager.utils.functions import extract_id_from_url, templatize_name_id
+from deployment_manager.utils.functions import templatize_name_id
 
 console = Console()
 
 
-# TODO: document methods
 # TODO: prebuilt exceptions that automatically reference the type/name/id of object
 class DeployObject(BaseModel):
     class Config:
@@ -93,19 +86,25 @@ class DeployObject(BaseModel):
     overrider: AttributeOverrider = None
     ref_replacer: ReferenceReplacer = None
 
-    async def initialize_deploy_object(self, release_file: "DeployOrchestrator"):
-        self.deploy_file = release_file
+    async def initialize_deploy_object(self, deploy_file: "DeployOrchestrator"):
+        self.deploy_file = deploy_file
         self.yaml_reference = self.get_object_in_yaml()
 
         self.overrider = AttributeOverrider(type=self.type)
-        self.ref_replacer = ReferenceReplacer(type=self.type)
+        self.ref_replacer = ReferenceReplacer(
+            type=self.type, parent_object_reference=self
+        )
 
         try:
             self.data = await read_json(self.path)
-        except Exception:
-            raise PathNotFoundException(
+        except PathNotFoundException:
+            self.initialize_failed = True
+            display_error(
                 f"Could not load object data from: [green]{self.path}[/green]. Is the object name in deploy file in-sync with its local path?"
-            ) from None
+            )
+        except Exception as e:
+            self.initialize_failed = True
+            display_error(f"Could not read data from: [green]{self.path}[/green]: {e}")
 
         self.ignored_attributes = [
             *settings.DEPLOY_NON_DIFFED_KEYS.get(self.type, []),
@@ -123,6 +122,18 @@ class DeployObject(BaseModel):
         for target_index, target in enumerate(self.targets):
             target.index = target_index
             target.parent_object = self
+            # New targets have a UUID as fallback
+            # For display purposes, create an ID that mentions the name of source object
+            if not target.exists_on_remote:
+                target.create_dummy_id_from_parent()
+            else:
+                try:
+                    await self.get_remote_object(target.id)
+                except NonExistentObjectException:
+                    display_error(
+                        f"{self.display_type} {target.display_label} does not exist on remote."
+                    )
+                    raise
 
             data_copy = deepcopy(self.data)
 
@@ -194,7 +205,7 @@ class DeployObject(BaseModel):
         except APIClientError as e:
             if e.status_code == 404:
                 raise NonExistentObjectException(
-                    f"{self.display_type} [purple]{remote_object_id}[/purple] does not exist on remote."
+                    f"{self.display_type} {remote_object_id} does not exist on remote."
                 ) from None
             raise e
 
@@ -212,8 +223,8 @@ class DeployObject(BaseModel):
         for target in self.targets:
             # Before first deploy of some objects (e.g., queues), it is important to create schemas, workspaces, etc. that must exist first
             # At this point, those objects were deployed, their local target objects have refreshed IDs
-            await self.override_references(
-                data_attribute=data_attribute, use_dummy_references=False
+            await self.override_references_in_target_object_data(
+                data_attribute=data_attribute, target=target, use_dummy_references=False
             )
 
             if target.exists_on_remote:
@@ -234,9 +245,10 @@ class DeployObject(BaseModel):
             data = getattr(target, data_attribute)
 
             result = await self.deploy_file.client._http_client.create(self.type, data)
-            # Only if the API call succeeds
+            # Remember last_applied only if the API call succeeds
             target.last_applied_data = data
             target.data_from_remote = result
+            target.update_after_first_create()
 
             pprint(
                 f"{settings.CREATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}."
@@ -288,7 +300,9 @@ class DeployObject(BaseModel):
             )
             self.deploy_failed = True
 
-    async def override_references(self, data_attribute: str, use_dummy_references: bool):
+    async def override_references(
+        self, data_attribute: str, use_dummy_references: bool
+    ):
         for target in self.targets:
             data = getattr(target, data_attribute)
 
@@ -344,18 +358,14 @@ class DeployObject(BaseModel):
         for key in ignored_keys_for_type:
             data.pop(key, None)
 
-        # match self.type:
-        #     case Resource.Queue:
-        #         if not self.is_same_org_deploy:
-        #             remove_queue_attributes_for_cross_org(data)
-
-    # TODO: handle half-ignored fields like queue.generic_engine
-    # ! TODO: if source has multiple targets, rebasing should be done in attr_override, not in source itself
-    # ! Conflicts write twice to the same file, making it unresolvable with nice IDE diffing
-    # (The user probably does not want to propagate the change into all targets in such a case)
+    # TODO: if source has multiple targets, rebasing should be done in attr_override, not in source itself
     async def compare_target_objects(self):
         try:
             for target in self.targets:
+                # No point comparing what does not yet exist
+                if not target.exists_on_remote:
+                    continue
+
                 # Get last applied from deploy state
                 last_applied = (
                     self.deploy_file.deploy_state.get_last_applied(
@@ -376,7 +386,7 @@ class DeployObject(BaseModel):
                     last_applied=last_applied,
                     source=target.visualized_plan_data,
                     target=remote_object,
-                    prefer="neither",
+                    prefer=self.deploy_file.prefer,
                     override_fields=[],
                     ignored_fields=[
                         "id",
@@ -390,11 +400,13 @@ class DeployObject(BaseModel):
                     # Target-only drift - should the value be saved in source? -> ask user
 
                     # ! TODO: check how paths look like for something like "first ID in hook.queues"
-                    # ! TODO: what if target hook is assigned to 2 target queues mapping to the same source? Is it OK to reference the same queue multiple times in the list?
-                    is_ref, reference_type = detect_reference_with_type(
+                    ref_status, reference_type = detect_reference_with_type(
                         value=target_val, field_name=path
                     )
-                    if is_ref:
+                    if ref_status in [
+                        ReferenceDetectionStatus.DEFINITELY_REFERENCE,
+                        ReferenceDetectionStatus.UNKNOWN,
+                    ]:
                         if reference_type:
                             target_val = ReferenceReplacer.reverse_target_reference_into_source(
                                 value=target_val,
@@ -430,7 +442,8 @@ class DeployObject(BaseModel):
                         await write_json(self.path, self.data)
 
                 # TODO: if source queue ABC maps to target queue 123 and 456 and target hook is assigned only to 456, there will be a conflict we can detect but not visualize back both references are translated to the same source
-                if conflicts:
+                # Only do it for the first target if there are conflicts with multiple of them
+                if conflicts and not self.conflict_detected:
                     self.conflict_detected = True
                     # Use source with potentially applied rebases
                     # But if user declined some rebase, we should not put it into this object, hence using self.data and not merged_data
@@ -438,10 +451,13 @@ class DeployObject(BaseModel):
                     source_with_target_values = deepcopy(self.data)
                     for path, (_, target_val) in conflicts.items():
                         # Target-only drift - should the value be saved in source? -> ask user
-                        is_ref, reference_type = detect_reference_with_type(
+                        ref_status, reference_type = detect_reference_with_type(
                             value=target_val, field_name=path
                         )
-                        if is_ref:
+                        if ref_status in [
+                            ReferenceDetectionStatus.DEFINITELY_REFERENCE,
+                            ReferenceDetectionStatus.UNKNOWN,
+                        ]:
                             if reference_type:
                                 target_val = ReferenceReplacer.reverse_target_reference_into_source(
                                     value=target_val,
@@ -463,15 +479,6 @@ class DeployObject(BaseModel):
                     display_error(
                         f"Conflict between {settings.SOURCE_DIRNAME} and remote {settings.TARGET_DIRNAME} detected for: [green]{self.path}[/green]"
                     )
-
-                # ? Initial data does not have references replaced, but it has attr overrides etc. <- would have to distinguish if the change was a reference field
-                # ? Rebased fields can be visualized and first_deployed, but reference fields were reversed!
-                # ? Conflict fields are resolved in source -> they require a reload of command or reload of data and reparsing of everything again
-                # ? Idea: once rebase and conflict done (do not stop command execution), reload the object from source and create visualied + first_deploy again - do not compare this time!
-                # ! Watch out for attr override overriding what the user just resolved as a conflict/rebase
-                # ? second_deploy_data can just be a reload of initial data
-                # ? Once reloaded, just show plan, do not compare again
-
         except Exception as e:
             display_error(
                 f"Error while comparing {self.display_type} {self.name} ({self.id}) ^",
@@ -490,14 +497,12 @@ class DeployObject(BaseModel):
 
             self.remove_ignored_attributes(overriden_object_data)
 
+            plan_label = f"{settings.PLAN_PRINT_STR} {settings.UPDATE_PRINT_STR if target.exists_on_remote else settings.CREATE_PRINT_STR}"
             diff = DeployObjectDiffer.create_override_diff(
                 overriden_object_data, target.visualized_plan_data
             )
-            if not diff:
-                return
-
             colorized_diff = DeployObjectDiffer.parse_diff(diff)
-            message = f"{self.display_type} {self.create_source_to_target_string(target.visualized_plan_data)}:\n{colorized_diff}"
+            message = f"{plan_label} {self.display_type} {self.create_source_to_target_string(target.visualized_plan_data)}:\n{colorized_diff if colorized_diff else ""}"
             pprint(Panel(message))
 
 

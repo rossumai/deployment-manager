@@ -57,6 +57,9 @@ class DeployObjectDiffer:
 
     @classmethod
     def parse_diff(cls, diff: str):
+        if not diff:
+            return ""
+
         colorized_lines = []
         split_lines = []
 

@@ -193,6 +193,9 @@ class Settings:
     DEPLOY_TEMPLATE_INIT_COMMAND_NAME: str = "init"
     DOCUMENT_COMMAND_NAME: str = "docommando"
     LLM_CHAT_COMMAND_NAME: str = "llm-chat"
+    DEPLOY_TEMPLATE_CREATE_COMMAND_NAME: str = "create"
+    DEPLOY_TEMPLATE_UPDATE_COMMAND_NAME: str = "update"
+    DEPLOY_TEMPLATE_REVERSE_COMMAND_NAME: str = "reverse"
     HOOK_COMMAND_NAME: str = "hook"
     HOOK_PAYLOAD_COMMAND_NAME: str = "payload"
     HOOK_TEST_COMMAND_NAME: str = "test"
@@ -246,6 +249,7 @@ class Settings:
     DELETE_PRINT_STR: str = "[red]DELETE[/red]"
     PLAN_PRINT_STR: str = "[bold]PLAN:[/bold]"
 
+    # These are not even saved locally when pulling
     NON_VERSIONED_KEYS_PER_OBJECT: dict = {
         Resource.Queue: ["counts", "users"],
         Resource.Hook: ["status"],
@@ -253,6 +257,8 @@ class Settings:
 
     NON_VERSIONED_ATTRIBUTES_FILE_NAME: str = "non_versioned_object_attributes.json"
     NON_VERSIONED_ATTRIBUTES: tuple = ("modified_at",)
+
+    # These are versioned locally, but should not be deployed, and so they are not displayed in diffs either
     DEPLOY_NON_DIFFED_KEYS: dict = {
         Resource.Inbox: ["email"],
         Resource.Hook: ["guide", "status"],

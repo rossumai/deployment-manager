@@ -14,8 +14,8 @@ class RuleDeployObject(DeployObject):
 
     parent_schema: DeployObject = None
 
-    async def initialize_deploy_object(self, release_file, parent_schema):
-        await super().initialize_deploy_object(release_file)
+    async def initialize_deploy_object(self, deploy_file, parent_schema):
+        await super().initialize_deploy_object(deploy_file)
         self.parent_schema = parent_schema
 
     @property
@@ -33,8 +33,6 @@ class RuleDeployObject(DeployObject):
             if rule.get("id", None) == self.id:
                 return rule
         return None
-
-    async def initialize_target_object_data(self, data, target): ...
 
     async def override_references_in_target_object_data(
         self, data_attribute, target, use_dummy_references

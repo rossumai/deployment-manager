@@ -32,7 +32,7 @@ class SchemaDeployObject(DeployObject):
 
     overwrite_ignored_fields: bool = False
 
-    rule_releases: list[RuleDeployObject] = Field(
+    rule_deploy_objects: list[RuleDeployObject] = Field(
         default_factory=lambda: [], alias="rules"
     )
 
@@ -46,26 +46,27 @@ class SchemaDeployObject(DeployObject):
         parent_yaml_reference = self.parent_queue.yaml_reference
         return parent_yaml_reference.get("schema", {})
 
-    async def initialize_deploy_object(self, release_file, parent_queue):
+    async def initialize_deploy_object(self, deploy_file, parent_queue):
         # Must come first!
         self.parent_queue = parent_queue
         # dynamic property caused issues in some function calls
         self.name = self.parent_queue.name
-        await super().initialize_deploy_object(release_file)
+        await super().initialize_deploy_object(deploy_file)
 
         await self.update_formula_fields_code()
 
         await asyncio.gather(
             *[
                 object.initialize_deploy_object(
-                    release_file=release_file, parent_schema=self
+                    deploy_file=deploy_file, parent_schema=self
                 )
-                for object in self.rule_releases
+                for object in self.rule_deploy_objects
             ]
         )
 
-        for rule in self.rule_releases:
+        for rule in self.rule_deploy_objects:
             if rule.initialize_failed:
+                self.initialize_failed = True
                 raise SubObjectException()
 
     # Overrides the parent method
@@ -73,7 +74,7 @@ class SchemaDeployObject(DeployObject):
         await super().initialize_target_objects()
 
         await asyncio.gather(
-            *[object.initialize_target_objects() for object in self.rule_releases]
+            *[object.initialize_target_objects() for object in self.rule_deploy_objects]
         )
 
     async def initialize_target_object_data(self, data: dict, target: Target):
@@ -88,7 +89,7 @@ class SchemaDeployObject(DeployObject):
 
         if not self.overwrite_ignored_fields:
             # Ignore should preceed attribute override, so that override can win if it is defined
-            await self.ignore_schema_ai_fields(schema=data, target=target)
+            await self.use_schema_ai_fields_from_remote(schema=data, target=target)
 
     async def override_references(self, data_attribute, use_dummy_references):
         await super().override_references(data_attribute, use_dummy_references)
@@ -99,7 +100,7 @@ class SchemaDeployObject(DeployObject):
                     data_attribute=data_attribute,
                     use_dummy_references=use_dummy_references,
                 )
-                for object in self.rule_releases
+                for object in self.rule_deploy_objects
             ]
         )
 
@@ -136,10 +137,16 @@ class SchemaDeployObject(DeployObject):
             target=target, data_attribute=data_attribute, dependency_name="rules"
         )
 
+        # Do not send an empty array if it's not an explicit emptying (compared to target)
+        if not data.get('rules', []):
+            remote_target = await self.get_remote_object(target.id)
+            if not remote_target.get('rules', []):
+                data.pop('rules', None)
+
     async def visualize_changes(self):
         await super().visualize_changes()
 
-        for rule in self.rule_releases:
+        for rule in self.rule_deploy_objects:
             await rule.visualize_changes()
 
     async def deploy_target_objects(self, data_attribute):
@@ -149,11 +156,11 @@ class SchemaDeployObject(DeployObject):
             await asyncio.gather(
                 *[
                     object.deploy_target_objects(data_attribute=data_attribute)
-                    for object in self.rule_releases
+                    for object in self.rule_deploy_objects
                 ]
             )
 
-            for rule in self.rule_releases:
+            for rule in self.rule_deploy_objects:
                 if rule.deploy_failed:
                     raise SubObjectException()
 
@@ -187,7 +194,7 @@ class SchemaDeployObject(DeployObject):
             schema_id = find_schema_id(self.data["content"], formula_name)
             schema_id["formula"] = formula_code
 
-    async def ignore_schema_ai_fields(self, schema: dict, target: Target):
+    async def use_schema_ai_fields_from_remote(self, schema: dict, target: Target):
         DEPLOY_IGNORED_SCHEMA_ATTRIBUTES = [("score_threshold", 1)]
 
         # Object was not deployed to this target yet -> no AI fields to preserve in target

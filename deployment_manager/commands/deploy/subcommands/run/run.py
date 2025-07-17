@@ -18,7 +18,6 @@ from deployment_manager.commands.deploy.subcommands.run.helpers import (
     generate_deploy_timestamp,
     get_new_deploy_file_path,
     get_url_and_credentials,
-    update_ignore_flags_in_yaml,
 )
 
 from deployment_manager.commands.deploy.subcommands.run.reverse_override import (
@@ -39,13 +38,14 @@ async def deploy_release_file(
     source_client: ElisAPIClient = None,
     target_client: ElisAPIClient = None,
     auto_apply_plan: bool = False,
-    force: bool = False,
-    auto_delete: bool = False,
+    prefer: str = None,
+    # auto_delete: bool = False,
     commit: bool = False,
     commit_message: str = "",
 ):
-    release_file = await deploy_file_path.read_text()
-    yaml = DeployYaml(release_file)
+    deploy_file = await deploy_file_path.read_text()
+    yaml = DeployYaml(deploy_file)
+
     if not check_required_keys(yaml.data):
         return
 
@@ -138,9 +138,9 @@ async def deploy_release_file(
             yaml=yaml,
             source_org=source_org,
             target_org=target_org,
+            prefer=prefer,
             plan_only=False,
-            force_deploy=force,
-            auto_delete=auto_delete,
+            # auto_delete=auto_delete,
         )
     except ValidationError as e:
         display_error(f"Missing information in the deploy file: {e}")
@@ -189,7 +189,7 @@ async def deploy_release_file(
 
     # Take what the user inputted (or the same if user input not applicable)
     yaml.data[settings.DEPLOY_KEY_TOKEN_OWNER] = release.token_owner_id
-    update_ignore_flags_in_yaml(yaml.data, release.queue_ignore_warnings)
+    release.update_ignore_flags_in_yaml()
 
     deploy_error = False
     try:
