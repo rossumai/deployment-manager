@@ -29,9 +29,6 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.schema_de
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.workspace_deploy_object import (
     WorkspaceDeployObject,
 )
-from deployment_manager.commands.deploy.subcommands.run.deploy_orchestrator.hook_run_after import (
-    HookDependenciesDeployer,
-)
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
 )
@@ -42,7 +39,6 @@ from deployment_manager.commands.deploy.subcommands.run.models import (
 )
 from deployment_manager.commands.deploy.subcommands.run.object_release import (
     DeployException,
-    ObjectRelease,
     Target,
 )
 
@@ -55,6 +51,7 @@ from deployment_manager.utils.consts import (
     display_error,
     display_info,
     display_warning,
+    settings,
 )
 
 
@@ -64,105 +61,16 @@ from rossum_api.api_client import Resource
 from rossum_api.models.organization import Organization
 
 
-# Strategy class with either plan or deploy methods
-# Passed into release objects and just call them with their arguments
-# The release objects can be shared, the actions are different
-
-# Object layers
-# 1. Deploy file: only attributes that are actually in it
-# 2. ReleaseOrchestrator: deploy file + logic that works with it
-# 2a. load everything
-# 2a. plan
-# Let user confirm or exit
-# 2c. deploy
-
-# Objects with a single representation
-# Original source, deploy state, yaml file, user-provided input
-# First deploy object (plan and real are the same)
-
-# Objects with different versions
-# Second deploy object (plan vs real)
-
-# Object states based on the flow
-# 1. Raw object loaded from local
-# 2. Object prepared for first deploy  (missing references, e.g., hook.queues)
-# 3. Object with references added in (dummy refs)
-# 4. Object with real references (only one-way: queue.hooks but not hook.queues)
-
-# Relevant methods for each object
-# Load/initialize (+ validate nothing is missing)
-# Prepare first deploy object
-# Replace references in plan mode (both-way)
-# Replace references in deploy mode (one-way)
-# Plan (diff + visualize)
-# Deploy (API call)
-
-# Order of objects and their operations
-# 1. Load everything
-# 2. Prepare everything
-# 3. Replace plan refs and show plan
-# 4. Upload first deploy: org -> workspaces -> hooks -> queues -> ...
-# 5. Replace deploy refs
-# 6. Reupload (order does not matter)
-
-# Operation flow
-# 1. Load YAML objects, find their JSONs, load deploy state
-# 2. Prepare first deploy objects (attribute override) - keep references as they are everywhere
-# (Deploy needs two steps because some refs can be resolved only once objects are created)
-# 3. Create dummy dependency resolution table: nonexistent objects get dummy refs
-# ! Need to do dummy refs in the targets
-# 4. Apply the table on the plan deploy objects (copy)
-# ! (References need to be replaced in both places: queue.workspace and workspace.queues)
-# 5. Visualize final state + show diffs between second deploy objects and target objects (on remote)
-# (There might be conflicts and rebase prompts - if user did any rebase or conflict, the deploy command should be rerun)
-# ? Rebase of reference fields will require a reverse table - but this will only be possible for existing objects - if the object does not exist in source, create it?
-# (List only the final state, the fact that two updates need to happen is a detail)
-
-# 6. User confirms/rejects plan, reacts to warnings, etc.
-# (Context like warnings ignored must be passed around, alternatively, the deploy state can just run since warnings would be stopped before real deploy by checking for any warnings being raise during plan)
-
-# 7. First upload (using object data without dummy refs)
-# ! Queue needs things like workspace and schema to be created first
-# 8. Create real dep resolution table
-# 9. Apply the table on the first deploy objects (real)
-# (One-way replacing only)
-# 10. Run another wave of updates
-# 11. Save deploy state (ideally after each deploy), repull
-# TODO: Save deploy state after first deploy as well?
-
-# Diffing
-# Non-diffed attributes that are deployed (but wouldn't have to be): id, url
-# Non-diffed attribtues that can be ignored (not deployed): generic_engine, workflows
-# ! But some of those fields should be versioned in source and target, just not compared: generic_engine, queue and schema AI fields and thresholds
-# org.users, modified_at, modified_by, org.org_group, org.creator
-
-# Diffed attributes that are not deployed? Probably makes no sense to diff if not deployed...
-# Diffed attribute that are deployed (default)
+# TODO: dummy refs not in diff -> conflict if org.workspaces is 1 and we are creating another
+# TODO: purge should clean up state file as well
 
 
-# TODO: error handling
-# TODO: different error flag for each stage failure
-
-# TODO: reverse deploy (PROD->UAT)
-
-# TODO: keep references to non-deploy objects (e.g., queue.hooks should not empty hook.queues = [], keep what is unknown)
-
-# TODO: check that all target IDs from deploy file actually (still) exist on remote
-
-#! TODO: what about derived fields?
-
-# TODO: --ours and --theirs params for merge
-
-
-# TODO: release -> deploy
 class DeployOrchestrator(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    plan_only: bool = False
-
-    force_deploy: bool = False
     auto_delete: bool = False
+    prefer: str = None
 
     patch_target_org: bool = True
     token_owner_id: int | None = None
@@ -187,8 +95,8 @@ class DeployOrchestrator(BaseModel):
     queues: list[QueueDeployObject] = []
     hooks: list[HookDeployObject] = []
 
-    lookup_table: LookupTable = None
-    reverse_lookup_table: ReverseLookupTable = None
+    lookup_table: LookupTable = {}
+    reverse_lookup_table: ReverseLookupTable = {}
 
     unselected_hooks: list[int] = []
 
@@ -197,14 +105,12 @@ class DeployOrchestrator(BaseModel):
 
     ignore_all_deploy_warnings: bool = False
 
-    hook_dep_deployer: HookDependenciesDeployer = None
-
     @property
     def is_same_org(self):
         return self.source_org.id == self.target_org.id
 
     @property
-    def release_objects(self) -> list[DeployObject]:
+    def deploy_objects(self) -> list[DeployObject]:
         return [
             self.organization,
             *self.hooks,
@@ -215,8 +121,6 @@ class DeployOrchestrator(BaseModel):
     def __init__(self, **data):
         super().__init__(**data)
 
-        self.hook_dep_deployer = HookDependenciesDeployer(deploy_file_reference=self)
-
         if (
             self.secrets_file
             and (secrets_file_path := pathlib.Path(self.secrets_file)).exists()
@@ -224,7 +128,6 @@ class DeployOrchestrator(BaseModel):
             # Read and parse the secrets file
             self.secrets = json.loads(secrets_file_path.read_text())
 
-        # TODO: if YAML does not have the path, create it and update YAML with it when saving deploy file
         self.deploy_state = DeployState.load_deploy_state(
             path=pathlib.Path(self.deploy_state_file)
         )
@@ -239,12 +142,9 @@ class DeployOrchestrator(BaseModel):
         if not self.deploy_state_file:
             return
 
-        # TODO: direction
-        # direction = "forward" if self.source_org.id < self.target_org.id else "reverse"
-
-        schemas = [queue.schema_release for queue in self.queues]
-        rules = [rule for schema in schemas for rule in schema.rule_releases]
-        inboxes = [queue.inbox_release for queue in self.queues]
+        schemas = [queue.schema_deploy_object for queue in self.queues]
+        rules = [rule for schema in schemas for rule in schema.rule_deploy_objects]
+        inboxes = [queue.inbox_deploy_object for queue in self.queues]
 
         deploy_state_objects = [
             (Resource.Organization, [self.organization]),
@@ -265,72 +165,95 @@ class DeployOrchestrator(BaseModel):
     async def initialize_deploy_objects(self):
         await self.ensure_token_owner()
 
-        # TODO: catch initialize exceptions
         await asyncio.gather(
             *[
-                deploy_object.initialize_deploy_object(release_file=self)
-                for deploy_object in self.release_objects
-            ]
+                deploy_object.initialize_deploy_object(deploy_file=self)
+                for deploy_object in self.deploy_objects
+            ],
         )
 
-        self.detect_initialize_phase_exceptions(self.workspaces)
+        self.detect_phase_exceptions("initialize_failed")
 
     async def initialize_target_objects(self):
-        await asyncio.gather(
-            *[
-                deploy_object.initialize_target_objects()
-                for deploy_object in self.release_objects
-            ]
-        )
+        try:
+            await asyncio.gather(
+                *[
+                    deploy_object.initialize_target_objects()
+                    for deploy_object in self.deploy_objects
+                ],
+            )
+        except Exception as e:
+            display_error(f"Error during initialization of target objects: {e}")
+            raise Exception from e
 
-        self.lookup_table = self.create_lookup_table()
+        try:
+            self.lookup_table = self.create_lookup_table()
 
-        # TODO: dummy references can be strings including the names of the objects for better diffs
-        await asyncio.gather(
-            *[
-                deploy_object.override_references(
-                    data_attribute="visualized_plan_data", use_dummy_references=True
-                )
-                for deploy_object in self.release_objects
-            ]
-        )
-
-        # TODO: hook run after
+            await asyncio.gather(
+                *[
+                    deploy_object.override_references(
+                        data_attribute="visualized_plan_data", use_dummy_references=True
+                    )
+                    for deploy_object in self.deploy_objects
+                ]
+            )
+        except Exception as e:
+            display_error(f"Error during overriding references of target objects: {e}")
+            raise Exception from e
 
     # TODO: ignored fields that should not be deployed, but what if user explicitly att overrides them?
-    # TODO: if not patch_target_org -> do not compare, visualize and deploy, the deploy object must be there though for references etc.
     async def compare_object_versions(self):
-        self.reverse_lookup_table = self.create_reverse_lookup_table()
+        try:
+            self.reverse_lookup_table = self.create_reverse_lookup_table()
 
-        for object in self.release_objects:
-            await object.compare_target_objects()
+            for object in self.deploy_objects:
+                if (
+                    isinstance(object, OrganizationDeployObject)
+                    and not self.patch_target_org
+                ):
+                    continue
+                await object.compare_target_objects()
 
-        # Need to pause execution of the command so the user can resolve them
-        if any(object.conflict_detected for object in self.release_objects):
-            display_warning(
-                "Conflicts detected: please go to the files listed above and resolve them.\n\n[bold]Do not exit this command, otherwise, you might be prompted to resolve the conflict again when source is compared to remote target.[/bold]"
-            )
-            if not await questionary.confirm(
-                "Confirm that conflicts were resolved."
-            ).ask_async():
-                raise DeployException(
-                    "Please rerun the command once conflicts were resolved."
+            # Need to pause execution of the command so the user can resolve them
+            if any(object.conflict_detected for object in self.deploy_objects):
+                display_warning(
+                    "Conflicts detected: please go to the files listed above and resolve them.\n\n[bold]Do not exit this command, otherwise, you might be prompted to resolve the conflict again when source is compared to remote target.[/bold]"
                 )
+                if not await questionary.confirm(
+                    "Confirm that conflicts were resolved."
+                ).ask_async():
+                    raise DeployException(
+                        "Please rerun the command once conflicts were resolved."
+                    )
 
-        # Objects need to be reloaded from source and everything reapplied for them
-        for object in self.release_objects:
-            if not object.conflict_detected and not object.rebase_detected:
-                continue
+            # Objects need to be reloaded from source and everything reapplied for them
+            for object in self.deploy_objects:
+                if not object.conflict_detected and not object.rebase_detected:
+                    continue
 
-            await object.initialize_deploy_object(release_file=self)
-            await object.initialize_target_objects()
-            await object.override_references(
-                data_attribute="visualized_plan_data", use_dummy_references=True
+                await object.initialize_deploy_object(deploy_file=self)
+                await object.initialize_target_objects()
+                await object.override_references(
+                    data_attribute="visualized_plan_data", use_dummy_references=True
+                )
+        except Exception as e:
+            display_error(
+                f"Error during comparison of prepared target objects with their remote versions: {e}"
             )
+            raise Exception from e
 
     async def show_deploy_plan(self):
-        for object in self.release_objects:
-            await object.visualize_changes()
+        try:
+            for object in self.deploy_objects:
+                if (
+                    isinstance(object, OrganizationDeployObject)
+                    and not self.patch_target_org
+                ):
+                    continue
+                await object.visualize_changes()
+        except Exception as e:
+            display_error(f"Error during visualization of deploy plan changes: {e}")
+            raise Exception from e
 
     async def run_deploy(self, is_first: bool):
         try:
@@ -350,8 +273,6 @@ class DeployOrchestrator(BaseModel):
                 ]
             )
 
-            await self.hook_dep_deployer.migrate_hook_dependency_graph()
-
             await asyncio.gather(
                 *[
                     deploy_object.deploy_target_objects(data_attribute=data_attribute)
@@ -368,31 +289,14 @@ class DeployOrchestrator(BaseModel):
 
             display_info(f'{"First" if is_first else "Second"} deploy finished.')
 
-            # TODO: deploy errors should lead to deploy finishing in the middle or should we check only after everything was run?
-
-            # TODO: Mark derived fields like run_after or queues
-            # mark_derived_fields(
-            #     deploy_state=self.deploy_state,
-            #     resource_type="hooks",
-            #     source_id=self.id,
-            #     target_objs=self.targets,
-            #     fields=["run_after", "queues"],
-            # )
         except Exception as e:
             display_error(
-                f'Error during {"first" if is_first else "second"} deploy: {e}', e
+                f'Error during {"first" if is_first else "second"} deploy: {e}'
             )
             raise Exception from e
 
     # TODO: for perfect safety, comparison should be done after first deploy (what if someone on remote changed something in the middle of deploy?)
     # Compare first_deploy_data vs last_applied (saved after first_deploy) against remote
-
-    # TODO: we have several versions of objects - should we just run ref replace again to catch what we did not the first time (i.e., objects that had to be created on target?)
-    # ! Second deploy should not be a copy of first where refs were replaced - we will loose unknown source refs
-    # ? Idea: second deploy is just literally initial_data (past attr override before ref replace) with another lookup applied
-    # You do not need to update lookup table, just look into a different target property/use updated ID (dummy ID replaced by real ID)
-    # ! Update dummy IDs to be real IDs after first deploy in targets
-    # ! All refs should be known by now, otherwise -> error
 
     async def ensure_token_owner(self):
         if self.source_org.id == self.target_org.id:
@@ -408,18 +312,19 @@ class DeployOrchestrator(BaseModel):
         if not self.token_owner_id:
             self.token_owner_id = await get_token_owner_from_user(self.client)
 
-    def detect_initialize_phase_exceptions(self, releases: list[ObjectRelease]):
-        for release in releases:
-            if release.initialize_failed:
-                raise DeployException(
-                    f"Initialize of {release.display_type} {release.display_label} failed, see error details above."
+    def detect_phase_exceptions(self, attribute_name: str):
+        error_objects = []
+        for deploy_object in self.deploy_objects:
+            attr = getattr(deploy_object, attribute_name)
+            if attr:
+                error_objects.append(
+                    f"{deploy_object.display_type} {deploy_object.display_label}"
                 )
 
-    def detect_deploy_phase_exceptions(self, releases: list[ObjectRelease]):
-        for release in releases:
-            if release.deploy_failed:
+            if error_objects:
                 raise DeployException(
-                    f"Deploy of {release.display_type} {release.display_label} failed, see error details above."
+                    f"Error occurred for the following deploy objects, see error details above:\n"
+                    + "\n".join(error_objects)
                 )
 
     def create_lookup_table(self):
@@ -436,15 +341,15 @@ class DeployOrchestrator(BaseModel):
         for queue in self.queues:
             lookup_table[queue.id][Resource.Queue] = queue.targets
 
-            lookup_table[queue.schema_release.id][
+            lookup_table[queue.schema_deploy_object.id][
                 Resource.Schema
-            ] = queue.schema_release.targets
-            for rule in queue.schema_release.rule_releases:
+            ] = queue.schema_deploy_object.targets
+            for rule in queue.schema_deploy_object.rule_deploy_objects:
                 lookup_table[rule.id][CustomResource.Rule] = rule.targets
 
-            lookup_table[queue.inbox_release.id][
+            lookup_table[queue.inbox_deploy_object.id][
                 Resource.Inbox
-            ] = queue.inbox_release.targets
+            ] = queue.inbox_deploy_object.targets
 
         return lookup_table
 
@@ -456,6 +361,18 @@ class DeployOrchestrator(BaseModel):
                     reverse[type][target.id] = source_id
         return reverse
 
+    def update_ignore_flags_in_yaml(self):
+        ignore_warning_map = {}
+        for queue in self.queues:
+            ignore_warning_map[queue.id] = queue.ignore_deploy_warnings
+
+        for queue in self.yaml.data.get(settings.DEPLOY_KEY_QUEUES, []):
+            if not (queue_id := queue.get("id", None)):
+                continue
+            queue[settings.DEPLOY_KEY_IGNORE_DEPLOY_WARNINGS] = ignore_warning_map.get(
+                queue_id, False
+            )
+
 
 # Pydantic needs this
 DeployOrchestrator.model_rebuild()
@@ -466,5 +383,4 @@ QueueDeployObject.model_rebuild()
 SchemaDeployObject.model_rebuild()
 InboxDeployObject.model_rebuild()
 RuleDeployObject.model_rebuild()
-HookDependenciesDeployer.model_rebuild()
 Target.model_rebuild()

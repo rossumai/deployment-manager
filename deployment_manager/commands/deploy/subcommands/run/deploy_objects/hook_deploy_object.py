@@ -3,6 +3,9 @@ from rich import print as pprint
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
     DeployObject,
 )
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.hook_reference_replacer import (
+    HookReferenceReplacer,
+)
 from deployment_manager.commands.deploy.subcommands.run.object_release import (
     Target,
 )
@@ -18,13 +21,17 @@ from deployment_manager.utils.functions import extract_id_from_url, templatize_n
 
 class HookDeployObject(DeployObject):
     type: Resource = Resource.Hook
+    ref_replacer: HookReferenceReplacer = None
     hook_template_url: str = None
     secrets: dict = {}
 
-    async def initialize_deploy_object(self, release_file):
-        await super().initialize_deploy_object(release_file)
-        self.hook_template_url = (release_file.hook_templates.get(self.id, None),)
-        self.secrets = release_file.secrets.get(
+    async def initialize_deploy_object(self, deploy_file):
+        await super().initialize_deploy_object(deploy_file)
+        # Overwrites default ref_replacer
+        self.ref_replacer = HookReferenceReplacer(self)
+
+        self.hook_template_url = (deploy_file.hook_templates.get(self.id, None),)
+        self.secrets = deploy_file.secrets.get(
             templatize_name_id(self.name, self.id), {}
         )
         await self.update_hook_code()
@@ -63,14 +70,12 @@ class HookDeployObject(DeployObject):
             target=target, data_attribute=data_attribute, dependency_name="queues"
         )
 
-        self.ref_replacer.replace_list_of_reference_urls(
+        data["run_after"] = await self.ref_replacer.replace_hook_run_after_list(
             object=data,
             target_index=target.index,
             target_objects_count=len(self.targets),
-            dependency_name="run_after",
             lookup_table=self.deploy_file.lookup_table,
             reverse_lookup_table=self.deploy_file.reverse_lookup_table,
-            object_type=Resource.Hook,
             use_dummy_references=use_dummy_references,
         )
         await self.persist_target_only_references(
@@ -86,6 +91,11 @@ class HookDeployObject(DeployObject):
                 result = await self.create_hook_without_known_template(
                     hook=data,
                 )
+
+            # Remember last_applied only if the API call succeeds
+            target.last_applied_data = data
+            target.data_from_remote = result
+            target.update_after_first_create()
 
             pprint(
                 f"{settings.CREATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}."

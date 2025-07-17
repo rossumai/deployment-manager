@@ -66,6 +66,68 @@ class AttributeOverrider:
                 new_value=value,
             )
 
+    def reverse_attributes_v2(
+        self,
+        source_object: dict,
+        target_object: dict,
+        attribute_overrides: dict,
+    ) -> dict[str, any]:
+        if not target_object:
+            raise Exception(
+                f'Cannot reverse attribute_override on None object (target name: {target_object.get("name", "")} | target id: {target_object.get("id", "")}).'
+            )
+
+        reversed_overrides = {}
+
+        for key in attribute_overrides:
+            single_reversal = self.reverse_attribute_override_v2(
+                source_object=source_object,
+                target_object=target_object,
+                key_query=key,
+            )
+            reversed_overrides.update(single_reversal)
+
+        return reversed_overrides
+
+    def reverse_attribute_override_v2(
+        self,
+        source_object: dict,
+        target_object: dict,
+        key_query: str,
+    ) -> dict[str, any]:
+        parent, key = parse_parent_and_key(key_query)
+
+        source_matches = perform_search(parent, source_object)
+        target_matches = perform_search(parent, target_object)
+
+        if len(source_matches) != len(target_matches):
+            raise AttributeOverrideException(
+                f'Mismatch in number of matches when reversing override at "{key_query}" '
+                f"(source={len(source_matches)}, target={len(target_matches)})."
+            )
+
+        reversed_values = []
+
+        for source_parent, target_parent in zip(source_matches, target_matches):
+            if key not in source_parent or key not in target_parent:
+                continue  # Can't reverse if missing
+
+            source_val = source_parent[key]
+            target_val = target_parent[key]
+
+            if source_val != target_val:
+                reversed_values.append(source_val)
+
+        if not reversed_values:
+            return {}
+
+        if len(reversed_values) == 1:
+            return {key_query: reversed_values[0]}
+        else:
+            return {
+                key_query: reversed_values
+            }  # list of values if multiple elements matched
+
 
 def traverse_mapping(submapping: dict):
     if isinstance(submapping, list):

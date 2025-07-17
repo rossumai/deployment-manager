@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 from typing import Any
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     create_object_label,
@@ -14,13 +17,20 @@ from rossum_api.api_client import Resource
 
 import copy
 
+if TYPE_CHECKING:
+    from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
+        DeployObject,
+    )
+
 
 class ReferenceReplacer:
     type: Resource
+    parent_object_reference: "DeployObject"
 
     IMPLICIT_OVERRIDE_KEYS = ["settings", "metadata"]
 
-    def __init__(self, type: Resource):
+    def __init__(self, parent_object_reference: DeployObject, type: Resource):
+        self.parent_object_reference = parent_object_reference
         self.type = type
 
     def replace_references_in_unstructured_attributes(
@@ -172,6 +182,7 @@ class ReferenceReplacer:
         object_type: Resource,
         use_dummy_references: bool,
         keep_dependency_without_equivalent: bool = False,
+        allow_empty_reference: bool = False,
     ):
         source_dependency_url = object.get(dependency_name, "")
         if not source_dependency_url:
@@ -191,6 +202,11 @@ class ReferenceReplacer:
             return
 
         if keep_dependency_without_equivalent:
+            return
+
+        # Remove object instead of making it None - Elis API does not allow that for some attribtues (e.g., queue.inbox)
+        if allow_empty_reference:
+            object.pop(dependency_name, "")
             return
 
         raise Exception(

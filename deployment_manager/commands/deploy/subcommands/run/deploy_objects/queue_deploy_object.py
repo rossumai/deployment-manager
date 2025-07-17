@@ -44,8 +44,8 @@ class QueueDeployObject(DeployObject):
 
     overwrite_ignored_fields: bool = False
 
-    schema_release: SchemaDeployObject = Field(alias="schema")
-    inbox_release: Optional[InboxDeployObject] = Field(
+    schema_deploy_object: SchemaDeployObject = Field(alias="schema")
+    inbox_deploy_object: Optional[InboxDeployObject] = Field(
         default_factory=lambda: EmptyObjectRelease(type=Resource.Inbox), alias="inbox"
     )
 
@@ -53,23 +53,18 @@ class QueueDeployObject(DeployObject):
 
     async def initialize_deploy_object(
         self,
-        release_file,
+        deploy_file,
     ):
-        await super().initialize_deploy_object(release_file)
+        await super().initialize_deploy_object(deploy_file)
 
-        await self.schema_release.initialize_deploy_object(
-            release_file=self.deploy_file,
+        await self.schema_deploy_object.initialize_deploy_object(
+            deploy_file=self.deploy_file,
             parent_queue=self,
         )
-        await self.inbox_release.initialize_deploy_object(
-            release_file=self.deploy_file,
+        await self.inbox_deploy_object.initialize_deploy_object(
+            deploy_file=self.deploy_file,
             parent_queue=self,
         )
-        if (
-            self.schema_release.initialize_failed
-            or self.inbox_release.initialize_failed
-        ):
-            raise SubObjectException()
 
         self.verify_queue_settings_are_compatible()
         await self.verify_subobjects_have_same_target_count()
@@ -84,6 +79,12 @@ class QueueDeployObject(DeployObject):
             ]
         )
 
+        if (
+            self.schema_deploy_object.initialize_failed
+            or self.inbox_deploy_object.initialize_failed
+        ):
+            self.initialize_failed = True
+
     @property
     def path(self) -> Path:
         return (
@@ -97,8 +98,8 @@ class QueueDeployObject(DeployObject):
     async def initialize_target_objects(self):
         await super().initialize_target_objects()
 
-        await self.schema_release.initialize_target_objects()
-        await self.inbox_release.initialize_target_objects()
+        await self.schema_deploy_object.initialize_target_objects()
+        await self.inbox_deploy_object.initialize_target_objects()
 
     async def initialize_target_object_data(self, data: dict, target: Target):
         if not self.deploy_file.is_same_org:
@@ -111,10 +112,10 @@ class QueueDeployObject(DeployObject):
     async def override_references(self, data_attribute, use_dummy_references):
         await super().override_references(data_attribute, use_dummy_references)
 
-        await self.schema_release.override_references(
+        await self.schema_deploy_object.override_references(
             data_attribute=data_attribute, use_dummy_references=use_dummy_references
         )
-        await self.inbox_release.override_references(
+        await self.inbox_deploy_object.override_references(
             data_attribute=data_attribute, use_dummy_references=use_dummy_references
         )
 
@@ -171,6 +172,9 @@ class QueueDeployObject(DeployObject):
             # Inbox cannot be assigned to multiple queues
             keep_dependency_without_equivalent=False,
             use_dummy_references=use_dummy_references,
+            # Inbox needs queue reference, so queue must be created first
+            # But this means we do not know the inbox ID yet
+            allow_empty_reference=True,
         )
 
         # if previous_schema_url == data["schema"] and not target.exists_on_remote:
@@ -212,25 +216,25 @@ class QueueDeployObject(DeployObject):
     async def visualize_changes(self):
         await super().visualize_changes()
 
-        await self.schema_release.visualize_changes()
-        await self.inbox_release.visualize_changes()
+        await self.schema_deploy_object.visualize_changes()
+        await self.inbox_deploy_object.visualize_changes()
 
     async def deploy_target_objects(self, data_attribute):
         try:
-            await self.schema_release.deploy_target_objects(
+            await self.schema_deploy_object.deploy_target_objects(
                 data_attribute=data_attribute
             )
 
-            if self.schema_release.deploy_failed:
+            if self.schema_deploy_object.deploy_failed:
                 raise SubObjectException()
 
             await super().deploy_target_objects(data_attribute)
 
-            await self.inbox_release.deploy_target_objects(
+            await self.inbox_deploy_object.deploy_target_objects(
                 data_attribute=data_attribute
             )
 
-            if self.inbox_release.deploy_failed:
+            if self.inbox_deploy_object.deploy_failed:
                 raise SubObjectException()
         except SubObjectException:
             self.deploy_failed = True
@@ -254,15 +258,15 @@ class QueueDeployObject(DeployObject):
         mismatch_found = False
 
         queue_targets_len = len(self.targets)
-        schema_targets_len = len(self.schema_release.targets)
+        schema_targets_len = len(self.schema_deploy_object.targets)
 
         if queue_targets_len != schema_targets_len:
             display_error(
-                f"{self.display_type} {self.display_label} has {queue_targets_len} targets while its {self.schema_release.display_type} has {schema_targets_len}. Please make the target counts equal."
+                f"{self.display_type} {self.display_label} has {queue_targets_len} targets while its {self.schema_deploy_object.display_type} has {schema_targets_len}. Please make the target counts equal."
             )
             mismatch_found = True
 
-        for rule in self.schema_release.rule_releases:
+        for rule in self.schema_deploy_object.rule_deploy_objects:
             rule_targets_len = len(rule.targets)
             if queue_targets_len != rule_targets_len:
                 display_error(
@@ -270,11 +274,13 @@ class QueueDeployObject(DeployObject):
                 )
                 mismatch_found = True
 
-        inbox_targets_len = len(self.inbox_release.targets)
-        queue_has_inbox = bool(self.data.get("inbox", "")) and self.inbox_release.id
+        inbox_targets_len = len(self.inbox_deploy_object.targets)
+        queue_has_inbox = (
+            bool(self.data.get("inbox", "")) and self.inbox_deploy_object.id
+        )
         if queue_has_inbox and queue_targets_len != inbox_targets_len:
             display_error(
-                f"{self.display_type} {self.display_label} has {queue_targets_len} targets while its {self.inbox_release.display_type} has {inbox_targets_len}. Please make the target counts equal."
+                f"{self.display_type} {self.display_label} has {queue_targets_len} targets while its {self.inbox_deploy_object.display_type} has {inbox_targets_len}. Please make the target counts equal."
             )
             mismatch_found = True
 

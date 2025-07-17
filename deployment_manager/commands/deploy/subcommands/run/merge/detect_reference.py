@@ -3,6 +3,16 @@ from typing import Any, Optional, Tuple
 
 from rossum_api.api_client import Resource
 
+from enum import Enum, auto
+from typing import Any, Optional, Tuple
+
+
+class ReferenceDetectionStatus(Enum):
+    DEFINITELY_REFERENCE = auto()
+    DEFINITELY_NOT = auto()
+    UNKNOWN = auto()
+
+
 # TODO: old US URLs fail with this regex
 ROSSUM_URL_RE = re.compile(r"https?://[\w\.-]+/api/v1/(\w+)/\d+")
 
@@ -24,32 +34,40 @@ FIELD_TO_RESOURCE = {
 
 def detect_reference_with_type(
     value: Any, field_name: str = ""
-) -> Tuple[bool, Optional[Resource]]:
+) -> Tuple[ReferenceDetectionStatus, Optional[Resource]]:
     """
     Try to detect if a value is a likely reference to another object and return the referenced type.
 
     Returns:
-        (is_reference: bool, reference_type: Optional[Resource])
+        (status: ReferenceDetectionStatus, reference_type: Optional[Resource])
     """
     # 1. Field name gives strong clue
     if field_name in FIELD_TO_RESOURCE:
-        return True, FIELD_TO_RESOURCE[field_name]
+        return (
+            ReferenceDetectionStatus.DEFINITELY_REFERENCE,
+            FIELD_TO_RESOURCE[field_name],
+        )
 
     # 2. Detect Rossum-style URL
-    if isinstance(value, str):
-        match = ROSSUM_URL_RE.match(value)
-        if match:
-            resource_str = match.group(1)
-            try:
-                resource = Resource(resource_str)
-                return True, resource
-            except ValueError:
-                pass  # Unrecognized type
+    if isinstance(value, str) and (match := ROSSUM_URL_RE.match(value)):
+        resource_str = match.group(1)
+        try:
+            resource = Resource(resource_str)
+            return ReferenceDetectionStatus.DEFINITELY_REFERENCE, resource
+        except ValueError:
+            return ReferenceDetectionStatus.DEFINITELY_NOT, None
 
-    # 3. Heuristic: ID-looking value — fallback only if field name implies nothing
-    if isinstance(value, int) or (isinstance(value, str) and value.isdigit()):
+    # 3. Heuristic: numeric ID-looking value, fallback only
+    if type(value) is int or (isinstance(value, str) and value.isdigit()):
         id_val = int(value)
         if 1 <= id_val <= 999_999_999:
-            return True, None  # Can't infer type from ID alone
+            return (
+                ReferenceDetectionStatus.UNKNOWN,
+                None,
+            )  # Might be a reference, might not
 
-    return False, None
+    # 4. Primitives or clearly non-reference
+    if isinstance(value, (bool, float, type(None))):
+        return ReferenceDetectionStatus.DEFINITELY_NOT, None
+
+    return ReferenceDetectionStatus.UNKNOWN, None

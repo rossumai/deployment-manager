@@ -12,12 +12,12 @@ class InboxDeployObject(DeployObject):
 
     parent_queue: DeployObject = None
 
-    async def initialize_deploy_object(self, release_file, parent_queue):
+    async def initialize_deploy_object(self, deploy_file, parent_queue):
         # Must come first!
         self.parent_queue = parent_queue
         # dynamic property caused issues in some function calls
         self.name = self.parent_queue.name
-        await super().initialize_deploy_object(release_file)
+        await super().initialize_deploy_object(deploy_file)
 
     async def initialize_target_object_data(self, data, target):
         if "name" not in target.attribute_override:

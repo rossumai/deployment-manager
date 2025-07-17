@@ -12,7 +12,7 @@ def deep_three_way_merge(
     last_applied: dict,
     source: dict,
     target: dict,
-    prefer: str = "neither",
+    prefer: str = None,
     ignored_fields: list[str] = None,
     override_fields: list[str] = None,
     derived_fields: list[str] = None,

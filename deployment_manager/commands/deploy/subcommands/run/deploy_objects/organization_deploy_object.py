@@ -3,13 +3,10 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_depl
     DeployObject,
 )
 from deployment_manager.commands.deploy.subcommands.run.object_release import (
-    ObjectRelease,
     Target,
 )
-from deployment_manager.utils.consts import display_error
 
 from rossum_api.api_client import Resource
-from copy import deepcopy
 
 
 class OrganizationDeployObject(DeployObject):
@@ -19,8 +16,8 @@ class OrganizationDeployObject(DeployObject):
     def path(self) -> Path:
         return Path(self.deploy_file.source_dir_path.parent) / "organization.json"
 
-    async def initialize_deploy_object(self, release_file):
-        await super().initialize_deploy_object(release_file)
+    async def initialize_deploy_object(self, deploy_file):
+        await super().initialize_deploy_object(deploy_file)
 
         org_target = Target(
             id=self.deploy_file.target_org.id,

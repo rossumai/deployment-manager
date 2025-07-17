@@ -1,3 +1,4 @@
+import hashlib
 import questionary
 from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
 from deployment_manager.commands.deploy.common.helpers import (
@@ -206,17 +207,17 @@ async def create_deploy_template(
     # Deploy state
     state_file_path = deploy_file_object.get(settings.DEPLOY_KEY_STATE_PATH, "")
 
-    if interactive and not state_file_path:
-        state_file_path = await get_filepath_from_user(
-            org_path,
-            default=(
-                settings.DEFAULT_DEPLOY_STATE_PARENT
-                + "/"
-                + f"{deploy_filepath.stem}.json"
-            ),
+    if not state_file_path:
+        hash_suffix = hashlib.sha1(
+            f"{source_dir_and_subdir}_{target_dir_and_subdir}_{source_url}_{target_url}"
+        ).hexdigest()[:6]
+        state_file_path = (
+            settings.DEFAULT_DEPLOY_STATE_PARENT
+            + "/"
+            + f"{deploy_filepath.stem}_{hash_suffix}.json"
         )
 
-    deploy_file_object[settings.DEPLOY_KEY_STATE_PATH] = str(state_file_path)
+    deploy_file_object[settings.DEPLOY_KEY_STATE_PATH] = state_file_path
 
     await yaml.save_to_file(deploy_filepath)
 
