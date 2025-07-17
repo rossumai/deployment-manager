@@ -6,10 +6,8 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_depl
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.rule_deploy_object import (
     RuleDeployObject,
 )
-from deployment_manager.commands.deploy.subcommands.run.models import SubObjectException
-from deployment_manager.commands.deploy.subcommands.run.object_release import (
-    Target,
-)
+from deployment_manager.commands.deploy.subcommands.run.models import SubObjectException, Target
+
 from deployment_manager.common.read_write import (
     find_fields_in_schema,
     read_formula_file,

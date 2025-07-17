@@ -6,6 +6,7 @@ from rossum_api.api_client import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
     DeployObject,
+    EmptyDeployObject,
 )
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.inbox_deploy_object import (
     InboxDeployObject,
@@ -20,9 +21,7 @@ from deployment_manager.commands.deploy.subcommands.run.models import (
     SubObjectException,
     Target,
 )
-from deployment_manager.commands.deploy.subcommands.run.object_release import (
-    EmptyObjectRelease,
-)
+
 from deployment_manager.utils.consts import (
     QUEUE_ENGINE_ATTRIBUTES,
     display_error,
@@ -46,7 +45,7 @@ class QueueDeployObject(DeployObject):
 
     schema_deploy_object: SchemaDeployObject = Field(alias="schema")
     inbox_deploy_object: Optional[InboxDeployObject] = Field(
-        default_factory=lambda: EmptyObjectRelease(type=Resource.Inbox), alias="inbox"
+        default_factory=lambda: EmptyDeployObject(type=Resource.Inbox), alias="inbox"
     )
 
     unselected_hooks: list[int] = []
