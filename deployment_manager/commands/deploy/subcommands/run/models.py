@@ -20,7 +20,6 @@ if TYPE_CHECKING:
 
 class Target(BaseModel):
     id: Union[str, None] = Field(
-        validation_alias=AliasChoices("id", "target_id"),
         default_factory=lambda: str(uuid.uuid4()),
     )
     attribute_override: dict = {}
@@ -50,6 +49,11 @@ class Target(BaseModel):
 
     @field_validator("id", mode="before")
     @classmethod
+    def fill_id_if_none(cls, v):
+        return str(uuid.uuid4()) if v is None else v
+
+    @field_validator("id", mode="before")
+    @classmethod
     def convert_id_to_str(cls, v):
         if isinstance(v, int):
             return str(v)
@@ -58,13 +62,21 @@ class Target(BaseModel):
     def model_post_init(self, __context):
         self.exists_on_remote = self._is_real_id(self.id)
 
+    def create_dummy_id_from_parent(self):
+        # self.id = f"<NEW COPY>[{self.index}]([yellow]{self.parent_object.name}[/yellow] - [purple]{self.parent_object.id}[/purple])"
+        self.id = f"<NEW COPY>[{self.index}]({self.parent_object.name} - {self.parent_object.id})"
+
+    def update_after_first_create(self):
+        self.id = self.data_from_remote["id"]
+        self.exists_on_remote = True
+
     @staticmethod
     def _is_real_id(id_val: str) -> bool:
         try:
             # Real IDs are numeric strings; dummy UUIDs have hyphens
             int(id_val)
             return True
-        except ValueError:
+        except (ValueError, TypeError):
             return False
 
 
