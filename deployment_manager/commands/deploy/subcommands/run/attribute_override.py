@@ -156,22 +156,15 @@ class AttributeOverrider:
             if code_diff:
                 code_diff = f"{'*'*80}\nconfig.code diff:\n{'*'*80}\n{code_diff}"
 
-        with tempfile.NamedTemporaryFile() as tf1, tempfile.NamedTemporaryFile() as tf2:
-            tf1.write(bytes(json.dumps(before_object, indent=2), "UTF-8"))
-            tf2.write(bytes(json.dumps(after_object, indent=2), "UTF-8"))
-            # Has to be manually seeked back to start
-            tf1.seek(0)
-            tf2.seek(0)
+        before_lines = json.dumps(before_object, indent=2).splitlines()
+        after_lines = json.dumps(after_object, indent=2).splitlines()
+        diff = difflib.unified_diff(before_lines, after_lines, fromfile="before", tofile="after", lineterm="")
+        diff = "\n".join(list(diff))
 
-            diff = subprocess.run(
-                ["diff", tf1.name, tf2.name, "-U" "3"],
-                capture_output=True,
-                text=True,
-            )
-            after_object["id"] = after_object_id
-            after_object["url"] = after_object_url
+        after_object["id"] = after_object_id
+        after_object["url"] = after_object_url
 
-            return diff.stdout + code_diff
+        return diff + code_diff
 
     def parse_diff(self, diff: str):
         colorized_lines = []

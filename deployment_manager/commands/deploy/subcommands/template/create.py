@@ -55,7 +55,7 @@ async def create_deploy_template(
             type=settings.SOURCE_DIRNAME.upper(),
             default=source_dir_and_subdir,
         )
-    deploy_file_object[settings.DEPLOY_KEY_SOURCE_DIR] = source_dir_and_subdir
+    deploy_file_object[settings.DEPLOY_KEY_SOURCE_DIR] = str(source_dir_and_subdir)
 
     source_path = org_path / source_dir_and_subdir
     if not (await (source_path / "workspaces").exists()):
@@ -72,14 +72,14 @@ async def create_deploy_template(
             type=settings.TARGET_DIRNAME.upper(),
             default=target_dir_and_subdir,
         )
-    deploy_file_object[settings.DEPLOY_KEY_TARGET_DIR] = target_dir_and_subdir
+    deploy_file_object[settings.DEPLOY_KEY_TARGET_DIR] = str(target_dir_and_subdir)
 
     # Source URL
     # Target URL can be in the deploy file already, in a config file, or inputted by the user
     source_url = deploy_file_object.get(settings.DEPLOY_KEY_SOURCE_URL, "")
     if not source_url:
         source_url = await get_api_url_from_config(
-            base_path=org_path, org_name=source_dir_and_subdir.split("/")[0]
+            base_path=org_path, org_name=source_dir_and_subdir.parts[0]
         )
     if interactive or not source_url:
         source_url = await get_api_url_from_user(
@@ -94,7 +94,7 @@ async def create_deploy_template(
     target_url = deploy_file_object.get(settings.DEPLOY_KEY_TARGET_URL, "")
     if not target_url and target_dir_and_subdir:
         target_url = await get_api_url_from_config(
-            base_path=org_path, org_name=target_dir_and_subdir.split("/")[0]
+            base_path=org_path, org_name=target_dir_and_subdir.parts[0]
         )
     if interactive or not target_url:
         target_url = await get_api_url_from_user(
@@ -155,15 +155,15 @@ async def create_deploy_template(
 
     # Filename
     if interactive:
-        source_subdir_name = source_dir_and_subdir.split("/")[1]
-        target_subdir_name = target_dir_and_subdir.split("/")
+        source_subdir_name = source_dir_and_subdir.parts[1]
+        target_subdir_name = target_dir_and_subdir.parts if target_dir_and_subdir else ""
         default_deploy_name = f"{source_subdir_name}_{target_subdir_name[1] if len(target_subdir_name) > 1 else "NA"}.yaml"
         deploy_filepath = await get_filepath_from_user(
             org_path,
             default=(
                 str(input_file_path)
                 if input_file_path
-                else settings.DEFAULT_DEPLOY_PARENT + "/" + default_deploy_name
+                else str(Path(settings.DEFAULT_DEPLOY_PARENT + "/" + default_deploy_name))
             ),
         )
     else:
@@ -192,11 +192,11 @@ async def create_deploy_template(
         if not secrets_file_path:
             secrets_file_path = await get_filepath_from_user(
                 org_path,
-                default=(
+                default=str(Path(
                     settings.DEFAULT_DEPLOY_SECRETS_PARENT
                     + "/"
                     + f"{deploy_filepath.stem}_secrets.json"
-                ),
+                )),
             )
 
         await write_object_to_json(secrets_file_path, secrets)

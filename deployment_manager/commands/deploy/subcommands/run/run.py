@@ -55,7 +55,7 @@ async def deploy_release_file(
         project_path = Path("./")
 
     source_dir_subdir = yaml.data[settings.DEPLOY_KEY_SOURCE_DIR]
-    source_org_name = source_dir_subdir.split("/")[0]
+    source_org_name = Path(source_dir_subdir).parts[0]
 
     if not source_client:
         source_credentials = await get_url_and_credentials(
@@ -84,7 +84,7 @@ async def deploy_release_file(
     )
 
     target_dir_subdir = yaml.data.get(settings.DEPLOY_KEY_TARGET_DIR, "")
-    target_org_name = target_dir_subdir.split("/")[0]
+    target_org_name = Path(target_dir_subdir).parts[0] if Path(target_dir_subdir).parts else ""
 
     if not target_client:
         target_credentials = await get_url_and_credentials(
