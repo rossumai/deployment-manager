@@ -95,7 +95,7 @@ async def upload_destinations(
     commit_message: str = "",
 ):
     if not destinations:
-        display_warning("No destinations specified to push.")
+        display_warning(f"No destinations specified to {settings.UPLOAD_COMMAND_NAME}.")
         return
 
     if not project_path:
