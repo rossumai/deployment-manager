@@ -126,7 +126,7 @@ async def download_destinations(
 
     for org_dir_name, org_dir_config in configured_directories.items():
         if all(not subdir.include for subdir in org_dir_config.subdirectories.values()):
-            display_warning(f"All subdirectories in organization {org_dir_name} are marked as not included. Skipping pull.")
+            display_warning(f"All subdirectories in selected destinations in organization {org_dir_name} are marked as not included. Skipping pull.")
             continue
 
         for subdir_name in org_dir_config.subdirectories.keys():
