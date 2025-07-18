@@ -190,7 +190,7 @@ class DirectoryDocumentator:
             for queue in self.queues:
                 await self.document_queue_with_context(queue)
 
-            # TODO: Allow to run only second/third stage
+            # TODO: load previously documented parts (e.g., queue) into the object before documenting use case
 
             await self.document_use_case()
 
