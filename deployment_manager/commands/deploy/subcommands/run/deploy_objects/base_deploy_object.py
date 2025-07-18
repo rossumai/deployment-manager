@@ -43,7 +43,7 @@ from deployment_manager.commands.deploy.subcommands.run.models import (
     Target,
     TargetWithDefault,
 )
-from deployment_manager.common.read_write import read_json, write_json
+from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
 from rich import print as pprint
 from rich.panel import Panel
 from rich.console import Console
@@ -96,7 +96,7 @@ class DeployObject(BaseModel):
         )
 
         try:
-            self.data = await read_json(self.path)
+            self.data = await read_object_from_json(self.path)
         except PathNotFoundException:
             self.initialize_failed = True
             display_error(
@@ -437,9 +437,9 @@ class DeployObject(BaseModel):
                     if await prompt_rebase_field(self.display_label, path):
                         self.rebase_detected = True
                         # Mutate local source data directly here
-                        # ! TODO: if name changes, the file needs to be resaved (would be good to wrap that logic in write_json).
+                        # ! TODO: if name changes, the file needs to be resaved (would be good to wrap that logic in write_object_to_json).
                         set_nested_value(self.data, path, target_val)
-                        await write_json(self.path, self.data)
+                        await write_object_to_json(self.path, self.data)
 
                 # TODO: if source queue ABC maps to target queue 123 and 456 and target hook is assigned only to 456, there will be a conflict we can detect but not visualize back both references are translated to the same source
                 # Only do it for the first target if there are conflicts with multiple of them
