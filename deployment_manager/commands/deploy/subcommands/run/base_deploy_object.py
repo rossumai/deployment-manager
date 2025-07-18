@@ -1,4 +1,3 @@
-from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime
 
@@ -8,7 +7,6 @@ from deployment_manager.commands.deploy.subcommands.run.attribute_override impor
     AttributeOverrider,
 )
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
-    DeployYaml,
     generate_deploy_timestamp,
     remove_queue_attributes_for_cross_org,
 )
@@ -17,17 +15,16 @@ from deployment_manager.commands.deploy.subcommands.run.models import (
     Target,
     TargetWithDefault,
 )
-from deployment_manager.commands.deploy.subcommands.run.merge.state import DeployState
-from deployment_manager.common.read_write import read_json
+from deployment_manager.common.read_write import read_object_from_json
 from rich import print as pprint
 from rich.panel import Panel
 
 
 from anyio import Path
-from rossum_api import APIClientError, ElisAPIClient
+from rossum_api import APIClientError
 from rossum_api.api_client import Resource
 
-from deployment_manager.utils.consts import CustomResource, display_error, settings
+from deployment_manager.utils.consts import display_error, settings
 from deployment_manager.utils.functions import templatize_name_id
 
 
@@ -83,7 +80,7 @@ class DeployObject(BaseModel):
 
         if not self.data:
             try:
-                self.data = await read_json(self.path)
+                self.data = await read_object_from_json(self.path)
             except Exception:
                 raise PathNotFoundException(
                     f"Could not load object data from: [green]{self.path}[/green]. Is the object name in deploy file in-sync with its local path?"
