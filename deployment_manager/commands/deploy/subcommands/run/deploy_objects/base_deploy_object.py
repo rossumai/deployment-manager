@@ -43,7 +43,10 @@ from deployment_manager.commands.deploy.subcommands.run.models import (
     Target,
     TargetWithDefault,
 )
-from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
+from deployment_manager.common.read_write import (
+    read_object_from_json,
+    write_object_to_json,
+)
 from rich import print as pprint
 from rich.panel import Panel
 from rich.console import Console
@@ -140,7 +143,11 @@ class DeployObject(BaseModel):
             # Should run before attribute override
             self.remove_ignored_attributes(data_copy)
 
-            # TODO: for cross-cluster/cross-org, URL might be different -> create from client base API URL?
+            data_copy["url"] = self.ref_replacer.replace_base_url(
+                url=data_copy["url"],
+                source_base_url=self.deploy_file.source_client._http_client.base_url,
+                target_base_url=self.deploy_file.client._http_client.base_url,
+            )
             data_copy["url"] = data_copy["url"].replace(
                 str(data_copy["id"]), str(target.id)
             )

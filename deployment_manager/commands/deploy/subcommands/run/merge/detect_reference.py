@@ -66,7 +66,7 @@ def detect_reference_with_type(
             )  # Might be a reference, might not
 
     # 4. Primitives or clearly non-reference
-    if isinstance(value, (bool, float, type(None))):
+    if isinstance(value, (str, bool, float, type(None))):
         return ReferenceDetectionStatus.DEFINITELY_NOT, None
 
     return ReferenceDetectionStatus.UNKNOWN, None

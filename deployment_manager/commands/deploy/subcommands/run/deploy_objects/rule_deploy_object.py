@@ -15,8 +15,9 @@ class RuleDeployObject(DeployObject):
     parent_schema: DeployObject = None
 
     async def initialize_deploy_object(self, deploy_file, parent_schema):
-        await super().initialize_deploy_object(deploy_file)
+        # Must come first
         self.parent_schema = parent_schema
+        await super().initialize_deploy_object(deploy_file)
 
     @property
     def path(self) -> Path:
@@ -39,6 +40,9 @@ class RuleDeployObject(DeployObject):
     ):
         data = getattr(target, data_attribute)
         # previous_schema_url = data["schema"]
+
+        # Elis API does not accept fake IDs for rules unlike other objects
+        data.pop('id', None)
 
         self.ref_replacer.replace_reference_url(
             object=data,
