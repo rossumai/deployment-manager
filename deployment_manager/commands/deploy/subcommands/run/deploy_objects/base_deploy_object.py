@@ -170,6 +170,10 @@ class DeployObject(BaseModel):
         """Method for specific deploy_objects (e.g., hooks) to add their custom logic"""
         ...
 
+    def scrub_attributes(self, data: dict):
+        """Removes fields that should not be saved into last_applied deploy state (e.g., hook.secrets)"""
+        return data
+
     @property
     def path(self) -> Path:
         return (
@@ -253,7 +257,7 @@ class DeployObject(BaseModel):
 
             result = await self.deploy_file.client._http_client.create(self.type, data)
             # Remember last_applied only if the API call succeeds
-            target.last_applied_data = data
+            target.last_applied_data = self.scrub_attributes(data)
             target.data_from_remote = result
             target.update_after_first_create()
 
@@ -276,7 +280,7 @@ class DeployObject(BaseModel):
                 resource=self.type, id_=target.id, data=data
             )
             # Only if the API call succeeds
-            target.last_applied_data = data
+            target.last_applied_data = self.scrub_attributes(data)
             target.data_from_remote = result
 
             pprint(
@@ -313,7 +317,6 @@ class DeployObject(BaseModel):
         for target in self.targets:
             data = getattr(target, data_attribute)
 
-            # TODO: dummy references flag here
             self.ref_replacer.replace_references_in_unstructured_attributes(
                 target_object=data,
                 target_object_label=self.display_label,

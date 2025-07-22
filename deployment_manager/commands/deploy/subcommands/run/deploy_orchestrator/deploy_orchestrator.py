@@ -200,7 +200,6 @@ class DeployOrchestrator(BaseModel):
             display_error(f"Error during overriding references of target objects: {e}")
             raise
 
-    # TODO: ignored fields that should not be deployed, but what if user explicitly att overrides them?
     async def compare_object_versions(self):
         try:
             self.reverse_lookup_table = self.create_reverse_lookup_table()

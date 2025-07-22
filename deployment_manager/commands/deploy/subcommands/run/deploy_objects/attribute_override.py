@@ -23,13 +23,14 @@ class AttributeOverrider:
         key_query: str,
         new_value: str,
     ):
-        parent, key = parse_parent_and_key(key_query)
+        parent, key, create_if_not_exists = parse_parent_and_key(key_query)
 
         search = perform_search(parent, object)
 
         for override_parent in search:
             # The attribute (key) might not be on all parent objects (e.g., configurations[*].queue_ids)
-            if key not in override_parent:
+            # If the user explicitly wants the attribute added, this does not apply
+            if key not in override_parent and not create_if_not_exists:
                 continue
 
             if isinstance(new_value, str):
@@ -95,7 +96,7 @@ class AttributeOverrider:
         target_object: dict,
         key_query: str,
     ) -> dict[str, any]:
-        parent, key = parse_parent_and_key(key_query)
+        parent, key, create_if_not_exists = parse_parent_and_key(key_query)
 
         source_matches = perform_search(parent, source_object)
         target_matches = perform_search(parent, target_object)
@@ -170,18 +171,25 @@ def parse_regex_attribute_override(value: str):
 
 def parse_parent_and_key(key_query: str):
     try:
-        dot = [pos for pos, char in enumerate(key_query) if char == "."]
-        pipe = [pos for pos, char in enumerate(key_query) if char == "|"]
-        dot_idx = dot[-1] if dot else -1
-        pipe_idx = pipe[-1] if pipe else -1
-        idx = dot_idx if dot_idx > -1 else pipe_idx if pipe_idx > -1 else -1
+        # Check for trailing exclamation mark
+        create_if_not_exists = key_query.endswith("!")
+        if create_if_not_exists:
+            key_query = key_query[:-1]  # Strip the '!' from the end
+
+        # Find last dot or pipe
+        dot_idx = key_query.rfind(".")
+        pipe_idx = key_query.rfind("|")
+
+        # Pick the later of the two
+        idx = max(dot_idx, pipe_idx)
+
         parent = key_query[:idx].strip() if idx > -1 else None
-        key = key_query[idx + 1 :].strip() if idx > -1 else key_query
+        key = key_query[idx + 1 :].strip() if idx > -1 else key_query.strip()
     except Exception:
         raise AttributeOverrideException(
             f'Invalid attribute override query "{key_query}" - the last part must be a single object key.'
         )
-    return parent, key
+    return parent, key, create_if_not_exists
 
 
 def perform_search(parent: str, object: dict):
