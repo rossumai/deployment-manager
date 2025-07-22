@@ -190,7 +190,9 @@ class Settings:
     DEPLOY_RUN_COMMAND_NAME: str = "run"
     DEPLOY_REVERT_COMMAND_NAME: str = "revert"
     DEPLOY_TEMPLATE_COMMAND_NAME: str = "template"
-    DEPLOY_TEMPLATE_INIT_COMMAND_NAME: str = "init"
+    DEPLOY_TEMPLATE_CREATE_COMMAND_NAME: str = "create"
+    DEPLOY_TEMPLATE_UPDATE_COMMAND_NAME: str = "update"
+    DEPLOY_TEMPLATE_REVERSE_COMMAND_NAME: str = "reverse"
     HOOK_COMMAND_NAME: str = "hook"
     HOOK_PAYLOAD_COMMAND_NAME: str = "payload"
     HOOK_TEST_COMMAND_NAME: str = "test"
@@ -211,7 +213,9 @@ class Settings:
     DEPLOY_DEFAULT_TARGET_URL = "https://my-org.rossum.app/api/v1"
     DEFAULT_DEPLOY_PARENT = "deploy_files"
     DEFAULT_DEPLOY_SECRETS_PARENT = "deploy_secrets"
+    DEFAULT_DEPLOY_STATE_PARENT = "deploy_states"
     DEPLOY_KEY_SECRETS_PATH = "secrets_file"
+    DEPLOY_KEY_STATE_PATH = "deploy_state_file"
     DEPLOY_KEY_TARGETS = "targets"
     DEPLOY_KEY_OVERRIDES = "attribute_override"
     DEPLOY_KEY_DEPLOYED_ORG_ID = "deployed_org_id"
@@ -239,7 +243,8 @@ class Settings:
     DELETE_PRINT_STR: str = "[red]DELETE[/red]"
     PLAN_PRINT_STR: str = "[bold]PLAN:[/bold]"
 
-    IGNORED_KEYS: dict = {
+    # These are not even saved locally when pulling
+    NON_PULLED_KEYS_PER_OBJECT: dict = {
         Resource.Queue: ["counts", "users"],
         Resource.Hook: ["status"],
     }
@@ -247,11 +252,29 @@ class Settings:
     NON_VERSIONED_ATTRIBUTES_FILE_NAME: str = "non_versioned_object_attributes.json"
     NON_VERSIONED_ATTRIBUTES: tuple = ("modified_at",)
 
+    # These are versioned locally, but should not be deployed, and so they are not displayed in diffs either
+    DEPLOY_NON_DIFFED_KEYS: dict = {
+        Resource.Inbox: ["email"],
+        Resource.Hook: ["guide", "status"],
+        Resource.Organization: [
+            "organization_group",
+            "users",
+            "creator",
+            "trial_expires_at",
+        ],
+    }
+    # Non-diffed only if cross-org
+    DEPLOY_CROSS_ORG_NON_DIFFED_KEYS: dict = {
+        Resource.Queue: ["workflows", *QUEUE_ENGINE_ATTRIBUTES]
+    }
+
     FORMULA_DIR_NAME: str = "formulas"
     RULES_DIR_NAME: str = "rules"
     EMAIL_TEMPLATES_DIR_NAME: str = "email_templates"
 
-    GITHUB_DEFAULT_LATEST_RELEASE_URL = "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
+    GITHUB_DEFAULT_LATEST_RELEASE_URL = (
+        "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
+    )
     GITHUB_DEPLOYMENT_MANAGER_REPO_OWNER = "rossumai"
     GITHUB_DEPLOYMENT_MANAGER_REPO_NAME = "deployment-manager"
 

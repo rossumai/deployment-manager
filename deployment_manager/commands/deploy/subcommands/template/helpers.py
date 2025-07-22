@@ -203,6 +203,7 @@ DEFAULT_TARGETS = [{"id": None}]
 def prepare_deploy_file_objects(
     objects: list[dict],
     include_path: bool = False,
+    extra_attributes: dict = {},
     objects_in_previous_file: list[dict] = [],
 ):
     previous_objects_by_id = {
@@ -219,6 +220,7 @@ def prepare_deploy_file_objects(
             settings.DEPLOY_KEY_TARGETS: previous_objects_by_id.get(
                 object["id"], {}
             ).get(settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)),
+            **extra_attributes,
         }
         if not include_path:
             deploy_representation.pop(settings.DEPLOY_KEY_BASE_PATH)
@@ -307,6 +309,7 @@ async def get_queues_from_user(
     deploy_file_queues = prepare_deploy_file_objects(
         deploy_file_queues,
         include_path=True,
+        extra_attributes={settings.DEPLOY_KEY_IGNORE_DEPLOY_WARNINGS: False},
         objects_in_previous_file=previous_deploy_file_queues,
     )
 
