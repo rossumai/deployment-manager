@@ -368,7 +368,7 @@ class ObjectRelease(BaseModel):
         data.pop("modified_at", None)
 
         # These keys are not pulled locally so comparing a remote object with a local one would yield false diffs
-        ignored_keys_for_type = settings.NON_VERSIONED_KEYS_PER_OBJECT.get(self.type, [])
+        ignored_keys_for_type = settings.NON_PULLED_KEYS_PER_OBJECT.get(self.type, [])
         for key in ignored_keys_for_type:
             data.pop(key, None)
 
