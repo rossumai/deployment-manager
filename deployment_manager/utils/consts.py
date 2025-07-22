@@ -244,7 +244,7 @@ class Settings:
     PLAN_PRINT_STR: str = "[bold]PLAN:[/bold]"
 
     # These are not even saved locally when pulling
-    NON_VERSIONED_KEYS_PER_OBJECT: dict = {
+    NON_PULLED_KEYS_PER_OBJECT: dict = {
         Resource.Queue: ["counts", "users"],
         Resource.Hook: ["status"],
     }
