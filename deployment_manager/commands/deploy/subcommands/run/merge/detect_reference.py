@@ -13,8 +13,7 @@ class ReferenceDetectionStatus(Enum):
     UNKNOWN = auto()
 
 
-# TODO: old US URLs fail with this regex
-ROSSUM_URL_RE = re.compile(r"https?://[\w\.-]+/api/v1/(\w+)/\d+")
+ROSSUM_URL_RE = re.compile(r"https?://(?:[\w-]+\.)*api\.rossum\.ai/(?:api/)?v1/(\w+)/(\d+)")
 
 
 # Field name hints → known Resource types

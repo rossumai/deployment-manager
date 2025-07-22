@@ -39,8 +39,8 @@ class AttributeOverrider:
                     override_parent[key] = new_value
                 else:
                     pattern = re.compile(source_regex)
-                    override_parent[key] = re.sub(
-                        pattern, new_value, override_parent[key]
+                    override_parent[key] = recursive_override(
+                        override_parent["key"], pattern, new_value
                     )
             # Overwriting dicts -> merge keys, overwrite only the provided ones
             elif isinstance(new_value, dict):
@@ -127,6 +127,22 @@ class AttributeOverrider:
             return {
                 key_query: reversed_values
             }  # list of values if multiple elements matched
+
+
+def recursive_override(data, search_string, replace_string):
+    if isinstance(data, dict):
+        return {
+            k: recursive_override(v, search_string, replace_string)
+            for k, v in data.items()
+        }
+    elif isinstance(data, list):
+        return [
+            recursive_override(elem, search_string, replace_string) for elem in data
+        ]
+    elif isinstance(data, str):
+        return re.sub(search_string, replace_string, data)
+    else:
+        return data
 
 
 def traverse_mapping(submapping: dict):
