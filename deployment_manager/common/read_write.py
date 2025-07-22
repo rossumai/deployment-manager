@@ -25,9 +25,9 @@ async def write_object_to_json(
     if path.parent:
         await path.parent.mkdir(parents=True, exist_ok=True)
     if type:
-        # IGNORED_KEYS are thrown away completely
-        if ignored_keys := settings.NON_PULLED_KEYS_PER_OBJECT.get(type):
-            for key in ignored_keys:
+        # NON_PULLED keys are thrown away completely
+        if non_pulled_keys := settings.NON_PULLED_KEYS_PER_OBJECT.get(type):
+            for key in non_pulled_keys:
                 if key in object:
                     del object[key]
         # NON_VERSIONED_ATTRIBUTES are saved in separate file
