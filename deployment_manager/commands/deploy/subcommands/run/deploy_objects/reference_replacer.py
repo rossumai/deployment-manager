@@ -33,6 +33,9 @@ class ReferenceReplacer:
         self.parent_object_reference = parent_object_reference
         self.type = type
 
+    def replace_base_url(self, url: str, source_base_url: str, target_base_url: str):
+        return url.replace(source_base_url, target_base_url)
+
     def replace_references_in_unstructured_attributes(
         self,
         target_object_label: str,

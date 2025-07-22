@@ -40,7 +40,7 @@ class AttributeOverrider:
                 else:
                     pattern = re.compile(source_regex)
                     override_parent[key] = recursive_override(
-                        override_parent["key"], pattern, new_value
+                        override_parent[key], pattern, new_value
                     )
             # Overwriting dicts -> merge keys, overwrite only the provided ones
             elif isinstance(new_value, dict):

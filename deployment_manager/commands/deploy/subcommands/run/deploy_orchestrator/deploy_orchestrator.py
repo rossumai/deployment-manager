@@ -183,7 +183,7 @@ class DeployOrchestrator(BaseModel):
             )
         except Exception as e:
             display_error(f"Error during initialization of target objects: {e}")
-            raise Exception from e
+            raise
 
         try:
             self.lookup_table = self.create_lookup_table()
@@ -198,7 +198,7 @@ class DeployOrchestrator(BaseModel):
             )
         except Exception as e:
             display_error(f"Error during overriding references of target objects: {e}")
-            raise Exception from e
+            raise
 
     # TODO: ignored fields that should not be deployed, but what if user explicitly att overrides them?
     async def compare_object_versions(self):
@@ -239,7 +239,7 @@ class DeployOrchestrator(BaseModel):
             display_error(
                 f"Error during comparison of prepared target objects with their remote versions: {e}"
             )
-            raise Exception from e
+            raise
 
     async def show_deploy_plan(self):
         try:
@@ -252,7 +252,7 @@ class DeployOrchestrator(BaseModel):
                 await object.visualize_changes()
         except Exception as e:
             display_error(f"Error during visualization of deploy plan changes: {e}")
-            raise Exception from e
+            raise
 
     async def run_deploy(self, is_first: bool):
         try:
@@ -292,7 +292,7 @@ class DeployOrchestrator(BaseModel):
             display_error(
                 f'Error during {"first" if is_first else "second"} deploy: {e}'
             )
-            raise Exception from e
+            raise
 
     # TODO: for perfect safety, comparison should be done after first deploy (what if someone on remote changed something in the middle of deploy?)
     # Compare first_deploy_data vs last_applied (saved after first_deploy) against remote
