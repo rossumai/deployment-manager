@@ -1,3 +1,4 @@
+from copy import deepcopy
 import questionary
 from rich import print as pprint
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
@@ -38,10 +39,8 @@ class HookDeployObject(DeployObject):
             self.hook_template_url = await self.find_template_for_hook()
 
     async def initialize_target_object_data(self, data: dict, target: Target):
-        ...
-        # TODO: do secrets somewhere where you do not commit them
-        # if self.secrets:
-        #     hook_copy["secrets"] = self.secrets
+        if self.secrets:
+            data["secrets"] = self.secrets
 
     async def override_references_in_target_object_data(
         self, data_attribute, target, use_dummy_references
@@ -91,7 +90,7 @@ class HookDeployObject(DeployObject):
                 )
 
             # Remember last_applied only if the API call succeeds
-            target.last_applied_data = data
+            target.last_applied_data = self.scrub_attributes(data)
             target.data_from_remote = result
             target.update_after_first_create()
 
@@ -106,6 +105,11 @@ class HookDeployObject(DeployObject):
             )
             self.deploy_failed = True
             return {}
+
+    def scrub_attributes(self, data):
+        data_copy = deepcopy(data)
+        data_copy.pop("secrets", None)
+        return data_copy
 
     async def create_hook_without_known_template(self, hook: dict):
         return await self.deploy_file.client._http_client.create(self.type, hook)

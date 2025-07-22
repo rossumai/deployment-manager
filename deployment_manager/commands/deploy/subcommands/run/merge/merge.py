@@ -145,7 +145,6 @@ async def prompt_rebase_field(label, path):
     ).ask_async()
 
 
-# TODO: --ours and --theirs params to resolve conflicts automatically
 async def prompt_conflict_resolution(target_val, last_applied_val, object_path):
 
     # ! This assumes that these two objects were created from the same JSON as source
