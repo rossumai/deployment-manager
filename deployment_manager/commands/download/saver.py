@@ -148,6 +148,14 @@ class EmailTemplateSaver(QueueSaver):
         )
         return object_path
 
+    def _get_message_for_subdir_selection(self, object):
+        message = super()._get_message_for_subdir_selection(object)
+
+        queue = self.find_queue(object)
+        if queue:
+            return message + f", for [yellow]queue[/yellow]: {self.display_label(queue['name'], queue['id'])}"
+        return message
+
     async def save_downloaded_object(self, email_template: dict, subdir: Subdirectory):
         if not email_template.get("queue", None):
             return
