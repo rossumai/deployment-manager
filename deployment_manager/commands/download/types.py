@@ -72,7 +72,7 @@ class ObjectSaver(BaseModel):
             self.subdirs_by_object_id[object["id"]] = subdir
             await self.save_downloaded_object(object, subdir)
 
-    def _get_subdir_from_user_message(self, object):
+    def _get_message_for_subdir_selection(self, object):
         return f"{self.display_type} {self.display_label(object['name'], object['id'])}"
 
     async def get_subdir_from_user(self, object):
@@ -81,7 +81,7 @@ class ObjectSaver(BaseModel):
             for subdir in self.subdirs
         ]
         pprint(
-            self._get_subdir_from_user_message(object),
+            self._get_message_for_subdir_selection(object),
             end=" ",
         )
         return await questionary.select(

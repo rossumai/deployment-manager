@@ -148,8 +148,8 @@ class EmailTemplateSaver(QueueSaver):
         )
         return object_path
 
-    def _get_subdir_from_user_message(self, object):
-        message = super()._get_subdir_from_user_message(object)
+    def _get_message_for_subdir_selection(self, object):
+        message = super()._get_message_for_subdir_selection(object)
 
         queue = self.find_queue(object)
         if queue:
