@@ -2,6 +2,7 @@ import click
 from anyio import Path
 
 from deployment_manager.commands.hook.payload import generate_and_save_hook_payload
+from deployment_manager.commands.hook.sync import sync_hook
 from deployment_manager.commands.hook.test import test_hook
 from deployment_manager.utils.consts import (
     settings,
@@ -65,4 +66,31 @@ async def test_hook_wrapper(
 ):
     await test_hook(
         hook_path=hook_path, payload_path=payload_path, annotation_url=annotation_url
+    )
+
+# TODO init config
+# TODO debugger
+
+@hook.command(
+    name=settings.HOOK_PULL_COMMAND_NAME,
+    help="""Run the hook under the specified path (JSON)""",
+)
+@click.argument(
+    "destination",
+    nargs=1,
+    type=click.Path(path_type=Path),
+)
+@click.argument(
+    "aliases",
+    nargs=-1,
+    type=click.Path(path_type=Path, exists=True),
+)
+@coro
+async def pull_hook_wrapper(
+    destination: Path,
+    aliases: list[Path] | None = None,
+):
+    await sync_hook(
+        destination=destination,
+        aliases=aliases
     )
