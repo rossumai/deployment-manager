@@ -3,7 +3,10 @@ import re
 
 from deployment_manager.common.read_write import read_object_from_json
 from deployment_manager.utils.consts import display_error
-
+import subprocess
+import tarfile
+from io import BytesIO
+from urllib.parse import urlparse
 
 async def load_hook_object(hook_path: Path):
     try:
@@ -31,13 +34,6 @@ def get_annotation_id_from_frontend_url(url: str):
         return match.group(1)
 
     return ""
-
-
-import subprocess
-import os
-import tarfile
-from io import BytesIO
-from urllib.parse import urlparse
 
 def parse_git_file_url(file_url):
     """
