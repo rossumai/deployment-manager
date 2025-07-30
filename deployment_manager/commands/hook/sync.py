@@ -12,7 +12,7 @@ from deployment_manager.utils.consts import display_warning, settings, display_e
 from rich import print as pprint
 from rich.panel import Panel
 
-async def sync_hook(destination: Path, aliases: list[Path]) -> None:
+async def sync_hook(destination: Path, aliases: list[str]) -> None:
     if not destination:
         display_warning(
             f"No destination specified to {settings.HOOK_SYNC_COMMAND_NAME}."
@@ -29,12 +29,17 @@ async def sync_hook(destination: Path, aliases: list[Path]) -> None:
         hooks_to_sync = hooks_sync_config
 
     for hook in hooks_to_sync:
-        parsed_url = urlparse(hook["repo_path"])
+        remote_file_path = hook["remote_path"]
+        parsed_url = urlparse(remote_file_path)
         if not parsed_url.path.endswith(".py") or not hook["local_path"].endswith(".py"):
             display_error(f"Processing of {hook['alias']} error: Repo path and local path must point to a .py file")
             continue
 
-        remote_file = get_git_file_content_from_url_ssh(hook["repo_path"])
+        # only file path was provided
+        if not parsed_url.hostname:
+            remote_file_path = f"{settings.GITLAB_SERVERLESS_FUNCTIONS_URL}/{hook['remote_path']}"
+
+        remote_file = get_git_file_content_from_url_ssh(remote_file_path)
         if not remote_file:
             display_error(f"Processing of {hook['alias']} error: Pull from remote unsuccessful.")
             return

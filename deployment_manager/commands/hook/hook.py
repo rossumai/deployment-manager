@@ -83,12 +83,12 @@ async def test_hook_wrapper(
 @click.argument(
     "aliases",
     nargs=-1,
-    type=click.Path(path_type=Path, exists=True),
+    type=str
 )
 @coro
 async def pull_hook_wrapper(
     destination: Path,
-    aliases: list[Path] | None = None,
+    aliases: list[str] | None = None,
 ):
     await sync_hook(
         destination=destination,
