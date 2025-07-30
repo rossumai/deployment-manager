@@ -33,13 +33,16 @@ async def sync_hook(destination: Path, aliases: list[Path]) -> None:
         if not parsed_url.path.endswith(".py") or not hook["local_path"].endswith(".py"):
             display_error(f"Processing of {hook['alias']} error: Repo path and local path must point to a .py file")
             continue
+
         remote_file = get_git_file_content_from_url_ssh(hook["repo_path"])
         if not remote_file:
             display_error(f"Processing of {hook['alias']} error: Pull from remote unsuccessful.")
             return
+
         remote_file = remote_file.decode("utf-8")
         with open(hook["local_path"], "r") as local_file:
             local_file = local_file.read()
+
         code_diff = difflib.unified_diff(local_file.splitlines(), remote_file.splitlines(), fromfile="local", tofile="remote", lineterm="")
         code_diff = "\n".join(list(code_diff))
         formatted_diff = AttributeOverrider.parse_diff(code_diff)
@@ -47,13 +50,16 @@ async def sync_hook(destination: Path, aliases: list[Path]) -> None:
             display_info(f"Skipping {hook['alias']}: No changes detected.")
             continue
         pprint(Panel(f"[purple]Differences for alias {hook['alias']}[/purple]:\n{formatted_diff}"))
+
         overwrite = await questionary.confirm(
             f'Do you want to pull the changes to your local repository?', default=True
         ).ask_async()
+
         if overwrite:
             with open(hook["local_path"], "w") as local_file:
                 local_file.write(remote_file)
             display_info(f"File {hook['local_path']} updated.")
         else:
             display_info(f"Skipping pull to {hook['local_path']}.")
+
     display_info("Pull completed.")

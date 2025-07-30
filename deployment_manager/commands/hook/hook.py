@@ -72,8 +72,8 @@ async def test_hook_wrapper(
 # TODO debugger
 
 @hook.command(
-    name=settings.HOOK_PULL_COMMAND_NAME,
-    help="""Run the hook under the specified path (JSON)""",
+    name=settings.HOOK_SYNC_COMMAND_NAME,
+    help="""Sync the local scripts with remote from ps-serverless-functions""",
 )
 @click.argument(
     "destination",
