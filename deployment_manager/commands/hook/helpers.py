@@ -147,9 +147,9 @@ def get_git_file_content_from_url_ssh(file_url):
                 return None
 
     except subprocess.CalledProcessError as e:
-        display_error(f"Git command failed with error code {e.returncode} for URL: {file_url}")
-        display_error(f"STDOUT: {e.stdout.decode('utf-8', errors='ignore')}")
-        display_error(f"STDERR: {e.stderr.decode('utf-8', errors='ignore')}")
+        display_error(f"Git command failed with error code {e.returncode} for URL: {file_url}\n"
+                      f"STDOUT: {e.stdout.decode('utf-8', errors='ignore')}\n"
+                      f"STDERR: {e.stderr.decode('utf-8', errors='ignore')}")
         return None
     except FileNotFoundError:
         display_error("Error: 'git' command not found. Make sure Git is installed and in your PATH.")

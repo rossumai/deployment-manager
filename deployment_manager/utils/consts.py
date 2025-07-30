@@ -257,6 +257,8 @@ class Settings:
     GITHUB_DEPLOYMENT_MANAGER_REPO_OWNER = "rossumai"
     GITHUB_DEPLOYMENT_MANAGER_REPO_NAME = "deployment-manager"
 
+    GITLAB_SERVERLESS_FUNCTIONS_URL = "https://gitlab.rossum.cloud/elis-connectors/elis-serverless-functions/-/blob/master"
+
     @property
     def SOURCE_API_URL(self):
         return self.SOURCE_API_BASE.rstrip("/")
