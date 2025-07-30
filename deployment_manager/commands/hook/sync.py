@@ -45,7 +45,12 @@ async def sync_hook(destination: Path, aliases: list[str]) -> None:
             return
 
         remote_file = remote_file.decode("utf-8")
-        with open(hook["local_path"], "r") as local_file:
+        local_file_path = Path(hook["local_path"])
+        if not local_file_path.exists():
+            display_error(f"Processing of {hook['alias']} error: Local path does not exist.")
+            return
+
+        with open(local_file_path, "r") as local_file:
             local_file = local_file.read()
 
         code_diff = difflib.unified_diff(local_file.splitlines(), remote_file.splitlines(), fromfile="local", tofile="remote", lineterm="")
