@@ -213,6 +213,7 @@ class Settings:
     DEPLOY_DEFAULT_TARGET_URL = "https://my-org.rossum.app/api/v1"
     DEFAULT_DEPLOY_PARENT = "deploy_files"
     DEFAULT_DEPLOY_SECRETS_PARENT = "deploy_secrets"
+    DEFAULT_HOOK_SYNC_PARENT = "hook_sync_configs"
     DEPLOY_KEY_SECRETS_PATH = "secrets_file"
     DEPLOY_KEY_TARGETS = "targets"
     DEPLOY_KEY_OVERRIDES = "attribute_override"
