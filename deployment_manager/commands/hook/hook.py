@@ -1,17 +1,11 @@
 import click
 from anyio import Path
-
 from deployment_manager.commands.hook.payload import generate_and_save_hook_payload
 from deployment_manager.commands.hook.sync.sync import sync_hook
 from deployment_manager.commands.hook.sync.template import create_sync_template
-
 from deployment_manager.commands.hook.test import test_hook
-from deployment_manager.utils.consts import (
-    settings,
-)
-from deployment_manager.utils.functions import (
-    coro,
-)
+from deployment_manager.utils.consts import settings
+from deployment_manager.utils.functions import coro
 
 
 @click.group(
@@ -80,11 +74,10 @@ def sync(): ...
 
 @sync.command(
     name=settings.DEPLOY_TEMPLATE_COMMAND_NAME,
-    help="""Create new template for hook sync"""
+    help="""Create new template for hook sync""",
 )
 @coro
-async def create_deploy_template_wrapper(
-):
+async def create_deploy_template_wrapper():
     await create_sync_template()
 
 
