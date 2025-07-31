@@ -35,7 +35,7 @@ async def init_project(name: Path):
         f"\n**/{settings.CREDENTIALS_FILENAME}",
         f"\n**/{settings.DEFAULT_DEPLOY_SECRETS_PARENT}/",
         f"\n**/**/{settings.NON_VERSIONED_ATTRIBUTES_FILE_NAME}",
-        f"\n**/{settings.HOOK_MAPPING_FILENAME}"
+        f"\n**/{settings.DEFAULT_HOOK_SYNC_PARENT}/"
     ]
 
     git_ignore_contents = (

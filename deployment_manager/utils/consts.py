@@ -196,6 +196,7 @@ class Settings:
     HOOK_PAYLOAD_COMMAND_NAME: str = "payload"
     HOOK_TEST_COMMAND_NAME: str = "test"
     HOOK_SYNC_COMMAND_NAME: str = "sync"
+    DEFAULT_HOOK_SYNC_PARENT = "hook_sync_configs"
 
     CONFIG_KEY_API_BASE_URL = "api_base"
     CONFIG_KEY_TOKEN = "token"
@@ -208,12 +209,11 @@ class Settings:
     DOWNLOAD_KEY_REGEX = "regex"
 
     # Deploy consts
-    DEPLOY_IGNORED_DIRS = [".git", "payloads", "deploy_files", "deploy_secrets"]
+    DEPLOY_IGNORED_DIRS = [".git", "payloads", "deploy_files", "deploy_secrets", "hook_sync_configs"]
     DEPLOY_OVERRIDE_REGEX_SEPARATOR = "/#/"
     DEPLOY_DEFAULT_TARGET_URL = "https://my-org.rossum.app/api/v1"
     DEFAULT_DEPLOY_PARENT = "deploy_files"
     DEFAULT_DEPLOY_SECRETS_PARENT = "deploy_secrets"
-    DEFAULT_HOOK_SYNC_PARENT = "hook_sync_configs"
     DEPLOY_KEY_SECRETS_PATH = "secrets_file"
     DEPLOY_KEY_TARGETS = "targets"
     DEPLOY_KEY_OVERRIDES = "attribute_override"
