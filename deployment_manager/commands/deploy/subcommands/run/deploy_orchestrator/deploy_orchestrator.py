@@ -85,6 +85,7 @@ class DeployOrchestrator(BaseModel):
     source_client: ElisAPIClient
     source_dir_path: Path
     yaml: DeployYaml
+    deploy_file_path: Path
 
     source_org: Organization
     target_org: Organization

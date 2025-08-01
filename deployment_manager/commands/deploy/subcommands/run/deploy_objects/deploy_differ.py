@@ -1,3 +1,4 @@
+from copy import deepcopy
 import difflib
 import json
 import subprocess
@@ -10,18 +11,23 @@ class DeployObjectDiffer:
     def create_override_diff(cls, before_object: dict, after_object: dict):
         """Displays both implicit and explicit overrides (the explicit applied already when uploading the file itself)"""
         # Do not display diffs in ID, but the ID must be retained for later reference
-        after_object_id = after_object.pop("id", None)
-        after_object_url = after_object.pop("url", None)
-        before_object.pop("id", None)
-        before_object.pop("url", None)
-        before_code = before_object.get("config", {}).get("code", "")
-        after_code = after_object.get("config", {}).get("code", "")
+
+        after_object_copy = deepcopy(after_object)
+        after_object_copy.pop("id", None)
+        after_object_copy.pop("url", None)
+
+        before_object_copy = deepcopy(before_object)
+        before_object_copy.pop("id", None)
+        before_object_copy.pop("url", None)
+
+        before_code = before_object_copy.get("config", {}).get("code", "")
+        after_code = after_object_copy.get("config", {}).get("code", "")
         code_diff = ""
 
         if before_code and after_code:
             # codes will be compared separately
-            del before_object["config"]["code"]
-            del after_object["config"]["code"]
+            del before_object_copy["config"]["code"]
+            del after_object_copy["config"]["code"]
 
             before_code = before_code.splitlines()
             after_code = after_code.splitlines()
@@ -36,10 +42,10 @@ class DeployObjectDiffer:
 
         with tempfile.NamedTemporaryFile() as tf1, tempfile.NamedTemporaryFile() as tf2:
             tf1.write(
-                bytes(json.dumps(before_object, indent=2, sort_keys=True), "UTF-8")
+                bytes(json.dumps(before_object_copy, indent=2, sort_keys=True), "UTF-8")
             )
             tf2.write(
-                bytes(json.dumps(after_object, indent=2, sort_keys=True), "UTF-8")
+                bytes(json.dumps(after_object_copy, indent=2, sort_keys=True), "UTF-8")
             )
             # Has to be manually seeked back to start
             tf1.seek(0)
@@ -50,8 +56,6 @@ class DeployObjectDiffer:
                 capture_output=True,
                 text=True,
             )
-            after_object["id"] = after_object_id
-            after_object["url"] = after_object_url
 
             return diff.stdout + code_diff
 

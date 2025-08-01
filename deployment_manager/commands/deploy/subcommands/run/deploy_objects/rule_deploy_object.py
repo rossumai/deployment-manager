@@ -41,9 +41,6 @@ class RuleDeployObject(DeployObject):
         data = getattr(target, data_attribute)
         # previous_schema_url = data["schema"]
 
-        # Elis API does not accept fake IDs for rules unlike other objects
-        data.pop("id", None)
-
         self.ref_replacer.replace_reference_url(
             object=data,
             target_index=target.index,

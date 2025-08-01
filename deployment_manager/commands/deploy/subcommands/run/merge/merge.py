@@ -7,6 +7,14 @@ import tempfile
 import questionary
 from rich.panel import Panel
 
+from deployment_manager.commands.deploy.subcommands.run.merge.detect_reference import (
+    ReferenceDetectionStatus,
+)
+
+
+def is_primitive(val):
+    return isinstance(val, (str, int, float, bool, type(None)))
+
 
 def deep_three_way_merge(
     last_applied: dict,
@@ -52,6 +60,49 @@ def deep_three_way_merge(
         # Skip derived fields not in source
         if k_path in derived_fields and key not in source:
             merged[key] = t_val
+            continue
+
+        # Handle lists of primitives (order-insensitive)
+        if (
+            isinstance(s_val, list)
+            and isinstance(t_val, list)
+            and isinstance(l_val, list)
+            and all(is_primitive(x) for x in s_val + t_val + l_val)
+        ):
+            s_set, t_set, l_set = set(s_val), set(t_val), set(l_val)
+
+            # No changes
+            if s_set == t_set:
+                merged[key] = sorted(list(s_set))
+                continue
+
+            # Source-only change
+            if s_set != l_set and t_set == l_set:
+                merged[key] = sorted(list(s_set))
+                continue
+
+            # Target-only change → rebase candidate
+            if s_set == l_set and t_set != l_set:
+                merged[key] = sorted(list(s_set))  # keep source
+                rebase_candidates[k_path] = sorted(list(t_set))
+                continue
+
+            # Explicit override
+            if k_path in override_fields:
+                merged[key] = sorted(list(s_set))
+                continue
+
+            # Prefer source/target
+            if prefer == "source":
+                merged[key] = sorted(list(s_set))
+                continue
+            elif prefer == "target":
+                merged[key] = sorted(list(t_set))
+                continue
+
+            # Conflict
+            conflicts[k_path] = (sorted(list(s_set)), sorted(list(t_set)))
+            merged[key] = sorted(list(s_set))  # default to source
             continue
 
         # If all values are dicts → recurse
@@ -111,8 +162,12 @@ def deep_three_way_merge(
     return merged, conflicts, rebase_candidates
 
 # TODO: do a colorized diff with substring changes detection
-def create_rebase_diff(source_val, target_val) -> str:
-    return Panel(f"SOURCE: {source_val}\n\nTARGET: {target_val}")
+def create_rebase_diff(source_val, target_val, ref_status) -> str:
+    return Panel(
+        f"""SOURCE: {source_val}
+
+TARGET: {('[red]' if ref_status == ReferenceDetectionStatus.UNKNOWN else "")+str(target_val)+('[/red]' if ref_status == ReferenceDetectionStatus.UNKNOWN else "")}"""
+    )
 
 
 def get_nested_value(obj: dict, dotted_path: str, default=None):
@@ -145,13 +200,9 @@ async def prompt_rebase_field(label, path):
     ).ask_async()
 
 
-async def prompt_conflict_resolution(target_val, last_applied_val, object_path):
+async def prompt_conflict_resolution(target_str, last_applied_str, object_path):
 
-    # ! This assumes that these two objects were created from the same JSON as source
-    # Thanks to that, sorting of keys is preserved (Python dict implementation guarantee) without the need to resort
-    last_applied_str = json.dumps(last_applied_val, indent=2)
-    target_str = json.dumps(target_val, indent=2)
-
+    # The command requires 3 local files -> create temp files
     with tempfile.NamedTemporaryFile() as f1, tempfile.NamedTemporaryFile() as f2:
         f1.write(last_applied_str.encode("utf-8"))
         f2.write(target_str.encode("utf-8"))

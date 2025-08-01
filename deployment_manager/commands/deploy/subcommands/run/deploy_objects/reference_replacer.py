@@ -82,7 +82,7 @@ class ReferenceReplacer:
                     targets = list(types_dict.values())[0]
                     # N:N objects -> objects are referenced in pairs
                     if num_targets == len(targets):
-                        target_id = targets[target_object_index]["id"]
+                        target_id = targets[target_object_index].id
                         self.replace_id_in_object(
                             object=parent,
                             key=key_in_parent,
@@ -92,7 +92,7 @@ class ReferenceReplacer:
                         )
                     # N:1 objects -> everything should be mapped to the first target ID
                     else:
-                        target_id = targets[0]["id"]
+                        target_id = targets[0].id
                         self.replace_id_in_object(
                             object=parent,
                             key=key_in_parent,
