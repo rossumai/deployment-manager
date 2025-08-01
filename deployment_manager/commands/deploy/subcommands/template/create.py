@@ -209,7 +209,7 @@ async def create_deploy_template(
 
     if not state_file_path:
         hash_suffix = hashlib.sha1(
-            f"{source_dir_and_subdir}_{target_dir_and_subdir}_{source_url}_{target_url}"
+            f"{source_dir_and_subdir}_{target_dir_and_subdir}_{source_url}_{target_url}".encode('utf-8')
         ).hexdigest()[:6]
         state_file_path = (
             settings.DEFAULT_DEPLOY_STATE_PARENT
