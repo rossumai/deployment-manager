@@ -274,6 +274,16 @@ class Settings:
         Resource.Queue: ["workflows", *QUEUE_ENGINE_ATTRIBUTES]
     }
 
+    DEPLOY_SORT_LIST_KEYS: dict = {
+        Resource.Hook: ["queues", "run_after"],
+        Resource.Queue: [
+            "hooks",
+            "webhooks",
+        ],
+        Resource.Workspace: ["queues"],
+        Resource.Organization: ["workspaces"],
+    }
+
     FORMULA_DIR_NAME: str = "formulas"
     RULES_DIR_NAME: str = "rules"
     EMAIL_TEMPLATES_DIR_NAME: str = "email_templates"

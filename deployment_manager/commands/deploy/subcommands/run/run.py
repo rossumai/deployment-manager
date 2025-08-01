@@ -139,7 +139,7 @@ async def deploy_release_file(
             source_org=source_org,
             target_org=target_org,
             prefer=prefer,
-            plan_only=False,
+            deploy_file_path=deploy_file_path,
             # auto_delete=auto_delete,
         )
     except ValidationError as e:

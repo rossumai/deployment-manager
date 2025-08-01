@@ -1,6 +1,9 @@
 from __future__ import annotations
+import json
 from typing import TYPE_CHECKING
 import asyncio
+
+import questionary
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.attribute_override import (
     AttributeOverrider,
@@ -86,6 +89,9 @@ class DeployObject(BaseModel):
 
     ignored_attributes: list[str] = []
 
+    # List attributes that should be sorted before diff (e.g., hook.queues)
+    sort_list_attributes: list[str] = []
+
     overrider: AttributeOverrider = None
     ref_replacer: ReferenceReplacer = None
 
@@ -99,7 +105,7 @@ class DeployObject(BaseModel):
         )
 
         try:
-            self.data = await read_object_from_json(self.path)
+            self.data = await read_object_from_json(self.path, False)
         except PathNotFoundException:
             self.initialize_failed = True
             display_error(
@@ -118,6 +124,8 @@ class DeployObject(BaseModel):
                 else []
             ),
         ]
+
+        self.sort_list_attributes = settings.DEPLOY_SORT_LIST_KEYS.get(self.type, [])
 
     # TODO: if attribute override explicitly specified a reference to target object, this would not work
     async def initialize_target_objects(self):
@@ -227,7 +235,10 @@ class DeployObject(BaseModel):
                 new_id := target.data_from_remote.get("id", None)
             ):
                 target.id = new_id
-            self.yaml_reference["targets"][target.index]["id"] = target.id
+                self.yaml_reference["targets"][target.index]["id"] = target.id
+            self.yaml_reference["targets"][target.index][
+                "attribute_override"
+            ] = target.attribute_override
 
     async def deploy_target_objects(self, data_attribute: str):
         requests = []
@@ -255,7 +266,13 @@ class DeployObject(BaseModel):
         try:
             data = getattr(target, data_attribute)
 
-            result = await self.deploy_file.client._http_client.create(self.type, data)
+            create_copy = deepcopy(data)
+            # Temporary fix because some objects like rules fail if ID is sent
+            create_copy.pop("id", None)
+
+            result = await self.deploy_file.client._http_client.create(
+                self.type, create_copy
+            )
             # Remember last_applied only if the API call succeeds
             target.last_applied_data = self.scrub_attributes(data)
             target.data_from_remote = result
@@ -276,8 +293,12 @@ class DeployObject(BaseModel):
         try:
             data = getattr(target, data_attribute)
 
+            update_copy = deepcopy(data)
+            # Temporary fix because some objects like rules fail if ID is sent
+            update_copy.pop("id", None)
+
             result = await self.deploy_file.client._http_client.update(
-                resource=self.type, id_=target.id, data=data
+                resource=self.type, id_=target.id, data=update_copy
             )
             # Only if the API call succeeds
             target.last_applied_data = self.scrub_attributes(data)
@@ -409,7 +430,6 @@ class DeployObject(BaseModel):
                 for path, target_val in rebase_candidates.items():
                     # Target-only drift - should the value be saved in source? -> ask user
 
-                    # ! TODO: check how paths look like for something like "first ID in hook.queues"
                     ref_status, reference_type = detect_reference_with_type(
                         value=target_val, field_name=path
                     )
@@ -430,10 +450,10 @@ class DeployObject(BaseModel):
                                 )
                             )
 
-                    # TODO: display big(ger) warning if reference is unknown
                     diff = create_rebase_diff(
-                        source_val=get_nested_value(last_applied, path),
+                        source_val=get_nested_value(self.data, path),
                         target_val=target_val,
+                        ref_status=ref_status,
                     )
                     display_warning(
                         f'{self.display_label}: Field "[green]{path}[/green]" has changed in {settings.TARGET_DIRNAME} only.'
@@ -451,15 +471,52 @@ class DeployObject(BaseModel):
                         set_nested_value(self.data, path, target_val)
                         await write_object_to_json(self.path, self.data)
 
-                # TODO: if source queue ABC maps to target queue 123 and 456 and target hook is assigned only to 456, there will be a conflict we can detect but not visualize back both references are translated to the same source
+                        data_copy = deepcopy(self.data)
+                        self.overrider.override_attributes_v2(
+                            data_copy, target.attribute_override
+                        )
+                        initial_value = get_nested_value(self.data, path)
+                        post_override_value = get_nested_value(data_copy, path)
+                        if initial_value != post_override_value:
+                            display_warning(
+                                f"Attribute override mutates the rebased value in {path}:\n\nRebased: {initial_value}\nOveride: {post_override_value}"
+                            )
+                            override_choices = [
+                                questionary.Choice(title=f"{key}: {value}", value=key)
+                                for key, value in target.attribute_override.items()
+                            ]
+                            keys_to_delete = await questionary.checkbox(
+                                "Select overrides to delete:", choices=override_choices
+                            ).ask_async()
+                            for key in keys_to_delete:
+                                target.attribute_override.pop(key, None)
+                            self.update_targets()
+                            await self.deploy_file.yaml.save_to_file(
+                                self.deploy_file.deploy_file_path
+                            )
+
                 # Only do it for the first target if there are conflicts with multiple of them
-                if conflicts and not self.conflict_detected:
+                if conflicts:
+                    if self.conflict_detected:
+                        display_warning(
+                            f"Conflict detected between multiple {settings.TARGET_DIRNAME}s and a single {settings.SOURCE_DIRNAME} - only the first was written into the {settings.SOURCE_DIRNAME} file."
+                        )
+                        continue
+
                     self.conflict_detected = True
                     # Use source with potentially applied rebases
                     # But if user declined some rebase, we should not put it into this object, hence using self.data and not merged_data
                     # We should also not write any version of data with replaced references or attribute overrides
                     source_with_target_values = deepcopy(self.data)
                     for path, (_, target_val) in conflicts.items():
+                        # Conflict in code was written into that file instead
+                        if await self.write_code_changes(
+                            attribute_path=path,
+                            last_applied=last_applied,
+                            target_val=target_val,
+                        ):
+                            continue
+
                         # Target-only drift - should the value be saved in source? -> ask user
                         ref_status, reference_type = detect_reference_with_type(
                             value=target_val, field_name=path
@@ -482,9 +539,16 @@ class DeployObject(BaseModel):
                                 )
 
                         set_nested_value(source_with_target_values, path, target_val)
+
                     # Real conflict - write to file and let user resolve
+                    # ! This assumes that these two objects were created from the same JSON as source
+                    # Thanks to that, sorting of keys is preserved (Python dict implementation guarantee) without the need to resort
+                    last_applied_str = json.dumps(last_applied, indent=2)
+                    target_str = json.dumps(source_with_target_values, indent=2)
                     await prompt_conflict_resolution(
-                        source_with_target_values, last_applied, self.path
+                        target_str=target_str,
+                        last_applied_str=last_applied_str,
+                        object_path=self.path,
                     )
                     display_error(
                         f"Conflict between {settings.SOURCE_DIRNAME} and remote {settings.TARGET_DIRNAME} detected for: [green]{self.path}[/green]"
@@ -506,6 +570,9 @@ class DeployObject(BaseModel):
                 overriden_object_data = {}
 
             self.remove_ignored_attributes(overriden_object_data)
+            self.sort_lists(overriden_object_data)
+
+            self.sort_lists(target.visualized_plan_data)
 
             plan_label = f"{settings.PLAN_PRINT_STR} {settings.UPDATE_PRINT_STR if target.exists_on_remote else settings.CREATE_PRINT_STR}"
             diff = DeployObjectDiffer.create_override_diff(
@@ -514,6 +581,15 @@ class DeployObject(BaseModel):
             colorized_diff = DeployObjectDiffer.parse_diff(diff)
             message = f"{plan_label} {self.display_type} {self.create_source_to_target_string(target.visualized_plan_data)}:\n{colorized_diff if colorized_diff else ""}"
             pprint(Panel(message))
+
+    async def write_code_changes(
+        self, attribute_path: str, last_applied: dict, target_val: str
+    ): ...
+
+    def sort_lists(self, object: dict):
+        """Done only before diffing to not show lists of URLS/IDs as different just because the ordering is different"""
+        for key in self.sort_list_attributes:
+            set_nested_value(object, key, sorted(get_nested_value(object, key, [])))
 
 
 class EmptyDeployObject(BaseModel):

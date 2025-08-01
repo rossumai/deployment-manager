@@ -212,15 +212,16 @@ def prepare_deploy_file_objects(
 
     deploy_objects = []
     for object in objects:
+        previous_object = previous_objects_by_id.get(object["id"], {})
         deploy_representation = {
-            **previous_objects_by_id.get(object["id"], {}),
+            **previous_object,
             "id": object["id"],
             "name": object["name"],
+            **{key: previous_object.get(key, value) for key, value in extra_attributes.items()},
             settings.DEPLOY_KEY_BASE_PATH: str(object["path"].parent.parent.parent),
             settings.DEPLOY_KEY_TARGETS: previous_objects_by_id.get(
                 object["id"], {}
             ).get(settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)),
-            **extra_attributes,
         }
         if not include_path:
             deploy_representation.pop(settings.DEPLOY_KEY_BASE_PATH)

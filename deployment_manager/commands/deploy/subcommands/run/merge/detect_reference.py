@@ -13,7 +13,9 @@ class ReferenceDetectionStatus(Enum):
     UNKNOWN = auto()
 
 
-ROSSUM_URL_RE = re.compile(r"https?://(?:[\w-]+\.)*api\.rossum\.ai/(?:api/)?v1/(\w+)/(\d+)")
+ROSSUM_URL_RE = re.compile(
+    r"^https?://(?:[\w-]+\.)*api\.rossum\.ai/(?:api/)?v1/(\w+)/(\d+)$"
+)
 
 
 # Field name hints → known Resource types
@@ -29,7 +31,6 @@ FIELD_TO_RESOURCE = {
     "hook_template": "hook_templates",
     "organization": Resource.Organization,
 }
-
 
 def detect_reference_with_type(
     value: Any, field_name: str = ""
@@ -66,7 +67,7 @@ def detect_reference_with_type(
             )  # Might be a reference, might not
 
     # 4. Primitives or clearly non-reference
-    if isinstance(value, (str, bool, float, type(None))):
+    if isinstance(value, (list, dict, bool, float, type(None))):
         return ReferenceDetectionStatus.DEFINITELY_NOT, None
 
-    return ReferenceDetectionStatus.UNKNOWN, None
+    return ReferenceDetectionStatus.DEFINITELY_NOT, None

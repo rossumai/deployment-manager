@@ -166,9 +166,10 @@ async def create_formula_file(path: Path, code: str):
     await write_str(path, code)
 
 
-async def read_object_from_json(path: Path) -> dict:
+async def read_object_from_json(path: Path, include_non_version_attribtues=True) -> dict:
     object_ = json.loads(await path.read_text())
-    await read_non_versioned_attribute_data(path, object_)
+    if include_non_version_attribtues:
+        await read_non_versioned_attribute_data(path, object_)
     return object_
 
 

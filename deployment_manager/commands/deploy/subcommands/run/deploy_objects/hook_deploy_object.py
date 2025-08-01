@@ -9,6 +9,10 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.hook_refe
 )
 
 
+from deployment_manager.commands.deploy.subcommands.run.merge.merge import (
+    get_nested_value,
+    prompt_conflict_resolution,
+)
 from deployment_manager.commands.deploy.subcommands.run.models import Target
 from deployment_manager.utils.consts import display_error, settings
 
@@ -219,3 +223,22 @@ class HookDeployObject(DeployObject):
             code_path = self.path.with_suffix(suffix)
             new_code = await code_path.read_text()
             self.data["config"]["code"] = new_code
+
+    async def write_code_changes(
+        self, attribute_path: str, last_applied: dict, target_val: str
+    ):
+        if attribute_path != "config.code":
+            return False
+
+        suffix = ".py" if "python" in self.data["config"].get("runtime") else ".js"
+        code_path = self.path.with_suffix(suffix)
+
+        last_applied_code = get_nested_value(last_applied, attribute_path)
+
+        await prompt_conflict_resolution(
+            target_str=target_val,
+            last_applied_str=last_applied_code,
+            object_path=code_path,
+        )
+
+        return True
