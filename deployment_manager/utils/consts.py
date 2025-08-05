@@ -152,7 +152,6 @@ class Settings:
 
     MAPPING_FILENAME: str = "mapping.yaml"
     CONFIG_FILENAME: str = "prd_config.yaml"
-    HOOK_MAPPING_FILENAME: str = "hooks_sync_mapping.yaml"
     CREDENTIALS_FILENAME = "credentials.yaml"
     MAPPING_KEYS_ORDER: list = ["comment", "id", "name", "ignore", "targets"]
 
