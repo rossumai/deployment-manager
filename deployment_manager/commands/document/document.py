@@ -25,7 +25,7 @@ from deployment_manager.commands.document.llm_helper import (
     display_tokens_and_cost,
 )
 from deployment_manager.common.read_write import (
-    read_json,
+    read_object_from_json,
     read_prd_project_config,
     read_txt,
     write_txt,
@@ -248,7 +248,7 @@ class DirectoryDocumentator:
         # Document inbox's email without having to pass in the whole inbox object to the LLM
         inbox_path = queue["path"].with_stem("inbox")
         if await inbox_path.exists():
-            inbox = await read_json(inbox_path)
+            inbox = await read_object_from_json(inbox_path)
             queue["email"] = inbox["email"]
         else:
             queue["email"] = "no-inbox"
@@ -270,7 +270,7 @@ class DirectoryDocumentator:
         # await self.visualize_extensions_chain()
 
         schema_path = queue["path"].with_stem("schema")
-        schema = await read_json(schema_path)
+        schema = await read_object_from_json(schema_path)
         await self.document_schema_ids(
             queue["id"],
             schema,

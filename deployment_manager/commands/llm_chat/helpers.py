@@ -157,7 +157,10 @@ class ConversationSolver:
         for path in all_file_paths:
             file_content = await Path(path).read_text()
             object = json.loads(file_content)
-            object_jsons.update({extract_id_from_url(object["url"]): object})
+            object_url = object.get('url', '')
+            if not object_url:
+                continue
+            object_jsons.update({extract_id_from_url(object_url): object})
         return object_jsons
 
     def setup_tools(self):
