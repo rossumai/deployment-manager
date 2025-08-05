@@ -161,13 +161,18 @@ def deep_three_way_merge(
 
     return merged, conflicts, rebase_candidates
 
-# TODO: do a colorized diff with substring changes detection
-def create_rebase_diff(source_val, target_val, ref_status) -> str:
-    return Panel(
-        f"""SOURCE: {source_val}
 
-TARGET: {('[red]' if ref_status == ReferenceDetectionStatus.UNKNOWN else "")+str(target_val)+('[/red]' if ref_status == ReferenceDetectionStatus.UNKNOWN else "")}"""
+def create_rebase_diff(source_val, target_val, ref_status) -> str:
+    code_diff = difflib.unified_diff(
+        str(source_val).splitlines(),
+        str(target_val).splitlines(),
+        fromfile="before",
+        tofile="after",
+        lineterm="",
     )
+    code_diff = "\n".join(list(code_diff))
+
+    return code_diff
 
 
 def get_nested_value(obj: dict, dotted_path: str, default=None):
