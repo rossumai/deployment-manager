@@ -592,6 +592,10 @@ async def get_secrets_from_user(deploy_file_object: dict, previous_secrets_file:
         )
         for hook in hooks
     ]
+
+    if not object_choices:
+        return {}
+
     selected_hooks = await questionary.checkbox(
         "Select hooks for secrets:", choices=object_choices
     ).ask_async()
