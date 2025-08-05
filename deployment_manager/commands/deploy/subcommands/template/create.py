@@ -178,20 +178,20 @@ async def create_deploy_template(
     ):
         previous_secrets_file = await read_object_from_json(secrets_file_path)
     else:
-        secret_file_path = None
+        secrets_file_path = None
         previous_secrets_file = {}
     if (
         interactive
         and await questionary.confirm(
-            f"Do you wish to {'update' if secret_file_path else 'create'} secrets file?"
+            f"Do you wish to {'update' if secrets_file_path else 'create'} secrets file?"
         ).ask_async()
     ):
         secrets = await get_secrets_from_user(
             deploy_file_object,
             previous_secrets_file=(previous_secrets_file),
         )
-        if not secret_file_path:
-            secret_file_path = await get_filepath_from_user(
+        if not secrets_file_path:
+            secrets_file_path = await get_filepath_from_user(
                 org_path,
                 default=(
                     settings.DEFAULT_DEPLOY_SECRETS_PARENT
@@ -199,10 +199,9 @@ async def create_deploy_template(
                     + f"{deploy_filepath.stem}_secrets.json"
                 ),
             )
-
         await write_object_to_json(secrets_file_path, secrets)
 
-    deploy_file_object[settings.DEPLOY_KEY_SECRETS_PATH] = str(secret_file_path)
+    deploy_file_object[settings.DEPLOY_KEY_SECRETS_PATH] = str(secrets_file_path)
 
     # Deploy state
     state_file_path = deploy_file_object.get(settings.DEPLOY_KEY_STATE_PATH, "")
