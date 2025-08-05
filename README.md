@@ -452,7 +452,7 @@ This command interactively creates a config file for future sync. It asks user t
 For the remote file, user can use either relative path from the repository, or full URL. When using relative path, script will be downloaded from the `master` branch
 
 Then you can go ahead and **run the sync**.
-#### Running the sync
+##### Running the sync
 ```
 prd2 hook sync run <SYNC-FILE-PATH>
 ```
