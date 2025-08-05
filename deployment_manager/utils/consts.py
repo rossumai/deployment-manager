@@ -249,9 +249,16 @@ class Settings:
         Resource.Hook: ["status"],
     }
 
+    NON_VERSIONED_ATTRIBUTES_FILE_NAME: str = "non_versioned_object_attributes.json"
+    NON_VERSIONED_ATTRIBUTES: tuple = ("modified_at",)
+
     FORMULA_DIR_NAME: str = "formulas"
     RULES_DIR_NAME: str = "rules"
     EMAIL_TEMPLATES_DIR_NAME: str = "email_templates"
+
+    GITHUB_DEFAULT_LATEST_RELEASE_URL = "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
+    GITHUB_DEPLOYMENT_MANAGER_REPO_OWNER = "rossumai"
+    GITHUB_DEPLOYMENT_MANAGER_REPO_NAME = "deployment-manager"
 
     @property
     def SOURCE_API_URL(self):

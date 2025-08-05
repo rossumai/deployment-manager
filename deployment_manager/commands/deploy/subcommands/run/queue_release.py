@@ -5,6 +5,8 @@ from typing import Optional
 from anyio import Path
 from pydantic import Field
 import questionary
+
+from deployment_manager.commands.download.downloader import Downloader
 from rossum_api import APIClientError
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     remove_queue_attributes_for_cross_org,
@@ -150,6 +152,7 @@ class QueueRelease(ObjectRelease):
                     dependency="workspace",
                     source_id_target_pairs=self.workspace_targets,
                 )
+                new_workspace_id = queue_copy["workspace"].split("/")[-1]
 
                 if previous_workspace_url == queue_copy["workspace"] and not target.id:
                     raise Exception(
@@ -171,12 +174,15 @@ class QueueRelease(ObjectRelease):
                     )
 
                 # Both should be updated, otherwise Elis API uses 'webhooks' in case of a mismatch even though it is deprecated
+                # We need full target object to be able to handle 'dangling' hooks
+                target_queue = await self.find_target_object(target, Resource.Queue)
                 replace_dependency_url(
                     object=queue_copy,
                     target_index=target_index,
                     target_objects_count=target_objects_count,
                     dependency="hooks",
                     source_id_target_pairs=self.hook_targets,
+                    target_object=target_queue,
                     keep_hook_dependencies_without_equivalent=self.keep_hook_dependencies_without_equivalent,
                 )
                 replace_dependency_url(
@@ -185,6 +191,7 @@ class QueueRelease(ObjectRelease):
                     target_objects_count=target_objects_count,
                     dependency="webhooks",
                     source_id_target_pairs=self.hook_targets,
+                    target_object=target_queue,
                     keep_hook_dependencies_without_equivalent=self.keep_hook_dependencies_without_equivalent,
                 )
 
@@ -199,7 +206,14 @@ class QueueRelease(ObjectRelease):
                 request = self.upload(target_object=queue_copy, target=target)
                 release_requests.append(request)
 
-            results = await asyncio.gather(*release_requests)
+            if self.plan_only:
+                results = []
+                # Run sequentially when planning because user may have to input things in the CLI
+                for request in release_requests:
+                    results.append(await request)
+            else:
+                results = await asyncio.gather(*release_requests)
+
             self.update_targets(results)
 
             if self.deploy_failed:
@@ -234,6 +248,14 @@ class QueueRelease(ObjectRelease):
                 e,
             )
             self.deploy_failed = True
+
+    async def find_target_object(self, target: Target, type):
+        downloader = Downloader(client=self.client)
+        objects = await downloader.download_remote_objects(type=type)
+        for object_ in objects:
+            if object_["id"] == target.id:
+                return object_
+        return None
 
     async def verify_subobjects_have_same_target_count(self):
         mismatch_found = False

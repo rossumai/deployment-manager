@@ -9,7 +9,7 @@ from deployment_manager.common.read_write import (
     create_formula_directory_path,
     create_formula_file,
     find_formula_fields_in_schema,
-    write_json,
+    write_object_to_json,
     write_str,
 )
 from deployment_manager.utils.consts import (
@@ -43,7 +43,7 @@ class WorkspaceSaver(ObjectSaver):
         if self.download_all or await should_write_object(
             object_path, workspace, self.changed_files, self.parent_dir_reference
         ):
-            await write_json(
+            await write_object_to_json(
                 object_path,
                 workspace,
                 self.type,
@@ -95,7 +95,7 @@ class QueueSaver(ObjectSaver):
         if self.download_all or await should_write_object(
             object_path, queue, self.changed_files, self.parent_dir_reference
         ):
-            await write_json(
+            await write_object_to_json(
                 object_path,
                 queue,
                 self.type,
@@ -148,6 +148,14 @@ class EmailTemplateSaver(QueueSaver):
         )
         return object_path
 
+    def _get_message_for_subdir_selection(self, object):
+        message = super()._get_message_for_subdir_selection(object)
+
+        queue = self.find_queue(object)
+        if queue:
+            return message + f", for [yellow]queue[/yellow]: {self.display_label(queue['name'], queue['id'])}"
+        return message
+
     async def save_downloaded_object(self, email_template: dict, subdir: Subdirectory):
         if not email_template.get("queue", None):
             return
@@ -160,7 +168,7 @@ class EmailTemplateSaver(QueueSaver):
         if self.download_all or await should_write_object(
             object_path, email_template, self.changed_files, self.parent_dir_reference
         ):
-            await write_json(
+            await write_object_to_json(
                 object_path,
                 email_template,
                 self.type,
@@ -213,7 +221,7 @@ class InboxSaver(QueueSaver):
         if self.download_all or await should_write_object(
             object_path, inbox, self.changed_files, self.parent_dir_reference
         ):
-            await write_json(
+            await write_object_to_json(
                 object_path,
                 inbox,
                 self.type,
@@ -289,7 +297,7 @@ class SchemaSaver(QueueSaver):
         if self.download_all or await should_write_object(
             object_path, schema, self.changed_files, self.parent_dir_reference
         ):
-            await write_json(
+            await write_object_to_json(
                 object_path,
                 schema,
                 self.type,
@@ -390,7 +398,7 @@ class RuleSaver(SchemaSaver):
         if self.download_all or await should_write_object(
             object_path, rule, self.changed_files, self.parent_dir_reference
         ):
-            await write_json(
+            await write_object_to_json(
                 object_path,
                 rule,
                 self.type,
@@ -417,7 +425,7 @@ class HookSaver(ObjectSaver):
         if self.download_all or await should_write_object(
             object_path, hook, self.changed_files, self.parent_dir_reference
         ):
-            await write_json(
+            await write_object_to_json(
                 object_path,
                 hook,
                 self.type,

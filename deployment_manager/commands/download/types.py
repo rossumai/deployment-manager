@@ -47,8 +47,13 @@ class ObjectSaver(BaseModel):
         for object in self.objects:
             subdir = self.find_subdir_of_object(object)
             if not subdir:
-                self.objects_without_subdir.append(object)
-                continue
+                if object.get("status") == "deletion_requested":
+                    # If the object has status deletion_requested, we bypass user selection
+                    # Instead, a dummy subdirectory with include=False is used to prevent its children from being downloaded
+                    subdir = Subdirectory(name="_skipped_assets", include=False)
+                else:
+                    self.objects_without_subdir.append(object)
+                    continue
             # The subdir should not be pulled, disregard the current object
             elif not subdir.include:
                 continue
@@ -67,13 +72,16 @@ class ObjectSaver(BaseModel):
             self.subdirs_by_object_id[object["id"]] = subdir
             await self.save_downloaded_object(object, subdir)
 
+    def _get_message_for_subdir_selection(self, object):
+        return f"{self.display_type} {self.display_label(object['name'], object['id'])}"
+
     async def get_subdir_from_user(self, object):
         subdir_choices = [
             questionary.Choice(title=subdir.name, value=subdir)
             for subdir in self.subdirs
         ]
         pprint(
-            f"{self.display_type} {self.display_label(object['name'], object['id'])}",
+            self._get_message_for_subdir_selection(object),
             end=" ",
         )
         return await questionary.select(
