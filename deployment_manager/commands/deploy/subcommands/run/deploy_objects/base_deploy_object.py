@@ -458,7 +458,8 @@ class DeployObject(BaseModel):
                     display_warning(
                         f'{self.display_label}: Field "[green]{path}[/green]" has changed in {settings.TARGET_DIRNAME} only.'
                     )
-                    console.print(diff)
+                    colorized_diff = DeployObjectDiffer.parse_diff(diff)
+                    pprint(Panel(colorized_diff))
                     # User accepts rebase/conflict and source now has target value (e.g., name)
                     # But if there is attribute override, this will still be applied and so the rebase/conflict will not be resolved
                     # ! TODO: Must also update attribute override
