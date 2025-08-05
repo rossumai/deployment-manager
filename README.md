@@ -441,6 +441,25 @@ Given a loal hook path, this command runs the hook and displays logs and the ret
 
 Optionally, you can provide an already created payload, otherwise a new one is created on the fly. You can combine an already created payload with a different annotation URL than the one provided when creating the payload.
 
+
+#### Syncing a hook with remote repository
+Goal of this functionality is to allow the prd user to update his local function with a python script from remote repository in a simple way.
+##### Creating a template
+```
+prd2 hook sync template        
+```
+This command interactively creates a config file for future sync. It asks user to input the path to local .py file and the remote .py file in elis-serverless-functions repository. 
+For the remote file, user can use either relative path from the repository, or full URL. When using relative path, script will be downloaded from the `master` branch
+
+Then you can go ahead and **run the sync**.
+#### Running the sync
+```
+prd2 hook sync run <SYNC-FILE-PATH>
+```
+User will first see a diff between the local and remote file and will be asked for confirmation that those changes should be applied.
+
+Once the `sync` is finished, the local file will be overridden with remote file. To upload the new changes to rossum, users need to use standard `push` or `deploy` commands.
+
 ---
 
 ## Deploy File Reference
