@@ -14,6 +14,7 @@ from deployment_manager.commands.deploy.subcommands.run.merge.merge import (
     prompt_conflict_resolution,
 )
 from deployment_manager.commands.deploy.subcommands.run.models import Target
+from deployment_manager.common.read_write import write_str
 from deployment_manager.utils.consts import display_error, settings
 
 from rossum_api.api_client import Resource
@@ -224,7 +225,7 @@ class HookDeployObject(DeployObject):
             new_code = await code_path.read_text()
             self.data["config"]["code"] = new_code
 
-    async def write_code_changes(
+    async def resolve_code_conflict(
         self, attribute_path: str, last_applied: dict, target_val: str
     ):
         if attribute_path != "config.code":
@@ -240,5 +241,16 @@ class HookDeployObject(DeployObject):
             last_applied_str=last_applied_code,
             object_path=code_path,
         )
+
+        return True
+
+    async def apply_code_rebase(self, attribute_path, new_code):
+        if attribute_path != "config.code":
+            return False
+
+        suffix = ".py" if "python" in self.data["config"].get("runtime") else ".js"
+        code_path = self.path.with_suffix(suffix)
+
+        await write_str(code_path, new_code)
 
         return True

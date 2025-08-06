@@ -129,6 +129,8 @@ async def deploy_release_file(
 
     source_dir_path = project_path / Path(source_dir_subdir)
 
+    display_info("Initializing deploy process")
+
     try:
         release = DeployOrchestrator(
             **yaml.data,
