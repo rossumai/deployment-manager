@@ -453,7 +453,6 @@ class DeployObject(BaseModel):
                     diff = create_rebase_diff(
                         source_val=get_nested_value(self.data, path),
                         target_val=target_val,
-                        ref_status=ref_status,
                     )
                     display_warning(
                         f'{self.display_label}: Field "[green]{path}[/green]" has changed in {settings.TARGET_DIRNAME} only.'
@@ -467,6 +466,13 @@ class DeployObject(BaseModel):
                     # TODO: yy option to do it for all targets
                     if await prompt_rebase_field(self.display_label, path):
                         self.rebase_detected = True
+
+                        # Conflict in code was written into that file instead
+                        if await self.apply_code_rebase(
+                            attribute_path=path,
+                            new_code=target_val,
+                        ):
+                            continue
                         # Mutate local source data directly here
                         # ! TODO: if name changes, the file needs to be resaved (would be good to wrap that logic in write_object_to_json).
                         set_nested_value(self.data, path, target_val)
@@ -511,7 +517,7 @@ class DeployObject(BaseModel):
                     source_with_target_values = deepcopy(self.data)
                     for path, (_, target_val) in conflicts.items():
                         # Conflict in code was written into that file instead
-                        if await self.write_code_changes(
+                        if await self.resolve_code_conflict(
                             attribute_path=path,
                             last_applied=last_applied,
                             target_val=target_val,
@@ -583,8 +589,12 @@ class DeployObject(BaseModel):
             message = f"{plan_label} {self.display_type} {self.create_source_to_target_string(target.visualized_plan_data)}:\n{colorized_diff if colorized_diff else ""}"
             pprint(Panel(message))
 
-    async def write_code_changes(
+    async def resolve_code_conflict(
         self, attribute_path: str, last_applied: dict, target_val: str
+    ): ...
+
+    async def apply_code_rebase(
+        self, attribute_path: str, target_val: str
     ): ...
 
     def sort_lists(self, object: dict):

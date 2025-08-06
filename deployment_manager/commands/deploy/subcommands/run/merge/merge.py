@@ -162,7 +162,12 @@ def deep_three_way_merge(
     return merged, conflicts, rebase_candidates
 
 
-def create_rebase_diff(source_val, target_val, ref_status) -> str:
+def create_rebase_diff(source_val, target_val) -> str:
+    # Preformat objects and lists for nicer diffs
+    if isinstance(source_val, (dict, list)) or isinstance(target_val, (dict, list)):
+        source_val = json.dumps(source_val, indent=2)
+        target_val = json.dumps(target_val, indent=2)
+
     code_diff = difflib.unified_diff(
         str(source_val).splitlines(),
         str(target_val).splitlines(),
