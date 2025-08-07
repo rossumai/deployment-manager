@@ -8,9 +8,7 @@ from deployment_manager.commands.deploy.subcommands.revert.revert_object_deploy 
     RevertWorkspaceDeploy,
 )
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
-from deployment_manager.commands.deploy.subcommands.run.object_release import (
-    DeployException,
-)
+from deployment_manager.commands.deploy.subcommands.run.models import DeployException
 from deployment_manager.utils.consts import display_error, settings
 
 

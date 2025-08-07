@@ -203,6 +203,7 @@ DEFAULT_TARGETS = [{"id": None}]
 def prepare_deploy_file_objects(
     objects: list[dict],
     include_path: bool = False,
+    extra_attributes: dict = {},
     objects_in_previous_file: list[dict] = [],
 ):
     previous_objects_by_id = {
@@ -211,10 +212,12 @@ def prepare_deploy_file_objects(
 
     deploy_objects = []
     for object in objects:
+        previous_object = previous_objects_by_id.get(object["id"], {})
         deploy_representation = {
-            **previous_objects_by_id.get(object["id"], {}),
+            **previous_object,
             "id": object["id"],
             "name": object["name"],
+            **{key: previous_object.get(key, value) for key, value in extra_attributes.items()},
             settings.DEPLOY_KEY_BASE_PATH: str(object["path"].parent.parent.parent),
             settings.DEPLOY_KEY_TARGETS: previous_objects_by_id.get(
                 object["id"], {}
@@ -307,6 +310,7 @@ async def get_queues_from_user(
     deploy_file_queues = prepare_deploy_file_objects(
         deploy_file_queues,
         include_path=True,
+        extra_attributes={settings.DEPLOY_KEY_IGNORE_DEPLOY_WARNINGS: False},
         objects_in_previous_file=previous_deploy_file_queues,
     )
 
@@ -587,6 +591,10 @@ async def get_secrets_from_user(deploy_file_object: dict, previous_secrets_file:
         )
         for hook in hooks
     ]
+
+    if not object_choices:
+        return {}
+
     selected_hooks = await questionary.checkbox(
         "Select hooks for secrets:", choices=object_choices
     ).ask_async()

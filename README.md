@@ -35,7 +35,7 @@ nano ~/.zshrc
 # Add this to the end of the file
 export PATH="$PATH:$HOME/.deployment-manager-venv/bin"
 # After saving, restart via the following command:
-source ~/.zshrc  
+source ~/.zshrc
 ```
 
 ### Windows
@@ -55,14 +55,16 @@ If you encounter errors during the second step, please make sure you have Python
 
 **Make sure to restart the terminal before using the command.**
 
-You can install a specific version by changing the URL, for instance, to install v2.0.1:
+You can install a specific version by changing the URL, for instance, to install v2.7.0a (replace all the places where the version tag is referenced - but without letters in the .whl filename):
 ```
-pip install https://github.com/rossumai/deployment-manager/releases/v2.0.1/download/deployment_manager-latest-py3-none-any.whl
+pip install https://github.com/rossumai/deployment-manager/releases/download/v2.7.0a/deployment_manager-2.7.0-py3-none-any.whl
 ```
+
 
 ### Updating to a new version
 You can use the same command as for installing the tool the first time. `pip` will recognize that you are installing a newer version and uninstall the previous one automatically.
 
+You can also run `prd2 update` to install the latest version on GitHub in the `main` branch.
 
 ### Migration from v1
 
@@ -137,10 +139,10 @@ Before uploading the changes, This command will check if the object `last_modifi
 ### 4. Copy (deploy) configuration elsewhere
 If you want to create a copy of your configuration (typically move a test setup into production), you first need to create a deploy file specifying what should be copied (deployed):
 ```
-prd2 deploy template
+prd2 deploy template create
 ```
 
-This command allows you to specify attribute override for all objects of a certain type. This is particularly useful for changing suffixes (e.g., `DEV` -> `PROD`).
+This command allows you to specify attribute override for all objects of a certain type. This is particularly useful for changing suffixes (e.g., `DEV` -> `PROD`). There are also other options related to moving objects between two configuration (see the reference below).
 
 Once you go through the CLI guide, you can also make other changes manually in the deploy file (e.g., attribute_override of specific objects). Any object specified in the deploy file with an empty `targets` will have a new copy created. If there is an ID specified, this command will instead update the object with that ID.
 
@@ -156,7 +158,7 @@ Once the `deploy` is finished, your deploy file will be updated with new informa
 
 You can **update a previously existing deploy file** via:
 ```
-prd2 deploy template -f <PATH> --interactive
+prd2 deploy template update <PATH> --interactive
 ```
 Without the `--interactive` flag, the update would fix names based on object IDs or add hooks assigned to the already specified queues, but it would not add/remove any of the specified objects in the deploy file.
 

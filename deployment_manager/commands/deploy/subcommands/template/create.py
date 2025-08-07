@@ -1,3 +1,4 @@
+import hashlib
 import questionary
 from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
 from deployment_manager.commands.deploy.common.helpers import (
@@ -170,7 +171,7 @@ async def create_deploy_template(
         deploy_filepath = input_file_path
 
     # Deploy secrets
-    secrets_file_path = deploy_file_object.get(settings.DEPLOY_KEY_SECRETS_PATH, None)
+    secrets_file_path = deploy_file_object.get(settings.DEPLOY_KEY_SECRETS_PATH, "")
     if (
         secrets_file_path
         and await (secrets_file_path := Path(secrets_file_path)).exists()
@@ -198,10 +199,24 @@ async def create_deploy_template(
                     + f"{deploy_filepath.stem}_secrets.json"
                 ),
             )
-
         await write_object_to_json(secrets_file_path, secrets)
 
     deploy_file_object[settings.DEPLOY_KEY_SECRETS_PATH] = str(secrets_file_path)
+
+    # Deploy state
+    state_file_path = deploy_file_object.get(settings.DEPLOY_KEY_STATE_PATH, "")
+
+    if not state_file_path:
+        hash_suffix = hashlib.sha1(
+            f"{source_dir_and_subdir}_{target_dir_and_subdir}_{source_url}_{target_url}".encode('utf-8')
+        ).hexdigest()[:6]
+        state_file_path = (
+            settings.DEFAULT_DEPLOY_STATE_PARENT
+            + "/"
+            + f"{deploy_filepath.stem}_{hash_suffix}.json"
+        )
+
+    deploy_file_object[settings.DEPLOY_KEY_STATE_PATH] = state_file_path
 
     await yaml.save_to_file(deploy_filepath)
 
