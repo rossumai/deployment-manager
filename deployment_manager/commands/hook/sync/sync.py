@@ -13,7 +13,7 @@ from rich.panel import Panel
 
 async def sync_hook(sync_file: Path) -> None:
     if not await sync_file.exists():
-        display_warning(f"Sync file {sync_file} does not exist.")
+        display_error(f"Sync file {sync_file} does not exist.")
         return
     hook_name = sync_file.name
     hook_to_sync = read_yaml(sync_file)
