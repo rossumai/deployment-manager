@@ -1,0 +1,17 @@
+Generate documentation for the following object representing a single field.
+
+{schema_id}
+
+generate a structured documentation of the field to humans in markdown:
+label (schema_id) (h3 markdown)
+description: description of the field logic (bullet point, audience: a human with no background in computer science should understand this)
+ui_configuration.type labelled as "field type": (for example: "formula") (bullet point)
+type labelled as "data type": (for example: "string") (bullet point)
+required: (boolean: bullet point)
+can_export labelled as "exported": (boolean: bullet point)
+hidden: (boolean, bullet point)
+
+you also have the knowledge that:
+- captured field is captured from the invoice based on the knowledge of our ai,
+- data field is used by an extension for data that is not from the document
+- formula field takes inputs and with small python code that implements a particular logic so that an output is calculated (for example a normalized invoice number), manual fields allow manual entry by data users.

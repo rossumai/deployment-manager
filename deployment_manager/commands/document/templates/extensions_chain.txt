@@ -1,0 +1,14 @@
+Generate python code using the Diagrams library that will visualize extensions (think of them as "microservices") as they are running one after the other.
+
+The code should define the diagram and then save it in the local directory, name it 'extensions_chain.png' or something like that.
+
+You will get a list of extensions, for each, you will get:
+- id
+- name
+- run_after => IDs of extensions that run BEFORE this extension.
+
+Your output should use extension names, not IDs.
+
+{extensions}
+
+Return only code that can be directly executed! No markdown wrapper, just code.
