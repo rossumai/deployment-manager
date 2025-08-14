@@ -173,7 +173,8 @@ class AttributeOverrider:
 
             return diff.stdout + code_diff
 
-    def parse_diff(self, diff: str):
+    @classmethod
+    def parse_diff(cls, diff: str):
         colorized_lines = []
         split_lines = []
 
