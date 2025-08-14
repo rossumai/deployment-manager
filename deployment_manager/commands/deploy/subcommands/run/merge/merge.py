@@ -204,10 +204,16 @@ def set_nested_value(obj: dict, dotted_path: str, value):
 
 
 async def prompt_rebase_field(label, path):
-    return await questionary.confirm(
+    user_answer = await questionary.text(
         "Rebase it into source?",
-        default=False,
+        instruction="(y/n/yy/nn)",
     ).ask_async()
+    if user_answer.casefold() == "yy":
+        return True, True, False
+    elif user_answer.casefold() == "nn":
+        return False, False, True
+
+    return user_answer == "y", False, False
 
 
 async def prompt_conflict_resolution(target_str, last_applied_str, object_path):

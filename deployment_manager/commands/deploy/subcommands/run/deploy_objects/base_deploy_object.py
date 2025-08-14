@@ -79,6 +79,8 @@ class DeployObject(BaseModel):
     yaml_reference: dict = None
 
     conflict_detected: bool = False
+    rebase_all: bool = False
+    rebase_none: bool = False
     rebase_detected: bool = False
 
     initialize_failed: bool = False
@@ -247,6 +249,14 @@ class DeployObject(BaseModel):
             # At this point, those objects were deployed, their local target objects have refreshed IDs
             await self.override_references_in_target_object_data(
                 data_attribute=data_attribute, target=target, use_dummy_references=False
+            )
+
+            self.ref_replacer.replace_references_in_unstructured_attributes(
+                target_object=getattr(target, data_attribute),
+                target_object_label=self.display_label,
+                lookup_table=self.deploy_file.lookup_table,
+                target_object_index=target.index,
+                num_targets=len(self.targets),
             )
 
             if target.exists_on_remote:
@@ -428,6 +438,9 @@ class DeployObject(BaseModel):
                 )
 
                 for path, target_val in rebase_candidates.items():
+                    if self.rebase_none:
+                        break
+
                     # Target-only drift - should the value be saved in source? -> ask user
 
                     ref_status, reference_type = detect_reference_with_type(
@@ -463,14 +476,17 @@ class DeployObject(BaseModel):
                     # But if there is attribute override, this will still be applied and so the rebase/conflict will not be resolved
                     # ! TODO: Must also update attribute override
 
-                    # TODO: yy option to do it for all targets
-                    if await prompt_rebase_field(self.display_label, path):
+                    if not self.rebase_all and not self.rebase_none:
+                        should_rebase, self.rebase_all, self.rebase_none = await prompt_rebase_field(
+                        self.display_label, path
+                    )
+                    if self.rebase_all or should_rebase:
                         self.rebase_detected = True
 
                         # Conflict in code was written into that file instead
                         if await self.apply_code_rebase(
                             attribute_path=path,
-                            new_code=target_val,
+                            target_val=target_val,
                         ):
                             continue
                         # Mutate local source data directly here
@@ -593,9 +609,7 @@ class DeployObject(BaseModel):
         self, attribute_path: str, last_applied: dict, target_val: str
     ): ...
 
-    async def apply_code_rebase(
-        self, attribute_path: str, target_val: str
-    ): ...
+    async def apply_code_rebase(self, attribute_path: str, target_val: str): ...
 
     def sort_lists(self, object: dict):
         """Done only before diffing to not show lists of URLS/IDs as different just because the ordering is different"""
@@ -618,9 +632,13 @@ class EmptyDeployObject(BaseModel):
 
     targets: list[TargetWithDefault] = []
 
-    async def initialize(*args, **kwargs): ...
-
-    async def deploy(self): ...
+    async def initialize_deploy_object(self, *args, **kwargs): ...
+    async def initialize_target_objects(self, *args, **kwargs): ...
+    async def initialize_target_object_data(self, *args, **kwargs): ...
+    async def deploy_target_objects(self, *args, **kwargs): ...
+    async def override_references(self, *args, **kwargs): ...
+    async def override_references_in_target_object_data(self, *args, **kwargs): ...
+    async def visualize_changes(self, *args, **kwargs): ...
 
     @property
     def display_type(self):
