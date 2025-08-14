@@ -244,13 +244,13 @@ class HookDeployObject(DeployObject):
 
         return True
 
-    async def apply_code_rebase(self, attribute_path, new_code):
+    async def apply_code_rebase(self, attribute_path, target_val):
         if attribute_path != "config.code":
             return False
 
         suffix = ".py" if "python" in self.data["config"].get("runtime") else ".js"
         code_path = self.path.with_suffix(suffix)
 
-        await write_str(code_path, new_code)
+        await write_str(code_path, target_val)
 
         return True

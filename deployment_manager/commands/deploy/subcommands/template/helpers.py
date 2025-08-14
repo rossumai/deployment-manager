@@ -4,7 +4,10 @@ from typing import Any
 from deployment_manager.commands.deploy.subcommands.run.attribute_override import (
     create_regex_override_syntax,
 )
-from deployment_manager.common.read_write import read_object_from_json, read_prd_project_config
+from deployment_manager.common.read_write import (
+    read_object_from_json,
+    read_prd_project_config,
+)
 from pydantic import BaseModel
 import questionary
 from anyio import Path
@@ -150,7 +153,8 @@ async def get_dir_and_subdir_from_user(
 async def find_hooks_for_queues(source_path: Path, queues: list[dict]):
     hook_paths = await find_all_hook_paths_in_destination(source_path)
     all_hooks = [
-        {**await read_object_from_json(hook_path), "path": hook_path} for hook_path in hook_paths
+        {**await read_object_from_json(hook_path), "path": hook_path}
+        for hook_path in hook_paths
     ]
     found_hook_ids = set()
     found_hooks = []
@@ -217,7 +221,10 @@ def prepare_deploy_file_objects(
             **previous_object,
             "id": object["id"],
             "name": object["name"],
-            **{key: previous_object.get(key, value) for key, value in extra_attributes.items()},
+            **{
+                key: previous_object.get(key, value)
+                for key, value in extra_attributes.items()
+            },
             settings.DEPLOY_KEY_BASE_PATH: str(object["path"].parent.parent.parent),
             settings.DEPLOY_KEY_TARGETS: previous_objects_by_id.get(
                 object["id"], {}
@@ -235,6 +242,7 @@ def prepare_subqueue_deploy_file_object(
     include_name: bool = False,
 ):
     deploy_representation = {
+        **previous_object,
         "id": object["id"],
         settings.DEPLOY_KEY_TARGETS: previous_object.get(
             settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)
@@ -372,8 +380,10 @@ async def get_rules_for_schema(queue: dict, schema: dict, previous_queues_by_id:
     if not (await rules_path.exists()):
         return
 
-    previous_rules = previous_queues_by_id.get(queue["id"], {}).get(
-        settings.DEPLOY_KEY_RULES, []
+    previous_rules = (
+        previous_queues_by_id.get(queue["id"], {})
+        .get(settings.DEPLOY_KEY_SCHEMA, {})
+        .get(settings.DEPLOY_KEY_RULES, [])
     )
     deploy_rule_objects = []
     for rule_path in await find_rule_paths_for_dir(rules_path):

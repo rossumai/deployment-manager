@@ -10,8 +10,6 @@ from deployment_manager.commands.deploy.subcommands.run.merge.state import Deplo
 from deployment_manager.commands.deploy.subcommands.run.models import DeployException
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.models.organization import Organization
-from rich.spinner import Spinner
-from rich.live import Live
 
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
@@ -44,143 +42,140 @@ async def deploy_release_file(
     commit: bool = False,
     commit_message: str = "",
 ):
-    spinner = Spinner("dots", text="Initializing deploy process...")
+    deploy_file = await deploy_file_path.read_text()
+    yaml = DeployYaml(deploy_file)
 
-    with Live(spinner, refresh_per_second=10):
-        deploy_file = await deploy_file_path.read_text()
-        yaml = DeployYaml(deploy_file)
+    if not check_required_keys(yaml.data):
+        return
 
-        if not check_required_keys(yaml.data):
-            return
+    if not project_path:
+        project_path = Path("./")
 
-        if not project_path:
-            project_path = Path("./")
+    # Ensure backwards compatibility with deploy files without deploy state file or path
+    deploy_state_file_path = yaml.data.get(settings.DEPLOY_KEY_STATE_PATH, "")
+    deploy_state_file_path = await DeployState.ensure_deploy_state_file(
+        path=anyio.Path(deploy_state_file_path or ""),
+        base_path=project_path,
+        deploy_file_path=anyio.Path(deploy_file_path),
+    )
+    yaml.data[settings.DEPLOY_KEY_STATE_PATH] = str(deploy_state_file_path)
 
-        # Ensure backwards compatibility with deploy files without deploy state file or path
-        deploy_state_file_path = yaml.data.get(settings.DEPLOY_KEY_STATE_PATH, "")
-        deploy_state_file_path = await DeployState.ensure_deploy_state_file(
-            path=anyio.Path(deploy_state_file_path or ""),
-            base_path=project_path,
-            deploy_file_path=anyio.Path(deploy_file_path),
+    source_dir_subdir = yaml.data[settings.DEPLOY_KEY_SOURCE_DIR]
+    source_org_name = source_dir_subdir.split("/")[0]
+
+    if not source_client:
+        source_credentials = await get_url_and_credentials(
+            project_path=project_path,
+            org_name=source_org_name,
+            type=settings.SOURCE_DIRNAME,
+            yaml_data=yaml.data,
         )
-        yaml.data[settings.DEPLOY_KEY_STATE_PATH] = str(deploy_state_file_path)
-
-        source_dir_subdir = yaml.data[settings.DEPLOY_KEY_SOURCE_DIR]
-        source_org_name = source_dir_subdir.split("/")[0]
-
-        if not source_client:
-            source_credentials = await get_url_and_credentials(
-                project_path=project_path,
-                org_name=source_org_name,
-                type=settings.SOURCE_DIRNAME,
-                yaml_data=yaml.data,
-            )
-            if not source_credentials:
-                return
-            source_client = ElisAPIClient(
-                base_url=source_credentials.url, token=source_credentials.token
-            )
-
-        source_org_path = project_path / source_org_name / "organization.json"
-        if not await source_org_path.exists():
-            display_error(f'Could not find organization.json under "{source_org_path}"')
+        if not source_credentials:
             return
-        source_org_dict = await read_object_from_json(source_org_path)
-        source_org = Organization(
+        source_client = ElisAPIClient(
+            base_url=source_credentials.url, token=source_credentials.token
+        )
+
+    source_org_path = project_path / source_org_name / "organization.json"
+    if not await source_org_path.exists():
+        display_error(f'Could not find organization.json under "{source_org_path}"')
+        return
+    source_org_dict = await read_object_from_json(source_org_path)
+    source_org = Organization(
+        **{
+            k: v
+            for k, v in source_org_dict.items()
+            if k in {f.name for f in fields(Organization)}
+        }
+    )
+
+    target_dir_subdir = yaml.data.get(settings.DEPLOY_KEY_TARGET_DIR, "")
+    target_org_name = target_dir_subdir.split("/")[0]
+
+    if not target_client:
+        target_credentials = await get_url_and_credentials(
+            project_path=project_path,
+            org_name=target_org_name if target_dir_subdir else "",
+            type=settings.TARGET_DIRNAME,
+            yaml_data=yaml.data,
+        )
+        if not target_credentials:
+            return
+        target_client = ElisAPIClient(
+            base_url=target_credentials.url, token=target_credentials.token
+        )
+
+    target_org_path: Path = project_path / target_org_name / "organization.json"
+    if await target_org_path.exists():
+        target_org_dict = await read_object_from_json(target_org_path)
+        target_org = Organization(
             **{
                 k: v
-                for k, v in source_org_dict.items()
+                for k, v in target_org_dict.items()
                 if k in {f.name for f in fields(Organization)}
             }
         )
-
-        target_dir_subdir = yaml.data.get(settings.DEPLOY_KEY_TARGET_DIR, "")
-        target_org_name = target_dir_subdir.split("/")[0]
-
-        if not target_client:
-            target_credentials = await get_url_and_credentials(
-                project_path=project_path,
-                org_name=target_org_name if target_dir_subdir else "",
-                type=settings.TARGET_DIRNAME,
-                yaml_data=yaml.data,
-            )
-            if not target_credentials:
-                return
-            target_client = ElisAPIClient(
-                base_url=target_credentials.url, token=target_credentials.token
-            )
-
-        target_org_path: Path = project_path / target_org_name / "organization.json"
-        if await target_org_path.exists():
-            target_org_dict = await read_object_from_json(target_org_path)
-            target_org = Organization(
-                **{
-                    k: v
-                    for k, v in target_org_dict.items()
-                    if k in {f.name for f in fields(Organization)}
-                }
-            )
+    else:
+        target_org_choices = []
+        async for org in target_client.list_all_organizations():
+            target_org_choices.append(questionary.Choice(title=org.name, value=org))
+        if len(target_org_choices) > 1:
+            target_org = await questionary.select(
+                "Select target organization:", choices=target_org_choices
+            ).ask_async()
         else:
-            target_org_choices = []
-            async for org in target_client.list_all_organizations():
-                target_org_choices.append(questionary.Choice(title=org.name, value=org))
-            if len(target_org_choices) > 1:
-                target_org = await questionary.select(
-                    "Select target organization:", choices=target_org_choices
-                ).ask_async()
-            else:
-                target_org = target_org_choices[0].value
+            target_org = target_org_choices[0].value
 
-        source_dir_path = project_path / Path(source_dir_subdir)
+    source_dir_path = project_path / Path(source_dir_subdir)
 
+    try:
+        release = DeployOrchestrator(
+            **yaml.data,
+            client=target_client,
+            source_client=source_client,
+            source_dir_path=source_dir_path,
+            yaml=yaml,
+            source_org=source_org,
+            target_org=target_org,
+            prefer=prefer,
+            deploy_file_path=deploy_file_path,
+            # auto_delete=auto_delete,
+        )
+    except ValidationError as e:
+        display_error(f"Missing information in the deploy file: {e}")
+        return
+
+    if release.deployed_org_id:
         try:
-            release = DeployOrchestrator(
-                **yaml.data,
-                client=target_client,
-                source_client=source_client,
-                source_dir_path=source_dir_path,
-                yaml=yaml,
-                source_org=source_org,
-                target_org=target_org,
-                prefer=prefer,
-                deploy_file_path=deploy_file_path,
-                # auto_delete=auto_delete,
-            )
-        except ValidationError as e:
-            display_error(f"Missing information in the deploy file: {e}")
-            return
-
-        if release.deployed_org_id:
-            try:
-                if release.deployed_org_id != target_org.id:
-                    raise DeployException(
-                        f"Target org ID in deploy file ({release.deployed_org_id}) is not the same as the selected target org ({target_org.id}). Please check your configuration."
-                    )
-                await target_client.retrieve_organization(release.deployed_org_id)
-            except APIClientError as e:
-                if e.status_code == 404:
-                    display_error(
-                        f'Organization with ID "{release.deployed_org_id}" not found with the specified token in {target_client._http_client.base_url}. Please make sure you have to correct token and target URL.'
-                    )
-                    return
-                else:
-                    raise e
-            except DeployException as e:
-                display_error(str(e))
+            if release.deployed_org_id != target_org.id:
+                raise DeployException(
+                    f"Target org ID in deploy file ({release.deployed_org_id}) is not the same as the selected target org ({target_org.id}). Please check your configuration."
+                )
+            await target_client.retrieve_organization(release.deployed_org_id)
+        except APIClientError as e:
+            if e.status_code == 404:
+                display_error(
+                    f'Organization with ID "{release.deployed_org_id}" not found with the specified token in {target_client._http_client.base_url}. Please make sure you have to correct token and target URL.'
+                )
                 return
-
-        try:
-            await release.initialize_deploy_objects()
-
-            await release.initialize_target_objects()
-
-            await release.compare_object_versions()
+            else:
+                raise e
         except DeployException as e:
-            display_error(f"Planning failed: {e}")
+            display_error(str(e))
             return
-        except Exception as e:
-            display_error(f"Planning failed: {e}", e)
-            return
+
+    try:
+        await release.initialize_deploy_objects()
+
+        await release.initialize_target_objects()
+
+        await release.compare_object_versions()
+    except DeployException as e:
+        display_error(f"Planning failed: {e}")
+        return
+    except Exception as e:
+        display_error(f"Planning failed: {e}", e)
+        return
 
     try:
         await release.show_deploy_plan()
