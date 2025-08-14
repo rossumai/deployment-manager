@@ -1,6 +1,6 @@
+import os
 import subprocess
-import tarfile
-from io import BytesIO
+import tempfile
 from urllib.parse import urlparse
 
 from deployment_manager.utils.consts import display_error
@@ -32,7 +32,7 @@ def parse_git_file_url(file_url):
             repo = path_parts[1]
             branch = path_parts[3]
             file_path = "/".join(path_parts[4:])
-            ssh_repo_url = f"git@github.com:{user}/{repo}.git"
+            ssh_repo_url = f"https://github.com/{user}/{repo}.git"
             return ssh_repo_url, branch, file_path
     elif hostname in ("gitlab.com", "www.gitlab.com") or (
         hostname and "gitlab" in hostname and "." in hostname
@@ -100,51 +100,50 @@ def get_git_file_content_from_url_ssh(file_url):
         )
         return None
 
-    git_command = [
-        "git",
-        "archive",
-        f"--remote={ssh_repo_url}",
-        branch,
-        file_path,
-        "--format=tar",
-    ]
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            # Clone the repository structure, but don't download any files yet.
+            clone_command = [
+                "git", "clone",
+                "--filter=blob:none",
+                "--no-checkout",
+                "--depth", "1",
+                "--branch", branch,
+                ssh_repo_url,
+                temp_dir
+            ]
+            subprocess.run(clone_command, capture_output=True, check=True, shell=False)
 
-    try:
-        result = subprocess.run(
-            git_command, capture_output=True, check=True, shell=False
-        )
+            # Specify which file(s) we want.
+            sparse_set_command = ["git", "sparse-checkout", "set", "--no-cone", file_path]
+            subprocess.run(sparse_set_command, capture_output=True, check=True, cwd=temp_dir)
 
-        tar_data = BytesIO(result.stdout)
-        with tarfile.open(fileobj=tar_data, mode="r") as tar:
-            try:
-                member = tar.getmember(file_path)
-                file_obj = tar.extractfile(member)
-                if file_obj:
-                    return file_obj.read()
-                else:
-                    display_error(
-                        f"Error: Could not extract file object from archive for '{file_path}'."
-                    )
-                    return None
-            except KeyError:
-                display_error(
-                    f"Error: File '{file_path}' not found in the remote repository or branch's archive. "
-                    f"Check file path and branch."
-                )
+            # Checkout the branch, gt will now download and write only the file specified in the previous step.
+            checkout_command = ["git", "checkout", branch]
+            subprocess.run(checkout_command, capture_output=True, check=True, cwd=temp_dir)
+
+            # Construct the full path to the now-existing file
+            full_file_path = os.path.join(temp_dir, file_path)
+
+            if os.path.exists(full_file_path):
+                with open(full_file_path, "rb") as f:
+                    return f.read()
+            else:
+                display_error(f"Error: File '{file_path}' not found after sparse checkout. Check file path and branch.")
                 return None
 
-    except subprocess.CalledProcessError as e:
-        display_error(
-            f"Git command failed with error code {e.returncode} for URL: {file_url}\n"
-            f"STDOUT: {e.stdout.decode('utf-8', errors='ignore')}\n"
-            f"STDERR: {e.stderr.decode('utf-8', errors='ignore')}"
-        )
-        return None
-    except FileNotFoundError:
-        display_error(
-            "Error: 'git' command not found. Make sure Git is installed and in your PATH."
-        )
-        return None
-    except Exception as e:
-        display_error(f"An unexpected error occurred: {e}")
-        return None
+        except subprocess.CalledProcessError as e:
+            display_error(
+                f"Git command failed with error code {e.returncode} for URL: {file_url}\n"
+                f"STDOUT: {e.stdout.decode('utf-8', errors='ignore')}\n"
+                f"STDERR: {e.stderr.decode('utf-8', errors='ignore')}"
+            )
+            return None
+        except FileNotFoundError:
+            display_error(
+                "Error: 'git' command not found. Make sure Git is installed and in your PATH."
+            )
+            return None
+        except Exception as e:
+            display_error(f"An unexpected error occurred: {e}")
+            return None
