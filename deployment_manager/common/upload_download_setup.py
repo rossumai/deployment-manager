@@ -61,3 +61,7 @@ def mark_subdirectories_to_include(
         for subdir_name, subdir_config in dir_config.subdirectories.items():
             if Path(f"{dir_name}/{subdir_name}") in expanded_destinations:
                 subdir_config.include = True
+            else:
+                display_warning(
+                    f"DEBUG: Subdir {Path(f"{dir_name}/{subdir_name}")} not included because it wasn't matched with objects in {expanded_destinations}.\nIgnore this warning if it's expected behavior."
+                )
