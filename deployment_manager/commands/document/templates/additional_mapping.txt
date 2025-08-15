@@ -1,0 +1,5 @@
+{schema_id}
+The above field (described by its json definition) is populated from main matching query.
+Just redirect the reader to look into that definition instead.
+The main matching query is already described in field with schema_id
+

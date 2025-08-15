@@ -16,9 +16,9 @@ pip install $(curl -s https://api.github.com/repos/rossumai/deployment-manager/r
 ```
 **Make sure to restart the terminal before using the command.**
 
-You can install a specific version by changing the URL, for instance, to install v2.0.1 (replace all the place where the version tag is referenced):
+You can install a specific version by changing the URL, for instance, to install v2.7.0a (replace all the places where the version tag is referenced - but without letters in the .whl filename):
 ```
-pip install https://github.com/rossumai/deployment-manager/releases/download/v2.5.0/deployment_manager-2.5.0-py3-none-any.whl
+pip install https://github.com/rossumai/deployment-manager/releases/download/v2.7.0a/deployment_manager-2.7.0-py3-none-any.whl
 ```
 
 In case the installation steps above do not work for you, you can install the tool into a Python virtual environment and link it to your $PATH:

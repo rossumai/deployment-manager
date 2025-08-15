@@ -1,0 +1,13 @@
+Generate documentation for the following object representing a single field.
+    - this is a formula field - value calculated based on the provided code
+
+{schema_id}
+
+generate a structured documentation of the field to humans in markdown:
+label (schema_id) (h3 markdown)
+description: description of the field logic (bullet point, audience: a human with no background in computer science should understand this. hint: look into the formula key and the code))
+ui_configuration.type labelled as "field type": (for example: "formula") (bullet point)
+type labelled as "data type": (for example: "string") (bullet point)
+required: (boolean: bullet point)
+can_export labelled as "exported": (boolean: bullet point)
+hidden: (boolean, bullet point)

@@ -1,0 +1,36 @@
+Generate markdown documentation for this Rossum custom format templating extension (hook).
+{attributes}
+
+Here is what you need to know (about Rossum configurations in general):
+- Rossum extension is a separate piece of functionality that runs on certain events.
+
+Background Information (for context):
+Rossum’s Custom Format Templating extension allows users to define how extracted document data should be exported by applying custom templates. These templates let users format the data into specific file types such as CSV, JSON, XML, or any other structured plain text format. The extension runs during the export phase of Rossum’s processing pipeline, after annotation is completed but before data is handed off to downstream systems.
+This extension is especially useful when integrating Rossum with external tools that require a particular export format, such as legacy ERPs, accounting systems, or APIs with strict payload schemas.
+The configuration is a JSON object that contains one or more export templates, each describing:
+The structure of the exported file (file_content_template or file_content_template_multiline)
+
+
+The format or encoding of the content (content_encoding)
+
+
+A reference key used to trigger or identify the export format (export_reference_key)
+
+
+Optional rules for selecting documents or customizing file names
+
+
+Each template uses a templating language (similar to Jinja2 or Mustache) to interpolate annotation fields, metadata, and queue-level data into the final output. Templates can be written inline or across multiple lines for readability. A single annotation can be exported using up to five different formats by defining multiple configurations.
+This configuration controls how Rossum converts structured annotation data into specific file formats tailored to downstream consumption.
+
+Related extensions:
+{run_after}
+
+Create these sections in the output:
+Name of the extension (extension id) (h3 markdown)
+Summary: Executive a brief max 2 sentence description of the actual matching logic including fields which are used for the check
+Fields Used: Which fields (schema_ids) are used in the configuration.
+Logic: What does the extension do. Use description if available. You can also infer it based on the extension’s ‘code’ attribute if available.
+Active Queues: Queues where the matching is active
+Events: list of events on which events is the hook triggered (bullet point)
+Related Extensions: hooks that are listed in ‘run_after’ attribute. Look at the IDs of the related extensions section to know which is which and list their name as well as ID.

@@ -2,7 +2,7 @@ import asyncio
 import dataclasses
 import json
 from typing import Any
-
+import aiofiles
 from anyio import Path
 from rich import print
 from rossum_api.api_client import Resource
@@ -200,6 +200,16 @@ async def read_non_versioned_attribute_data(path, object_):
             # join non_versioned data into the object
             object_.update(non_versioned_data)
     return
+
+
+async def read_txt(path: Path) -> str:
+    return open(path, "r").read()
+
+
+async def write_txt(path: Path, text: str):
+    await path.parent.mkdir(parents=True, exist_ok=True)
+    async with aiofiles.open(path, "w", encoding="utf-8") as f:
+        await f.write(text)
 
 
 async def write_yaml(path: Path, object: dict):
