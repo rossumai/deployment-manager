@@ -109,7 +109,7 @@ async def get_dir_from_user(
 
 async def get_dir_and_subdir_from_user(
     project_path: Path, type: str, default: str = None
-):
+) -> Path:
     config = await read_prd_project_config(project_path)
 
     if not config:
@@ -144,7 +144,7 @@ async def get_dir_and_subdir_from_user(
         default=default,
     ).ask_async()
 
-    return selected_subdir
+    return Path(selected_subdir)
 
 
 async def find_hooks_for_queues(source_path: Path, queues: list[dict]):
