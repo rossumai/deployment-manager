@@ -48,16 +48,29 @@ Deletes all objects in Rossum based on IDs in the mappping file. This operation 
         choices=PURGE_OBJECT_TYPES,
     ),
 )
+@click.option(
+    "--dir",
+    "-d",
+    default=None,
+    help="Directory where objects will be purged.",
+)
+@click.option(
+    "--subdir",
+    "-s",
+    default=None,
+    help='Subdirectory where objects will be purged. You can enter multiple subdirectories divided by ","',
+)
 @coro
-async def purge_object_types_wrapper(object_types):
+async def purge_object_types_wrapper(object_types, dir, subdir):
     # To be able to run the command progammatically without the CLI decorators
+
     await purge_object_types(
-        object_types=object_types,
+        object_types=object_types, selected_dir=dir, selected_subdirs=subdir.split(",") if subdir else None
     )
 
 
 async def purge_object_types(
-    object_types: list[str], client: ElisAPIClient = None, project_path: Path = None
+    object_types: list[str], client: ElisAPIClient = None, project_path: Path = None, selected_dir=None, selected_subdirs=None
 ):
     try:
         if not object_types:
@@ -74,7 +87,16 @@ async def purge_object_types(
         if not config:
             return ""
 
-        selected_dir = await get_dir_from_user(project_path=project_path, config=config)
+        if selected_dir:
+            # dir selected as parameter, we need to check whether it exists
+            dir_candidates = await get_dir_candidates(project_path=project_path, config=config)
+            if selected_dir not in dir_candidates:
+                display_warning(
+                    f"Dir `{selected_dir}` not found. Please specify existing directory with --dir or remove the parameter."
+                )
+                return
+        else:
+            selected_dir = await get_dir_from_user(project_path=project_path, config=config)
         credentials = await get_url_and_credentials(
             project_path=project_path,
             org_name=selected_dir,
@@ -87,9 +109,23 @@ async def purge_object_types(
         directory_in_config = await get_directory_from_config(
             base_path=project_path, org_name=selected_dir
         )
-        selected_subdirs = await get_subdirs_from_user(
-            selected_dir=selected_dir, config=config
-        )
+
+        if selected_subdirs:
+            subdir_candidates = await get_subdir_candidates(selected_dir=selected_dir, config=config)
+            nonexisting_subdirs = []
+            for selected_subdir in selected_subdirs:
+                if selected_subdir not in subdir_candidates:
+                    nonexisting_subdirs.append(selected_subdir)
+            if nonexisting_subdirs:
+                display_warning(
+                    f"Subdir(s) `{'`, `'.join(nonexisting_subdirs)}` not found in dir {selected_dir}. Please specify existing subdirectories with --subdir or remove the parameter."
+                )
+                return
+
+        else:
+            selected_subdirs = await get_subdirs_from_user(
+                selected_dir=selected_dir, config=config
+            )
 
         if selected_dir:
             org_name = selected_dir
@@ -128,12 +164,16 @@ async def purge_object_types(
         display_error(f"Error during project {settings.UPLOAD_COMMAND_NAME}: {e}", e)
 
 
-async def get_dir_from_user(project_path: Path, config: dict):
-    dir_candidates = [
+async def get_dir_candidates(project_path: Path, config: dict):
+    return  [
         dir_path
         for dir_path in config.get(settings.CONFIG_KEY_DIRECTORIES, {}).keys()
         if await (Path(project_path) / dir_path).exists()
     ]
+
+
+async def get_dir_from_user(project_path: Path, config: dict):
+    dir_candidates = await get_dir_candidates(project_path=project_path, config=config)
 
     dir_choices = [
         questionary.Choice(title=str(Path(project_path / path)))
@@ -148,8 +188,8 @@ async def get_dir_from_user(project_path: Path, config: dict):
     return selected_dir
 
 
-async def get_subdirs_from_user(selected_dir: str, config: dict):
-    subdir_candidates = [
+async def get_subdir_candidates(selected_dir: Path, config: dict):
+    return [
         subdir_path
         for subdir_path in config.get(settings.CONFIG_KEY_DIRECTORIES, {})
         .get(selected_dir, {})
@@ -157,6 +197,9 @@ async def get_subdirs_from_user(selected_dir: str, config: dict):
         .keys()
         if await (Path(selected_dir) / subdir_path).exists()
     ]
+
+async def get_subdirs_from_user(selected_dir: Path, config: dict):
+    subdir_candidates = await get_subdir_candidates(selected_dir=selected_dir, config=config)
     subdir_choices = [questionary.Choice(title=str(path)) for path in subdir_candidates]
     if not subdir_choices:
         return []
