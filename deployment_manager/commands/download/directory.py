@@ -21,7 +21,17 @@ from deployment_manager.commands.download.helpers import (
     should_write_object,
 )
 from deployment_manager.commands.download.remover import ObjectRemover
-from deployment_manager.commands.download.saver import EmailTemplateSaver, HookSaver, InboxSaver, QueueSaver, RuleSaver, SchemaSaver, WorkspaceSaver
+from deployment_manager.commands.download.saver import (
+    EmailTemplateSaver,
+    HookSaver,
+    InboxSaver,
+    QueueSaver,
+    RuleSaver,
+    SchemaSaver,
+    WorkflowSaver,
+    WorkflowStepSaver,
+    WorkspaceSaver,
+)
 from deployment_manager.commands.download.subdirectory import (
     SubdirectoriesDict,
     Subdirectory,
@@ -34,7 +44,10 @@ from deployment_manager.utils.consts import (
 )
 
 from deployment_manager.common.git import get_changed_file_paths
-from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
+from deployment_manager.common.read_write import (
+    read_object_from_json,
+    write_object_to_json,
+)
 from deployment_manager.utils.functions import (
     find_all_object_paths,
 )
@@ -104,6 +117,8 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
     schema_saver: Optional["SchemaSaver"] = None
     rule_saver: Optional["RuleSaver"] = None
     hook_saver: Optional["HookSaver"] = None
+    workflow_saver: Optional["WorkflowSaver"] = None
+    workflow_step_saver: Optional["WorkflowStepSaver"] = None
 
     async def initialize(self):
         if not self.project_path:
@@ -142,6 +157,8 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 schemas_for_mapping,
                 rules_for_mapping,
                 hooks_for_mapping,
+                workflows_for_mapping,
+                workflow_steps_for_mapping,
             ) = await asyncio.gather(
                 *[
                     downloader.download_remote_objects(type=Resource.Workspace),
@@ -153,6 +170,12 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                         type=CustomResource.Rule, check_access=True
                     ),
                     downloader.download_remote_objects(type=Resource.Hook),
+                    downloader.download_remote_objects(
+                        type=CustomResource.Workflow, check_access=True
+                    ),
+                    downloader.download_remote_objects(
+                        type=CustomResource.WorkflowStep, check_access=True
+                    ),
                 ]
             )
 
@@ -265,6 +288,31 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             self.hook_saver.subdirs_by_object_id = subdirs_by_object_id
             await self.hook_saver.save_downloaded_objects()
 
+            self.workflow_saver = WorkflowSaver(
+                parent_dir_reference=self,
+                base_path=self.project_path / self.name,
+                objects=workflows_for_mapping,
+                changed_files=self.changed_files,
+                download_all=self.download_all,
+                skip_objects_without_subdir=self.skip_objects_without_subdir,
+                subdirs=subdir_list,
+            )
+            self.workflow_saver.subdirs_by_object_id = subdirs_by_object_id
+            await self.workflow_saver.save_downloaded_objects()
+
+            self.workflow_step_saver = WorkflowStepSaver(
+                parent_dir_reference=self,
+                base_path=self.project_path / self.name,
+                objects=workflow_steps_for_mapping,
+                workflows=workflows_for_mapping,
+                changed_files=self.changed_files,
+                download_all=self.download_all,
+                skip_objects_without_subdir=self.skip_objects_without_subdir,
+                subdirs=subdir_list,
+            )
+            self.workflow_step_saver.subdirs_by_object_id = subdirs_by_object_id
+            await self.workflow_step_saver.save_downloaded_objects()
+
             self.id_objects_map = self.create_id_objects_map(
                 [
                     *workspaces_for_mapping,
@@ -274,6 +322,8 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                     *schemas_for_mapping,
                     *rules_for_mapping,
                     *hooks_for_mapping,
+                    *workflows_for_mapping,
+                    *workflow_steps_for_mapping,
                 ]
             )
 
@@ -398,6 +448,14 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 )
             case Resource.Workspace:
                 remote_path = self.workspace_saver.construct_object_path(
+                    subdir, remote_object
+                )
+            case CustomResource.Workflow:
+                remote_path = self.workflow_saver.construct_object_path(
+                    subdir, remote_object
+                )
+            case CustomResource.WorkflowStep:
+                remote_path = self.workflow_step_saver.construct_object_path(
                     subdir, remote_object
                 )
             case _:
