@@ -397,6 +397,8 @@ class DirectoryDocumentator:
             + queue_names
         )
 
+        hook.pop("test", "")
+
         hook_documentation = await self.model.run(
             template.format(attributes=hook, run_after=run_after)
         )
