@@ -153,7 +153,10 @@ class EmailTemplateSaver(QueueSaver):
 
         queue = self.find_queue(object)
         if queue:
-            return message + f", for [yellow]queue[/yellow]: {self.display_label(queue['name'], queue['id'])}"
+            return (
+                message
+                + f", for [yellow]queue[/yellow]: {self.display_label(queue['name'], queue['id'])}"
+            )
         return message
 
     async def save_downloaded_object(self, email_template: dict, subdir: Subdirectory):
@@ -437,3 +440,93 @@ class HookSaver(ObjectSaver):
                 await write_str(
                     custom_hook_code_path, hook.get("config", {}).get("code", None)
                 )
+
+
+class WorkflowSaver(ObjectSaver):
+    type: Resource = CustomResource.Workflow
+
+    def construct_object_path(self, subdir: Subdirectory, object: dict) -> Path:
+        object_path = (
+            self.base_path
+            / subdir.name
+            / "workflows"
+            / templatize_name_id(object["name"], object["id"])
+            / "workflow.json"
+        )
+        return object_path
+
+    async def save_downloaded_object(self, workflow: dict, subdir: Subdirectory):
+        object_path = self.construct_object_path(subdir=subdir, object=workflow)
+        if self.download_all or await should_write_object(
+            object_path, workflow, self.changed_files, self.parent_dir_reference
+        ):
+            await write_object_to_json(
+                object_path,
+                workflow,
+                self.type,
+                log_message=f"Pulled {self.display_type} {object_path}",
+            )
+
+
+class WorkflowStepSaver(ObjectSaver):
+    type: Resource = CustomResource.WorkflowStep
+    workflows: list[dict]
+
+    def find_subdir_of_object(self, object: dict):
+        parent = self.find_parent_object(object)
+        if parent:
+            # If you know the parent's subdir, you can use its subdir
+            subdir = self.subdirs_by_object_id.get(parent["id"])
+            return subdir if subdir else super().find_subdir_of_object(parent)
+
+        subdir = super().find_subdir_of_object(object)
+        if subdir:
+            return subdir
+
+        return None
+
+    def find_parent_object(self, child):
+        return self.find_workflow_for_workflow_step(child)
+
+    def construct_object_path(self, subdir: Subdirectory, workflow_step: dict) -> Path:
+        workflow_for_workflow_step = self.find_workflow_for_workflow_step(workflow_step)
+        if not workflow_for_workflow_step:
+
+            return
+
+        object_path = (
+            self.base_path
+            / subdir.name
+            / "workflows"
+            / templatize_name_id(
+                workflow_for_workflow_step["name"], workflow_for_workflow_step["id"]
+            )
+            / "workflow_steps"
+            / f'{templatize_name_id(workflow_step["name"], workflow_step["id"])}.json'
+        )
+        return object_path
+
+    async def save_downloaded_object(self, workflow_step: dict, subdir: Subdirectory):
+        object_path = self.construct_object_path(
+            subdir=subdir, workflow_step=workflow_step
+        )
+        if not object_path:
+            return
+        if self.download_all or await should_write_object(
+            object_path, workflow_step, self.changed_files, self.parent_dir_reference
+        ):
+            await write_object_to_json(
+                object_path,
+                workflow_step,
+                self.type,
+                log_message=f"Pulled {self.display_type} {object_path}",
+            )
+
+    def find_workflow_for_workflow_step(self, workflow_step: dict):
+        for ws in self.workflows:
+            if ws["url"] == workflow_step.get("workflow", None):
+                return ws
+        # display_error(
+        #     f"Could not find workflow for {self.display_type} {self.display_label(queue.get('name', "no-name"), queue.get('id', 'no-id'))}. Skipping."
+        # )
+        return None

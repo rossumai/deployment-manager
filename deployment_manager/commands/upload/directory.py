@@ -25,6 +25,7 @@ from deployment_manager.common.modified_at import check_modified_timestamp
 from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
 from deployment_manager.utils.consts import (
     GIT_CHARACTERS,
+    CustomResource,
     display_error,
     display_warning,
     settings,
@@ -138,6 +139,7 @@ class UploadOrganizationDirectory(OrganizationDirectory):
                 continue
 
             data = await read_object_from_json(path)
+            object_type = determine_object_type_from_url(data.get('url', ""))
             subdir = self.find_subdir_of_object(data)
             if not subdir:
                 display_warning(f"No subdir found for path: {path}, skipping.")
@@ -145,6 +147,10 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             # Change found in a subdir not selected by the user to be pushed, skip
             elif not subdir.include:
                 continue
+            # Some objects cannot be updated via Elis API
+            elif object_type in [CustomResource.Workflow, CustomResource.WorkflowStep]:
+                continue
+
             changed_object = ChangedObject(operation=op, path=path, data=data)
             self.changed_objects.append(changed_object)
 
