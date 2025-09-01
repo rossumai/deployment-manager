@@ -73,7 +73,7 @@ class DeployObject(BaseModel):
     id: int
     name: str
     type: Resource
-    data: dict = None
+    data: dict = {}
 
     deploy_file: DeployOrchestrator = None
     yaml_reference: dict = None

@@ -5,7 +5,7 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_depl
     DeployObject,
 )
 from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
-from deployment_manager.utils.consts import display_error, display_info, settings
+from deployment_manager.utils.consts import CustomResource, display_error, display_info, settings
 from pydantic import BaseModel, Field
 from typing import Dict, Optional, Literal
 
@@ -32,6 +32,7 @@ class DeployState(BaseModel):
     hooks: Dict[int, ResourceDeployments] = Field(default_factory=dict)
     schemas: Dict[int, ResourceDeployments] = Field(default_factory=dict)
     rules: Dict[int, ResourceDeployments] = Field(default_factory=dict)
+    rule_templates: Dict[int, ResourceDeployments] = Field(default_factory=dict)
     queues: Dict[int, ResourceDeployments] = Field(default_factory=dict)
     inboxes: Dict[int, ResourceDeployments] = Field(default_factory=dict)
     workspaces: Dict[int, ResourceDeployments] = Field(default_factory=dict)
@@ -67,7 +68,7 @@ class DeployState(BaseModel):
 
     def get_last_applied(
         self,
-        resource_type: Resource,
+        resource_type: Resource | CustomResource,
         source_id: int | str,
         target_id: int | str,
         direction: Literal["forward", "reverse"],

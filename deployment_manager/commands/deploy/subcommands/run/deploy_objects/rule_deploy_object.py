@@ -63,6 +63,17 @@ class RuleDeployObject(DeployObject):
             use_dummy_references=use_dummy_references,
         )
 
+        self.ref_replacer.replace_reference_url(
+            object=data,
+            target_index=target.index,
+            target_objects_count=len(self.targets),
+            dependency_name="rule_template",
+            lookup_table=self.deploy_file.lookup_table,
+            reverse_lookup_table=self.deploy_file.reverse_lookup_table,
+            object_type=CustomResource.RuleTemplate,
+            use_dummy_references=use_dummy_references,
+        )
+
         # if previous_schema_url == data["schema"] and not target.id:
         #     raise Exception(
         #         f'Cannot create target for {self.display_type} "{self.display_label}" - there is no target schema to use it with.'

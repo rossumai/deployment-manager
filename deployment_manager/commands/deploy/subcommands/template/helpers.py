@@ -12,13 +12,19 @@ from pydantic import BaseModel
 import questionary
 from anyio import Path
 
-from deployment_manager.utils.consts import display_error, display_warning, settings
+from deployment_manager.utils.consts import (
+    CustomResource,
+    display_error,
+    display_warning,
+    settings,
+)
 from deployment_manager.utils.functions import (
     extract_id_from_url,
     find_all_hook_paths_in_destination,
     find_object_by_id,
     templatize_name_id,
 )
+from rossum_api.api_client import Resource
 
 
 def create_deploy_file_template():
@@ -118,8 +124,10 @@ async def get_dir_and_subdir_from_user(
     if not config:
         return ""
 
+    source_dir = default.split('/')[0]
+
     selected_dir = await get_dir_from_user(
-        project_path=project_path, type=type, default=default, config=config
+        project_path=project_path, type=type, default=source_dir, config=config
     )
     if not selected_dir:
         return ""
@@ -192,13 +200,21 @@ async def find_queue_paths_for_workspaces(ws_paths: list[Path]):
 async def find_ws_paths_for_dir(base_dir: Path):
     return [
         workspace_path
-        async for workspace_path in (base_dir / "workspaces").iterdir()
+        async for workspace_path in (base_dir / Resource.Workspace.value).iterdir()
         if await workspace_path.is_dir()
     ]
 
 
 async def find_rule_paths_for_dir(base_dir: Path):
     return [rule_path async for rule_path in (base_dir).iterdir()]
+
+
+async def find_rule_template_paths_for_dir(base_dir: Path):
+    return [
+        rule_path
+        async for rule_path in (base_dir / CustomResource.RuleTemplate.value).iterdir()
+        if await rule_path.is_file()
+    ]
 
 
 DEFAULT_TARGETS = [{"id": None}]
@@ -745,3 +761,36 @@ def find_rule(rules, rule_id):
         if rule["id"] == rule_id:
             return rule
     return {}
+
+
+async def get_rule_templates_from_user(
+    source_path: Path,
+    interactive: bool,
+    previous_deploy_file_rule_templates: list[dict] = None,
+):
+    if not previous_deploy_file_rule_templates:
+        previous_deploy_file_rule_templates = []
+    selected_rule_template_ids = [
+        template["id"] for template in previous_deploy_file_rule_templates
+    ]
+    rule_template_paths = await find_rule_template_paths_for_dir(source_path)
+    if not rule_template_paths:
+        return []
+
+    rule_template_choices = await prepare_choices(
+        paths=rule_template_paths,
+        preselected_ids=selected_rule_template_ids,
+    )
+    deploy_file_rule_templates = [
+        template.value for template in rule_template_choices if template.checked
+    ]
+    if interactive or not selected_rule_template_ids:
+        deploy_file_rule_templates = await questionary.checkbox(
+            f"Select {CustomResource.RuleTemplate.value}:",
+            choices=rule_template_choices,
+        ).ask_async()
+
+    return prepare_deploy_file_objects(
+        objects=deploy_file_rule_templates,
+        objects_in_previous_file=previous_deploy_file_rule_templates,
+    ), [template["path"] for template in deploy_file_rule_templates]

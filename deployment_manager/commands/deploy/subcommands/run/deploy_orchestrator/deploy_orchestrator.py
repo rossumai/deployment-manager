@@ -23,6 +23,9 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.queue_dep
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.rule_deploy_object import (
     RuleDeployObject,
 )
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.rule_template_deploy_object import (
+    RuleTemplateDeployObject,
+)
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.schema_deploy_object import (
     SchemaDeployObject,
 )
@@ -94,6 +97,7 @@ class DeployOrchestrator(BaseModel):
     workspaces: list[WorkspaceDeployObject] = []
     queues: list[QueueDeployObject] = []
     hooks: list[HookDeployObject] = []
+    rule_templates: list[RuleTemplateDeployObject] = []
 
     lookup_table: LookupTable = {}
     reverse_lookup_table: ReverseLookupTable = {}
@@ -114,6 +118,7 @@ class DeployOrchestrator(BaseModel):
         return [
             self.organization,
             *self.hooks,
+            *self.rule_templates,
             *self.workspaces,
             *self.queues,
         ]
@@ -152,6 +157,7 @@ class DeployOrchestrator(BaseModel):
             (Resource.Queue, self.queues),
             (Resource.Schema, schemas),
             (CustomResource.Rule, rules),
+            (CustomResource.RuleTemplate, self.rule_templates),
             (Resource.Inbox, inboxes),
             (Resource.Workspace, self.workspaces),
         ]
@@ -275,6 +281,13 @@ class DeployOrchestrator(BaseModel):
             await asyncio.gather(
                 *[
                     deploy_object.deploy_target_objects(data_attribute=data_attribute)
+                    for deploy_object in self.rule_templates
+                ]
+            )
+
+            await asyncio.gather(
+                *[
+                    deploy_object.deploy_target_objects(data_attribute=data_attribute)
                     for deploy_object in self.workspaces
                 ]
             )
@@ -335,8 +348,15 @@ class DeployOrchestrator(BaseModel):
 
         for hook in self.hooks:
             lookup_table[hook.id][Resource.Hook] = hook.targets
+
+        for rule_template in self.rule_templates:
+            lookup_table[rule_template.id][
+                CustomResource.RuleTemplate
+            ] = rule_template.targets
+
         for workspace in self.workspaces:
             lookup_table[workspace.id][Resource.Workspace] = workspace.targets
+
         for queue in self.queues:
             lookup_table[queue.id][Resource.Queue] = queue.targets
 
@@ -382,4 +402,5 @@ QueueDeployObject.model_rebuild()
 SchemaDeployObject.model_rebuild()
 InboxDeployObject.model_rebuild()
 RuleDeployObject.model_rebuild()
+RuleTemplateDeployObject.model_rebuild()
 Target.model_rebuild()

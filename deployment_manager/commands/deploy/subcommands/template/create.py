@@ -17,9 +17,13 @@ from deployment_manager.commands.deploy.subcommands.template.helpers import (
     get_dir_and_subdir_from_user,
     get_secrets_from_user,
     get_workspaces_from_user,
+    get_rule_templates_from_user,
 )
 from deployment_manager.common.mapping import read_mapping
-from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
+from deployment_manager.common.read_write import (
+    read_object_from_json,
+    write_object_to_json,
+)
 from deployment_manager.utils.consts import display_error, display_info, settings
 
 from rich import print as pprint
@@ -136,6 +140,17 @@ async def create_deploy_template(
     deploy_file_object[settings.DEPLOY_KEY_HOOKS] = selected_hooks
     deploy_file_object[settings.DEPLOY_KEY_UNSELECTED_HOOK_IDS] = unselected_hooks
 
+    # Rule templates
+    rule_templates = deploy_file_object.get(settings.DEPLOY_KEY_RULE_TEMPLATES, [])
+    selected_rule_templates, unselected_rule_templates = (
+        await get_rule_templates_from_user(
+            previous_deploy_file_rule_templates=rule_templates,
+            source_path=source_path,
+            interactive=interactive,
+        )
+    )
+    deploy_file_object[settings.DEPLOY_KEY_RULE_TEMPLATES] = selected_rule_templates
+
     # Multi-target specification
     if interactive:
         await get_multi_targets_from_user(deploy_file_object)
@@ -208,7 +223,9 @@ async def create_deploy_template(
 
     if not state_file_path:
         hash_suffix = hashlib.sha1(
-            f"{source_dir_and_subdir}_{target_dir_and_subdir}_{source_url}_{target_url}".encode('utf-8')
+            f"{source_dir_and_subdir}_{target_dir_and_subdir}_{source_url}_{target_url}".encode(
+                "utf-8"
+            )
         ).hexdigest()[:6]
         state_file_path = (
             settings.DEFAULT_DEPLOY_STATE_PARENT
