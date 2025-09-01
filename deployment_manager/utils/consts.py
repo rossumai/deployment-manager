@@ -310,5 +310,6 @@ initialize_settings()
 
 class CustomResource(Enum):
     Rule = "rules"
+    RuleTemplate = "rule_templates"
     Workflow = "workflows"
     WorkflowStep = "workflow_steps"

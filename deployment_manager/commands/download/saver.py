@@ -409,6 +409,33 @@ class RuleSaver(SchemaSaver):
             )
 
 
+class RuleTemplateSaver(ObjectSaver):
+    type: Resource = CustomResource.RuleTemplate
+
+    def construct_object_path(self, subdir: Subdirectory, rule_template: dict) -> Path:
+        object_path = (
+            self.base_path
+            / subdir.name
+            / "rule_templates"
+            / f'{templatize_name_id(rule_template["name"], rule_template["id"])}.json'
+        )
+        return object_path
+
+    async def save_downloaded_object(self, rule_template: dict, subdir: Subdirectory):
+        object_path = self.construct_object_path(subdir=subdir, rule_template=rule_template)
+        if not object_path:
+            return
+        if self.download_all or await should_write_object(
+            object_path, rule_template, self.changed_files, self.parent_dir_reference
+        ):
+            await write_object_to_json(
+                object_path,
+                rule_template,
+                self.type,
+                log_message=f"Pulled {self.display_type} {object_path}",
+            )
+
+
 class HookSaver(ObjectSaver):
     type: Resource = Resource.Hook
 

@@ -27,6 +27,7 @@ from deployment_manager.commands.download.saver import (
     InboxSaver,
     QueueSaver,
     RuleSaver,
+    RuleTemplateSaver,
     SchemaSaver,
     WorkflowSaver,
     WorkflowStepSaver,
@@ -118,6 +119,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
     inbox_saver: Optional["InboxSaver"] = None
     schema_saver: Optional["SchemaSaver"] = None
     rule_saver: Optional["RuleSaver"] = None
+    rule_template_saver: Optional["RuleTemplateSaver"] = None
     hook_saver: Optional["HookSaver"] = None
     workflow_saver: Optional["WorkflowSaver"] = None
     workflow_step_saver: Optional["WorkflowStepSaver"] = None
@@ -158,6 +160,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 inboxes_for_mapping,
                 schemas_for_mapping,
                 rules_for_mapping,
+                rule_templates_for_mapping,
                 hooks_for_mapping,
                 workflows_for_mapping,
                 workflow_steps_for_mapping,
@@ -170,6 +173,9 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                     downloader.download_remote_objects(type=Resource.Schema),
                     downloader.download_remote_objects(
                         type=CustomResource.Rule, check_access=True
+                    ),
+                    downloader.download_remote_objects(
+                        type=CustomResource.RuleTemplate, check_access=True
                     ),
                     downloader.download_remote_objects(type=Resource.Hook),
                     downloader.download_remote_objects(
@@ -278,6 +284,18 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             self.rule_saver.subdirs_by_object_id = subdirs_by_object_id
             await self.rule_saver.save_downloaded_objects()
 
+            self.rule_template_saver = RuleTemplateSaver(
+                parent_dir_reference=self,
+                base_path=self.project_path / self.name,
+                objects=rule_templates_for_mapping,
+                changed_files=self.changed_files,
+                download_all=self.download_all,
+                skip_objects_without_subdir=self.skip_objects_without_subdir,
+                subdirs=subdir_list,
+            )
+            self.rule_template_saver.subdirs_by_object_id = subdirs_by_object_id
+            await self.rule_template_saver.save_downloaded_objects()
+
             self.hook_saver = HookSaver(
                 parent_dir_reference=self,
                 base_path=self.project_path / self.name,
@@ -323,6 +341,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                     *inboxes_for_mapping,
                     *schemas_for_mapping,
                     *rules_for_mapping,
+                    *rule_templates_for_mapping,
                     *hooks_for_mapping,
                     *workflows_for_mapping,
                     *workflow_steps_for_mapping,
@@ -436,6 +455,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 remote_path = self.rule_saver.construct_object_path(
                     subdir, remote_object
                 )
+            case CustomResource.RuleTemplate:
+                remote_path = self.rule_template_saver.construct_object_path(
+                    subdir, remote_object
+                )
             case Resource.Inbox:
                 remote_path = self.inbox_saver.construct_object_path(
                     subdir, remote_object
@@ -465,6 +488,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
 
         return remote_path
 
+
 # Pydantic needs this
 ObjectSaver.model_rebuild()
 WorkspaceSaver.model_rebuild()
@@ -475,4 +499,5 @@ WorkflowSaver.model_rebuild()
 WorkflowStepSaver.model_rebuild()
 SchemaSaver.model_rebuild()
 RuleSaver.model_rebuild()
+RuleTemplateSaver.model_rebuild()
 InboxSaver.model_rebuild()
