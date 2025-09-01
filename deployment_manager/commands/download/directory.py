@@ -36,6 +36,7 @@ from deployment_manager.commands.download.subdirectory import (
     SubdirectoriesDict,
     Subdirectory,
 )
+from deployment_manager.commands.download.types import ObjectSaver
 from deployment_manager.common.determine_path import determine_object_type_from_url
 from deployment_manager.utils.consts import (
     CustomResource,
@@ -55,6 +56,7 @@ from deployment_manager.utils.functions import (
 from rich.panel import Panel
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
+from rossum_api.models.hook import Hook
 
 
 class DownloadException(Exception): ...
@@ -462,3 +464,15 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 return ""
 
         return remote_path
+
+# Pydantic needs this
+ObjectSaver.model_rebuild()
+WorkspaceSaver.model_rebuild()
+QueueSaver.model_rebuild()
+EmailTemplateSaver.model_rebuild()
+HookSaver.model_rebuild()
+WorkflowSaver.model_rebuild()
+WorkflowStepSaver.model_rebuild()
+SchemaSaver.model_rebuild()
+RuleSaver.model_rebuild()
+InboxSaver.model_rebuild()
