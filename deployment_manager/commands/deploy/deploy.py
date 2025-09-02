@@ -11,8 +11,9 @@ from deployment_manager.commands.deploy.subcommands.run.run import (
 from deployment_manager.commands.deploy.subcommands.template.create import (
     create_deploy_template,
 )
-from deployment_manager.commands.deploy.subcommands.template.init import (
-    init_deploy_template_file,
+
+from deployment_manager.commands.deploy.subcommands.template.reverse import (
+    DeployFileReverser,
 )
 from deployment_manager.utils.consts import (
     settings,
@@ -29,24 +30,16 @@ from deployment_manager.utils.functions import (
 def deploy(): ...
 
 
-@deploy.command(
-    name=settings.DEPLOY_TEMPLATE_INIT_COMMAND_NAME,
-    help=f"""Create an empty deploy file that can be used with the {settings.DEPLOY_COMMAND_NAME} command.""",
-)
-@coro
-async def init_deploy_template_wrapper():
-    await init_deploy_template_file()
-
-
-@deploy.command(
+@deploy.group(
     name=settings.DEPLOY_TEMPLATE_COMMAND_NAME,
-    help=f"""Create a deploy file that can be used with the {settings.DEPLOY_COMMAND_NAME} command.""",
+    help=f"""Create/update/reverse a deploy file that can be used with the {settings.DEPLOY_COMMAND_NAME} command.""",
 )
-@click.option(
-    "--deploy-file",
-    "-f",
-    help="Previous deploy file to speed up deploy file creation",
-    type=click.Path(path_type=Path, exists=True),
+def template(): ...
+
+
+@template.command(
+    name=settings.DEPLOY_TEMPLATE_CREATE_COMMAND_NAME,
+    help=f"""Create a deploy file that can be used with the {settings.DEPLOY_COMMAND_NAME} command.""",
 )
 @click.option(
     "--mapping-file",
@@ -54,6 +47,22 @@ async def init_deploy_template_wrapper():
     help="PRD v1 mapping for reusing IDs and attribute overrides",
     type=click.Path(path_type=Path, exists=True),
 )
+@coro
+async def create_deploy_template_wrapper(
+    mapping_file: Path = None,
+):
+    await create_deploy_template(
+        input_file_path=None,
+        mapping_file_path=mapping_file,
+        interactive=True,
+    )
+
+
+@template.command(
+    name=settings.DEPLOY_TEMPLATE_UPDATE_COMMAND_NAME,
+    help=f"""Update a deploy file that can be used with the {settings.DEPLOY_COMMAND_NAME} command.""",
+)
+@click.argument("deploy_file", type=click.Path(path_type=Path), required=True)
 @click.option(
     "--interactive",
     "-i",
@@ -61,17 +70,43 @@ async def init_deploy_template_wrapper():
     is_flag=True,
     default=False,
 )
+@click.option(
+    "--mapping-file",
+    "-mf",
+    help="PRD v1 mapping for reusing IDs and attribute overrides",
+    type=click.Path(path_type=Path, exists=True),
+)
 @coro
 async def create_deploy_template_wrapper(
     deploy_file: Path = None,
-    mapping_file: Path = None,
     interactive: bool = False,
+    mapping_file: Path = None,
 ):
     await create_deploy_template(
         input_file_path=deploy_file,
         mapping_file_path=mapping_file,
         interactive=interactive,
     )
+
+
+@template.command(
+    name=settings.DEPLOY_TEMPLATE_REVERSE_COMMAND_NAME,
+    help=f"""Create a deploy file that reverses source and target of an existing deploy file. Can be used for reverse {settings.MIGRATE_COMMAND_NAME}""",
+)
+@click.argument("deploy_file", type=click.Path(path_type=Path, exists=True))
+@coro
+async def reverse_deploy_template_wrapper(deploy_file: Path, project_path: Path = None):
+    if not project_path:
+        project_path = Path("./")
+
+    reverser = DeployFileReverser(
+        input_file_path=deploy_file,
+        project_path=project_path,
+    )
+
+    await reverser.initialize()
+
+    await reverser.reverse_deploy_file()
 
 
 @deploy.command(
@@ -82,19 +117,20 @@ If these objects don't exist, they get created.
                """,
 )
 @click.argument("deploy_file", type=click.Path(path_type=Path, exists=True))
+# @click.option(
+#     "--auto-delete",
+#     "-ad",
+#     default=False,
+#     is_flag=True,
+#     help="Checks if source object exists and if not, deletes target + removes the object from deploy file.",
+# )
 @click.option(
-    "--force",
-    "-f",
-    default=False,
-    is_flag=True,
-    help="Ignores newer remote timestamps = always overwrites remote with local version of objects.",
-)
-@click.option(
-    "--auto-delete",
-    "-ad",
-    default=False,
-    is_flag=True,
-    help="Checks if source object exists and if not, deletes target + removes the object from deploy file.",
+    "--prefer",
+    type=click.Choice(
+        [settings.SOURCE_DIRNAME, settings.TARGET_DIRNAME], case_sensitive=False
+    ),
+    default=None,
+    help=f"When resolving merge conflicts, prefer {settings.SOURCE_DIRNAME} or {settings.TARGET_DIRNAME} values. If unset, neither is preferred and conflicts will be raised.",
 )
 @click.option(
     "--auto-apply",
@@ -119,17 +155,22 @@ If these objects don't exist, they get created.
 @coro
 async def deploy_project_wrapper(
     deploy_file: Path,
-    force: bool,
-    auto_delete: bool,
+    # auto_delete: bool,
     auto_apply: bool,
     commit: bool,
     message: str,
+    prefer: str = None,
 ):
+    if prefer:
+        prefer = prefer.lower()  # Normalize input
+    else:
+        prefer = "neither"
+
     await deploy_release_file(
         deploy_file_path=deploy_file,
-        auto_delete=auto_delete,
+        prefer=prefer,
+        # auto_delete=auto_delete,
         auto_apply_plan=auto_apply,
-        force=force,
         commit=commit,
         commit_message=message,
     )

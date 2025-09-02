@@ -21,11 +21,23 @@ from deployment_manager.commands.download.helpers import (
     should_write_object,
 )
 from deployment_manager.commands.download.remover import ObjectRemover
-from deployment_manager.commands.download.saver import EmailTemplateSaver, HookSaver, InboxSaver, QueueSaver, RuleSaver, SchemaSaver, WorkspaceSaver
+from deployment_manager.commands.download.saver import (
+    EmailTemplateSaver,
+    HookSaver,
+    InboxSaver,
+    QueueSaver,
+    RuleSaver,
+    RuleTemplateSaver,
+    SchemaSaver,
+    WorkflowSaver,
+    WorkflowStepSaver,
+    WorkspaceSaver,
+)
 from deployment_manager.commands.download.subdirectory import (
     SubdirectoriesDict,
     Subdirectory,
 )
+from deployment_manager.commands.download.types import ObjectSaver
 from deployment_manager.common.determine_path import determine_object_type_from_url
 from deployment_manager.utils.consts import (
     CustomResource,
@@ -34,7 +46,10 @@ from deployment_manager.utils.consts import (
 )
 
 from deployment_manager.common.git import get_changed_file_paths
-from deployment_manager.common.read_write import read_json, write_json
+from deployment_manager.common.read_write import (
+    read_object_from_json,
+    write_object_to_json,
+)
 from deployment_manager.utils.functions import (
     find_all_object_paths,
 )
@@ -42,6 +57,7 @@ from deployment_manager.utils.functions import (
 from rich.panel import Panel
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
+from rossum_api.models.hook import Hook
 
 
 class DownloadException(Exception): ...
@@ -79,7 +95,7 @@ class OrganizationDirectory(BaseModel):
 
             object_ids = set()
             for object_path in object_paths:
-                object = await read_json(object_path)
+                object = await read_object_from_json(object_path)
                 object_id = object.get("id", None)
                 if object_id:
                     object_ids.add(object_id)
@@ -103,7 +119,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
     inbox_saver: Optional["InboxSaver"] = None
     schema_saver: Optional["SchemaSaver"] = None
     rule_saver: Optional["RuleSaver"] = None
+    rule_template_saver: Optional["RuleTemplateSaver"] = None
     hook_saver: Optional["HookSaver"] = None
+    workflow_saver: Optional["WorkflowSaver"] = None
+    workflow_step_saver: Optional["WorkflowStepSaver"] = None
 
     async def initialize(self):
         if not self.project_path:
@@ -141,7 +160,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 inboxes_for_mapping,
                 schemas_for_mapping,
                 rules_for_mapping,
+                rule_templates_for_mapping,
                 hooks_for_mapping,
+                workflows_for_mapping,
+                workflow_steps_for_mapping,
             ) = await asyncio.gather(
                 *[
                     downloader.download_remote_objects(type=Resource.Workspace),
@@ -152,7 +174,16 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                     downloader.download_remote_objects(
                         type=CustomResource.Rule, check_access=True
                     ),
+                    downloader.download_remote_objects(
+                        type=CustomResource.RuleTemplate, check_access=True
+                    ),
                     downloader.download_remote_objects(type=Resource.Hook),
+                    downloader.download_remote_objects(
+                        type=CustomResource.Workflow, check_access=True
+                    ),
+                    downloader.download_remote_objects(
+                        type=CustomResource.WorkflowStep, check_access=True
+                    ),
                 ]
             )
 
@@ -253,6 +284,18 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             self.rule_saver.subdirs_by_object_id = subdirs_by_object_id
             await self.rule_saver.save_downloaded_objects()
 
+            self.rule_template_saver = RuleTemplateSaver(
+                parent_dir_reference=self,
+                base_path=self.project_path / self.name,
+                objects=rule_templates_for_mapping,
+                changed_files=self.changed_files,
+                download_all=self.download_all,
+                skip_objects_without_subdir=self.skip_objects_without_subdir,
+                subdirs=subdir_list,
+            )
+            self.rule_template_saver.subdirs_by_object_id = subdirs_by_object_id
+            await self.rule_template_saver.save_downloaded_objects()
+
             self.hook_saver = HookSaver(
                 parent_dir_reference=self,
                 base_path=self.project_path / self.name,
@@ -265,6 +308,31 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             self.hook_saver.subdirs_by_object_id = subdirs_by_object_id
             await self.hook_saver.save_downloaded_objects()
 
+            self.workflow_saver = WorkflowSaver(
+                parent_dir_reference=self,
+                base_path=self.project_path / self.name,
+                objects=workflows_for_mapping,
+                changed_files=self.changed_files,
+                download_all=self.download_all,
+                skip_objects_without_subdir=self.skip_objects_without_subdir,
+                subdirs=subdir_list,
+            )
+            self.workflow_saver.subdirs_by_object_id = subdirs_by_object_id
+            await self.workflow_saver.save_downloaded_objects()
+
+            self.workflow_step_saver = WorkflowStepSaver(
+                parent_dir_reference=self,
+                base_path=self.project_path / self.name,
+                objects=workflow_steps_for_mapping,
+                workflows=workflows_for_mapping,
+                changed_files=self.changed_files,
+                download_all=self.download_all,
+                skip_objects_without_subdir=self.skip_objects_without_subdir,
+                subdirs=subdir_list,
+            )
+            self.workflow_step_saver.subdirs_by_object_id = subdirs_by_object_id
+            await self.workflow_step_saver.save_downloaded_objects()
+
             self.id_objects_map = self.create_id_objects_map(
                 [
                     *workspaces_for_mapping,
@@ -273,7 +341,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                     *inboxes_for_mapping,
                     *schemas_for_mapping,
                     *rules_for_mapping,
+                    *rule_templates_for_mapping,
                     *hooks_for_mapping,
+                    *workflows_for_mapping,
+                    *workflow_steps_for_mapping,
                 ]
             )
 
@@ -293,7 +364,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             if self.download_all or await should_write_object(
                 org_file_path, organization, self.changed_files, self
             ):
-                await write_json(
+                await write_object_to_json(
                     org_file_path,
                     organization,
                     Resource.Organization,
@@ -384,6 +455,10 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 remote_path = self.rule_saver.construct_object_path(
                     subdir, remote_object
                 )
+            case CustomResource.RuleTemplate:
+                remote_path = self.rule_template_saver.construct_object_path(
+                    subdir, remote_object
+                )
             case Resource.Inbox:
                 remote_path = self.inbox_saver.construct_object_path(
                     subdir, remote_object
@@ -400,7 +475,29 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 remote_path = self.workspace_saver.construct_object_path(
                     subdir, remote_object
                 )
+            case CustomResource.Workflow:
+                remote_path = self.workflow_saver.construct_object_path(
+                    subdir, remote_object
+                )
+            case CustomResource.WorkflowStep:
+                remote_path = self.workflow_step_saver.construct_object_path(
+                    subdir, remote_object
+                )
             case _:
                 return ""
 
         return remote_path
+
+
+# Pydantic needs this
+ObjectSaver.model_rebuild()
+WorkspaceSaver.model_rebuild()
+QueueSaver.model_rebuild()
+EmailTemplateSaver.model_rebuild()
+HookSaver.model_rebuild()
+WorkflowSaver.model_rebuild()
+WorkflowStepSaver.model_rebuild()
+SchemaSaver.model_rebuild()
+RuleSaver.model_rebuild()
+RuleTemplateSaver.model_rebuild()
+InboxSaver.model_rebuild()

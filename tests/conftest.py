@@ -3,7 +3,7 @@ from anyio import Path
 import pytest
 import pytest_asyncio
 from rossum_api import ElisAPIClient
-from deployment_manager.common.read_write import read_json, write_json
+from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
 from deployment_manager.utils.consts import settings
 
 base_url = os.environ.get("SOURCE_API_BASE")
@@ -58,12 +58,12 @@ TEST_DATA_PATH = Path("tests/test_data")
 
 @pytest_asyncio.fixture(scope="function")
 async def workspace_json_path(tmp_path):
-    data = await read_json(TEST_DATA_PATH / "workspace.json")
+    data = await read_object_from_json(TEST_DATA_PATH / "workspace.json")
     tmp_ws_path = tmp_path / "workspace.json"
-    await write_json(tmp_ws_path, data)
+    await write_object_to_json(tmp_ws_path, data)
     return tmp_ws_path
 
 
 @pytest_asyncio.fixture(scope="function")
 async def workspace_json():
-    return await read_json(TEST_DATA_PATH / "workspace.json")
+    return await read_object_from_json(TEST_DATA_PATH / "workspace.json")

@@ -1,0 +1,48 @@
+Here's a documentation for duplicates detection extension in Rossum a platform for intelligent document processing with AI.
+
+You have the following knowledge of duplicate handling and its possible configurations:
+The Duplicate Handling Extension in Rossum is designed to identify and manage duplicate documents efficiently. Here's a comprehensive summary of its configuration options:
+Trigger Events:
+Define when the configuration should be activated. Common events include annotation_status and annotation_content.
+Trigger Actions:
+Specify actions that trigger the configuration, such as changed, initialize, updated, started, confirm, export, and user_update.
+Statuses:
+A list of annotation status couples (e.g., importing.to_review) that define when the processing logic should be applied.
+Logic:
+The core of the duplicate handling extension, defining rules, scope, matching flow, timestamp, and actions.
+Rules:
+Criteria for detecting duplicates, based on:
+Field: Extracted field values (e.g., document_id).
+Filename: The filename of the document.
+Relation: File hash.
+Each rule has an id and an attribute specifying the type of detection.
+Matching Flow:
+Defines how rules are combined using logical operations.
+Example: ["1and2", "3"] combines rule 1 and 2 with an "and" operation, and rule 3 separately with an "or" operation.
+Scope:
+Determines where to look for duplicates: queue, workspace, or organization.
+Can specify IDs and statuses of annotations to consider.
+Timestamp:
+Sets a time range for duplicate detection, using action (e.g., arrived_at_after) and timespan in days.
+Actions:
+Operations executed when duplicates are detected:
+Fill Field: Populate a field with a specific value.
+Forward Annotation: Move the annotation to a different queue/status.
+Mark Duplicate: Flag the document as a duplicate.
+Show Message: Display a custom message on the document.
+Stop Automation: Halt further automated processing.
+Apply Label: Add a label to the document.
+This is the actual configuration:
+
+JSON:
+{attributes}
+
+Your task is to describe the configuration to a busy manager who needs only high level overview structured in the following way:
+Name of the extension (extension id) (h3 markdown)
+Summary: Executive a brief max 2 sentence description of the actual matching logic including fields which are used for the check
+Active Queues: Queues where the matching is active
+Logic: structured overview of the matching logic and resulting actions
+Related Extensions: hooks that are listed in ‘run_after’ attribute. Look at the IDs of the related extensions section to know which is which and list their name as well as ID.
+
+Related extensions:
+{run_after}

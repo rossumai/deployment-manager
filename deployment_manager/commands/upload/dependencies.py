@@ -1,5 +1,9 @@
 import os
 from rich.prompt import Confirm
+from deployment_manager.common.determine_path import (
+    determine_object_type_from_path,
+    determine_object_type_from_url,
+)
 from rossum_api import ElisAPIClient
 from deployment_manager.common.read_write import (
     create_custom_hook_code_path,
@@ -7,8 +11,8 @@ from deployment_manager.common.read_write import (
     create_formula_file,
     find_formula_fields_in_schema,
     read_formula_file,
-    read_json,
-    write_json,
+    read_object_from_json,
+    write_object_to_json,
     write_str,
 )
 from deployment_manager.common.schema import find_schema_id
@@ -22,7 +26,7 @@ from deployment_manager.utils.consts import (
 
 from anyio import Path
 
-from rossum_api.api_client import APIClientError
+from rossum_api.api_client import APIClientError, Resource
 
 
 def is_change_existing(change, changes):
@@ -55,11 +59,11 @@ async def merge_formula_changes(changes: list[tuple[str, Path]]):
             if not await schema_path.exists():
                 continue
 
-            schema = await read_json(schema_path)
+            schema = await read_object_from_json(schema_path)
             schema_id = find_schema_id(schema["content"], formula_name)
             schema_id["formula"] = formula_code
 
-            await write_json(schema_path, schema)
+            await write_object_to_json(schema_path, schema)
             new_change = (GIT_CHARACTERS.UPDATED, schema_path)
             if not is_change_existing(new_change, merged_changes):
                 merged_changes.append(new_change)
@@ -79,7 +83,7 @@ async def merge_formula_changes(changes: list[tuple[str, Path]]):
             ]
             and "schema.json" in path.name
         ):
-            schema = await read_json(path)
+            schema = await read_object_from_json(path)
 
             formula_fields = find_formula_fields_in_schema(schema["content"])
             if formula_fields:
@@ -113,9 +117,9 @@ async def merge_hook_changes(changes: list[tuple[str, Path]], org_path: Path):
                 object_path = org_path / (
                     Path(str(path).removesuffix(".py").removesuffix(".js") + ".json")
                 )
-                hook = await read_json(object_path)
+                hook = await read_object_from_json(object_path)
                 hook["config"]["code"] = code_str
-                await write_json(object_path, hook)
+                await write_object_to_json(object_path, hook)
                 new_change = (GIT_CHARACTERS.UPDATED, object_path)
                 exists = is_change_existing(new_change, merged_changes)
                 if not exists:
@@ -136,7 +140,7 @@ async def merge_hook_changes(changes: list[tuple[str, Path]], org_path: Path):
             ]
             and path.parent.name == "hooks"
         ) and path.suffix == ".json":
-            hook = await read_json(path)
+            hook = await read_object_from_json(path)
 
             code_path = create_custom_hook_code_path(Path(path), hook)
             if not code_path:
@@ -159,36 +163,23 @@ async def mark_unstaged_objects_as_updated(changes, org_path, client: ElisAPICli
             op == GIT_CHARACTERS.CREATED or op == GIT_CHARACTERS.CREATED_STAGED
         ) and path.suffix == ".json":
             object_path = org_path / path
-            object = await read_json(object_path)
+            object = await read_object_from_json(object_path)
 
-            id = object.get("id", None)
-            if not id:
+            id, url = object.get("id", None), object.get("url", None)
+            if not id or not url:
                 display_warning(
-                    f"Skipping uncommitted object without ID: ({object_path})"
+                    f"Skipping uncommitted object without ID or URL: ({object_path})"
                 )
                 continue
 
             obj = None
             is_non_creatable_object = False
-            object_type = ""
-
-            if str(path).endswith("workspace.json"):
-                object_type = "workspaces"
-            elif str(path).endswith("queue.json"):
-                object_type = "queues"
-            elif str(path.parent).endswith("hooks"):
-                object_type = "hooks"
-            elif str(path).endswith("schema.json"):
-                object_type = "schemas"
-            elif str(path).endswith("inbox.json"):
-                object_type = "inboxes"
-                is_non_creatable_object = True
-            elif str(path).endswith("organization.json"):
-                object_type = "organizations"
+            object_type = determine_object_type_from_url(url)
+            if object_type in [Resource.Organization, Resource.Inbox]:
                 is_non_creatable_object = True
 
             try:
-                obj = await client.request_json(method="GET", url=f"{object_type}/{id}")
+                obj = await client._http_client.request_json(method="GET", url=url)
             # 404 may happen when looking for the object
             except APIClientError as e:
                 if e.status_code != 404:

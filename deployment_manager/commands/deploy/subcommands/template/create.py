@@ -1,3 +1,4 @@
+import hashlib
 import questionary
 from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
 from deployment_manager.commands.deploy.common.helpers import (
@@ -16,9 +17,13 @@ from deployment_manager.commands.deploy.subcommands.template.helpers import (
     get_dir_and_subdir_from_user,
     get_secrets_from_user,
     get_workspaces_from_user,
+    get_rule_templates_from_user,
 )
 from deployment_manager.common.mapping import read_mapping
-from deployment_manager.common.read_write import read_json, write_json
+from deployment_manager.common.read_write import (
+    read_object_from_json,
+    write_object_to_json,
+)
 from deployment_manager.utils.consts import display_error, display_info, settings
 
 from rich import print as pprint
@@ -135,6 +140,17 @@ async def create_deploy_template(
     deploy_file_object[settings.DEPLOY_KEY_HOOKS] = selected_hooks
     deploy_file_object[settings.DEPLOY_KEY_UNSELECTED_HOOK_IDS] = unselected_hooks
 
+    # Rule templates
+    rule_templates = deploy_file_object.get(settings.DEPLOY_KEY_RULE_TEMPLATES, [])
+    selected_rule_templates, unselected_rule_templates = (
+        await get_rule_templates_from_user(
+            previous_deploy_file_rule_templates=rule_templates,
+            source_path=source_path,
+            interactive=interactive,
+        )
+    )
+    deploy_file_object[settings.DEPLOY_KEY_RULE_TEMPLATES] = selected_rule_templates
+
     # Multi-target specification
     if interactive:
         await get_multi_targets_from_user(deploy_file_object)
@@ -170,12 +186,12 @@ async def create_deploy_template(
         deploy_filepath = input_file_path
 
     # Deploy secrets
-    secrets_file_path = deploy_file_object.get(settings.DEPLOY_KEY_SECRETS_PATH, None)
+    secrets_file_path = deploy_file_object.get(settings.DEPLOY_KEY_SECRETS_PATH, "")
     if (
         secrets_file_path
         and await (secrets_file_path := Path(secrets_file_path)).exists()
     ):
-        previous_secrets_file = await read_json(secrets_file_path)
+        previous_secrets_file = await read_object_from_json(secrets_file_path)
     else:
         secrets_file_path = None
         previous_secrets_file = {}
@@ -198,10 +214,26 @@ async def create_deploy_template(
                     + f"{deploy_filepath.stem}_secrets.json"
                 ),
             )
-
-        await write_json(secrets_file_path, secrets)
+        await write_object_to_json(secrets_file_path, secrets)
 
     deploy_file_object[settings.DEPLOY_KEY_SECRETS_PATH] = str(secrets_file_path)
+
+    # Deploy state
+    state_file_path = deploy_file_object.get(settings.DEPLOY_KEY_STATE_PATH, "")
+
+    if not state_file_path:
+        hash_suffix = hashlib.sha1(
+            f"{source_dir_and_subdir}_{target_dir_and_subdir}_{source_url}_{target_url}".encode(
+                "utf-8"
+            )
+        ).hexdigest()[:6]
+        state_file_path = (
+            settings.DEFAULT_DEPLOY_STATE_PARENT
+            + "/"
+            + f"{deploy_filepath.stem}_{hash_suffix}.json"
+        )
+
+    deploy_file_object[settings.DEPLOY_KEY_STATE_PATH] = state_file_path
 
     await yaml.save_to_file(deploy_filepath)
 

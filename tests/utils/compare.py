@@ -9,7 +9,7 @@ from deployment_manager.common.mapping import (
     extract_sources_targets,
     read_mapping,
 )
-from deployment_manager.common.read_write import read_json
+from deployment_manager.common.read_write import read_object_from_json
 from deployment_manager.utils.functions import (
     detemplatize_name_id,
     extract_id_from_url,
@@ -101,7 +101,7 @@ async def ensure_downloaded_object(
 ):
     """Checks that the project files include the specified object"""
     assert await expected_path.exists()
-    saved_json_object = await read_json(expected_path)
+    saved_json_object = await read_object_from_json(expected_path)
     if reference:
         object_id = reference.id
     else:
@@ -142,7 +142,7 @@ async def ensure_hooks_have_same_dependency_graph(mapping: dict, tmp_path: Path)
     ).iterdir():
         if source_hook_path.suffix != ".json":
             continue
-        source_hook = await read_json(source_hook_path)
+        source_hook = await read_object_from_json(source_hook_path)
 
         target_hook_ids = source_target_pairs["hooks"][source_hook["id"]]
         target_hook_path = (
@@ -151,7 +151,7 @@ async def ensure_hooks_have_same_dependency_graph(mapping: dict, tmp_path: Path)
             / "hooks"
             / f'{templatize_name_id(source_hook["name"], target_hook_ids[0])}.json'
         )
-        target_hook = await read_json(target_hook_path)
+        target_hook = await read_object_from_json(target_hook_path)
 
         remapped_source_hook_ids = []
         for hook_url in source_hook["run_after"]:

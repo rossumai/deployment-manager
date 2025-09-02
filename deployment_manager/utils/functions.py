@@ -53,7 +53,6 @@ def extract_id_from_url(url: str) -> int:
         return None
     return int(url.split("/")[-1])
 
-
 async def make_request_with_progress(coro, progress, task):
     result = await coro
     progress.update(task, advance=1)

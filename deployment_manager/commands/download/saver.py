@@ -9,7 +9,7 @@ from deployment_manager.common.read_write import (
     create_formula_directory_path,
     create_formula_file,
     find_formula_fields_in_schema,
-    write_json,
+    write_object_to_json,
     write_str,
 )
 from deployment_manager.utils.consts import (
@@ -43,7 +43,7 @@ class WorkspaceSaver(ObjectSaver):
         if self.download_all or await should_write_object(
             object_path, workspace, self.changed_files, self.parent_dir_reference
         ):
-            await write_json(
+            await write_object_to_json(
                 object_path,
                 workspace,
                 self.type,
@@ -95,7 +95,7 @@ class QueueSaver(ObjectSaver):
         if self.download_all or await should_write_object(
             object_path, queue, self.changed_files, self.parent_dir_reference
         ):
-            await write_json(
+            await write_object_to_json(
                 object_path,
                 queue,
                 self.type,
@@ -148,6 +148,17 @@ class EmailTemplateSaver(QueueSaver):
         )
         return object_path
 
+    def _get_message_for_subdir_selection(self, object):
+        message = super()._get_message_for_subdir_selection(object)
+
+        queue = self.find_queue(object)
+        if queue:
+            return (
+                message
+                + f", for [yellow]queue[/yellow]: {self.display_label(queue['name'], queue['id'])}"
+            )
+        return message
+
     async def save_downloaded_object(self, email_template: dict, subdir: Subdirectory):
         if not email_template.get("queue", None):
             return
@@ -160,7 +171,7 @@ class EmailTemplateSaver(QueueSaver):
         if self.download_all or await should_write_object(
             object_path, email_template, self.changed_files, self.parent_dir_reference
         ):
-            await write_json(
+            await write_object_to_json(
                 object_path,
                 email_template,
                 self.type,
@@ -213,7 +224,7 @@ class InboxSaver(QueueSaver):
         if self.download_all or await should_write_object(
             object_path, inbox, self.changed_files, self.parent_dir_reference
         ):
-            await write_json(
+            await write_object_to_json(
                 object_path,
                 inbox,
                 self.type,
@@ -289,7 +300,7 @@ class SchemaSaver(QueueSaver):
         if self.download_all or await should_write_object(
             object_path, schema, self.changed_files, self.parent_dir_reference
         ):
-            await write_json(
+            await write_object_to_json(
                 object_path,
                 schema,
                 self.type,
@@ -390,9 +401,36 @@ class RuleSaver(SchemaSaver):
         if self.download_all or await should_write_object(
             object_path, rule, self.changed_files, self.parent_dir_reference
         ):
-            await write_json(
+            await write_object_to_json(
                 object_path,
                 rule,
+                self.type,
+                log_message=f"Pulled {self.display_type} {object_path}",
+            )
+
+
+class RuleTemplateSaver(ObjectSaver):
+    type: Resource = CustomResource.RuleTemplate
+
+    def construct_object_path(self, subdir: Subdirectory, rule_template: dict) -> Path:
+        object_path = (
+            self.base_path
+            / subdir.name
+            / "rule_templates"
+            / f'{templatize_name_id(rule_template["name"], rule_template["id"])}.json'
+        )
+        return object_path
+
+    async def save_downloaded_object(self, rule_template: dict, subdir: Subdirectory):
+        object_path = self.construct_object_path(subdir=subdir, rule_template=rule_template)
+        if not object_path:
+            return
+        if self.download_all or await should_write_object(
+            object_path, rule_template, self.changed_files, self.parent_dir_reference
+        ):
+            await write_object_to_json(
+                object_path,
+                rule_template,
                 self.type,
                 log_message=f"Pulled {self.display_type} {object_path}",
             )
@@ -417,7 +455,7 @@ class HookSaver(ObjectSaver):
         if self.download_all or await should_write_object(
             object_path, hook, self.changed_files, self.parent_dir_reference
         ):
-            await write_json(
+            await write_object_to_json(
                 object_path,
                 hook,
                 self.type,
@@ -429,3 +467,93 @@ class HookSaver(ObjectSaver):
                 await write_str(
                     custom_hook_code_path, hook.get("config", {}).get("code", None)
                 )
+
+
+class WorkflowSaver(ObjectSaver):
+    type: Resource = CustomResource.Workflow
+
+    def construct_object_path(self, subdir: Subdirectory, object: dict) -> Path:
+        object_path = (
+            self.base_path
+            / subdir.name
+            / "workflows"
+            / templatize_name_id(object["name"], object["id"])
+            / "workflow.json"
+        )
+        return object_path
+
+    async def save_downloaded_object(self, workflow: dict, subdir: Subdirectory):
+        object_path = self.construct_object_path(subdir=subdir, object=workflow)
+        if self.download_all or await should_write_object(
+            object_path, workflow, self.changed_files, self.parent_dir_reference
+        ):
+            await write_object_to_json(
+                object_path,
+                workflow,
+                self.type,
+                log_message=f"Pulled {self.display_type} {object_path}",
+            )
+
+
+class WorkflowStepSaver(ObjectSaver):
+    type: Resource = CustomResource.WorkflowStep
+    workflows: list[dict]
+
+    def find_subdir_of_object(self, object: dict):
+        parent = self.find_parent_object(object)
+        if parent:
+            # If you know the parent's subdir, you can use its subdir
+            subdir = self.subdirs_by_object_id.get(parent["id"])
+            return subdir if subdir else super().find_subdir_of_object(parent)
+
+        subdir = super().find_subdir_of_object(object)
+        if subdir:
+            return subdir
+
+        return None
+
+    def find_parent_object(self, child):
+        return self.find_workflow_for_workflow_step(child)
+
+    def construct_object_path(self, subdir: Subdirectory, workflow_step: dict) -> Path:
+        workflow_for_workflow_step = self.find_workflow_for_workflow_step(workflow_step)
+        if not workflow_for_workflow_step:
+
+            return
+
+        object_path = (
+            self.base_path
+            / subdir.name
+            / "workflows"
+            / templatize_name_id(
+                workflow_for_workflow_step["name"], workflow_for_workflow_step["id"]
+            )
+            / "workflow_steps"
+            / f'{templatize_name_id(workflow_step["name"], workflow_step["id"])}.json'
+        )
+        return object_path
+
+    async def save_downloaded_object(self, workflow_step: dict, subdir: Subdirectory):
+        object_path = self.construct_object_path(
+            subdir=subdir, workflow_step=workflow_step
+        )
+        if not object_path:
+            return
+        if self.download_all or await should_write_object(
+            object_path, workflow_step, self.changed_files, self.parent_dir_reference
+        ):
+            await write_object_to_json(
+                object_path,
+                workflow_step,
+                self.type,
+                log_message=f"Pulled {self.display_type} {object_path}",
+            )
+
+    def find_workflow_for_workflow_step(self, workflow_step: dict):
+        for ws in self.workflows:
+            if ws["url"] == workflow_step.get("workflow", None):
+                return ws
+        # display_error(
+        #     f"Could not find workflow for {self.display_type} {self.display_label(queue.get('name', "no-name"), queue.get('id', 'no-id'))}. Skipping."
+        # )
+        return None
