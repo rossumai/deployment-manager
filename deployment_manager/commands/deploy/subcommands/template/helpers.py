@@ -117,7 +117,7 @@ async def get_dir_from_user(
 
 
 async def get_dir_and_subdir_from_user(
-    project_path: Path, type: str, default: str = None
+    project_path: Path, type: str, default: str = ""
 ):
     config = await read_prd_project_config(project_path)
 
