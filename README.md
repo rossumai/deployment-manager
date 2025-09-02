@@ -309,7 +309,7 @@ Some commands (e.g., `purge`) ask you for credentials every time because they ca
 
 ## Full(er) Command Reference
 
-### Pull
+### pull
 
 When saving remote objects locally, `pull` tries to guess into what org-level dir and subdir to place the object . The org-level dir is clear based on the provided credentials. The subdir is evaluated/guessed in the following order:
 1. If there is a single subdir configured in the org-level dir, use that one.
@@ -326,13 +326,13 @@ The following object attributes are ignored - that means they are neither pulled
 The following attributes are *non-versioned* - they are pulled locally, but they are put into a separate JSON file. These attributes are "meta-fields", so their change does not mean the object really changed:
 - `modified_at`
 
-### Push
+### push
 
 If you have many local changes and want to push only some of them to remote, you can run `git add <selected_paths>` and then use `push` with `-io` or `--indexed-only` parameter which will only register changes added to GIT index.
 
 `-c` or `-cm` parameter can be added to automatically commit all changes with default or custom (`-m` parameter) commit message.
 
-### Purge
+### purge
 
 This command allows you to remove objects from a specific organization. You always specify types of objects to delete (e.g., hooks, all, etc.).
 
@@ -347,7 +347,7 @@ You can delete only schemas unassigned to any queues that can accumulate in an o
 prd2 purge unused_schemas
 ```
 
-### Deploy
+### deploy
 
 #### Ignoring some attributes
 
@@ -452,9 +452,7 @@ workspaces:
 
 #### Pull from production into dev
 
-In cases where the user has a configuration in Rossum production and wants to replicate it for development purposes and then deploy changes back into production, the user can use `reverse_mapping_after_deploy: true` in the deploy file.
-
-This flag will replicate `source_org` into `target_org` and then reverse the left and right hand sides for each object. The resulting deploy file thus has `source_org` and `target_org` reversed and is ready for a dev->prod release.
+In cases where the user has a configuration in Rossum production and wants to replicate it for development purposes and then deploy changes back into production, the user can use `prd2 deploy revert <deploy_file>`. This will create a new deploy file that flips source and target and can be run just like any other deploy file.
 
 #### Working with secrets
 
@@ -472,7 +470,7 @@ This diff feature is mostly there for you to see if your explicit `attribute_ove
 
 PRD expects each to find a schema next to each queue that you want to release. In cases where a schema is assigned to multiple queues, the release will not work. If you need to distribute schema changes, you can create a release from a source queue to all queues which currently share the same schema.
 
-### Hook
+### hook
 
 #### Creating a hook payload
 
@@ -494,6 +492,40 @@ Given a loal hook path, this command runs the hook and displays logs and the ret
 
 Optionally, you can provide an already created payload, otherwise a new one is created on the fly. You can combine an already created payload with a different annotation URL than the one provided when creating the payload.
 
+### docommando
+
+> ℹ️ Note: This command requires access to an LLM running in Rossum's AWS account - it is therefore only available for internal users.
+
+```
+prd2 docommando
+```
+
+Use this to command to generate documentation by an LLM. The command asks you for dir and subdir and then documents every queue, hook, and schema in that dir/subdir.
+
+The documentation then gets combined into one long writeup for each queue. A short general "use case" description is also created.
+
+The command saves intermediate documentation files; repeated invocations use these files as a form of caching. If you want to regenerate the documentation (e.g., some object substantially changed), you can use the `-i` flag to ignore the cached files.
+
+This command has an extra cost because of the LLM usage. You will the estimated costs at the end of the command. Even for large projects, the costs usually do not exceed a few USD.
+
+### llm-chat
+
+> ℹ️ Note: This command requires access to an LLM running in Rossum's AWS account - it is therefore only available for internal users.
+
+```
+prd2 llm-chat <DIR-NAME>/<SUBDIR-NAME>
+```
+
+Use this command to enter into a CLI chat window with an LLM (currently set to Claude 4 Sonnet). You can ask the LLM to answer questions or solve problems related to the configuration. The LLM has access to:
+- Rossum API calls, including access to specific objects, annotations, etc.
+- Knowledge base (vector DB of Rossum University + Elis API dumps)
+- Data Storage API calls
+- Extension logs from the API
+- Local JSONs
+- Local documentation files (if they exist)
+
+This command has an extra cost because of the LLM usage. You will the estimated costs at the end of the command. Even for long conversations, the costs usually do not exceed a few USD.
+
 ---
 
 ## Deploy File Reference
@@ -502,7 +534,7 @@ You can leave comments in the deploy file and they will be preserved (in almost 
 
 > ℹ️ Note: Unlike in PRD v1, there is no `ignore` option for objects. If you do not want to deploy something, just remove it from the deploy file. However, this does not work for objects like schemas since a queue always needs one.
 
-For queues, there are optional flags:
+For some objects, there are optional flags:
 
 #### `queue.keep_hook_dependencies_without_equivalent`
 
@@ -511,6 +543,14 @@ By default, any hooks that did not have have a target equivalent found (the hook
 #### `queue.ignore_deploy_warnings`
 
 If `true`, `deploy` does not display the warning that the queue has a workflow or dedicated engine defined. Note that this warning is shown only for cros-org releases.
+
+#### `queue.overwrite_ignored_fields`
+
+If `true`, `deploy` will overwrite target fields like `settings.columns` or `default_threshold`.
+
+#### `schema.overwrite_ignored_fields`
+
+If `true`, `deploy` will overwrite `score_threshold` fields.
 
 - Difference between:
 
