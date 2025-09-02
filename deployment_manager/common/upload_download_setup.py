@@ -42,13 +42,13 @@ def expand_destinations(
             dir_config = configured_directories.get(destination.name, {})
             expanded_destinations.extend(
                 [
-                    str(project_path / destination / subdir)
+                    project_path / destination / subdir
                     for subdir in dir_config.subdirectories.keys()
                 ]
             )
 
         else:
-            expanded_destinations.append(str(destination))
+            expanded_destinations.append(destination)
 
     return expanded_destinations
 
@@ -59,5 +59,9 @@ def mark_subdirectories_to_include(
 ):
     for dir_name, dir_config in configured_directories.items():
         for subdir_name, subdir_config in dir_config.subdirectories.items():
-            if f"{dir_name}/{subdir_name}" in expanded_destinations:
+            if Path(f"{dir_name}/{subdir_name}") in expanded_destinations:
                 subdir_config.include = True
+            else:
+                display_warning(
+                    f"DEBUG: Subdir {Path(f"{dir_name}/{subdir_name}")} not included because it wasn't matched with objects in {expanded_destinations}.\nIgnore this warning if it's expected behavior."
+                )
