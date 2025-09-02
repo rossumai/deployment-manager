@@ -275,6 +275,7 @@ class Settings:
         Resource.Queue: ["workflows", *QUEUE_ENGINE_ATTRIBUTES]
     }
 
+    # List attributes that should be sorted before diff so not get false positive diffs (e.g., hook.queues)
     DEPLOY_SORT_LIST_KEYS: dict = {
         Resource.Hook: ["queues", "run_after"],
         Resource.Queue: [

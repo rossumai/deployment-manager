@@ -90,8 +90,6 @@ class DeployObject(BaseModel):
     targets: list[TargetWithDefault] = []
 
     ignored_attributes: list[str] = []
-
-    # List attributes that should be sorted before diff (e.g., hook.queues)
     sort_list_attributes: list[str] = []
 
     overrider: AttributeOverrider = None

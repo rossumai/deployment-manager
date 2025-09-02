@@ -264,6 +264,4 @@ async def deploy_release_file(
 
 # TODO: more granular error handling for hook dep graph and implicit attribute override
 
-# TODO: diff could show ID and (name)
-
 # TODO: log all messages to stdout and into a separate file as well
