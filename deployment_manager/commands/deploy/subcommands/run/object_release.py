@@ -266,11 +266,14 @@ class ObjectRelease(BaseModel):
                         self.last_deploy_timestamp, target.id
                     )
                 ):
-                    if await questionary.confirm(
-                        "Overwrite the remote target?", default=True
-                    ).ask_async():
+                    user_answer = await questionary.text(
+                        message="Overwrite the remote target?",
+                        instruction="(y/n/yy)",
+                    ).ask_async()
+                    # Disable warnings for all other queues
+                    if user_answer.casefold() == "yy":
                         self.ignore_timestamp_mismatch = True
-                    else:
+                    elif user_answer.casefold() == "n":
                         raise TimestampMismatchException(
                             "Unexpected timestamp mismatch"
                         )
