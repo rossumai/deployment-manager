@@ -4,18 +4,27 @@ from typing import Any
 from deployment_manager.commands.deploy.subcommands.run.attribute_override import (
     create_regex_override_syntax,
 )
-from deployment_manager.common.read_write import read_object_from_json, read_prd_project_config
+from deployment_manager.common.read_write import (
+    read_object_from_json,
+    read_prd_project_config,
+)
 from pydantic import BaseModel
 import questionary
 from anyio import Path
 
-from deployment_manager.utils.consts import display_error, display_warning, settings
+from deployment_manager.utils.consts import (
+    CustomResource,
+    display_error,
+    display_warning,
+    settings,
+)
 from deployment_manager.utils.functions import (
     extract_id_from_url,
     find_all_hook_paths_in_destination,
     find_object_by_id,
     templatize_name_id,
 )
+from rossum_api.api_client import Resource
 
 
 def create_deploy_file_template():
@@ -115,8 +124,10 @@ async def get_dir_and_subdir_from_user(
     if not config:
         return ""
 
+    source_dir = default.split('/')[0]
+
     selected_dir = await get_dir_from_user(
-        project_path=project_path, type=type, default=default, config=config
+        project_path=project_path, type=type, default=source_dir, config=config
     )
     if not selected_dir:
         return ""
@@ -150,7 +161,8 @@ async def get_dir_and_subdir_from_user(
 async def find_hooks_for_queues(source_path: Path, queues: list[dict]):
     hook_paths = await find_all_hook_paths_in_destination(source_path)
     all_hooks = [
-        {**await read_object_from_json(hook_path), "path": hook_path} for hook_path in hook_paths
+        {**await read_object_from_json(hook_path), "path": hook_path}
+        for hook_path in hook_paths
     ]
     found_hook_ids = set()
     found_hooks = []
@@ -188,7 +200,7 @@ async def find_queue_paths_for_workspaces(ws_paths: list[Path]):
 async def find_ws_paths_for_dir(base_dir: Path):
     return [
         workspace_path
-        async for workspace_path in (base_dir / "workspaces").iterdir()
+        async for workspace_path in (base_dir / Resource.Workspace.value).iterdir()
         if await workspace_path.is_dir()
     ]
 
@@ -197,12 +209,21 @@ async def find_rule_paths_for_dir(base_dir: Path):
     return [rule_path async for rule_path in (base_dir).iterdir()]
 
 
+async def find_rule_template_paths_for_dir(base_dir: Path):
+    return [
+        rule_path
+        async for rule_path in (base_dir / CustomResource.RuleTemplate.value).iterdir()
+        if await rule_path.is_file()
+    ]
+
+
 DEFAULT_TARGETS = [{"id": None}]
 
 
 def prepare_deploy_file_objects(
     objects: list[dict],
     include_path: bool = False,
+    extra_attributes: dict = {},
     objects_in_previous_file: list[dict] = [],
 ):
     previous_objects_by_id = {
@@ -211,10 +232,15 @@ def prepare_deploy_file_objects(
 
     deploy_objects = []
     for object in objects:
+        previous_object = previous_objects_by_id.get(object["id"], {})
         deploy_representation = {
-            **previous_objects_by_id.get(object["id"], {}),
+            **previous_object,
             "id": object["id"],
             "name": object["name"],
+            **{
+                key: previous_object.get(key, value)
+                for key, value in extra_attributes.items()
+            },
             settings.DEPLOY_KEY_BASE_PATH: str(object["path"].parent.parent.parent),
             settings.DEPLOY_KEY_TARGETS: previous_objects_by_id.get(
                 object["id"], {}
@@ -232,6 +258,7 @@ def prepare_subqueue_deploy_file_object(
     include_name: bool = False,
 ):
     deploy_representation = {
+        **previous_object,
         "id": object["id"],
         settings.DEPLOY_KEY_TARGETS: previous_object.get(
             settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)
@@ -308,6 +335,7 @@ async def get_queues_from_user(
     deploy_file_queues = prepare_deploy_file_objects(
         deploy_file_queues,
         include_path=True,
+        extra_attributes={settings.DEPLOY_KEY_IGNORE_DEPLOY_WARNINGS: False},
         objects_in_previous_file=previous_deploy_file_queues,
     )
 
@@ -369,8 +397,10 @@ async def get_rules_for_schema(queue: dict, schema: dict, previous_queues_by_id:
     if not (await rules_path.exists()):
         return
 
-    previous_rules = previous_queues_by_id.get(queue["id"], {}).get(
-        settings.DEPLOY_KEY_RULES, []
+    previous_rules = (
+        previous_queues_by_id.get(queue["id"], {})
+        .get(settings.DEPLOY_KEY_SCHEMA, {})
+        .get(settings.DEPLOY_KEY_RULES, [])
     )
     deploy_rule_objects = []
     for rule_path in await find_rule_paths_for_dir(rules_path):
@@ -588,6 +618,10 @@ async def get_secrets_from_user(deploy_file_object: dict, previous_secrets_file:
         )
         for hook in hooks
     ]
+
+    if not object_choices:
+        return {}
+
     selected_hooks = await questionary.checkbox(
         "Select hooks for secrets:", choices=object_choices
     ).ask_async()
@@ -727,3 +761,36 @@ def find_rule(rules, rule_id):
         if rule["id"] == rule_id:
             return rule
     return {}
+
+
+async def get_rule_templates_from_user(
+    source_path: Path,
+    interactive: bool,
+    previous_deploy_file_rule_templates: list[dict] = None,
+):
+    if not previous_deploy_file_rule_templates:
+        previous_deploy_file_rule_templates = []
+    selected_rule_template_ids = [
+        template["id"] for template in previous_deploy_file_rule_templates
+    ]
+    rule_template_paths = await find_rule_template_paths_for_dir(source_path)
+    if not rule_template_paths:
+        return []
+
+    rule_template_choices = await prepare_choices(
+        paths=rule_template_paths,
+        preselected_ids=selected_rule_template_ids,
+    )
+    deploy_file_rule_templates = [
+        template.value for template in rule_template_choices if template.checked
+    ]
+    if interactive or not selected_rule_template_ids:
+        deploy_file_rule_templates = await questionary.checkbox(
+            f"Select {CustomResource.RuleTemplate.value}:",
+            choices=rule_template_choices,
+        ).ask_async()
+
+    return prepare_deploy_file_objects(
+        objects=deploy_file_rule_templates,
+        objects_in_previous_file=previous_deploy_file_rule_templates,
+    ), [template["path"] for template in deploy_file_rule_templates]

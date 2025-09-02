@@ -2,11 +2,10 @@ from copy import deepcopy
 from anyio import Path
 from pydantic import ValidationError
 import questionary
+from deployment_manager.commands.deploy.subcommands.run.models import DeployException
 from rossum_api import ElisAPIClient
 
-from deployment_manager.commands.deploy.subcommands.run.object_release import (
-    DeployException,
-)
+
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
     check_required_keys,

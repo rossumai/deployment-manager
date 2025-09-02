@@ -35,7 +35,7 @@ nano ~/.zshrc
 # Add this to the end of the file
 export PATH="$PATH:$HOME/.deployment-manager-venv/bin"
 # After saving, restart via the following command:
-source ~/.zshrc  
+source ~/.zshrc
 ```
 
 ### Windows
@@ -55,14 +55,18 @@ If you encounter errors during the second step, please make sure you have Python
 
 **Make sure to restart the terminal before using the command.**
 
-You can install a specific version by changing the URL, for instance, to install v2.0.1:
+You can install a specific version by changing the URL, for instance, to install v2.7.0a (replace all the places where the version tag is referenced - but without letters in the .whl filename):
 ```
-pip install https://github.com/rossumai/deployment-manager/releases/v2.0.1/download/deployment_manager-latest-py3-none-any.whl
+pip install https://github.com/rossumai/deployment-manager/releases/download/v2.7.0a/deployment_manager-2.7.0-py3-none-any.whl
 ```
+
 
 ### Updating to a new version
 You can use the same command as for installing the tool the first time. `pip` will recognize that you are installing a newer version and uninstall the previous one automatically.
 
+You can also run `prd2 update` to install the latest version on GitHub in the `main` branch.
+
+You can use the same command to also update to a specific version: `prd2 update <version_tag>`.
 
 ### Migration from v1
 
@@ -137,10 +141,10 @@ Before uploading the changes, This command will check if the object `last_modifi
 ### 4. Copy (deploy) configuration elsewhere
 If you want to create a copy of your configuration (typically move a test setup into production), you first need to create a deploy file specifying what should be copied (deployed):
 ```
-prd2 deploy template
+prd2 deploy template create
 ```
 
-This command allows you to specify attribute override for all objects of a certain type. This is particularly useful for changing suffixes (e.g., `DEV` -> `PROD`).
+This command allows you to specify attribute override for all objects of a certain type. This is particularly useful for changing suffixes (e.g., `DEV` -> `PROD`). There are also other options related to moving objects between two configuration (see the reference below).
 
 Once you go through the CLI guide, you can also make other changes manually in the deploy file (e.g., attribute_override of specific objects). Any object specified in the deploy file with an empty `targets` will have a new copy created. If there is an ID specified, this command will instead update the object with that ID.
 
@@ -150,13 +154,17 @@ prd2 deploy run <DEPLOY-FILE-PATH>
 ```
 You will first see a plan of the deploy (what will be deployed, what are the changes) and then you are asked for confirmation that those changes should be applied.
 
+If the command detects a difference between a **local** source object and a **remote** target object, it will try to resolve the difference. You will be prompted to resolve them if it cannot do so automatically.
+
+> ℹ️ Note: If you are using deploy with an existing deploy file after updating PRD to v2.11+, include `--prefer=source` into your first deploy after the update. Otherwise, you will get source-target conflicts (there is no deploy state file yet to resolve them for you).
+
 If there is any error during the planning phase, you will see an error and the deploy will automatically abort. If there was an error during the execution phase, PRD will log the error and stop deploying. Any intermediate results (newly created targets) are stored in the deploy file.
 
 Once the `deploy` is finished, your deploy file will be updated with new information. If you created new objects, their IDs will be on the right hand side.
 
 You can **update a previously existing deploy file** via:
 ```
-prd2 deploy template -f <PATH> --interactive
+prd2 deploy template update <PATH> --interactive
 ```
 Without the `--interactive` flag, the update would fix names based on object IDs or add hooks assigned to the already specified queues, but it would not add/remove any of the specified objects in the deploy file.
 
@@ -312,8 +320,11 @@ When saving remote objects locally, `pull` tries to guess into what org-level di
 `-c` or `-cm` parameter can be added to automatically commit all changes with default or custom (`-m` parameter) commit message.
 
 The following object attributes are ignored - that means they are neither pulled nor pushed:
-  - Queue: ["counts", "users"]
-  - Hook: ["status"]
+  - Queue: [`counts`, `users`]
+  - Hook: [`status`]
+
+The following attributes are *non-versioned* - they are pulled locally, but they are put into a separate JSON file. These attributes are "meta-fields", so their change does not mean the object really changed:
+- `modified_at`
 
 ### Push
 
@@ -340,7 +351,25 @@ prd2 purge unused_schemas
 
 #### Ignoring some attributes
 
-**For cross-org deploys, some parts of the Rossum configuration are ignored because they are not writable via the API** (e.g., approval workflows, engines, etc.).
+**If an attribute is not deployed, it is not shown in the diff either, even though it may be different between source and target.**
+
+There are several attributes that PRD never deploys (even though they exist locally):
+- Inbox: [`email`]
+- Hook: [`guide`, `status`]
+- Organization: [`organization_group`, `users`, `creator`, `trial_expires_at`]
+
+There are also attributes that PRD does not deploy by default because they usually should not be overwritten:
+- Queue: [`automation_enabled`, `automation_level`, `default_score_threshold`, `settings.columns`, `settings.annotation_list_table`]
+- Schema: [`score_threshold` (on each schema_id)]
+
+> ℹ️ Note: You can make PRD deploy these attributes on specific objects by adding `overwrite_ignored_fields: true` into the respective YAML object.
+
+
+For cross-org deploys, some parts of the Rossum configuration are ignored because they are not writable via the API:
+- Workflow
+- Workflow Step
+- Queue: [`workflows`, `generic_engine`, `dedicated_engine`, `engine`]
+(For same-org deploys, these attributes are maintained as they are, they are still not replicated!)
 
 #### Automatic ID override
 
@@ -369,6 +398,30 @@ PRD handles the following edge cases:
 2. There might not be any known target ID to use, PRD will flag these for you as well.
 
 In both cases, **if the ID was found in a list (not a single value), the source ID will be removed from this list** (for instance, unknown queue_id in `hook.settings.queue_ids` gets removed since it is a source queue and this is a target object which should not have any connection to source).
+
+#### Source-target difference resolution
+
+PRD maintains a *deploy_state* file for each *deploy_file* and inside this file, it tracks the object at the time of the last deploy. Because references (IDs) need to be replaced before deploy, deploy state tracks the object BEFORE the IDs were replaced but AFTER user-defined attribute override happened (e.g., name was replaced to "... (PROD)").
+
+During deploys, PRD compares:
+- **Source (S)**: current local object
+- **Target (T)**: current remote object
+- **Last Applied (L)**: version at last deploy (after override, before ID remapping)
+
+This enables a **3-way merge** per field, with the following resolution logic:
+
+| Change Scenario                | Resolution        | Notes |
+|-------------------------------|-------------------|-------|
+| `S == T == L`                 | Take any          | No changes |
+| `S == T ≠ L`                 | Take S/T          | Both sides changed identically |
+| `S ≠ L == T`                 | Take S            | Local-only change |
+| `T ≠ L == S`                 | Flag rebase | Target-only change |
+| `S ≠ T ≠ L` and `S ≠ T`     | Conflict           | Needs user resolution unless `--prefer` set |
+| `path in ignored_fields`     | Take S            | Force source, skip diff logic |
+
+#### Special Cases:
+- **Rebase candidates**: Detected when only T changed (`S == L`). User is prompted if they want to rebase into source. **Rebase is local only, no `push` is done.**
+- **Conflicts**: If no `--prefer` flag is set, conflict is reported with both values.
 
 #### Multiple targets
 

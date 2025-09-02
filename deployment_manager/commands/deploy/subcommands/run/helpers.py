@@ -131,24 +131,21 @@ async def get_new_deploy_file_path(
     return after_deploy_file_path
 
 
-def update_ignore_flags_in_yaml(yaml_data: dict, ignore_warning_flags: dict):
-    for queue in yaml_data[settings.DEPLOY_KEY_QUEUES]:
-        if (queue_id := queue.get("id", None)) not in ignore_warning_flags:
-            continue
-        queue[settings.DEPLOY_KEY_IGNORE_DEPLOY_WARNINGS] = ignore_warning_flags.get(
-            queue_id, False
-        )
-
-
 def generate_deploy_timestamp():
     return (
         datetime.now(timezone.utc)
         .isoformat(timespec="microseconds")
-        .replace("+00:00", "") + "Z"
+        .replace("+00:00", "")
+        + "Z"
     )
 
 
 def remove_queue_attributes_for_cross_org(queue_copy: dict):
+    # These attributes cannot be created through the API and so if used cross-org, they can only be ignored
     queue_copy.pop("workflows", None)
     for attr in QUEUE_ENGINE_ATTRIBUTES:
         queue_copy.pop(attr, None)
+
+
+def create_object_label(name: str, id: str | int):
+    return f'"[green]{name}[/green] ([purple]{id}[/purple])"'
