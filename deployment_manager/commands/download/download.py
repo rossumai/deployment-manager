@@ -190,7 +190,7 @@ async def download_destinations(
                         display_info(f"Merged files pushed to {org_dir_config.org_path}. Now, you can commit them locally.")
                     else:
                         display_info(f"Important: Do not forget to run `prd2 push` after solving conflicts, before commiting the files locally.\n{'_'*80}"
-                                     f"Files with merged changes which need to be pushed before commiting:\n{'\n'.join(all_unmerged_files)}")
+                                     f"\nFiles with merged changes which need to be pushed before commiting:\n{'\n'.join(all_unmerged_files)}")
 
 
 
