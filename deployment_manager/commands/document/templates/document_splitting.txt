@@ -1,0 +1,62 @@
+Generate markdown documentation for this Rossum document splitting extension (hook).
+
+JSON:
+{attributes}
+
+
+Here is what you need to know (about Rossum configurations in general):
+- Rossum extension is a separate piece of functionality that runs on certain events.
+
+Background Information (for context):
+Rossum allows users to upload multi-page PDFs that may contain multiple business documents in a single file (e.g. a batch scan of 10 invoices or delivery notes). The Document Splitting extension is designed to automatically divide these into individual documents before data extraction takes place. Each resulting document is processed independently through Rossum’s pipeline.
+This extension is event-driven and is triggered after the document is uploaded, but before any data capture or annotation is performed.
+About the Configuration
+The configuration is a JSON object that defines how the splitting should work. It may include fields such as:
+split_type: Strategy used for splitting. Typical values include:
+
+
+"blank_page": Splits the document wherever a blank page is detected.
+
+
+"keyword": Splits when a specific word or phrase appears.
+
+
+"barcode": Splits based on detection of a barcode.
+
+
+"page_ranges": Splits based on explicitly defined page groups.
+
+
+keyword: The text that triggers a new document split (used only with split_type: "keyword").
+
+
+barcode_type: Optional filter for the type of barcode (e.g. QR, EAN).
+
+
+barcode_content: Defines the expected format or pattern of barcode content.
+
+
+min_pages: The minimum number of pages required to allow splitting.
+
+
+combine_single_page_documents: Boolean flag to merge consecutive single-page documents into one.
+
+
+confidence_threshold: OCR confidence threshold for text-based splitting logic.
+
+
+Additional optional fields may control fallback behavior, debugging output, or OCR settings.
+
+
+This configuration controls the logic used by the extension to detect document boundaries and how those boundaries are interpreted.
+
+Related extensions:
+{run_after}
+
+Create these sections in the output:
+Name of the extension (extension id) (h3 markdown)
+Summary: Executive a brief max 2 sentence description of the logic including fields which are used for the check
+Logic: structured overview of the matching logic and resulting actions
+Active Queues: Queues where the matching is active
+Events: list of events on which events is the hook triggered (bullet point)
+Related Extensions: hooks that are listed in ‘run_after’ attribute. Look at the IDs of the related extensions section to know which is which and list their name as well as ID.

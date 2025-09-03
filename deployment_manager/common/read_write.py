@@ -2,7 +2,7 @@ import asyncio
 import dataclasses
 import json
 from typing import Any
-
+import aiofiles
 from anyio import Path
 from rich import print
 from rossum_api.api_client import Resource
@@ -25,9 +25,9 @@ async def write_object_to_json(
     if path.parent:
         await path.parent.mkdir(parents=True, exist_ok=True)
     if type:
-        # IGNORED_KEYS are thrown away completely
-        if ignored_keys := settings.IGNORED_KEYS.get(type):
-            for key in ignored_keys:
+        # NON_PULLED keys are thrown away completely
+        if non_pulled_keys := settings.NON_PULLED_KEYS_PER_OBJECT.get(type):
+            for key in non_pulled_keys:
                 if key in object:
                     del object[key]
         # NON_VERSIONED_ATTRIBUTES are saved in separate file
@@ -166,9 +166,10 @@ async def create_formula_file(path: Path, code: str):
     await write_str(path, code)
 
 
-async def read_object_from_json(path: Path) -> dict:
+async def read_object_from_json(path: Path, include_non_version_attribtues=True) -> dict:
     object_ = json.loads(await path.read_text())
-    await read_non_versioned_attribute_data(path, object_)
+    if include_non_version_attribtues:
+        await read_non_versioned_attribute_data(path, object_)
     return object_
 
 
@@ -200,6 +201,16 @@ async def read_non_versioned_attribute_data(path, object_):
             # join non_versioned data into the object
             object_.update(non_versioned_data)
     return
+
+
+async def read_txt(path: Path) -> str:
+    return open(path, "r").read()
+
+
+async def write_txt(path: Path, text: str):
+    await path.parent.mkdir(parents=True, exist_ok=True)
+    async with aiofiles.open(path, "w", encoding="utf-8") as f:
+        await f.write(text)
 
 
 async def write_yaml(path: Path, object: dict):

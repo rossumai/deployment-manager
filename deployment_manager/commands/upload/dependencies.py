@@ -1,5 +1,9 @@
 import os
 from rich.prompt import Confirm
+from deployment_manager.common.determine_path import (
+    determine_object_type_from_path,
+    determine_object_type_from_url,
+)
 from rossum_api import ElisAPIClient
 from deployment_manager.common.read_write import (
     create_custom_hook_code_path,
@@ -22,7 +26,7 @@ from deployment_manager.utils.consts import (
 
 from anyio import Path
 
-from rossum_api.api_client import APIClientError
+from rossum_api.api_client import APIClientError, Resource
 
 
 def is_change_existing(change, changes):
@@ -161,34 +165,21 @@ async def mark_unstaged_objects_as_updated(changes, org_path, client: ElisAPICli
             object_path = org_path / path
             object = await read_object_from_json(object_path)
 
-            id = object.get("id", None)
-            if not id:
+            id, url = object.get("id", None), object.get("url", None)
+            if not id or not url:
                 display_warning(
-                    f"Skipping uncommitted object without ID: ({object_path})"
+                    f"Skipping uncommitted object without ID or URL: ({object_path})"
                 )
                 continue
 
             obj = None
             is_non_creatable_object = False
-            object_type = ""
-
-            if str(path).endswith("workspace.json"):
-                object_type = "workspaces"
-            elif str(path).endswith("queue.json"):
-                object_type = "queues"
-            elif str(path.parent).endswith("hooks"):
-                object_type = "hooks"
-            elif str(path).endswith("schema.json"):
-                object_type = "schemas"
-            elif str(path).endswith("inbox.json"):
-                object_type = "inboxes"
-                is_non_creatable_object = True
-            elif str(path).endswith("organization.json"):
-                object_type = "organizations"
+            object_type = determine_object_type_from_url(url)
+            if object_type in [Resource.Organization, Resource.Inbox]:
                 is_non_creatable_object = True
 
             try:
-                obj = await client.request_json(method="GET", url=f"{object_type}/{id}")
+                obj = await client._http_client.request_json(method="GET", url=url)
             # 404 may happen when looking for the object
             except APIClientError as e:
                 if e.status_code != 404:

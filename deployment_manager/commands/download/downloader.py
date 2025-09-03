@@ -22,7 +22,7 @@ class Downloader(BaseModel):
                     # First item is enough to check
                     break
             except APIClientError as e:
-                display_warning(f"Could not download {type.value}, skipping: {e}")
+                # display_warning(f"Could not download {type.value}, skipping: {e}")
                 return []
 
         paginated_object_ids = await self.download_remote_object_ids(type=type)
