@@ -142,12 +142,10 @@ async def create_deploy_template(
 
     # Rule templates
     rule_templates = deploy_file_object.get(settings.DEPLOY_KEY_RULE_TEMPLATES, [])
-    selected_rule_templates, unselected_rule_templates = (
-        await get_rule_templates_from_user(
-            previous_deploy_file_rule_templates=rule_templates,
-            source_path=source_path,
-            interactive=interactive,
-        )
+    selected_rule_templates = await get_rule_templates_from_user(
+        previous_deploy_file_rule_templates=rule_templates,
+        source_path=source_path,
+        interactive=interactive,
     )
     deploy_file_object[settings.DEPLOY_KEY_RULE_TEMPLATES] = selected_rule_templates
 

@@ -127,7 +127,7 @@ async def get_dir_and_subdir_from_user(
     if not default:
         default = ""
 
-    source_dir = default.split('/')[0]
+    source_dir = default.split("/")[0]
 
     selected_dir = await get_dir_from_user(
         project_path=project_path, type=type, default=source_dir, config=config
@@ -213,9 +213,12 @@ async def find_rule_paths_for_dir(base_dir: Path):
 
 
 async def find_rule_template_paths_for_dir(base_dir: Path):
+    rule_template_dir = base_dir / CustomResource.RuleTemplate.value
+    if not (await rule_template_dir.exists()):
+        return []
     return [
         rule_path
-        async for rule_path in (base_dir / CustomResource.RuleTemplate.value).iterdir()
+        async for rule_path in (rule_template_dir).iterdir()
         if await rule_path.is_file()
     ]
 
