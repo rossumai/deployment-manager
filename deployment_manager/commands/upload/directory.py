@@ -139,7 +139,9 @@ class UploadOrganizationDirectory(OrganizationDirectory):
                 continue
 
             data = await read_object_from_json(path)
-            object_type = determine_object_type_from_url(data.get('url', ""))
+            if not (object_url := data.get('url', "")):
+                continue
+            object_type = determine_object_type_from_url(object_url)
             subdir = self.find_subdir_of_object(data)
             if not subdir:
                 display_warning(f"No subdir found for path: {path}, skipping.")
