@@ -124,6 +124,9 @@ async def get_dir_and_subdir_from_user(
     if not config:
         return ""
 
+    if not default:
+        default = ""
+
     source_dir = default.split('/')[0]
 
     selected_dir = await get_dir_from_user(
