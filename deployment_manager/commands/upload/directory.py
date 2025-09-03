@@ -97,6 +97,7 @@ class UploadOrganizationDirectory(OrganizationDirectory):
     indexed_only: bool = False
     changed_objects: list[ChangedObject] = []
     request_errors: list[str] = []
+    include_only_files: list[Path] | None = None
 
     async def initialize(self):
         if not self.project_path:
@@ -116,6 +117,13 @@ class UploadOrganizationDirectory(OrganizationDirectory):
         changes = get_changed_file_paths(
             self.project_path / self.name, indexed_only=self.indexed_only
         )
+        if self.include_only_files:
+            filtered_changes = []
+            for change_type, change_filename in changes:
+                if change_filename in self.include_only_files:
+                    filtered_changes.append((change_type, change_filename))
+            changes = filtered_changes
+
         if not changes:
             display_warning(
                 f"No changes to {settings.UPLOAD_COMMAND_NAME} found in {self.org_path}."
