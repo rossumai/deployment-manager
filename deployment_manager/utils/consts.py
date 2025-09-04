@@ -201,6 +201,7 @@ class Settings:
     HOOK_TEST_COMMAND_NAME: str = "test"
     HOOK_SYNC_COMMAND_NAME: str = "sync"
     DEFAULT_HOOK_SYNC_PARENT = "hook_sync_configs"
+    HOOK_SYNC_ADD_TO_TEMPLATE_COMMAND_NAME: str = "add"
 
     CONFIG_KEY_API_BASE_URL = "api_base"
     CONFIG_KEY_TOKEN = "token"

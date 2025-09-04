@@ -2,7 +2,7 @@ import click
 from anyio import Path
 from deployment_manager.commands.hook.payload import generate_and_save_hook_payload
 from deployment_manager.commands.hook.sync.sync import sync_hook
-from deployment_manager.commands.hook.sync.template import create_sync_template
+from deployment_manager.commands.hook.sync.template import create_or_append_sync_template
 from deployment_manager.commands.hook.test import test_hook
 from deployment_manager.utils.consts import settings
 from deployment_manager.utils.functions import coro
@@ -78,7 +78,7 @@ def sync(): ...
 )
 @coro
 async def create_deploy_template_wrapper():
-    await create_sync_template()
+    await create_or_append_sync_template()
 
 
 @sync.command(
@@ -92,4 +92,17 @@ async def pull_hook_wrapper(
 ):
     await sync_hook(
         sync_file=sync_file,
+    )
+
+@sync.command(
+    name=settings.HOOK_SYNC_ADD_TO_TEMPLATE_COMMAND_NAME,
+    help="""Add new hook to existing sync template""",
+)
+@click.argument("sync_file", type=click.Path(path_type=Path, exists=True))
+@coro
+async def pull_hook_wrapper(
+    sync_file: Path,
+):
+    await create_or_append_sync_template(
+        old_hooks_file=sync_file,
     )
