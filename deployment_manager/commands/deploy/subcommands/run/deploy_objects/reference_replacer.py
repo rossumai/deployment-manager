@@ -1,4 +1,5 @@
 from __future__ import annotations
+from curses.ascii import isdigit
 from typing import TYPE_CHECKING
 
 from typing import Any
@@ -110,17 +111,18 @@ class ReferenceReplacer:
         self, object: dict, key: str, value: str | int, source_id: int, target_id: int
     ):
         if isinstance(object[key], list):
-            value_index = object[key].index(value)
-            if value_index > -1:
+            if value in object[key]:
+                value_index = object[key].index(value)
                 new_value = str(value).replace(str(source_id), str(target_id))
                 # Convert value back to int if applicable
-                if isinstance(value, int):
+                if isinstance(value, int) and all(isdigit(c) for c in new_value):
                     new_value = int(new_value)
                 object[key][value_index] = new_value
         else:
             new_value = str(value).replace(str(source_id), str(target_id))
             # Convert value back to int if applicable
-            if isinstance(value, int):
+            # Only do it if the new ID can be converted - dummy references cannot for instance
+            if isinstance(value, int) and all(isdigit(c) for c in new_value):
                 new_value = int(new_value)
             object[key] = new_value
         # Using lambdas for sub() because of quotes inside strings
@@ -189,6 +191,8 @@ class ReferenceReplacer:
     ):
         source_dependency_url = object.get(dependency_name, "")
         if not source_dependency_url:
+            if allow_empty_reference:
+                object.pop(dependency_name, "")
             return
 
         new_url = self._replace_reference_in_url(

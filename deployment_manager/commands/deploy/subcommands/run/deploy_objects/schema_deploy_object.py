@@ -103,7 +103,7 @@ class SchemaDeployObject(DeployObject):
         )
 
     async def override_references_in_target_object_data(
-        self, data_attribute, target, use_dummy_references
+        self, data_attribute, target: Target, use_dummy_references
     ):
         data = getattr(target, data_attribute)
 
@@ -136,7 +136,7 @@ class SchemaDeployObject(DeployObject):
         )
 
         # Do not send an empty array if it's not an explicit emptying (compared to target)
-        if not data.get('rules', []):
+        if not data.get('rules', []) and target.exists_on_remote:
             remote_target = await self.get_remote_object(target.id)
             if not remote_target.get('rules', []):
                 data.pop('rules', None)
