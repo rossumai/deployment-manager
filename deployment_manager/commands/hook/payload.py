@@ -59,13 +59,18 @@ async def generate_hook_payload(
 
     if not annotation_url:
         annotation_url = await questionary.text(
-            "Annotation URL for hook payload:"
+            "Annotation ID or URL for hook payload:"
         ).ask_async()
     if not annotation_url:
-        display_warning("No annotation URL provided.")
+        display_warning("No annotation ID or URL provided.")
         return
+
+    # Only the annotation ID was provided
+    if annotation_url.isnumeric():
+        annotation_url = client._http_client.base_url + f"/annotations/{annotation_url}"
+
     # The annotation was pasted from the FE
-    if "/document" in annotation_url:
+    elif "/document" in annotation_url:
         annotation_id = get_annotation_id_from_frontend_url(url=annotation_url)
         annotation_url = client._http_client.base_url + f"/annotations/{annotation_id}"
 

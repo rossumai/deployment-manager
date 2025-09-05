@@ -475,22 +475,42 @@ PRD expects each to find a schema next to each queue that you want to release. I
 #### Creating a hook payload
 
 ```
-prd2 hook payload <HOOK-PATH> [ -au <ANNOTATION-URL>]
+prd2 hook payload <HOOK-PATH> [ -au <ANNOTATION-ID|ANNOTATION-URL>]
 ```
 
 Given a local hook path, this command generates a corresponding payload (similarly to what the UI SF editor does).
 
-You can optionally provide the annotation URL (otherwise you will be asked by the CLI to provide it).
+You can optionally provide the annotation ID or URL (otherwise you will be asked by the CLI to provide it).
 
 #### Testing a hook
 
 ```
-prd2 hook payload <HOOK-PATH> [-pp <PAYLOAD-PATH> -au <ANNOTATION-URL>]
+prd2 hook payload <HOOK-PATH> [-pp <PAYLOAD-PATH> -au <ANNOTATION-ID|ANNOTATION-URL>]
 ```
 
 Given a loal hook path, this command runs the hook and displays logs and the return value.
 
-Optionally, you can provide an already created payload, otherwise a new one is created on the fly. You can combine an already created payload with a different annotation URL than the one provided when creating the payload.
+Optionally, you can provide an already created payload, otherwise a new one is created on the fly. You can combine an already created payload with a different annotation ID or URL than the one provided when creating the payload.
+
+
+#### Syncing a hook with remote repository
+Goal of this functionality is to allow the prd user to update his local python function with a python script from remote repository in a simple way.
+##### Creating a template
+```
+prd2 hook sync template        
+```
+This command interactively creates a config file for future sync. It asks user to input the path to local .py file and the remote .py file. 
+For the remote file, user can use either relative path from the repository, or full URL. When using relative path, script will be downloaded from the `master` branch.
+User also needs to have an SSH key set to access private git repositories.
+
+Then you can go ahead and **run the sync**.
+##### Running the sync
+```
+prd2 hook sync run <SYNC-FILE-PATH>
+```
+User will first see a diff between the local and remote file and will be asked for confirmation that those changes should be applied.
+
+Once the `sync` is finished, the local file will be overridden with remote file. To upload the new changes to rossum, users need to use standard `push` or `deploy` commands.
 
 ### docommando
 

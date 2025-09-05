@@ -1,14 +1,13 @@
 import click
 from anyio import Path
-
 from deployment_manager.commands.hook.payload import generate_and_save_hook_payload
+from deployment_manager.commands.hook.sync.sync import sync_hook
+from deployment_manager.commands.hook.sync.template import (
+    create_or_append_sync_template,
+)
 from deployment_manager.commands.hook.test import test_hook
-from deployment_manager.utils.consts import (
-    settings,
-)
-from deployment_manager.utils.functions import (
-    coro,
-)
+from deployment_manager.utils.consts import settings
+from deployment_manager.utils.functions import coro
 
 
 @click.group(
@@ -65,4 +64,48 @@ async def test_hook_wrapper(
 ):
     await test_hook(
         hook_path=hook_path, payload_path=payload_path, annotation_url=annotation_url
+    )
+
+
+@hook.group(
+    name=settings.HOOK_SYNC_COMMAND_NAME,
+    help="Group of commands related to working with hook syncs",
+)
+def sync(): ...
+
+
+@sync.command(
+    name=settings.DEPLOY_TEMPLATE_COMMAND_NAME,
+    help="""Create new template for hook sync""",
+)
+@coro
+async def create_deploy_template_wrapper():
+    await create_or_append_sync_template()
+
+
+@sync.command(
+    name=settings.DEPLOY_RUN_COMMAND_NAME,
+    help="""Sync the local scripts with remote from ps-serverless-functions""",
+)
+@click.argument("sync_file", type=click.Path(path_type=Path, exists=True))
+@coro
+async def pull_hook_wrapper(
+    sync_file: Path,
+):
+    await sync_hook(
+        sync_file=sync_file,
+    )
+
+
+@sync.command(
+    name=settings.HOOK_SYNC_ADD_TO_TEMPLATE_COMMAND_NAME,
+    help="""Add new hook to existing sync template""",
+)
+@click.argument("sync_file", type=click.Path(path_type=Path, exists=True))
+@coro
+async def pull_hook_wrapper(
+    sync_file: Path,
+):
+    await create_or_append_sync_template(
+        old_hooks_file=sync_file,
     )
