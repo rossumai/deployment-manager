@@ -104,23 +104,36 @@ def get_git_file_content_from_url_ssh(file_url):
         try:
             # Clone the repository structure, but don't download any files yet.
             clone_command = [
-                "git", "clone",
+                "git",
+                "clone",
                 "--filter=blob:none",
                 "--no-checkout",
-                "--depth", "1",
-                "--branch", branch,
+                "--depth",
+                "1",
+                "--branch",
+                branch,
                 ssh_repo_url,
-                temp_dir
+                temp_dir,
             ]
             subprocess.run(clone_command, capture_output=True, check=True, shell=False)
 
             # Specify which file(s) we want.
-            sparse_set_command = ["git", "sparse-checkout", "set", "--no-cone", file_path]
-            subprocess.run(sparse_set_command, capture_output=True, check=True, cwd=temp_dir)
+            sparse_set_command = [
+                "git",
+                "sparse-checkout",
+                "set",
+                "--no-cone",
+                file_path,
+            ]
+            subprocess.run(
+                sparse_set_command, capture_output=True, check=True, cwd=temp_dir
+            )
 
             # Checkout the branch, gt will now download and write only the file specified in the previous step.
             checkout_command = ["git", "checkout", branch]
-            subprocess.run(checkout_command, capture_output=True, check=True, cwd=temp_dir)
+            subprocess.run(
+                checkout_command, capture_output=True, check=True, cwd=temp_dir
+            )
 
             # Construct the full path to the now-existing file
             full_file_path = os.path.join(temp_dir, file_path)
@@ -129,7 +142,9 @@ def get_git_file_content_from_url_ssh(file_url):
                 with open(full_file_path, "rb") as f:
                     return f.read()
             else:
-                display_error(f"Error: File '{file_path}' not found after sparse checkout. Check file path and branch.")
+                display_error(
+                    f"Error: File '{file_path}' not found after sparse checkout. Check file path and branch."
+                )
                 return None
 
         except subprocess.CalledProcessError as e:

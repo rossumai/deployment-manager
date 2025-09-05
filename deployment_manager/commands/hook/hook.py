@@ -2,7 +2,9 @@ import click
 from anyio import Path
 from deployment_manager.commands.hook.payload import generate_and_save_hook_payload
 from deployment_manager.commands.hook.sync.sync import sync_hook
-from deployment_manager.commands.hook.sync.template import create_or_append_sync_template
+from deployment_manager.commands.hook.sync.template import (
+    create_or_append_sync_template,
+)
 from deployment_manager.commands.hook.test import test_hook
 from deployment_manager.utils.consts import settings
 from deployment_manager.utils.functions import coro
@@ -93,6 +95,7 @@ async def pull_hook_wrapper(
     await sync_hook(
         sync_file=sync_file,
     )
+
 
 @sync.command(
     name=settings.HOOK_SYNC_ADD_TO_TEMPLATE_COMMAND_NAME,

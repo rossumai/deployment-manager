@@ -56,8 +56,9 @@ async def create_or_append_sync_template(old_hooks_file: Path = "") -> None:
     org_path = Path("./")
     sync_filepath = await get_filepath_from_user(
         org_path,
-        default=str(old_hooks_file) or str(Path(settings.DEFAULT_HOOK_SYNC_PARENT) / "deployment.yaml"),
-        should_confirm_overwrite=not bool(old_hooks_file)
+        default=str(old_hooks_file)
+        or str(Path(settings.DEFAULT_HOOK_SYNC_PARENT) / "deployment.yaml"),
+        should_confirm_overwrite=not bool(old_hooks_file),
     )
 
     await sync_filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -71,7 +72,9 @@ async def create_or_append_sync_template(old_hooks_file: Path = "") -> None:
         f'\n  {settings.NEW_COMMAND_NAME} {settings.HOOK_COMMAND_NAME} {settings.HOOK_SYNC_COMMAND_NAME} {settings.DEPLOY_RUN_COMMAND_NAME} "{sync_filepath}"\n'
     )
 
-    display_info(f"To add more hooks to this file, run the [green]{settings.HOOK_SYNC_ADD_TO_TEMPLATE_COMMAND_NAME}[/green] command:")
+    display_info(
+        f"To add more hooks to this file, run the [green]{settings.HOOK_SYNC_ADD_TO_TEMPLATE_COMMAND_NAME}[/green] command:"
+    )
     pprint(
         f'\n  {settings.NEW_COMMAND_NAME} {settings.HOOK_COMMAND_NAME} {settings.HOOK_SYNC_COMMAND_NAME} {settings.HOOK_SYNC_ADD_TO_TEMPLATE_COMMAND_NAME} "{sync_filepath}"\n'
     )
