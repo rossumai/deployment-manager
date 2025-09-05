@@ -13,6 +13,8 @@ async def create_or_append_sync_template(old_hooks_file: Path = "") -> None:
     if old_hooks_file and await old_hooks_file.exists():
         # load existing hooks from the old file
         old_hooks = YAML().load(await old_hooks_file.read_text())
+        if not isinstance(old_hooks, list):
+            old_hooks = [old_hooks]
     hooks = []
     while (
         not len(hooks)
@@ -65,7 +67,11 @@ async def create_or_append_sync_template(old_hooks_file: Path = "") -> None:
     display_info(
         f"Deploy file saved to [green]{sync_filepath}[/green]. Use it by running:"
     )
-
     pprint(
         f'\n  {settings.NEW_COMMAND_NAME} {settings.HOOK_COMMAND_NAME} {settings.HOOK_SYNC_COMMAND_NAME} {settings.DEPLOY_RUN_COMMAND_NAME} "{sync_filepath}"\n'
+    )
+
+    display_info(f"To add more hooks to this file, run the [green]{settings.HOOK_SYNC_ADD_TO_TEMPLATE_COMMAND_NAME}[/green] command:")
+    pprint(
+        f'\n  {settings.NEW_COMMAND_NAME} {settings.HOOK_COMMAND_NAME} {settings.HOOK_SYNC_COMMAND_NAME} {settings.HOOK_SYNC_ADD_TO_TEMPLATE_COMMAND_NAME} "{sync_filepath}"\n'
     )
