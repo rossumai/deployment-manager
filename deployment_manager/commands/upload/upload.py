@@ -93,6 +93,8 @@ async def upload_destinations(
     indexed_only: bool = False,
     commit: bool = False,
     commit_message: str = "",
+    include_only_files: list[Path] | None = None,
+    show_commit_message: bool = True,
 ):
     if not destinations:
         display_warning("No destinations specified to pull.")
@@ -110,6 +112,7 @@ async def upload_destinations(
             upload_all=upload_all,
             force=force,
             indexed_only=indexed_only,
+            include_only_files=include_only_files,
             **value,
         )
         for name, value in project_config.get("directories", {}).items()
@@ -154,8 +157,9 @@ async def upload_destinations(
         subprocess.run(["git", "add", "."])
         subprocess.run(["git", "commit", "-m", commit_message])
 
-    pprint(
-        Panel(
-            f"Finished {settings.UPLOAD_COMMAND_NAME}.{ ' Please commit the changes before running this command again.' if not commit else ''}"
+    if show_commit_message:
+        pprint(
+            Panel(
+                f"Finished {settings.UPLOAD_COMMAND_NAME}.{ ' Please commit the changes before running this command again.' if not commit else ''}"
+            )
         )
-    )
