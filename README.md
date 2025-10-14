@@ -520,7 +520,7 @@ Once the `sync` is finished, the local file will be overridden with remote file.
 prd2 docommando
 ```
 
-Use this to command to generate documentation by an LLM. The command asks you for dir and subdir and then documents every queue, hook, and schema in that dir/subdir.
+Use this to command to generate documentation by an LLM. The command should be run from the **project's root directory** (where prd_config.yaml is located); it will ask you for org dir and subdir and then documents every queue, hook, and schema in that dir/subdir.
 
 The documentation then gets combined into one long writeup for each queue. A short general "use case" description is also created.
 
