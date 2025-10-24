@@ -98,6 +98,7 @@ class DeployObject(BaseModel):
     async def initialize_deploy_object(self, deploy_file: "DeployOrchestrator"):
         self.deploy_file = deploy_file
         self.yaml_reference = self.get_object_in_yaml()
+        self.rebase_none = self.deploy_file.no_rebase
 
         self.overrider = AttributeOverrider(type=self.type)
         self.ref_replacer = ReferenceReplacer(
@@ -453,6 +454,8 @@ class DeployObject(BaseModel):
                                 value=target_val,
                                 reference_type=reference_type,
                                 reverse_lookup_table=self.deploy_file.reverse_lookup_table,
+                                source_base_url=self.deploy_file.source_client._http_client.base_url,
+                                target_base_url=self.deploy_file.client._http_client.base_url,
                             )
                         else:
                             target_val = (
@@ -461,10 +464,19 @@ class DeployObject(BaseModel):
                                 )
                             )
 
+                    source_val=get_nested_value(self.data, path)
+
+                    # Ensure consistent order for lists of IDs
+                    if path in self.sort_list_attributes:
+                        source_val = sorted(source_val if source_val else [])
+                        target_val = sorted(target_val if target_val else [])
+
                     diff = create_rebase_diff(
-                        source_val=get_nested_value(self.data, path),
+                        source_val=source_val,
                         target_val=target_val,
                     )
+                    if not diff:
+                        continue
                     display_warning(
                         f'{self.display_label}: Field "[green]{path}[/green]" has changed in {settings.TARGET_DIRNAME} only.'
                     )
@@ -475,9 +487,9 @@ class DeployObject(BaseModel):
                     # ! TODO: Must also update attribute override
 
                     if not self.rebase_all and not self.rebase_none:
-                        should_rebase, self.rebase_all, self.rebase_none = await prompt_rebase_field(
-                        self.display_label, path
-                    )
+                        should_rebase, self.rebase_all, self.rebase_none = (
+                            await prompt_rebase_field(self.display_label, path)
+                        )
                     if self.rebase_all or should_rebase:
                         self.rebase_detected = True
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from curses.ascii import isdigit
+import re
 from typing import TYPE_CHECKING
 
 from typing import Any
@@ -270,6 +271,8 @@ class ReferenceReplacer:
         value: Any,
         reference_type: Resource,
         reverse_lookup_table: ReverseLookupTable,
+        source_base_url: str,
+        target_base_url: str,
     ):
         if isinstance(value, str) or isinstance(value, int):
             value = str(value)
@@ -278,18 +281,29 @@ class ReferenceReplacer:
             ).items():
                 if target_id in value:
                     value = value.replace(target_id, str(source_id))
+
+            if re.compile(target_base_url).match(value):
+                value = value.replace(target_base_url, source_base_url)
             return value
         elif isinstance(value, list):
             return [
                 cls.reverse_target_reference_into_source(
-                    v, reference_type, reverse_lookup_table
+                    v,
+                    reference_type,
+                    reverse_lookup_table,
+                    source_base_url,
+                    target_base_url,
                 )
                 for v in value
             ]
         elif isinstance(value, dict):
             return {
                 k: cls.reverse_target_reference_into_source(
-                    v, reference_type, reverse_lookup_table
+                    v,
+                    reference_type,
+                    reverse_lookup_table,
+                    source_base_url,
+                    target_base_url,
                 )
                 for k, v in value.items()
             }

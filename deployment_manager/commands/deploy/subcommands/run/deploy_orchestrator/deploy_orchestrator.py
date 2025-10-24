@@ -73,6 +73,7 @@ class DeployOrchestrator(BaseModel):
 
     auto_delete: bool = False
     prefer: str = None
+    no_rebase: bool = False
 
     patch_target_org: bool = True
     token_owner_id: int | None = None

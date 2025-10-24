@@ -38,6 +38,7 @@ async def deploy_release_file(
     target_client: ElisAPIClient = None,
     auto_apply_plan: bool = False,
     prefer: str = None,
+    no_rebase: bool =False,
     # auto_delete: bool = False,
     commit: bool = False,
     commit_message: str = "",
@@ -138,6 +139,7 @@ async def deploy_release_file(
             source_org=source_org,
             target_org=target_org,
             prefer=prefer,
+            no_rebase=no_rebase,
             deploy_file_path=deploy_file_path,
             # auto_delete=auto_delete,
         )

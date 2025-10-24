@@ -265,6 +265,7 @@ class Settings:
     # These are versioned locally, but should not be deployed, and so they are not displayed in diffs either
     DEPLOY_NON_DIFFED_KEYS: dict = {
         Resource.Inbox: ["email"],
+        Resource.Queue: ["training_enabled"],
         Resource.Hook: ["guide", "status"],
         Resource.Organization: [
             "organization_group",

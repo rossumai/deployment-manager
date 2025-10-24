@@ -133,6 +133,12 @@ If these objects don't exist, they get created.
     help=f"When resolving merge conflicts, prefer {settings.SOURCE_DIRNAME} or {settings.TARGET_DIRNAME} values. If unset, neither is preferred and conflicts will be raised.",
 )
 @click.option(
+    "--no-rebase",
+    default=False,
+    is_flag=True,
+    help="Does not ask user about any rebase from target.",
+)
+@click.option(
     "--auto-apply",
     "-y",
     default=False,
@@ -160,6 +166,7 @@ async def deploy_project_wrapper(
     commit: bool,
     message: str,
     prefer: str = None,
+    no_rebase: bool = False,
 ):
     if prefer:
         prefer = prefer.lower()  # Normalize input
@@ -169,6 +176,7 @@ async def deploy_project_wrapper(
     await deploy_release_file(
         deploy_file_path=deploy_file,
         prefer=prefer,
+        no_rebase=no_rebase,
         # auto_delete=auto_delete,
         auto_apply_plan=auto_apply,
         commit=commit,
