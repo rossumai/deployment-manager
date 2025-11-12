@@ -781,7 +781,7 @@ async def get_rule_templates_from_user(
     ]
     rule_template_paths = await find_rule_template_paths_for_dir(source_path)
     if not rule_template_paths:
-        return []
+        return [], []
 
     rule_template_choices = await prepare_choices(
         paths=rule_template_paths,
