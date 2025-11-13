@@ -563,6 +563,8 @@ class DeployObject(BaseModel):
                                     value=target_val,
                                     reference_type=reference_type,
                                     reverse_lookup_table=self.deploy_file.reverse_lookup_table,
+                                    source_base_url=self.deploy_file.source_client._http_client.base_url,
+                                    target_base_url=self.deploy_file.client._http_client.base_url,
                                 )
                             else:
                                 target_val = (
