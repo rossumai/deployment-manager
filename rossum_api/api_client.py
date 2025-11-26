@@ -21,6 +21,28 @@ RETRIED_HTTP_CODES = (408, 429, 500, 502, 503, 504)
 logger = logging.getLogger(__name__)
 
 
+def wait_with_retry_after(retry_backoff_factor: float, retry_max_jitter: float):
+    """Wait strategy that respects Retry-After header for 429 errors."""
+    standard_backoff = tenacity.wait_exponential_jitter(
+        initial=retry_backoff_factor, jitter=retry_max_jitter
+    )
+    rate_limit_backoff = tenacity.wait_exponential_jitter(
+        initial=retry_backoff_factor, jitter=retry_max_jitter, max=60
+    )
+
+    def wait_func(retry_state: tenacity.RetryCallState) -> float:
+        exception = retry_state.outcome.exception()
+
+        if isinstance(exception, APIClientError) and exception.status_code == 429:
+            if exception.retry_after is not None:
+                return exception.retry_after
+            return rate_limit_backoff(retry_state)
+
+        return standard_backoff(retry_state)
+
+    return wait_func
+
+
 class Resource(Enum):
     """Convenient representation of resources provided by Elis API.
 
@@ -46,9 +68,10 @@ class Resource(Enum):
 
 
 class APIClientError(Exception):
-    def __init__(self, status_code, error):
+    def __init__(self, status_code, error, retry_after: Optional[int] = None):
         self.status_code = status_code
         self.error = error
+        self.retry_after = retry_after
 
     def __str__(self):
         return f"HTTP {self.status_code}, content: {self.error}"
@@ -440,14 +463,25 @@ class APIClient:
                 return True
             if isinstance(exc, httpx.HTTPStatusError):
                 return exc.response.status_code in RETRIED_HTTP_CODES
+            if isinstance(exc, APIClientError):
+                return exc.status_code in RETRIED_HTTP_CODES
             return False
 
+        def log_retry_attempt(retry_state: tenacity.RetryCallState) -> None:
+            exception = retry_state.outcome.exception()
+            attempt_number = retry_state.attempt_number
+            wait_time = retry_state.next_action.sleep if retry_state.next_action else 0
+
+            if isinstance(exception, APIClientError) and exception.status_code == 429:
+                logger.warning(
+                    f"Rate limited. Retrying in {wait_time:.1f}s (attempt {attempt_number}/{self.n_retries})"
+                )
+
         return tenacity.AsyncRetrying(
-            wait=tenacity.wait_exponential_jitter(
-                initial=self.retry_backoff_factor, jitter=self.retry_max_jitter
-            ),
+            wait=wait_with_retry_after(self.retry_backoff_factor, self.retry_max_jitter),
             retry=tenacity.retry_if_exception(should_retry_request),
             stop=tenacity.stop_after_attempt(self.n_retries),
+            before_sleep=log_retry_attempt,
             reraise=True,
         )
 
@@ -495,4 +529,12 @@ class APIClient:
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
             content = response.content if response.stream is None else await response.aread()
-            raise APIClientError(response.status_code, content.decode("utf-8")) from e
+
+            retry_after = None
+            if response.status_code == 429 and "Retry-After" in response.headers:
+                try:
+                    retry_after = int(response.headers["Retry-After"])
+                except ValueError:
+                    pass
+
+            raise APIClientError(response.status_code, content.decode("utf-8"), retry_after) from e
