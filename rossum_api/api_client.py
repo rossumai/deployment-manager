@@ -5,6 +5,7 @@ import functools
 import itertools
 import json
 import logging
+import random
 import typing
 from enum import Enum
 
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 def wait_with_retry_after(retry_backoff_factor: float, retry_max_jitter: float):
     """Wait strategy that respects Retry-After header for 429 errors."""
+
     standard_backoff = tenacity.wait_exponential_jitter(
         initial=retry_backoff_factor, jitter=retry_max_jitter
     )
@@ -35,7 +37,10 @@ def wait_with_retry_after(retry_backoff_factor: float, retry_max_jitter: float):
 
         if isinstance(exception, APIClientError) and exception.status_code == 429:
             if exception.retry_after is not None:
-                return exception.retry_after
+                # Add jitter to desynchronize concurrent retries (0.5x to 1.5x the suggested wait time)
+                jitter_factor = 0.5 + random.random()  # Random between 0.5 and 1.5
+                wait_time = max(0.1, exception.retry_after * jitter_factor)
+                return wait_time
             return rate_limit_backoff(retry_state)
 
         return standard_backoff(retry_state)
@@ -467,21 +472,21 @@ class APIClient:
                 return exc.status_code in RETRIED_HTTP_CODES
             return False
 
-        def log_retry_attempt(retry_state: tenacity.RetryCallState) -> None:
-            exception = retry_state.outcome.exception()
-            attempt_number = retry_state.attempt_number
-            wait_time = retry_state.next_action.sleep if retry_state.next_action else 0
+        def should_stop(retry_state: tenacity.RetryCallState) -> bool:
+            """Stop after 3 attempts for most errors, but 8 attempts for 429 rate limits."""
+            exception = retry_state.outcome.exception() if retry_state.outcome else None
 
+            # For 429 errors, allow more retries
             if isinstance(exception, APIClientError) and exception.status_code == 429:
-                logger.warning(
-                    f"Rate limited. Retrying in {wait_time:.1f}s (attempt {attempt_number}/{self.n_retries})"
-                )
+                return retry_state.attempt_number >= 8
+
+            # For other errors, use the standard retry count
+            return retry_state.attempt_number >= self.n_retries
 
         return tenacity.AsyncRetrying(
             wait=wait_with_retry_after(self.retry_backoff_factor, self.retry_max_jitter),
             retry=tenacity.retry_if_exception(should_retry_request),
-            stop=tenacity.stop_after_attempt(self.n_retries),
-            before_sleep=log_retry_attempt,
+            stop=should_stop,
             reraise=True,
         )
 
