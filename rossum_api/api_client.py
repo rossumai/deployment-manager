@@ -37,10 +37,12 @@ def wait_with_retry_after(retry_backoff_factor: float, retry_max_jitter: float):
 
         if isinstance(exception, APIClientError) and exception.status_code == 429:
             if exception.retry_after is not None:
-                # Add jitter to desynchronize concurrent retries (0.5x to 1.5x the suggested wait time)
-                jitter_factor = 0.5 + random.random()  # Random between 0.5 and 1.5
+                # Add aggressive jitter to desynchronize concurrent retries (0.5x to 5.0x the suggested wait time)
+                # This helps prevent concurrent requests from retrying at the same time
+                jitter_factor = 0.5 + (random.random() * 4.5)  # Random between 0.5 and 5.0
                 wait_time = max(0.1, exception.retry_after * jitter_factor)
                 return wait_time
+            # No Retry-After header, use exponential backoff with jitter
             return rate_limit_backoff(retry_state)
 
         return standard_backoff(retry_state)
@@ -473,12 +475,12 @@ class APIClient:
             return False
 
         def should_stop(retry_state: tenacity.RetryCallState) -> bool:
-            """Stop after 3 attempts for most errors, but 8 attempts for 429 rate limits."""
+            """Stop after n_retries attempts for most errors, but never stop for 429 rate limits."""
             exception = retry_state.outcome.exception() if retry_state.outcome else None
 
-            # For 429 errors, allow more retries
+            # For 429 errors, never stop retrying
             if isinstance(exception, APIClientError) and exception.status_code == 429:
-                return retry_state.attempt_number >= 8
+                return False
 
             # For other errors, use the standard retry count
             return retry_state.attempt_number >= self.n_retries
