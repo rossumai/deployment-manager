@@ -19,6 +19,7 @@ from deployment_manager.utils.consts import (
     settings,
 )
 from deployment_manager.utils.functions import (
+    apply_concurrency_override,
     coro,
 )
 
@@ -158,6 +159,12 @@ If these objects don't exist, they get created.
     default="Deployed changes to target organization",
     help="Commit message.",
 )
+@click.option(
+    "--concurrency",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Maximum concurrent API requests (default: 5, or PRD2_CONCURRENCY env var).",
+)
 @coro
 async def deploy_project_wrapper(
     deploy_file: Path,
@@ -167,7 +174,10 @@ async def deploy_project_wrapper(
     message: str,
     prefer: str = None,
     no_rebase: bool = False,
+    concurrency: int = None,
 ):
+    apply_concurrency_override(concurrency)
+
     if prefer:
         prefer = prefer.lower()  # Normalize input
     else:

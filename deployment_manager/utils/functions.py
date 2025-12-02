@@ -53,6 +53,7 @@ def extract_id_from_url(url: str) -> int:
         return None
     return int(url.split("/")[-1])
 
+
 async def make_request_with_progress(coro, progress, task):
     result = await coro
     progress.update(task, advance=1)
@@ -79,7 +80,26 @@ class PauseProgress:
         self._progress.start()
 
 
-async def gather_with_concurrency(n, *coros):
+def apply_concurrency_override(concurrency: int | None):
+    """Override the global concurrency setting if a value is provided.
+
+    Args:
+        concurrency: The concurrency limit to apply, or None to use existing setting
+    """
+    if concurrency is not None:
+        from deployment_manager.utils.consts import settings
+
+        if settings:
+            settings.CONCURRENCY = concurrency
+
+
+async def gather_with_concurrency(*coros, n=None):
+    # Determine concurrency limit: CLI flag > env var > default 5
+    if n is None:
+        from deployment_manager.utils.consts import settings
+
+        n = settings.CONCURRENCY if settings else 5
+
     semaphore = asyncio.Semaphore(n)
 
     async def sem_coro(coro):

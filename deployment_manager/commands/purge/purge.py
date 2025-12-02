@@ -25,6 +25,7 @@ from deployment_manager.utils.consts import (
     settings,
 )
 from deployment_manager.utils.functions import (
+    apply_concurrency_override,
     coro,
 )
 
@@ -48,8 +49,16 @@ Deletes all objects in Rossum based on IDs in the mappping file. This operation 
         choices=PURGE_OBJECT_TYPES,
     ),
 )
+@click.option(
+    "--concurrency",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Maximum concurrent API requests (default: 5, or PRD2_CONCURRENCY env var).",
+)
 @coro
-async def purge_object_types_wrapper(object_types):
+async def purge_object_types_wrapper(object_types, concurrency):
+    apply_concurrency_override(concurrency)
+
     # To be able to run the command progammatically without the CLI decorators
     await purge_object_types(
         object_types=object_types,

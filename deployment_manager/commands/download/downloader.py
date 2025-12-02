@@ -1,9 +1,9 @@
-import asyncio
 from pydantic import BaseModel
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
 
 from deployment_manager.utils.consts import CustomResource, display_warning
+from deployment_manager.utils.functions import gather_with_concurrency
 
 
 class Downloader(BaseModel):
@@ -18,7 +18,7 @@ class Downloader(BaseModel):
         # Some API objects (e.g., rules) might not be allowed and Elis API would return 403...
         if check_access:
             try:
-                async for item in  self.client._http_client.fetch_all(type):
+                async for item in self.client._http_client.fetch_all(type):
                     # First item is enough to check
                     break
             except APIClientError as e:
@@ -29,11 +29,11 @@ class Downloader(BaseModel):
 
         # Refetch in case the paginated fields don't include everything
         # Use raw dicts and not dataclasses in case of fields not defined in the Rossum API lib
-        full_objects = await asyncio.gather(
+        full_objects = await gather_with_concurrency(
             *[
                 self.client._http_client.fetch_one(type, object_id)
                 for object_id in paginated_object_ids
-            ]
+            ],
         )
 
         return full_objects

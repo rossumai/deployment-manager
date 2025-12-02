@@ -60,7 +60,10 @@ from rossum_api import APIClientError
 from rossum_api.api_client import Resource
 
 from deployment_manager.utils.consts import display_error, display_warning, settings
-from deployment_manager.utils.functions import templatize_name_id
+from deployment_manager.utils.functions import (
+    gather_with_concurrency,
+    templatize_name_id,
+)
 
 console = Console()
 
@@ -194,7 +197,7 @@ class DeployObject(BaseModel):
     @property
     def display_type(self):
         # Remove the plural 's'
-        return f"[yellow]{self.type.value[:-2 if self.type in [Resource.Inbox] else -1]}[/yellow]"
+        return f"[yellow]{self.type.value[: -2 if self.type in [Resource.Inbox] else -1]}[/yellow]"
 
     @property
     def display_label(self):
@@ -215,7 +218,7 @@ class DeployObject(BaseModel):
         return None
 
     def create_source_to_target_string(self, target: dict):
-        return f'"{self.name} ([purple]{self.id}[/purple])" -> "{target['name']} ([purple]{target['id']}[/purple])"'
+        return f'"{self.name} ([purple]{self.id}[/purple])" -> "{target["name"]} ([purple]{target["id"]}[/purple])"'
 
     async def get_remote_object(self, remote_object_id):
         try:
@@ -237,9 +240,9 @@ class DeployObject(BaseModel):
             ):
                 target.id = new_id
                 self.yaml_reference["targets"][target.index]["id"] = target.id
-            self.yaml_reference["targets"][target.index][
-                "attribute_override"
-            ] = target.attribute_override
+            self.yaml_reference["targets"][target.index]["attribute_override"] = (
+                target.attribute_override
+            )
 
     async def deploy_target_objects(self, data_attribute: str):
         requests = []
@@ -267,7 +270,7 @@ class DeployObject(BaseModel):
                     self.create_remote(data_attribute=data_attribute, target=target)
                 )
 
-        await asyncio.gather(*requests)
+        await gather_with_concurrency(*requests)
         # asyncio.gather returns results in the same order as they were put in
         self.update_targets()
 
@@ -464,7 +467,7 @@ class DeployObject(BaseModel):
                                 )
                             )
 
-                    source_val=get_nested_value(self.data, path)
+                    source_val = get_nested_value(self.data, path)
 
                     # Ensure consistent order for lists of IDs
                     if path in self.sort_list_attributes:
@@ -487,9 +490,11 @@ class DeployObject(BaseModel):
                     # ! TODO: Must also update attribute override
 
                     if not self.rebase_all and not self.rebase_none:
-                        should_rebase, self.rebase_all, self.rebase_none = (
-                            await prompt_rebase_field(self.display_label, path)
-                        )
+                        (
+                            should_rebase,
+                            self.rebase_all,
+                            self.rebase_none,
+                        ) = await prompt_rebase_field(self.display_label, path)
                     if self.rebase_all or should_rebase:
                         self.rebase_detected = True
 
@@ -614,7 +619,7 @@ class DeployObject(BaseModel):
                 overriden_object_data, target.visualized_plan_data
             )
             colorized_diff = DeployObjectDiffer.parse_diff(diff)
-            message = f"{plan_label} {self.display_type} {self.create_source_to_target_string(target.visualized_plan_data)}:\n{colorized_diff if colorized_diff else ""}"
+            message = f"{plan_label} {self.display_type} {self.create_source_to_target_string(target.visualized_plan_data)}:\n{colorized_diff if colorized_diff else ''}"
             pprint(Panel(message))
 
     async def resolve_code_conflict(
@@ -655,4 +660,4 @@ class EmptyDeployObject(BaseModel):
     @property
     def display_type(self):
         # Remove the plural 's'
-        return f"[yellow]{self.type.value[:-2 if self.type in [Resource.Inbox] else -1]}[/yellow]"
+        return f"[yellow]{self.type.value[: -2 if self.type in [Resource.Inbox] else -1]}[/yellow]"
