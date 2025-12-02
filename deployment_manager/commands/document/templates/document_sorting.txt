@@ -58,7 +58,6 @@ Order (Implicit in this example):
 LLM Guidance: Explain that the order of rules in the array usually matters. Rules are typically evaluated from top to bottom. The example shows a sequence of rules for different conditions and statuses.
 Default Queue (Not explicitly present in the settings.rules of this example):
 
-
 Description: This specifies the queue where documents will be routed if none of the defined rules are matched.
 LLM Guidance: Explain the role of the default queue as a fallback mechanism. Note that in this specific example, a default queue isn't explicitly defined within the rules structure, but there might be a global default setting for this Document Sorting configuration or it might be handled differently.
 Active:
@@ -68,27 +67,19 @@ Description: A boolean flag (True/False) indicating whether this Document Routin
 LLM Guidance: Explain that setting this to "True" enables the routing logic, while "False" disables it. The example shows "active": true.
 Events (events in the example):
 
-
-Description: This lists the events that trigger this Document Routing configuration.
-LLM Guidance: Explain that Document Routing can be triggered by specific events in the document lifecycle. The example shows it's triggered by annotation_status.changed.
-Instructions for the LLM:
-When provided with the configuration details of a specific Document Routing object, use this template to generate comprehensive documentation. For each configuration option, first state its name, then provide the description as defined above, and finally, use the "LLM Guidance" to elaborate on its purpose, functionality, and potential implications. Pay close attention to the structure of the rules within the settings section, as it might vary. Refer to the anonymized example configuration above. A good example of the expected output for the provided configuration would be:
-Example Output (Based on the Anonymized Configuration):
-This Document Sorting (likely functioning as Document Routing) configuration is designed to automatically route documents into different queues based on whether they are identified as "PO" (Purchase Order) or "non-PO" documents. It also takes into account the current status of the document within the Rossum workflow.
-The routing is triggered when the annotation_status of a document changes.
-Documents are classified as "po" or "non-po" based on a field within the ff_sorting schema.
-When a document's annotation_status changes to confirmed and it's classified as "po", it's routed to queue [QUEUE_ID_1].
-When a document's annotation_status changes to confirmed and it's classified as "non-po", it's routed to queue [QUEUE_ID_2].
-"po" documents are also routed to queue [QUEUE_ID_1] when their status changes to to_review or exported.
-"non-po" documents are also routed to queue [QUEUE_ID_2] when their status changes to exported.
-The configuration is currently active.
-Aim for a similar level of detail and clarity in your documentation.
-Remember to maintain a clear, concise, and informative tone suitable for technical documentation.
-
 JSON:
 {attributes}
 
 
-
 Related extensions:
 {run_after}
+
+return a structured markdown table with the following aspects (omit any urls from output, do not return anything else besides this table):
+- header row print in h3 markdown: "Extension: [Extension Name] (extension_id)"
+- after header row, follow 2 column layout with (column title / description)
+- "Summary" = in the "description column" provide executive a brief max 2 sentence description of the actual matching logic including fields which are used for the check
+- "Fields Used" = in the "description column" provide which fields (schema_ids) are used in the configuration.
+- "Logic" = in the "description column" write what does the extension do (bullet point, hint: Use description if available. You can also infer it based on the extension’s ‘code’ attribute if available.)
+- "Events" = in the "description column" write on which events is the hook triggered
+- "Related Extensions" = in the "description column" list hooks that are listed in ‘run_after’ attribute. Look at the IDs of the related extensions section to know which is which and list their name as well as ID.
+- "Active Queues" = in the "description column", print only the human readable name (queue_id) where this extension applies, omit any URLs
