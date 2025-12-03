@@ -243,7 +243,7 @@ class DirectoryDocumentator:
         # TODO: document sorting should be included in the target queue too (not just source)
 
         display_info(
-            f"Documenting queue [green]{queue.get('name', 'unkonwn-queue')}[/green] ([purple]{queue.get('id', 'unknown-id')}[/purple])"
+            f"Documenting queue [green]{queue.get('name', 'unknown-queue')}[/green] ([purple]{queue.get('id', 'unknown-id')}[/purple])"
         )
 
         # Document inbox's email without having to pass in the whole inbox object to the LLM
@@ -344,10 +344,6 @@ class DirectoryDocumentator:
 
         queue_documentation.text += (
             "\n\n ## 4. Extensions documentation\n" + hook_documentations
-        )
-
-        queue_documentation.text += (
-            "\n\n ## 5. Data matching fields\n" + data_matching_documentations
         )
 
         self.queue_docs[queue["id"]] = queue_documentation
