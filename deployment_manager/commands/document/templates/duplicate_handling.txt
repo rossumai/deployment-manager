@@ -37,12 +37,15 @@ This is the actual configuration:
 JSON:
 {attributes}
 
-Your task is to describe the configuration to a busy manager who needs only high level overview structured in the following way:
-Name of the extension (extension id) (h3 markdown)
-Summary: Executive a brief max 2 sentence description of the actual matching logic including fields which are used for the check
-Active Queues: Queues where the matching is active
-Logic: structured overview of the matching logic and resulting actions
-Related Extensions: hooks that are listed in ‘run_after’ attribute. Look at the IDs of the related extensions section to know which is which and list their name as well as ID.
-
 Related extensions:
 {run_after}
+
+return a structured markdown table with the following aspects (omit any urls from output, do not return anything else besides this table):
+- header row print in h3 markdown: "Extension: [Extension Name] (extension_id)"
+- after header row, follow 2 column layout with (column title / description)
+- "Summary" = in the "description column" provide executive a brief max 2 sentence description of the actual matching logic including fields which are used for the check
+- "Fields Used" = in the "description column" provide which fields (schema_ids) are used in the configuration. Return field names delimited in `` separated by comma.
+- "Logic" = in the "description column" write what does the extension do (bullet point, hint: Use description if available. You can also infer it based on the extension’s ‘code’ attribute if available. Return bullet points list printed in <ul><li></li></ul>.
+- "Events" = in the "description column" write on which events is the hook triggered. Return field names delimited in `` separated by comma.
+- "Related Extensions" = in the "description column" list hooks that are listed in ‘run_after’ attribute. Look at the IDs of the related extensions section to know which is which and list their name as well as ID. Return bullet points list printed in <ul><li></li></ul>, sorted A-Z, with extension names delimited in ``.
+- "Active Queues" = in the "description column", return Return bullet points list printed in <ul><li></li></ul> of only the human readable name (queue_id) where this extension applies, omit any URLs, sort queue names A-Z

@@ -11,8 +11,10 @@ General information about Rossum configurations:
 - Hooks (aka extensions) run some functionality based on an event related to a specific annotation.
 - Hooks can be assigned to 0-n queues.
 - You can recognize the type of the object by its URL (e.g., https://rdttest.rossum.app/api/v1/workspaces/595306 -> workspace)
-
+- You can recognize the field section by 1st child object of the schema_ids array provided below with the following attributes for example ("category": "section", "id": "basic_info_section", "label": "Basic Information"). Return the Label
 Here is documentation for extensions related to the queue:
+
+Here is the documentation of the hook events in their succession: annotation_content.initialize > annotation_content.started > annotation_status.changed > annotation_content.user_update > annotation_content.updated > annotation_content.confirm > annotation_content.export
 
 {hook_documentations}
 
@@ -22,12 +24,12 @@ Here is documentation for schema_ids (fields) in that specific queue:
 
 {data_matching_documentations}
 
-Make sure the output includes the following sections:
-1. Queue Overview (h2 markdown)
+Make sure the output includes the following sections  (omit any urls from output):
+"1. Queue Overview" (h2 markdown)
 - In a format of a table, provide overview information of the queue in the following columns: queue name, queue id, workspace it belongs to, and, if applicable, the associated email address
 - Queue usage description (h3 markdown): overall description of the use case of the queue based on the documentation of its sub-objects.
-2. Summary of extensions (h2 markdown)
-Provide a summary for each extension listed above (format: numbered list).
-3. Summary of fields (h2 markdown)
-Table of fields referenced above, with columns "ID", "Label", "Description", "Field type", "Data Type", "Required/Optional", "Visible/Hidden"
-Sort the fields by "theme" (e.g., basic information: document_id, ...), you don't need to list the themes though.
+"2. Summary of extensions" (h2 markdown)
+Provide a summary for each extension listed above (format: numbered list sorted according to the hooks event succession).
+"3. Summary of fields" (h2 markdown)
+Group the Fields by the Sections they belong to (e.g., basic information, amounts...) and sort them alphabetically from A to Z
+Return a markdown table of fields referenced above, with columns "Rossum Section", "ID", "Label", "Description", "Field type", "Data Type", "Required/Optional", "Visible/Hidden"
