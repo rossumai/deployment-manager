@@ -11,6 +11,8 @@ from enum import Enum
 
 import httpx
 import tenacity
+from rich.console import Console
+from rich.panel import Panel
 
 if typing.TYPE_CHECKING:
     from typing import Any, AsyncIterator, Dict, List, Optional, Sequence, Tuple, Union
@@ -480,6 +482,16 @@ class APIClient:
 
             # For 429 errors, never stop retrying
             if isinstance(exception, APIClientError) and exception.status_code == 429:
+                # Notify user when retries exceed threshold
+                if retry_state.attempt_number > 8:
+                    console = Console()
+                    console.print(
+                        Panel(
+                            f"High retry count detected: {retry_state.attempt_number} retries. "
+                            f"Consider lowering concurrency with --concurrency flag or PRD2_CONCURRENCY env var."
+                        ),
+                        style="bold yellow"
+                    )
                 return False
 
             # For other errors, use the standard retry count

@@ -20,6 +20,7 @@ from deployment_manager.utils.consts import (
     settings,
 )
 from deployment_manager.utils.functions import (
+    apply_concurrency_override,
     coro,
 )
 
@@ -70,10 +71,17 @@ Only source files are taken into account by default.
     default="Pushed changes to remote",
     help="Commit message after push.",
 )
+@click.option(
+    "--concurrency",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Maximum concurrent API requests (default: 5, or PRD2_CONCURRENCY env var).",
+)
 @coro
 async def upload_project_wrapper(
-    destinations, all, force, indexed_only, commit, message
+    destinations, all, force, indexed_only, commit, message, concurrency
 ):
+    apply_concurrency_override(concurrency)
     # To be able to run the command progammatically without the CLI decorators
     await upload_destinations(
         destinations=destinations,
@@ -139,7 +147,7 @@ async def upload_destinations(
             if dir_config.request_errors:
                 errors_encountered = True
                 display_error(
-                    f'Error(s) while uploading {dir_config.display_label}:\n{'\n'.join(dir_config.request_errors)}'
+                    f"Error(s) while uploading {dir_config.display_label}:\n{'\n'.join(dir_config.request_errors)}"
                 )
         except Exception as e:
             display_error(
@@ -156,6 +164,6 @@ async def upload_destinations(
 
     pprint(
         Panel(
-            f"Finished {settings.UPLOAD_COMMAND_NAME}.{ ' Please commit the changes before running this command again.' if not commit else ''}"
+            f"Finished {settings.UPLOAD_COMMAND_NAME}.{' Please commit the changes before running this command again.' if not commit else ''}"
         )
     )

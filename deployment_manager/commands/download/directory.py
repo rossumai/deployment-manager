@@ -1,4 +1,3 @@
-import asyncio
 from collections import defaultdict
 from typing import Optional
 from anyio import Path
@@ -52,6 +51,7 @@ from deployment_manager.common.read_write import (
 )
 from deployment_manager.utils.functions import (
     find_all_object_paths,
+    gather_with_concurrency,
 )
 
 from rich.panel import Panel
@@ -164,7 +164,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 hooks_for_mapping,
                 workflows_for_mapping,
                 workflow_steps_for_mapping,
-            ) = await asyncio.gather(
+            ) = await gather_with_concurrency(
                 *[
                     downloader.download_remote_objects(type=Resource.Workspace),
                     downloader.download_remote_objects(type=Resource.Queue),
@@ -184,7 +184,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                     downloader.download_remote_objects(
                         type=CustomResource.WorkflowStep, check_access=True
                     ),
-                ]
+                ],
             )
 
         except DownloadException as e:

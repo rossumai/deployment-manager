@@ -1,4 +1,3 @@
-import asyncio
 from rich import print as pprint
 from rich.panel import Panel
 from deployment_manager.commands.deploy.subcommands.revert.revert_object_deploy import (
@@ -10,6 +9,7 @@ from deployment_manager.commands.deploy.subcommands.revert.revert_object_deploy 
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
 from deployment_manager.commands.deploy.subcommands.run.models import DeployException
 from deployment_manager.utils.consts import display_error, settings
+from deployment_manager.utils.functions import gather_with_concurrency
 
 
 from pydantic import BaseModel
@@ -48,7 +48,7 @@ class RevertDeployFile(BaseModel):
                 return
 
     async def revert_hooks(self):
-        await asyncio.gather(
+        await gather_with_concurrency(
             *[
                 hook_release.initialize(
                     yaml=self.yaml,
@@ -59,11 +59,13 @@ class RevertDeployFile(BaseModel):
             ]
         )
 
-        await asyncio.gather(*[hook_release.revert() for hook_release in self.hooks])
+        await gather_with_concurrency(
+            *[hook_release.revert() for hook_release in self.hooks]
+        )
         self.detect_revert_phase_exceptions(self.hooks)
 
     async def revert_workspaces(self):
-        await asyncio.gather(
+        await gather_with_concurrency(
             *[
                 workspace_release.initialize(
                     yaml=self.yaml,
@@ -74,13 +76,13 @@ class RevertDeployFile(BaseModel):
             ]
         )
 
-        await asyncio.gather(
+        await gather_with_concurrency(
             *[workspace_release.revert() for workspace_release in self.workspaces]
         )
         self.detect_revert_phase_exceptions(self.workspaces)
 
     async def revert_queues(self):
-        await asyncio.gather(
+        await gather_with_concurrency(
             *[
                 queue_release.initialize(
                     yaml=self.yaml,
@@ -91,7 +93,9 @@ class RevertDeployFile(BaseModel):
             ]
         )
 
-        await asyncio.gather(*[queue_release.revert() for queue_release in self.queues])
+        await gather_with_concurrency(
+            *[queue_release.revert() for queue_release in self.queues]
+        )
         self.detect_revert_phase_exceptions(self.queues)
 
     def detect_revert_phase_exceptions(self, releases: list[RevertObjectDeploy]):

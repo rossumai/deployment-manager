@@ -24,6 +24,7 @@ from deployment_manager.utils.consts import (
     display_warning,
     settings,
 )
+from deployment_manager.utils.functions import gather_with_concurrency
 
 
 class NonExistentObjectException(Exception): ...
@@ -71,7 +72,7 @@ class RevertObjectDeploy(BaseModel):
                 request = self.delete_remote(target=target)
                 delete_requests.append(request)
 
-            await asyncio.gather(*delete_requests)
+            await gather_with_concurrency(*delete_requests)
 
             self.delete_target_ids_in_deploy_file()
 
@@ -85,7 +86,7 @@ class RevertObjectDeploy(BaseModel):
     @property
     def display_type(self):
         # Remove the plural 's'
-        return f"[yellow]{self.type.value[:-2 if self.type in [Resource.Inbox] else -1]}[/yellow]"
+        return f"[yellow]{self.type.value[: -2 if self.type in [Resource.Inbox] else -1]}[/yellow]"
 
     @property
     def display_label(self):

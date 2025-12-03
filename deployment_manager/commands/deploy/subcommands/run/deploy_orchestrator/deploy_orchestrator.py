@@ -55,6 +55,7 @@ from deployment_manager.utils.consts import (
     display_warning,
     settings,
 )
+from deployment_manager.utils.functions import gather_with_concurrency
 
 
 from pydantic import BaseModel
@@ -172,7 +173,7 @@ class DeployOrchestrator(BaseModel):
     async def initialize_deploy_objects(self):
         await self.ensure_token_owner()
 
-        await asyncio.gather(
+        await gather_with_concurrency(
             *[
                 deploy_object.initialize_deploy_object(deploy_file=self)
                 for deploy_object in self.deploy_objects
@@ -183,7 +184,7 @@ class DeployOrchestrator(BaseModel):
 
     async def initialize_target_objects(self):
         try:
-            await asyncio.gather(
+            await gather_with_concurrency(
                 *[
                     deploy_object.initialize_target_objects()
                     for deploy_object in self.deploy_objects
@@ -196,7 +197,7 @@ class DeployOrchestrator(BaseModel):
         try:
             self.lookup_table = self.create_lookup_table()
 
-            await asyncio.gather(
+            await gather_with_concurrency(
                 *[
                     deploy_object.override_references(
                         data_attribute="visualized_plan_data", use_dummy_references=True
@@ -265,46 +266,46 @@ class DeployOrchestrator(BaseModel):
         try:
             data_attribute = "first_deploy_data" if is_first else "second_deploy_data"
 
-            display_info(f'{"First" if is_first else "Second"} deploy started.')
+            display_info(f"{'First' if is_first else 'Second'} deploy started.")
 
             if self.patch_target_org:
                 await self.organization.deploy_target_objects(
                     data_attribute=data_attribute
                 )
 
-            await asyncio.gather(
+            await gather_with_concurrency(
                 *[
                     deploy_object.deploy_target_objects(data_attribute=data_attribute)
                     for deploy_object in self.hooks
                 ]
             )
 
-            await asyncio.gather(
+            await gather_with_concurrency(
                 *[
                     deploy_object.deploy_target_objects(data_attribute=data_attribute)
                     for deploy_object in self.rule_templates
                 ]
             )
 
-            await asyncio.gather(
+            await gather_with_concurrency(
                 *[
                     deploy_object.deploy_target_objects(data_attribute=data_attribute)
                     for deploy_object in self.workspaces
                 ]
             )
 
-            await asyncio.gather(
+            await gather_with_concurrency(
                 *[
                     deploy_object.deploy_target_objects(data_attribute=data_attribute)
                     for deploy_object in self.queues
                 ]
             )
 
-            display_info(f'{"First" if is_first else "Second"} deploy finished.')
+            display_info(f"{'First' if is_first else 'Second'} deploy finished.")
 
         except Exception as e:
             display_error(
-                f'Error during {"first" if is_first else "second"} deploy: {e}'
+                f"Error during {'first' if is_first else 'second'} deploy: {e}"
             )
             raise
 
@@ -343,17 +344,17 @@ class DeployOrchestrator(BaseModel):
     def create_lookup_table(self):
         lookup_table = defaultdict(dict)
 
-        lookup_table[self.organization.id][
-            Resource.Organization
-        ] = self.organization.targets
+        lookup_table[self.organization.id][Resource.Organization] = (
+            self.organization.targets
+        )
 
         for hook in self.hooks:
             lookup_table[hook.id][Resource.Hook] = hook.targets
 
         for rule_template in self.rule_templates:
-            lookup_table[rule_template.id][
-                CustomResource.RuleTemplate
-            ] = rule_template.targets
+            lookup_table[rule_template.id][CustomResource.RuleTemplate] = (
+                rule_template.targets
+            )
 
         for workspace in self.workspaces:
             lookup_table[workspace.id][Resource.Workspace] = workspace.targets
@@ -361,15 +362,15 @@ class DeployOrchestrator(BaseModel):
         for queue in self.queues:
             lookup_table[queue.id][Resource.Queue] = queue.targets
 
-            lookup_table[queue.schema_deploy_object.id][
-                Resource.Schema
-            ] = queue.schema_deploy_object.targets
+            lookup_table[queue.schema_deploy_object.id][Resource.Schema] = (
+                queue.schema_deploy_object.targets
+            )
             for rule in queue.schema_deploy_object.rule_deploy_objects:
                 lookup_table[rule.id][CustomResource.Rule] = rule.targets
 
-            lookup_table[queue.inbox_deploy_object.id][
-                Resource.Inbox
-            ] = queue.inbox_deploy_object.targets
+            lookup_table[queue.inbox_deploy_object.id][Resource.Inbox] = (
+                queue.inbox_deploy_object.targets
+            )
 
         return lookup_table
 

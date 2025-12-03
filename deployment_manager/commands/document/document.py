@@ -40,6 +40,7 @@ from deployment_manager.utils.consts import (
 from deployment_manager.utils.functions import (
     coro,
     extract_id_from_url,
+    gather_with_concurrency,
 )
 
 
@@ -255,7 +256,7 @@ class DirectoryDocumentator:
 
         hooks = await find_hooks_for_queues(self.org_path, queues=[queue])
         self.hooks = hooks
-        await asyncio.gather(
+        await gather_with_concurrency(
             *[
                 self._limited_run(
                     self.document_hook,
@@ -425,7 +426,7 @@ class DirectoryDocumentator:
             for hook in self.hooks:
                 if str(hook.get("id", "")) == id:
                     run_after_formatting += (
-                        f'{hook.get("name", "unknown")} ({hook.get('id', 'no-id')})\n'
+                        f"{hook.get('name', 'unkonwn')} ({hook.get('id', 'no-id')})\n"
                     )
         return run_after_formatting
 
@@ -439,7 +440,7 @@ class DirectoryDocumentator:
             for queue in self.queues:
                 if str(queue.get("id", "")) == id:
                     queue_formatting += (
-                        f'{queue.get("name", "unkonwn")} ({queue.get('id', 'no-id')})\n'
+                        f"{queue.get('name', 'unkonwn')} ({queue.get('id', 'no-id')})\n"
                     )
         return queue_formatting
 
@@ -451,7 +452,7 @@ class DirectoryDocumentator:
         )
 
         datapoints = extract_datapoints(schema)
-        await asyncio.gather(
+        await gather_with_concurrency(
             *[
                 self._limited_run(
                     self.document_schema_id,

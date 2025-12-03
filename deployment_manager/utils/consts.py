@@ -1,6 +1,7 @@
 from enum import Enum, StrEnum
 import json
 import logging
+import os
 from pathlib import Path
 import re
 import sys
@@ -92,6 +93,16 @@ settings = None
 
 class Settings:
     def __init__(self):
+        # Read concurrency from environment variable, default to 5
+        self.CONCURRENCY = int(os.environ.get("PRD2_CONCURRENCY", 5))
+
+        # Validate concurrency value
+        if self.CONCURRENCY < 1:
+            raise ValueError(
+                f"PRD2_CONCURRENCY must be at least 1, got {self.CONCURRENCY}. "
+                f"Please set a valid value: export PRD2_CONCURRENCY=5"
+            )
+
         cred_path = Path("./") / self.CREDENTIALS_FILENAME
         if not cred_path.exists():
             return
@@ -143,6 +154,9 @@ class Settings:
             self.IS_PROJECT_IN_SAME_ORG = True
 
     IS_PROJECT_IN_SAME_ORG: bool = False
+
+    # Concurrency limit for gather_with_concurrency
+    CONCURRENCY: int = 5
 
     SOURCE_API_BASE: str = ""
     # Empty string gives an API error even if there is username and password
@@ -217,7 +231,13 @@ class Settings:
     DOWNLOAD_KEY_REGEX = "regex"
 
     # Deploy consts
-    DEPLOY_IGNORED_DIRS = [".git", "payloads", "deploy_files", "deploy_secrets", "hook_sync_configs"]
+    DEPLOY_IGNORED_DIRS = [
+        ".git",
+        "payloads",
+        "deploy_files",
+        "deploy_secrets",
+        "hook_sync_configs",
+    ]
     DEPLOY_OVERRIDE_REGEX_SEPARATOR = "/#/"
     DEPLOY_DEFAULT_TARGET_URL = "https://my-org.rossum.app/api/v1"
     DEFAULT_DEPLOY_PARENT = "deploy_files"

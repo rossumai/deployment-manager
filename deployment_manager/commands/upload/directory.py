@@ -22,7 +22,10 @@ from deployment_manager.common.determine_path import (
     determine_object_type_from_url,
 )
 from deployment_manager.common.modified_at import check_modified_timestamp
-from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
+from deployment_manager.common.read_write import (
+    read_object_from_json,
+    write_object_to_json,
+)
 from deployment_manager.utils.consts import (
     GIT_CHARACTERS,
     CustomResource,
@@ -59,7 +62,7 @@ class ChangedObject(BaseModel):
     @property
     def display_type(self) -> str:
         # Remove the plural 's'
-        return f"[yellow]{self.type.value[:-2 if self.type in [Resource.Inbox] else -1]}[/yellow]"
+        return f"[yellow]{self.type.value[: -2 if self.type in [Resource.Inbox] else -1]}[/yellow]"
 
     @property
     def display_label(self) -> str:
@@ -139,7 +142,7 @@ class UploadOrganizationDirectory(OrganizationDirectory):
                 continue
 
             data = await read_object_from_json(path)
-            if not (object_url := data.get('url', "")):
+            if not (object_url := data.get("url", "")):
                 continue
             object_type = determine_object_type_from_url(object_url)
             subdir = self.find_subdir_of_object(data)
@@ -192,8 +195,8 @@ class UploadOrganizationDirectory(OrganizationDirectory):
                 f"Pushing objects to {self.display_label} (Total objects: {len(requests)})"
             )
         )
-        # Update in batches of 5
-        await gather_with_concurrency(5, *requests)
+        # Update with concurrency limit
+        await gather_with_concurrency(*requests)
 
     async def prepare_upload_requests(self):
         requests = []

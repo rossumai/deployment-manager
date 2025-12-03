@@ -6,7 +6,10 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_depl
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.rule_deploy_object import (
     RuleDeployObject,
 )
-from deployment_manager.commands.deploy.subcommands.run.models import SubObjectException, Target
+from deployment_manager.commands.deploy.subcommands.run.models import (
+    SubObjectException,
+    Target,
+)
 
 from deployment_manager.common.read_write import (
     find_fields_in_schema,
@@ -21,7 +24,10 @@ from rossum_api.api_client import Resource
 
 import asyncio
 
-from deployment_manager.utils.functions import templatize_name_id
+from deployment_manager.utils.functions import (
+    gather_with_concurrency,
+    templatize_name_id,
+)
 
 
 class SchemaDeployObject(DeployObject):
@@ -53,7 +59,7 @@ class SchemaDeployObject(DeployObject):
 
         await self.update_formula_fields_code()
 
-        await asyncio.gather(
+        await gather_with_concurrency(
             *[
                 object.initialize_deploy_object(
                     deploy_file=deploy_file, parent_schema=self
@@ -71,7 +77,7 @@ class SchemaDeployObject(DeployObject):
     async def initialize_target_objects(self):
         await super().initialize_target_objects()
 
-        await asyncio.gather(
+        await gather_with_concurrency(
             *[object.initialize_target_objects() for object in self.rule_deploy_objects]
         )
 
@@ -92,7 +98,7 @@ class SchemaDeployObject(DeployObject):
     async def override_references(self, data_attribute, use_dummy_references):
         await super().override_references(data_attribute, use_dummy_references)
 
-        await asyncio.gather(
+        await gather_with_concurrency(
             *[
                 object.override_references(
                     data_attribute=data_attribute,
@@ -136,10 +142,10 @@ class SchemaDeployObject(DeployObject):
         )
 
         # Do not send an empty array if it's not an explicit emptying (compared to target)
-        if not data.get('rules', []) and target.exists_on_remote:
+        if not data.get("rules", []) and target.exists_on_remote:
             remote_target = await self.get_remote_object(target.id)
-            if not remote_target.get('rules', []):
-                data.pop('rules', None)
+            if not remote_target.get("rules", []):
+                data.pop("rules", None)
 
     async def visualize_changes(self):
         await super().visualize_changes()
@@ -151,7 +157,7 @@ class SchemaDeployObject(DeployObject):
         try:
             await super().deploy_target_objects(data_attribute)
 
-            await asyncio.gather(
+            await gather_with_concurrency(
                 *[
                     object.deploy_target_objects(data_attribute=data_attribute)
                     for object in self.rule_deploy_objects
@@ -209,7 +215,7 @@ class SchemaDeployObject(DeployObject):
                 )
                 if not target_schema_id:
                     continue
-                if target_schema_id['type'] in ['button']:
+                if target_schema_id["type"] in ["button"]:
                     continue
                 for ignored_field, default_value in DEPLOY_IGNORED_SCHEMA_ATTRIBUTES:
                     schema_id[ignored_field] = target_schema_id.get(

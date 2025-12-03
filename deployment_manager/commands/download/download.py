@@ -16,6 +16,7 @@ from deployment_manager.common.upload_download_setup import (
 )
 from deployment_manager.utils.consts import display_error, display_warning, settings
 from deployment_manager.utils.functions import (
+    apply_concurrency_override,
     coro,
 )
 
@@ -62,6 +63,12 @@ In case the directory already exists, it first deletes its contents and then dow
     default="Sync changes to local",
     help="Commit message for pulling.",
 )
+@click.option(
+    "--concurrency",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Maximum concurrent API requests (default: 5, or PRD2_CONCURRENCY env var).",
+)
 @coro
 # To be able to run the command progammatically without the CLI decorators
 async def download_project_wrapper(
@@ -70,7 +77,9 @@ async def download_project_wrapper(
     message: str = "",
     all: bool = False,
     skip_objects_without_subdir: bool = False,
+    concurrency: int = None,
 ):
+    apply_concurrency_override(concurrency)
     await download_destinations(
         destinations=destinations,
         commit_message=message,
