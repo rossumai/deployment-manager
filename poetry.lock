@@ -1785,6 +1785,23 @@ files = [
 prompt_toolkit = ">=2.0,<4.0"
 
 [[package]]
+name = "rank-bm25"
+version = "0.2.2"
+description = "Various BM25 algorithms for document ranking"
+optional = false
+python-versions = "*"
+files = [
+    {file = "rank_bm25-0.2.2-py3-none-any.whl", hash = "sha256:7bd4a95571adadfc271746fa146a4bcfd89c0cf731e49c3d1ad863290adbe8ae"},
+    {file = "rank_bm25-0.2.2.tar.gz", hash = "sha256:096ccef76f8188563419aaf384a02f0ea459503fdf77901378d4fd9d87e5e51d"},
+]
+
+[package.dependencies]
+numpy = "*"
+
+[package.extras]
+dev = ["pytest"]
+
+[[package]]
 name = "requests"
 version = "2.32.4"
 description = "Python HTTP for Humans."
@@ -2334,4 +2351,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "72dfae0c7509c5b0ad37c8f5e51293281618ece841510856040a0548c52ecc66"
+content-hash = "ac99f81768de8f425f6d5a5ae88a1abe05ff7e3c40090f189b9c82599b04a319"
