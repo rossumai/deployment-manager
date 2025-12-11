@@ -1,7 +1,10 @@
 import dataclasses
+import warnings
 from anyio import Path
 from langchain_aws import ChatBedrockConverse
 from deployment_manager.commands.llm_chat.local_retriever import LocalDocsRetriever
+
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
 from langchain_core.tools import tool
 import json
 from typing import AsyncGenerator

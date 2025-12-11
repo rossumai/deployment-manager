@@ -50,6 +50,8 @@ diagrams = "^0.24.4"
 langchain = {extras = ["aws"], version = "^0.3.25"}
 langchain-aws = "^0.2.23"
 rank-bm25 = "^0.2.2"
+sentence-transformers = "^5.1.2"
+faiss-cpu = "<1.14"
 
 [tool.poetry.scripts]
 prd2 = "deployment_manager.main:main"
