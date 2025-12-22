@@ -34,14 +34,16 @@ class AttributeOverrider:
                 continue
 
             if isinstance(new_value, str):
-                source_regex, new_value = parse_regex_attribute_override(new_value)
+                source_regex, parsed_new_value = parse_regex_attribute_override(
+                    new_value
+                )
 
                 if not source_regex:
-                    override_parent[key] = new_value
+                    override_parent[key] = parsed_new_value
                 else:
                     pattern = re.compile(source_regex)
                     override_parent[key] = recursive_override(
-                        override_parent[key], pattern, new_value
+                        override_parent[key], pattern, parsed_new_value
                     )
             # Overwriting dicts -> merge keys, overwrite only the provided ones
             elif isinstance(new_value, dict):
