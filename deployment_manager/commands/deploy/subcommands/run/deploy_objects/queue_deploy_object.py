@@ -333,7 +333,6 @@ class QueueDeployObject(DeployObject):
         if not self.pending_warnings or self.deploy_file.ignore_all_deploy_warnings:
             return
 
-        any_acknowledged = False
         for warning in self.pending_warnings:
             if self.deploy_file.ignore_all_deploy_warnings:
                 self.ignore_deploy_warnings = True
@@ -351,9 +350,7 @@ class QueueDeployObject(DeployObject):
                 self.ignore_deploy_warnings = True
                 return
             elif user_answer.casefold() == "y":
-                any_acknowledged = True
-
-        self.ignore_deploy_warnings = any_acknowledged
+                return
 
     async def ignore_ai_fields(self, queue: dict, target: Target):
         # Object was not deployed to this target yet -> no AI fields to preserve in target
