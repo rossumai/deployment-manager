@@ -495,6 +495,33 @@ class WorkflowSaver(ObjectSaver):
             )
 
 
+class EngineSaver(ObjectSaver):
+    type: Resource = Resource.Engine
+
+    def construct_object_path(self, subdir: Subdirectory, engine: dict) -> Path:
+        object_path = (
+            self.base_path
+            / subdir.name
+            / "engines"
+            / f'{templatize_name_id(engine["name"], engine["id"])}.json'
+        )
+        return object_path
+
+    async def save_downloaded_object(self, engine: dict, subdir: Subdirectory):
+        object_path = self.construct_object_path(subdir=subdir, engine=engine)
+        if not object_path:
+            return
+        if self.download_all or await should_write_object(
+            object_path, engine, self.changed_files, self.parent_dir_reference
+        ):
+            await write_object_to_json(
+                object_path,
+                engine,
+                self.type,
+                log_message=f"Pulled {self.display_type} {object_path}",
+            )
+
+
 class WorkflowStepSaver(ObjectSaver):
     type: Resource = CustomResource.WorkflowStep
     workflows: list[dict]

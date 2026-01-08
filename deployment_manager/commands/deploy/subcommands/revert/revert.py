@@ -78,6 +78,8 @@ async def revert_release_file(
 
         await planned_release.revert_hooks()
 
+        await planned_release.revert_engines()
+
         await planned_release.revert_queues()
 
         await planned_release.revert_workspaces()
@@ -99,6 +101,8 @@ async def revert_release_file(
     revert_error = False
     try:
         await release.revert_hooks()
+
+        await release.revert_engines()
 
         await release.revert_queues()
 

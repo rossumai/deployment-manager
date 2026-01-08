@@ -11,6 +11,7 @@ from deployment_manager.commands.deploy.subcommands.template.helpers import (
     add_targets_from_mapping,
     create_deploy_file_template,
     get_attribute_overrides_from_user,
+    get_engines_from_user,
     get_hooks_from_user,
     get_multi_targets_from_user,
     get_queues_from_user,
@@ -148,6 +149,15 @@ async def create_deploy_template(
         interactive=interactive,
     )
     deploy_file_object[settings.DEPLOY_KEY_RULE_TEMPLATES] = selected_rule_templates
+
+    # Engines
+    engines = deploy_file_object.get(settings.DEPLOY_KEY_ENGINES, [])
+    selected_engines, engine_paths = await get_engines_from_user(
+        previous_deploy_file_engines=engines,
+        source_path=source_path,
+        interactive=interactive,
+    )
+    deploy_file_object[settings.DEPLOY_KEY_ENGINES] = selected_engines
 
     # Multi-target specification
     if interactive:

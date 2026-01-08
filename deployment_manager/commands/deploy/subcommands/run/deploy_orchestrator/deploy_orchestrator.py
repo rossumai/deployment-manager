@@ -8,6 +8,9 @@ from deployment_manager.commands.deploy.common.helpers import get_token_owner_fr
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
     DeployObject,
 )
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.engine_deploy_object import (
+    EngineDeployObject,
+)
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.hook_deploy_object import (
     HookDeployObject,
 )
@@ -99,6 +102,7 @@ class DeployOrchestrator(BaseModel):
     workspaces: list[WorkspaceDeployObject] = []
     queues: list[QueueDeployObject] = []
     hooks: list[HookDeployObject] = []
+    engines: list[EngineDeployObject] = []
     rule_templates: list[RuleTemplateDeployObject] = []
 
     lookup_table: LookupTable = {}
@@ -120,6 +124,7 @@ class DeployOrchestrator(BaseModel):
         return [
             self.organization,
             *self.hooks,
+            *self.engines,
             *self.rule_templates,
             *self.workspaces,
             *self.queues,
@@ -156,6 +161,7 @@ class DeployOrchestrator(BaseModel):
         deploy_state_objects = [
             (Resource.Organization, [self.organization]),
             (Resource.Hook, self.hooks),
+            (Resource.Engine, self.engines),
             (Resource.Queue, self.queues),
             (Resource.Schema, schemas),
             (CustomResource.Rule, rules),
@@ -287,6 +293,13 @@ class DeployOrchestrator(BaseModel):
             await gather_with_concurrency(
                 *[
                     deploy_object.deploy_target_objects(data_attribute=data_attribute)
+                    for deploy_object in self.engines
+                ]
+            )
+
+            await gather_with_concurrency(
+                *[
+                    deploy_object.deploy_target_objects(data_attribute=data_attribute)
                     for deploy_object in self.rule_templates
                 ]
             )
@@ -355,6 +368,9 @@ class DeployOrchestrator(BaseModel):
         for hook in self.hooks:
             lookup_table[hook.id][Resource.Hook] = hook.targets
 
+        for engine in self.engines:
+            lookup_table[engine.id][Resource.Engine] = engine.targets
+
         for rule_template in self.rule_templates:
             lookup_table[rule_template.id][CustomResource.RuleTemplate] = (
                 rule_template.targets
@@ -403,6 +419,7 @@ class DeployOrchestrator(BaseModel):
 DeployOrchestrator.model_rebuild()
 OrganizationDeployObject.model_rebuild()
 HookDeployObject.model_rebuild()
+EngineDeployObject.model_rebuild()
 WorkspaceDeployObject.model_rebuild()
 QueueDeployObject.model_rebuild()
 SchemaDeployObject.model_rebuild()

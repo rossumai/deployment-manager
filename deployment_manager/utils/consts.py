@@ -86,7 +86,7 @@ class GIT_CHARACTERS(StrEnum):
     CREATED_STAGED = "A"
 
 
-QUEUE_ENGINE_ATTRIBUTES = ["dedicated_engine", "engine", "generic_engine"]
+QUEUE_ENGINE_ATTRIBUTES = ["dedicated_engine", "engine", "generic_engine", "extraction_engine"]
 
 settings = None
 
@@ -266,6 +266,7 @@ class Settings:
     DEPLOY_KEY_RULES = "rules"
     DEPLOY_KEY_INBOX = "inbox"
     DEPLOY_KEY_HOOKS = "hooks"
+    DEPLOY_KEY_ENGINES = "engines"
     DEPLOY_KEY_RULE_TEMPLATES = "rule_templates"
 
     UPDATE_PRINT_STR: str = "[blue]UPDATE[/blue]"
@@ -294,9 +295,9 @@ class Settings:
             "trial_expires_at",
         ],
     }
-    # Non-diffed only if cross-org
+    # Non-diffed only if cross-org (engine attributes are now handled via reference replacement)
     DEPLOY_CROSS_ORG_NON_DIFFED_KEYS: dict = {
-        Resource.Queue: ["workflows", *QUEUE_ENGINE_ATTRIBUTES]
+        Resource.Queue: ["workflows"]
     }
 
     # List attributes that should be sorted before diff so not get false positive diffs (e.g., hook.queues)
