@@ -180,6 +180,10 @@ class DeployOrchestrator(BaseModel):
             ],
         )
 
+        for deploy_object in self.deploy_objects:
+            if isinstance(deploy_object, QueueDeployObject):
+                await deploy_object.prompt_pending_warnings()
+
         self.detect_phase_exceptions("initialize_failed")
 
     async def initialize_target_objects(self):

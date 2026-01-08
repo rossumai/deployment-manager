@@ -40,6 +40,7 @@ class QueueDeployObject(DeployObject):
     keep_hook_dependencies_without_equivalent: bool = False
 
     ignore_deploy_warnings: bool = False
+    pending_warnings: list[str] = Field(default_factory=list)
 
     overwrite_ignored_fields: bool = False
 
@@ -67,16 +68,10 @@ class QueueDeployObject(DeployObject):
 
         self.verify_queue_settings_are_compatible()
         await self.verify_subobjects_have_same_target_count()
-        ignore_unassigned_hooks = await self.verify_no_unassigned_hooks()
-        ignore_workflow_warnings = await self.evaluate_workflow_warning()
-        ignore_engine_warnings = await self.evaluate_engine_warning()
-        self.ignore_deploy_warnings = any(
-            [
-                ignore_unassigned_hooks,
-                ignore_workflow_warnings,
-                ignore_engine_warnings,
-            ]
-        )
+        self.pending_warnings = []
+        self.collect_unassigned_hooks_warning()
+        self.collect_workflow_warning()
+        self.collect_engine_warnings()
 
         if (
             self.schema_deploy_object.initialize_failed
@@ -288,9 +283,9 @@ class QueueDeployObject(DeployObject):
                 "Incorrect inbox/schema target count vs queue target count"
             )
 
-    async def verify_no_unassigned_hooks(self):
+    def collect_unassigned_hooks_warning(self):
         if self.deploy_file.ignore_all_deploy_warnings or self.ignore_deploy_warnings:
-            return True
+            return
 
         queue_hook_urls = self.data.get("hooks", [])
         queue_hook_ids = [extract_id_from_url(url) for url in queue_hook_urls]
@@ -301,54 +296,61 @@ class QueueDeployObject(DeployObject):
 
         for queue_hook_id in queue_hook_ids:
             if queue_hook_id not in deployed_hook_ids:
-                display_warning(
+                self.pending_warnings.append(
                     f"{self.display_type} {self.display_label} depends on hook [purple]{queue_hook_id}[/purple] that is not in the deploy file - is this a new hook created after the deploy file?"
                 )
-                return await self.prompt_user_about_warnings()
+                return
 
-    async def evaluate_workflow_warning(self):
+    def collect_workflow_warning(self):
         if (
             self.deploy_file.ignore_all_deploy_warnings
             or self.ignore_deploy_warnings
             or self.deploy_file.is_same_org
         ):
-            return True
+            return
 
         if self.data.get("workflows", []):
-            display_warning(
+            self.pending_warnings.append(
                 f"{self.display_type} {self.display_label} has 'workflows' defined. Please make sure to create and assign them manually for the target."
             )
-            return await self.prompt_user_about_warnings()
 
-    async def evaluate_engine_warning(self):
+    def collect_engine_warnings(self):
+        if (
+            self.deploy_file.ignore_all_deploy_warnings
+            or self.ignore_deploy_warnings
+            or self.deploy_file.is_same_org
+        ):
+            return
+
         for attr in QUEUE_ENGINE_ATTRIBUTES:
-            # Recheck after each iteration in case the user saig "ignore warnings"
-            if (
-                self.deploy_file.ignore_all_deploy_warnings
-                or self.ignore_deploy_warnings
-                or self.deploy_file.is_same_org
-            ):
-                return True
-
             if self.data.get(attr, None):
-                display_warning(
+                self.pending_warnings.append(
                     f"{self.display_type} {self.display_label} has '{attr}' defined. Please make sure to create and assign it manually for the target."
                 )
-                return await self.prompt_user_about_warnings()
+                return
 
-    async def prompt_user_about_warnings(
-        self, message="Do you want to disable warnings like this for this queue?"
-    ):
-        user_answer = await questionary.text(
-            message=message,
-            instruction="(y/n/yy)",
-        ).ask_async()
-        # Disable warnings for all other queues
-        if user_answer.casefold() == "yy":
-            self.deploy_file.ignore_all_deploy_warnings = True
-            return True
+    async def prompt_pending_warnings(self):
+        if not self.pending_warnings or self.deploy_file.ignore_all_deploy_warnings:
+            return
 
-        return user_answer == "y"
+        for warning in self.pending_warnings:
+            if self.deploy_file.ignore_all_deploy_warnings:
+                self.ignore_deploy_warnings = True
+                return
+
+            display_warning(warning)
+
+            user_answer = await questionary.text(
+                message="Do you want to disable warnings like this for this queue?",
+                instruction="(y/n/yy)",
+            ).ask_async()
+
+            if user_answer.casefold() == "yy":
+                self.deploy_file.ignore_all_deploy_warnings = True
+                self.ignore_deploy_warnings = True
+                return
+            elif user_answer.casefold() == "y":
+                return
 
     async def ignore_ai_fields(self, queue: dict, target: Target):
         # Object was not deployed to this target yet -> no AI fields to preserve in target
