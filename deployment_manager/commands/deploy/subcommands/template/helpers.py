@@ -62,6 +62,8 @@ queues:
 
 hooks:
 
+engines:
+
 unselected_hooks: # List hook IDs that should not be deployed, even if they belong to selected queues
 """
 
@@ -220,6 +222,17 @@ async def find_rule_template_paths_for_dir(base_dir: Path):
         rule_path
         async for rule_path in (rule_template_dir).iterdir()
         if await rule_path.is_file()
+    ]
+
+
+async def find_engine_paths_for_dir(base_dir: Path):
+    engine_dir = base_dir / Resource.Engine.value
+    if not (await engine_dir.exists()):
+        return []
+    return [
+        engine_path
+        async for engine_path in (engine_dir).iterdir()
+        if await engine_path.is_file()
     ]
 
 
@@ -577,6 +590,7 @@ async def get_attribute_overrides_from_user():
         settings.DEPLOY_KEY_WORKSPACES,
         settings.DEPLOY_KEY_QUEUES,
         settings.DEPLOY_KEY_HOOKS,
+        settings.DEPLOY_KEY_ENGINES,
     ]
     overrides = []
     while await questionary.confirm(
@@ -700,6 +714,14 @@ def add_targets_from_mapping(mapping: dict, deploy_file: dict):
         object_type=settings.DEPLOY_KEY_HOOKS,
     )
 
+    mapping_engines = mapping["organization"].get("engines", [])
+    deploy_engines = deploy_file.get(settings.DEPLOY_KEY_ENGINES, [])
+    add_targets_for_objects(
+        mapping_objects=mapping_engines,
+        deploy_objects=deploy_engines,
+        object_type=settings.DEPLOY_KEY_ENGINES,
+    )
+
     mapping_inboxes = []
     for mapping_queue in mapping_queues:
         if mapping_inbox := mapping_queue.get("inbox", None):
@@ -800,3 +822,34 @@ async def get_rule_templates_from_user(
         objects=deploy_file_rule_templates,
         objects_in_previous_file=previous_deploy_file_rule_templates,
     ), [template["path"] for template in deploy_file_rule_templates]
+
+
+async def get_engines_from_user(
+    source_path: Path,
+    interactive: bool,
+    previous_deploy_file_engines: list[dict] = None,
+):
+    if not previous_deploy_file_engines:
+        previous_deploy_file_engines = []
+    selected_engine_ids = [engine["id"] for engine in previous_deploy_file_engines]
+    engine_paths = await find_engine_paths_for_dir(source_path)
+    if not engine_paths:
+        return [], []
+
+    engine_choices = await prepare_choices(
+        paths=engine_paths,
+        preselected_ids=selected_engine_ids,
+    )
+    deploy_file_engines = [
+        engine.value for engine in engine_choices if engine.checked
+    ]
+    if interactive or not selected_engine_ids:
+        deploy_file_engines = await questionary.checkbox(
+            f"Select {Resource.Engine.value}:",
+            choices=engine_choices,
+        ).ask_async()
+
+    return prepare_deploy_file_objects(
+        objects=deploy_file_engines,
+        objects_in_previous_file=previous_deploy_file_engines,
+    ), [engine["path"] for engine in deploy_file_engines]

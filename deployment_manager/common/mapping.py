@@ -76,6 +76,7 @@ def create_empty_mapping():
             "targets": [{"target_id": None}],
             "workspaces": [],
             "hooks": [],
+            "engines": [],
             "schemas": [],
         }
     }

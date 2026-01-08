@@ -36,6 +36,7 @@ class DeployState(BaseModel):
     queues: Dict[int, ResourceDeployments] = Field(default_factory=dict)
     inboxes: Dict[int, ResourceDeployments] = Field(default_factory=dict)
     workspaces: Dict[int, ResourceDeployments] = Field(default_factory=dict)
+    engines: Dict[int, ResourceDeployments] = Field(default_factory=dict)
 
     @classmethod
     async def ensure_deploy_state_file(

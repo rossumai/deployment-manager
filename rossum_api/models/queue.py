@@ -28,6 +28,7 @@ class Queue:
     settings: Dict[str, Any] = field(default_factory=dict)
     dedicated_engine: Optional[Union[str, Dict[str, Any]]] = None
     generic_engine: Optional[Union[str, Dict[str, Any]]] = None
+    extraction_engine: Optional[Union[str, Dict[str, Any]]] = None
     use_confirmed_state: bool = False
     document_lifetime: Optional[str] = None
     delete_after: Optional[str] = None
