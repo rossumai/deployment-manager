@@ -1,7 +1,10 @@
 from pydantic import BaseModel
-from rossum_api import APIClientError, ElisAPIClient
-from rossum_api.api_client import Resource
+from rossum_api import APIClientError
+from rossum_api.domain_logic.resources import Resource
 
+from deployment_manager.common.custom_client import (
+    CustomAsyncRossumAPIClient as AsyncRossumAPIClient,
+)
 from deployment_manager.utils.consts import CustomResource, display_warning
 from deployment_manager.utils.functions import gather_with_concurrency
 
@@ -10,7 +13,7 @@ class Downloader(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    client: ElisAPIClient
+    client: AsyncRossumAPIClient
 
     async def download_remote_objects(
         self, type: Resource | CustomResource, check_access: bool = False

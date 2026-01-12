@@ -4,7 +4,7 @@ from pydantic import BaseModel
 import re
 from anyio import Path
 import questionary
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 from rich import print as pprint
 from deployment_manager.commands.download.subdirectory import (

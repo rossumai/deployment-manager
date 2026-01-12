@@ -1,26 +1,27 @@
-from pydantic import BaseModel
 import questionary
+from anyio import Path
+from pydantic import BaseModel
+from rich import print as pprint
+from deployment_manager.common.custom_client import CustomAsyncRossumAPIClient as AsyncRossumAPIClient
+from rossum_api.domain_logic.resources import Resource
+from rossum_api.dtos import Token
+
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.attribute_override import (
     AttributeOverrider,
 )
-from deployment_manager.commands.download.downloader import Downloader
-from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
     get_url_and_credentials,
 )
+from deployment_manager.commands.download.downloader import Downloader
+from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
 from deployment_manager.utils.consts import (
     display_error,
     display_info,
     display_warning,
     settings,
 )
-
-from rich import print as pprint
-from anyio import Path
 from deployment_manager.utils.functions import extract_id_from_url, templatize_name_id
-from rossum_api import ElisAPIClient
-from rossum_api.api_client import Resource
 
 
 class DeployFileReverser(BaseModel):
@@ -33,8 +34,8 @@ class DeployFileReverser(BaseModel):
     source_path: Path = None
     target_path: Path = None
 
-    source_client: ElisAPIClient = None
-    target_client: ElisAPIClient = None
+    source_client: AsyncRossumAPIClient = None
+    target_client: AsyncRossumAPIClient = None
 
     yaml: DeployYaml = None
 
@@ -53,8 +54,8 @@ class DeployFileReverser(BaseModel):
         )
         if not source_credentials:
             return
-        self.source_client = ElisAPIClient(
-            base_url=source_credentials.url, token=source_credentials.token
+        self.source_client = AsyncRossumAPIClient(
+            base_url=source_credentials.url, credentials=Token(source_credentials.token)
         )
 
         target_dir_subdir = self.yaml.data.get(settings.DEPLOY_KEY_TARGET_DIR, "")
@@ -68,8 +69,8 @@ class DeployFileReverser(BaseModel):
         )
         if not target_credentials:
             return
-        self.target_client = ElisAPIClient(
-            base_url=target_credentials.url, token=target_credentials.token
+        self.target_client = AsyncRossumAPIClient(
+            base_url=target_credentials.url, credentials=Token(target_credentials.token)
         )
 
         self.source_path = self.project_path / source_dir_subdir

@@ -2,7 +2,7 @@ from typing import Optional
 from anyio import Path
 from pydantic import Field
 import questionary
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
     DeployObject,

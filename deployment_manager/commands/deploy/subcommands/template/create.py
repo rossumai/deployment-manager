@@ -28,7 +28,7 @@ from deployment_manager.utils.consts import display_error, display_info, setting
 
 from rich import print as pprint
 from anyio import Path
-from rossum_api import ElisAPIClient
+from deployment_manager.common.custom_client import CustomAsyncRossumAPIClient as AsyncRossumAPIClient
 
 
 async def create_deploy_template(
@@ -36,8 +36,8 @@ async def create_deploy_template(
     mapping_file_path: Path = None,
     org_path: Path = None,
     interactive: bool = False,
-    source_client: ElisAPIClient = None,
-    target_client: ElisAPIClient = None,
+    source_client: AsyncRossumAPIClient = None,
+    target_client: AsyncRossumAPIClient = None,
 ):
     if not input_file_path:
         input_file_content = create_deploy_file_template()

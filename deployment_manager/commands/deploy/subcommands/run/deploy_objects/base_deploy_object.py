@@ -57,7 +57,7 @@ from rich.console import Console
 
 from anyio import Path
 from rossum_api import APIClientError
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.utils.consts import display_error, display_warning, settings
 from deployment_manager.utils.functions import (

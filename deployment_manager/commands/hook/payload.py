@@ -1,6 +1,8 @@
-from anyio import Path
 import questionary
-from rossum_api import ElisAPIClient
+from anyio import Path
+from deployment_manager.common.custom_client import CustomAsyncRossumAPIClient as AsyncRossumAPIClient
+from rossum_api.dtos import Token
+
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     get_url_and_credentials,
 )
@@ -18,7 +20,7 @@ STATUS_REQUIRING_EVENTS = ["annotation_status", "annotation_content"]
 
 
 async def generate_and_save_hook_payload(
-    hook_path: Path, annotation_url: str = "", client: ElisAPIClient = None
+    hook_path: Path, annotation_url: str = "", client: AsyncRossumAPIClient = None
 ):
     try:
         payload = await generate_hook_payload(
@@ -40,7 +42,7 @@ async def generate_and_save_hook_payload(
 
 
 async def generate_hook_payload(
-    hook_path: Path, annotation_url: str = "", client: ElisAPIClient = None
+    hook_path: Path, annotation_url: str = "", client: AsyncRossumAPIClient = None
 ):
     hook = await load_hook_object(hook_path=hook_path)
     if not hook:
@@ -55,7 +57,9 @@ async def generate_hook_payload(
         )
         if not credentials:
             return
-        client = ElisAPIClient(base_url=credentials.url, token=credentials.token)
+        client = AsyncRossumAPIClient(
+            base_url=credentials.url, credentials=Token(credentials.token)
+        )
 
     if not annotation_url:
         annotation_url = await questionary.text(

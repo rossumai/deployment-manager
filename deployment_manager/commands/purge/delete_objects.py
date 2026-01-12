@@ -1,7 +1,6 @@
 from rich.progress import Progress
-from rossum_api import ElisAPIClient
-from rossum_api.api_client import Resource
-
+from deployment_manager.common.custom_client import CustomAsyncRossumAPIClient as AsyncRossumAPIClient
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.utils.consts import display_error
 from deployment_manager.utils.functions import (
@@ -10,7 +9,9 @@ from deployment_manager.utils.functions import (
 )
 
 
-async def delete_all_objects_with_ids(ids_to_delete: list[dict], client: ElisAPIClient):
+async def delete_all_objects_with_ids(
+    ids_to_delete: list[dict], client: AsyncRossumAPIClient
+):
     to_delete = {
         "workspaces": [],
         "queues": [],
@@ -20,22 +21,22 @@ async def delete_all_objects_with_ids(ids_to_delete: list[dict], client: ElisAPI
     }
     total_to_delete_count = 0
 
-    async for schema in client.list_all_schemas():
+    async for schema in client.list_schemas():
         if schema.id in ids_to_delete["schemas"]:
             to_delete["schemas"].append(schema.id)
             total_to_delete_count += 1
 
-    async for hook in client.list_all_hooks():
+    async for hook in client.list_hooks():
         if hook.id in ids_to_delete["hooks"]:
             to_delete["hooks"].append(hook.id)
             total_to_delete_count += 1
 
-    async for workspace in client.list_all_workspaces():
+    async for workspace in client.list_workspaces():
         if workspace.id in ids_to_delete["workspaces"]:
             to_delete["workspaces"].append(workspace.id)
             total_to_delete_count += 1
 
-    async for queue in client.list_all_queues():
+    async for queue in client.list_queues():
         if queue.id in ids_to_delete["queues"]:
             to_delete["queues"].append(queue.id)
             total_to_delete_count += 1

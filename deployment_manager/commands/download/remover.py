@@ -6,7 +6,7 @@ from anyio import Path
 from pydantic import BaseModel
 
 from deployment_manager.commands.download.helpers import delete_objects_non_versioned_attributes
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.common.determine_path import determine_object_type_from_url
 from deployment_manager.common.read_write import (

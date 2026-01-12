@@ -1,9 +1,9 @@
 import asyncio
 import logging
-from anyio import Path
 
-from rossum_api import ElisAPIClient
-from rossum_api.api_client import Resource
+from anyio import Path
+from deployment_manager.common.custom_client import CustomAsyncRossumAPIClient as AsyncRossumAPIClient
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.common.mapping import read_mapping, write_mapping
 from deployment_manager.utils.consts import settings
@@ -23,7 +23,9 @@ async def create_self_targetting_org(tmp_path: Path, undo=False):
     await write_mapping(tmp_path / settings.MAPPING_FILENAME, mapping)
 
 
-async def delete_migrated_objects(ids_to_retain: list[dict], client: ElisAPIClient):
+async def delete_migrated_objects(
+    ids_to_retain: list[dict], client: AsyncRossumAPIClient
+):
     to_delete = {
         "workspaces": [],
         "queues": [],
@@ -32,19 +34,19 @@ async def delete_migrated_objects(ids_to_retain: list[dict], client: ElisAPIClie
         "hooks": [],
     }
 
-    async for schema in client.list_all_schemas():
+    async for schema in client.list_schemas():
         if schema.id not in ids_to_retain["schemas"]:
             to_delete["schemas"].append(schema.id)
 
-    async for hook in client.list_all_hooks():
+    async for hook in client.list_hooks():
         if hook.id not in ids_to_retain["hooks"]:
             to_delete["hooks"].append(hook.id)
 
-    async for workspace in client.list_all_workspaces():
+    async for workspace in client.list_workspaces():
         if workspace.id not in ids_to_retain["workspaces"]:
             to_delete["workspaces"].append(workspace.id)
 
-    async for queue in client.list_all_queues():
+    async for queue in client.list_queues():
         if queue.id not in ids_to_retain["queues"]:
             to_delete["queues"].append(queue.id)
 

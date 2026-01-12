@@ -1,5 +1,5 @@
 from anyio import Path
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.utils.consts import CustomResource
 

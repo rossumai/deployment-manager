@@ -2,19 +2,15 @@
 name = "deployment-manager"
 version = "0.0.0"
 packages = [
-    { include = "deployment_manager" },    # Keeps main package
-    { include = "rossum_api" },
+  { include = "deployment_manager" }, # Keeps main package
 ]
 
 
-# Force Poetry to include rossum_api, even if it's in .gitignore
-include = ["rossum_api/**/*"]
-
 description = ""
 authors = [
-    "Miroslav Rehounek <miroslav.rehounek@rossum.ai>",
-    "Jan Sporek <jan.sporek@rossum.ai>",
-    "Ondrej Polesny <ondrej.polesny@rossum.ai>",
+  "Miroslav Rehounek <miroslav.rehounek@rossum.ai>",
+  "Jan Sporek <jan.sporek@rossum.ai>",
+  "Ondrej Polesny <ondrej.polesny@rossum.ai>",
 ]
 license = "MIT"
 readme = "README.md"
@@ -38,16 +34,10 @@ pydantic = "^2.9.2"
 questionary = "^2.0.1"
 boto3 = "^1.37.30"
 botocore = "^1.37.30"
+rossum-api = "^3.7.0"
 
-# Moved from `rossum_api` dependencies:
-tenacity = "^8.2.3"
-datamodel-code-generator = "^0.21.2"
-fastapi = "^0.100.0"
-uvicorn = "^0.20.0"
-aiofiles = "^24.1.0"
-dacite = "^1.9.2"
-diagrams = "^0.24.4"
-langchain = {extras = ["aws"], version = "^0.3.25"}
+# LLM
+langchain = { extras = ["aws"], version = "^0.3.25" }
 langchain-aws = "^0.2.23"
 
 [tool.poetry.scripts]
@@ -65,7 +55,7 @@ requires = ["poetry-core", "poetry-dynamic-versioning"]
 build-backend = "poetry_dynamic_versioning.backend"
 
 [tool.ruff]
-exclude = ["dummy_project", "dist", "rossum_api"]
+exclude = ["dummy_project", "dist"]
 
 [tool.pytest]
 env_files = [".env"]

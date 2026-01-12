@@ -1,9 +1,15 @@
 import asyncio
-from collections import defaultdict
 import json
-from anyio import Path
 import pathlib
+from collections import defaultdict
+
 import questionary
+from anyio import Path
+from pydantic import BaseModel
+from rossum_api import APIClientError
+from rossum_api.domain_logic.resources import Resource
+from rossum_api.models.organization import Organization
+
 from deployment_manager.commands.deploy.common.helpers import get_token_owner_from_user
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
     DeployObject,
@@ -35,19 +41,18 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.workspace
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
 )
-
+from deployment_manager.commands.deploy.subcommands.run.merge.state import (
+    DeployState,
+)
 from deployment_manager.commands.deploy.subcommands.run.models import (
     DeployException,
     LookupTable,
     ReverseLookupTable,
     Target,
 )
-
-
-from deployment_manager.commands.deploy.subcommands.run.merge.state import (
-    DeployState,
+from deployment_manager.common.custom_client import (
+    CustomAsyncRossumAPIClient as AsyncRossumAPIClient,
 )
-
 from deployment_manager.utils.consts import (
     CustomResource,
     display_error,
@@ -56,13 +61,6 @@ from deployment_manager.utils.consts import (
     settings,
 )
 from deployment_manager.utils.functions import gather_with_concurrency
-
-
-from pydantic import BaseModel
-from rossum_api import APIClientError, ElisAPIClient
-from rossum_api.api_client import Resource
-from rossum_api.models.organization import Organization
-
 
 # TODO: dummy refs not in diff -> conflict if org.workspaces is 1 and we are creating another
 # TODO: purge should clean up state file as well
@@ -86,8 +84,8 @@ class DeployOrchestrator(BaseModel):
     secrets: dict | None = {}
     deploy_state: DeployState | None = {}
 
-    client: ElisAPIClient
-    source_client: ElisAPIClient
+    client: AsyncRossumAPIClient
+    source_client: AsyncRossumAPIClient
     source_dir_path: Path
     yaml: DeployYaml
     deploy_file_path: Path
@@ -348,17 +346,17 @@ class DeployOrchestrator(BaseModel):
     def create_lookup_table(self):
         lookup_table = defaultdict(dict)
 
-        lookup_table[self.organization.id][Resource.Organization] = (
-            self.organization.targets
-        )
+        lookup_table[self.organization.id][
+            Resource.Organization
+        ] = self.organization.targets
 
         for hook in self.hooks:
             lookup_table[hook.id][Resource.Hook] = hook.targets
 
         for rule_template in self.rule_templates:
-            lookup_table[rule_template.id][CustomResource.RuleTemplate] = (
-                rule_template.targets
-            )
+            lookup_table[rule_template.id][
+                CustomResource.RuleTemplate
+            ] = rule_template.targets
 
         for workspace in self.workspaces:
             lookup_table[workspace.id][Resource.Workspace] = workspace.targets
@@ -366,15 +364,15 @@ class DeployOrchestrator(BaseModel):
         for queue in self.queues:
             lookup_table[queue.id][Resource.Queue] = queue.targets
 
-            lookup_table[queue.schema_deploy_object.id][Resource.Schema] = (
-                queue.schema_deploy_object.targets
-            )
+            lookup_table[queue.schema_deploy_object.id][
+                Resource.Schema
+            ] = queue.schema_deploy_object.targets
             for rule in queue.schema_deploy_object.rule_deploy_objects:
                 lookup_table[rule.id][CustomResource.Rule] = rule.targets
 
-            lookup_table[queue.inbox_deploy_object.id][Resource.Inbox] = (
-                queue.inbox_deploy_object.targets
-            )
+            lookup_table[queue.inbox_deploy_object.id][
+                Resource.Inbox
+            ] = queue.inbox_deploy_object.targets
 
         return lookup_table
 

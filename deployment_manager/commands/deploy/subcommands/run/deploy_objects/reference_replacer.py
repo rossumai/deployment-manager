@@ -14,7 +14,7 @@ from deployment_manager.commands.deploy.subcommands.run.models import (
 )
 from deployment_manager.utils.consts import display_warning, settings
 from deployment_manager.utils.functions import extract_id_from_url
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 
 import copy

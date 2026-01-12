@@ -1,11 +1,10 @@
-from anyio import Path
-
-import questionary
-from rich.panel import Panel
-
-from rich import print as pprint
 import click
-from rossum_api import ElisAPIClient
+import questionary
+from anyio import Path
+from rich import print as pprint
+from rich.panel import Panel
+from deployment_manager.common.custom_client import CustomAsyncRossumAPIClient as AsyncRossumAPIClient
+from rossum_api.dtos import Token
 
 from deployment_manager.commands.deploy.common.helpers import (
     get_directory_from_config,
@@ -13,7 +12,6 @@ from deployment_manager.commands.deploy.common.helpers import (
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     get_url_and_credentials,
 )
-
 from deployment_manager.commands.purge.directory import (
     ALL_OBJECT_TYPES,
     PurgeOrganizationDirectory,
@@ -28,7 +26,6 @@ from deployment_manager.utils.functions import (
     apply_concurrency_override,
     coro,
 )
-
 
 PURGE_OBJECT_TYPES = [
     *ALL_OBJECT_TYPES,
@@ -66,7 +63,9 @@ async def purge_object_types_wrapper(object_types, concurrency):
 
 
 async def purge_object_types(
-    object_types: list[str], client: ElisAPIClient = None, project_path: Path = None
+    object_types: list[str],
+    client: AsyncRossumAPIClient = None,
+    project_path: Path = None,
 ):
     try:
         if not object_types:
@@ -91,7 +90,9 @@ async def purge_object_types(
         if not credentials:
             return
 
-        client = ElisAPIClient(base_url=credentials.url, token=credentials.token)
+        client = AsyncRossumAPIClient(
+            base_url=credentials.url, credentials=Token(credentials.token)
+        )
 
         directory_in_config = await get_directory_from_config(
             base_path=project_path, org_name=selected_dir
@@ -106,7 +107,7 @@ async def purge_object_types(
         # N/A selected -> need to find target org via API
         else:
             target_org_choices = []
-            async for org in client.list_all_organizations():
+            async for org in client.list_organizations():
                 target_org_choices.append(questionary.Choice(title=org.name, value=org))
             if len(target_org_choices) > 1:
                 target_org = await questionary.select(

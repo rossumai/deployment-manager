@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import jmespath
 
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     traverse_object,

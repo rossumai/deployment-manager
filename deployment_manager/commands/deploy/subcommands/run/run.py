@@ -1,16 +1,16 @@
-from anyio import Path
-import anyio
-from pydantic import ValidationError
-import questionary
 from dataclasses import fields
+
+import anyio
+import questionary
+from anyio import Path
+from pydantic import ValidationError
+from rossum_api import APIClientError
+from rossum_api.dtos import Token
+from rossum_api.models.organization import Organization
+
 from deployment_manager.commands.deploy.subcommands.run.deploy_orchestrator.deploy_orchestrator import (
     DeployOrchestrator,
 )
-from deployment_manager.commands.deploy.subcommands.run.merge.state import DeployState
-from deployment_manager.commands.deploy.subcommands.run.models import DeployException
-from rossum_api import APIClientError, ElisAPIClient
-from rossum_api.models.organization import Organization
-
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
     check_required_keys,
@@ -18,11 +18,15 @@ from deployment_manager.commands.deploy.subcommands.run.helpers import (
     get_new_deploy_file_path,
     get_url_and_credentials,
 )
-
+from deployment_manager.commands.deploy.subcommands.run.merge.state import DeployState
+from deployment_manager.commands.deploy.subcommands.run.models import DeployException
 from deployment_manager.commands.deploy.subcommands.run.reverse_override import (
     reverse_source_target_in_yaml,
 )
 from deployment_manager.commands.download.download import download_destinations
+from deployment_manager.common.custom_client import (
+    CustomAsyncRossumAPIClient as AsyncRossumAPIClient,
+)
 from deployment_manager.common.read_write import read_object_from_json
 from deployment_manager.utils.consts import (
     display_error,
@@ -34,11 +38,11 @@ from deployment_manager.utils.consts import (
 async def deploy_release_file(
     deploy_file_path: Path,
     project_path: Path = None,
-    source_client: ElisAPIClient = None,
-    target_client: ElisAPIClient = None,
+    source_client: AsyncRossumAPIClient = None,
+    target_client: AsyncRossumAPIClient = None,
     auto_apply_plan: bool = False,
     prefer: str = None,
-    no_rebase: bool =False,
+    no_rebase: bool = False,
     # auto_delete: bool = False,
     commit: bool = False,
     commit_message: str = "",
@@ -73,8 +77,8 @@ async def deploy_release_file(
         )
         if not source_credentials:
             return
-        source_client = ElisAPIClient(
-            base_url=source_credentials.url, token=source_credentials.token
+        source_client = AsyncRossumAPIClient(
+            base_url=source_credentials.url, credentials=Token(source_credentials.token)
         )
 
     source_org_path = project_path / source_org_name / "organization.json"
@@ -102,8 +106,8 @@ async def deploy_release_file(
         )
         if not target_credentials:
             return
-        target_client = ElisAPIClient(
-            base_url=target_credentials.url, token=target_credentials.token
+        target_client = AsyncRossumAPIClient(
+            base_url=target_credentials.url, credentials=Token(target_credentials.token)
         )
 
     target_org_path: Path = project_path / target_org_name / "organization.json"
@@ -118,7 +122,7 @@ async def deploy_release_file(
         )
     else:
         target_org_choices = []
-        async for org in target_client.list_all_organizations():
+        async for org in target_client.list_organizations():
             target_org_choices.append(questionary.Choice(title=org.name, value=org))
         if len(target_org_choices) > 1:
             target_org = await questionary.select(

@@ -19,7 +19,7 @@ from deployment_manager.common.schema import find_schema_id
 from deployment_manager.utils.consts import display_error, settings, CustomResource
 
 
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 
 import asyncio

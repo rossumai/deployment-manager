@@ -6,7 +6,7 @@ from deployment_manager.utils.consts import CustomResource
 
 
 from deployment_manager.utils.functions import templatize_name_id
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 
 class RuleDeployObject(DeployObject):
