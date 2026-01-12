@@ -1,7 +1,7 @@
 import re
 from typing import Any, Optional, Tuple
 
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 from enum import Enum, auto
 from typing import Any, Optional, Tuple

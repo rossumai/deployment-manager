@@ -5,7 +5,7 @@ from typing import Any
 import aiofiles
 from anyio import Path
 from rich import print
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 import yaml
 from ruamel.yaml import YAML
 

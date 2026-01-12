@@ -24,7 +24,7 @@ from deployment_manager.utils.functions import (
     find_object_by_id,
     templatize_name_id,
 )
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 
 def create_deploy_file_template():

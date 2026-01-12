@@ -1,5 +1,6 @@
 import click
-from rossum_api import ElisAPIClient
+from deployment_manager.common.custom_client import CustomAsyncRossumAPIClient as AsyncRossumAPIClient
+from rossum_api.dtos import Token, UserCredentials
 
 from deployment_manager.utils.consts import settings, validate_token
 
@@ -13,17 +14,31 @@ async def create_and_validate_client(
         if not settings.SOURCE_API_BASE:
             raise click.ClickException(f"No base URL provided for {destination}.")
 
+        if not (
+            settings.SOURCE_TOKEN
+            or (settings.SOURCE_USERNAME and settings.SOURCE_PASSWORD)
+        ):
+            raise ValueError("username + password or token must be specified.")
+
         if settings.SOURCE_TOKEN and not settings.SOURCE_PASSWORD:
             validate_token(settings.SOURCE_API_BASE, settings.SOURCE_TOKEN, "source")
 
         try:
-            client = ElisAPIClient(
-                base_url=settings.SOURCE_API_URL,
-                token=settings.SOURCE_TOKEN,
-                username=settings.SOURCE_USERNAME,
-                password=settings.SOURCE_PASSWORD,
-            )
-            await client.request("get", "auth/user")
+            if settings.SOURCE_TOKEN:
+                client = AsyncRossumAPIClient(
+                    base_url=settings.SOURCE_API_URL,
+                    credentials=Token(settings.SOURCE_TOKEN),
+                )
+            else:
+                client = AsyncRossumAPIClient(
+                    base_url=settings.SOURCE_API_URL,
+                    credentials=UserCredentials(
+                        username=settings.SOURCE_USERNAME,
+                        password=settings.SOURCE_PASSWORD,
+                    ),
+                )
+
+            await client.request("GET", "auth/user")
             return client
         except Exception:
             raise click.ClickException(f'Invalid credentials for "{destination}".')
@@ -32,17 +47,31 @@ async def create_and_validate_client(
         if not settings.TARGET_API_URL:
             raise click.ClickException(f"No base URL provided for {destination}.")
 
+        if not (
+            settings.TARGET_TOKEN
+            or (settings.TARGET_USERNAME and settings.TARGET_PASSWORD)
+        ):
+            raise ValueError("username + password or token must be specified.")
+
         if settings.TARGET_TOKEN and not settings.TARGET_PASSWORD:
             validate_token(settings.TARGET_API_BASE, settings.TARGET_TOKEN, "target")
 
         try:
-            client = ElisAPIClient(
-                base_url=settings.TARGET_API_URL,
-                token=settings.TARGET_TOKEN,
-                username=settings.TARGET_USERNAME,
-                password=settings.TARGET_PASSWORD,
-            )
-            await client.request("get", "auth/user")
+            if settings.TARGET_TOKEN:
+                client = AsyncRossumAPIClient(
+                    base_url=settings.TARGET_API_URL,
+                    credentials=Token(settings.TARGET_TOKEN),
+                )
+            else:
+                client = AsyncRossumAPIClient(
+                    base_url=settings.TARGET_API_URL,
+                    credentials=UserCredentials(
+                        username=settings.TARGET_USERNAME,
+                        password=settings.TARGET_PASSWORD,
+                    ),
+                )
+
+            await client.request("GET", "auth/user")
             return client
         except Exception:
             raise click.ClickException(f'Invalid credentials for "{destination}".')

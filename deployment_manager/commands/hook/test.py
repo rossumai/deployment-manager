@@ -1,6 +1,7 @@
 import json
+from rossum_api.dtos import Token
 from anyio import Path
-from rossum_api import ElisAPIClient
+from deployment_manager.common.custom_client import CustomAsyncRossumAPIClient as AsyncRossumAPIClient
 from rich import print as pprint
 
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
@@ -21,7 +22,7 @@ async def test_hook(
     hook_path: Path,
     payload_path: Path = None,
     annotation_url: str = "",
-    client: ElisAPIClient = None,
+    client: AsyncRossumAPIClient = None,
 ):
     try:
         if not client:
@@ -33,7 +34,9 @@ async def test_hook(
             )
             if not credentials:
                 return
-            client = ElisAPIClient(base_url=credentials.url, token=credentials.token)
+            client = AsyncRossumAPIClient(
+                base_url=credentials.url, credentials=Token(credentials.token)
+            )
 
         if not payload_path:
             payload = await generate_hook_payload(

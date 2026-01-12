@@ -11,7 +11,7 @@ import httpx
 from rich.prompt import Prompt
 from rich.console import Console
 from rich.panel import Panel
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 import yaml
 
 

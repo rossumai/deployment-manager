@@ -4,7 +4,7 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_depl
 
 
 from deployment_manager.utils.consts import CustomResource
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 
 class RuleTemplateDeployObject(DeployObject):

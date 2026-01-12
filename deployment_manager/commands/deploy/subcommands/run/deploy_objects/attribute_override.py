@@ -6,7 +6,7 @@ from deployment_manager.utils.consts import settings
 from deployment_manager.utils.functions import (
     flatten,
 )
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 
 class AttributeOverrideException(Exception): ...

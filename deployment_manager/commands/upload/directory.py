@@ -1,8 +1,9 @@
 from anyio import Path
 from pydantic import BaseModel
 from deployment_manager.commands.upload.models import PushException
-from rossum_api import ElisAPIClient
-from rossum_api.api_client import Resource
+from deployment_manager.common.custom_client import CustomAsyncRossumAPIClient as AsyncRossumAPIClient
+from rossum_api.dtos import Token
+from rossum_api.domain_logic.resources import Resource
 from deployment_manager.commands.deploy.common.helpers import (
     validate_credentials,
 )
@@ -113,7 +114,9 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             )
             credentials = Credentials(token=token, url=self.api_base)
             await validate_credentials(credentials)
-            self.client = ElisAPIClient(base_url=self.api_base, token=token)
+            self.client = AsyncRossumAPIClient(
+                base_url=self.api_base, credentials=Token(token)
+            )
 
     async def prepare_changed_objects(self):
         changes = get_changed_file_paths(

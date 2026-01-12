@@ -1,5 +1,8 @@
+from pydantic import BaseModel
 from rich import print as pprint
 from rich.panel import Panel
+from rossum_api import APIClientError
+
 from deployment_manager.commands.deploy.subcommands.revert.revert_object_deploy import (
     RevertHookDeploy,
     RevertObjectDeploy,
@@ -8,12 +11,11 @@ from deployment_manager.commands.deploy.subcommands.revert.revert_object_deploy 
 )
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
 from deployment_manager.commands.deploy.subcommands.run.models import DeployException
+from deployment_manager.common.custom_client import (
+    CustomAsyncRossumAPIClient as AsyncRossumAPIClient,
+)
 from deployment_manager.utils.consts import display_error, settings
 from deployment_manager.utils.functions import gather_with_concurrency
-
-
-from pydantic import BaseModel
-from rossum_api import APIClientError, ElisAPIClient
 
 
 class RevertDeployFile(BaseModel):
@@ -24,7 +26,7 @@ class RevertDeployFile(BaseModel):
 
     deployed_org_id: int | None = ""
 
-    client: ElisAPIClient
+    client: AsyncRossumAPIClient
     yaml: DeployYaml
 
     workspaces: list[RevertWorkspaceDeploy] = []

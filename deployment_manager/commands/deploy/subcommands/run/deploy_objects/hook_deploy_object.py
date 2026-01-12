@@ -17,7 +17,7 @@ from deployment_manager.commands.deploy.subcommands.run.models import Target
 from deployment_manager.common.read_write import write_str
 from deployment_manager.utils.consts import display_error, settings
 
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 
 from deployment_manager.utils.functions import extract_id_from_url, templatize_name_id

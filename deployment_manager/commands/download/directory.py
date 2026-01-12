@@ -1,9 +1,14 @@
 from collections import defaultdict
 from typing import Optional
+
 from anyio import Path
 from pydantic import BaseModel
 from rich import print as pprint
-
+from rich.panel import Panel
+from rossum_api import APIClientError
+from rossum_api.domain_logic.resources import Resource
+from rossum_api.dtos import Token
+from rossum_api.models.hook import Hook
 
 from deployment_manager.commands.deploy.common.helpers import (
     validate_credentials,
@@ -37,27 +42,24 @@ from deployment_manager.commands.download.subdirectory import (
     Subdirectory,
 )
 from deployment_manager.commands.download.types import ObjectSaver
-from deployment_manager.common.determine_path import determine_object_type_from_url
-from deployment_manager.utils.consts import (
-    CustomResource,
-    display_error,
-    settings,
+from deployment_manager.common.custom_client import (
+    CustomAsyncRossumAPIClient as AsyncRossumAPIClient,
 )
-
+from deployment_manager.common.determine_path import determine_object_type_from_url
 from deployment_manager.common.git import get_changed_file_paths
 from deployment_manager.common.read_write import (
     read_object_from_json,
     write_object_to_json,
 )
+from deployment_manager.utils.consts import (
+    CustomResource,
+    display_error,
+    settings,
+)
 from deployment_manager.utils.functions import (
     find_all_object_paths,
     gather_with_concurrency,
 )
-
-from rich.panel import Panel
-from rossum_api import APIClientError, ElisAPIClient
-from rossum_api.api_client import Resource
-from rossum_api.models.hook import Hook
 
 
 class DownloadException(Exception): ...
@@ -77,7 +79,7 @@ class OrganizationDirectory(BaseModel):
     subdirectories: SubdirectoriesDict = {}
 
     # Added later
-    client: ElisAPIClient = None
+    client: AsyncRossumAPIClient = None
     project_path: Path = None
 
     @property
@@ -141,7 +143,9 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             )
             credentials = Credentials(token=token, url=self.api_base)
             await validate_credentials(credentials)
-            self.client = ElisAPIClient(base_url=self.api_base, token=token)
+            self.client = AsyncRossumAPIClient(
+                base_url=self.api_base, credentials=Token(token)
+            )
 
     # TODO: catch errors on org-dir or subdir level?
     async def download_organization(self):

@@ -1,6 +1,6 @@
 from anyio import Path
 from pydantic import BaseModel
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.download.helpers import should_write_object
 from deployment_manager.commands.download.types import ObjectSaver

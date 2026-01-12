@@ -1,20 +1,22 @@
 import asyncio
+
 import questionary
-from rossum_api import APIClientError, ElisAPIClient
-from rossum_api.api_client import Resource
 from rich import print as pprint
 from rich.panel import Panel
+from rossum_api import APIClientError
+from rossum_api.domain_logic.resources import Resource
 
+from deployment_manager.commands.download.directory import OrganizationDirectory
 from deployment_manager.commands.download.downloader import Downloader
-
+from deployment_manager.common.custom_client import (
+    CustomAsyncRossumAPIClient as AsyncRossumAPIClient,
+)
 from deployment_manager.utils.consts import (
     display_error,
     display_info,
     display_warning,
     settings,
 )
-
-from deployment_manager.commands.download.directory import OrganizationDirectory
 from deployment_manager.utils.functions import extract_id_from_url
 
 ALL_OBJECT_TYPES = [
@@ -46,7 +48,7 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
     api_base: str = None  # Make non-required
     org_id: int = None  # Make non-required
 
-    client: ElisAPIClient
+    client: AsyncRossumAPIClient
     selected_subdirs: list[str]
     purged_object_types: list[str]
 
@@ -200,7 +202,10 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
                 else:
                     if type == Resource.Schema:
                         schema = await self.client.retrieve_schema(object_id)
-                        queues = [extract_id_from_url(queue_url) for queue_url in schema.queues]
+                        queues = [
+                            extract_id_from_url(queue_url)
+                            for queue_url in schema.queues
+                        ]
                         if not queues:
                             queues = []
 

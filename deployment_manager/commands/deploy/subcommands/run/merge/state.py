@@ -9,7 +9,7 @@ from deployment_manager.utils.consts import CustomResource, display_error, displ
 from pydantic import BaseModel, Field
 from typing import Dict, Optional, Literal
 
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 
 class LastAppliedEntry(BaseModel):
