@@ -57,7 +57,9 @@ def mark_subdirectories_to_include(
     configured_directories: ConfiguredDirectories,
     expanded_destinations: list[str],
 ):
+    # Normalize path separators for cross-platform compatibility (Windows uses backslashes)
+    normalized_destinations = [d.replace("\\", "/") for d in expanded_destinations]
     for dir_name, dir_config in configured_directories.items():
         for subdir_name, subdir_config in dir_config.subdirectories.items():
-            if f"{dir_name}/{subdir_name}" in expanded_destinations:
+            if f"{dir_name}/{subdir_name}" in normalized_destinations:
                 subdir_config.include = True

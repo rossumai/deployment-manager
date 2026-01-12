@@ -14,7 +14,9 @@ def coro(f):
     return wrapper
 
 
-FORBIDDEN_CHARS_REGEX = re.compile(r"[/\\\"\'\`]")
+# Windows forbidden filename characters: < > : " / \ | ? *
+# Also remove control characters (0x00-0x1F) and other problematic Unicode
+FORBIDDEN_CHARS_REGEX = re.compile(r'[<>:"/\\|?*\x00-\x1F\'\`«»""'']')
 
 
 def flatten(x):
@@ -32,7 +34,9 @@ async def find_all_object_paths(base_directory: Path) -> list[Path]:
 
 
 def templatize_name_id(name: str, id: int):
-    return f"{re.sub(FORBIDDEN_CHARS_REGEX, '', name)}_[{id}]"
+    # Remove forbidden characters and strip trailing spaces/periods (Windows restriction)
+    sanitized_name = re.sub(FORBIDDEN_CHARS_REGEX, '', name).rstrip(' .')
+    return f"{sanitized_name}_[{id}]"
 
 
 def detemplatize_name_id(path: Path | str) -> tuple[str, int]:
