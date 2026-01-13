@@ -14,3 +14,7 @@ temp_project
 **/credentials.json
 **/credentials.yaml
 **/deploy_secrets/
+
+# Local retriever cache
+deployment_manager/commands/llm_chat/api_docs/faiss_index.bin
+deployment_manager/commands/llm_chat/api_docs/chunks.json

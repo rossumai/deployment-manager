@@ -1,6 +1,10 @@
 import dataclasses
+import warnings
 from anyio import Path
-from langchain_aws import AmazonKnowledgeBasesRetriever, ChatBedrockConverse
+from langchain_aws import ChatBedrockConverse
+from deployment_manager.commands.llm_chat.local_retriever import LocalDocsRetriever
+
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
 from langchain_core.tools import tool
 import json
 from typing import AsyncGenerator
@@ -121,12 +125,7 @@ class ConversationSolver:
             credentials_profile_name=self.llm.credentials_profile_name,
         )
 
-        self.bedrock_kb_retriever = AmazonKnowledgeBasesRetriever(
-            knowledge_base_id=self.knowledge_base_id,
-            region_name=self.region,
-            credentials_profile_name=self.profile_name,
-            retrieval_config={"vectorSearchConfiguration": {"numberOfResults": 4}},
-        )
+        self.docs_retriever = LocalDocsRetriever(num_results=4)
 
         self.memory = ConversationSummaryBufferMemory(
             llm=self.llm,
@@ -346,18 +345,16 @@ class ConversationSolver:
         @tool
         async def search_knowledge_base(query: str):
             """
-            Searches the Knowledge Base for relevant information.
+            Searches the Rossum API documentation for relevant information.
             Use this tool when you need general (not project-specific) information about Rossum and its configuration.
 
             Args:
-                query: The question or query to search the knowledge base with.
+                query: The question or query to search the documentation with.
             """
             try:
-                docs = await self.bedrock_kb_retriever.ainvoke(query)
-                parsed_docs = "\n\n".join([doc.page_content for doc in docs])
-                return parsed_docs
+                return await self.docs_retriever.ainvoke(query)
             except Exception as e:
-                display_error(f"Error while searching knowledge base: {e}")
+                display_error(f"Error while searching documentation: {e}")
                 return None
 
         return [
