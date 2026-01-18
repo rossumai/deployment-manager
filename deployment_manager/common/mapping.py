@@ -1,6 +1,7 @@
 import copy
 from math import inf
 from typing import Any
+
 from anyio import Path
 
 from deployment_manager.common.read_write import read_yaml, write_yaml
@@ -50,9 +51,7 @@ def sort_mapping(mapping: dict):
         return result
     elif isinstance(mapping, dict):
         result = {}
-        for k, v in sorted(
-            mapping.items(), key=lambda item: get_mapping_key_index(item[0])
-        ):
+        for k, v in sorted(mapping.items(), key=lambda item: get_mapping_key_index(item[0])):
             result[k] = sort_mapping(v)
         return result
     else:
@@ -134,9 +133,7 @@ async def create_update_mapping(
             continue
         mapping["organization"]["schemas"].append(get_attributes_for_mapping(schema))
 
-    enrich_mappings_with_existing_attributes(
-        old_mapping=old_mapping, new_mapping=mapping, new_ids=new_ids
-    )
+    enrich_mappings_with_existing_attributes(old_mapping=old_mapping, new_mapping=mapping, new_ids=new_ids)
 
     await write_mapping(org_path / settings.MAPPING_FILENAME, mapping)
 
@@ -160,9 +157,7 @@ def index_mappings_by_object_id(sub_mapping: list[dict]):
     return indexed
 
 
-def enrich_mapping_with_previous_properties(
-    new_sub_mapping: dict, old_sub_mapping: dict
-):
+def enrich_mapping_with_previous_properties(new_sub_mapping: dict, old_sub_mapping: dict):
     if not old_sub_mapping:
         old_sub_mapping = {}
     for k, v in old_sub_mapping.items():
@@ -170,9 +165,7 @@ def enrich_mapping_with_previous_properties(
             new_sub_mapping[k] = v
 
 
-def enrich_mapping_with_previous_targets(
-    new_sub_mapping: dict, old_sub_mapping: dict, new_ids: list
-):
+def enrich_mapping_with_previous_targets(new_sub_mapping: dict, old_sub_mapping: dict, new_ids: list):
     old_targets = old_sub_mapping.get("targets", [])
     new_targets = []
     for old_target in old_targets:
@@ -186,22 +179,16 @@ def enrich_mapping_with_previous_targets(
     new_sub_mapping["targets"] = new_targets
 
 
-def enrich_mappings_with_existing_attributes(
-    old_mapping: dict, new_mapping: dict, new_ids: list[int]
-):
+def enrich_mappings_with_existing_attributes(old_mapping: dict, new_mapping: dict, new_ids: list[int]):
     """Use targets from the previous mapping, but only if the target objects were not deleted in Rossum"""
 
-    enrich_mapping_with_previous_properties(
-        new_mapping["organization"], old_mapping["organization"]
-    )
+    enrich_mapping_with_previous_properties(new_mapping["organization"], old_mapping["organization"])
     old_org_targets = old_mapping["organization"].get("targets", [])
     if not old_org_targets:
         old_org_targets = [{"target_id": None}]
     new_mapping["organization"]["targets"] = old_org_targets
 
-    old_schema_mappings = index_mappings_by_object_id(
-        old_mapping["organization"]["schemas"]
-    )
+    old_schema_mappings = index_mappings_by_object_id(old_mapping["organization"]["schemas"])
     for new_schema_mapping in new_mapping["organization"]["schemas"]:
         old_schema_mapping = old_schema_mappings.get(new_schema_mapping["id"], {})
         enrich_mapping_with_previous_properties(new_schema_mapping, old_schema_mapping)
@@ -212,9 +199,7 @@ def enrich_mappings_with_existing_attributes(
             new_ids=new_ids,
         )
 
-    old_hook_mappings = index_mappings_by_object_id(
-        old_mapping["organization"]["hooks"]
-    )
+    old_hook_mappings = index_mappings_by_object_id(old_mapping["organization"]["hooks"])
     for new_hook_mapping in new_mapping["organization"]["hooks"]:
         old_hook_mapping = old_hook_mappings.get(new_hook_mapping["id"], {})
         enrich_mapping_with_previous_properties(new_hook_mapping, old_hook_mapping)
@@ -225,16 +210,10 @@ def enrich_mappings_with_existing_attributes(
             new_ids=new_ids,
         )
 
-    old_workspace_mappings = index_mappings_by_object_id(
-        old_mapping["organization"]["workspaces"]
-    )
+    old_workspace_mappings = index_mappings_by_object_id(old_mapping["organization"]["workspaces"])
     for new_workspace_mapping in new_mapping["organization"]["workspaces"]:
-        old_workspace_mapping = old_workspace_mappings.get(
-            new_workspace_mapping["id"], {}
-        )
-        enrich_mapping_with_previous_properties(
-            new_workspace_mapping, old_workspace_mapping
-        )
+        old_workspace_mapping = old_workspace_mappings.get(new_workspace_mapping["id"], {})
+        enrich_mapping_with_previous_properties(new_workspace_mapping, old_workspace_mapping)
 
         enrich_mapping_with_previous_targets(
             new_sub_mapping=new_workspace_mapping,
@@ -242,14 +221,10 @@ def enrich_mappings_with_existing_attributes(
             new_ids=new_ids,
         )
 
-        old_queue_mappings = index_mappings_by_object_id(
-            old_workspace_mapping.get("queues", [])
-        )
+        old_queue_mappings = index_mappings_by_object_id(old_workspace_mapping.get("queues", []))
         for new_queue_mapping in new_workspace_mapping.get("queues", []):
             old_queue_mapping = old_queue_mappings.get(new_queue_mapping["id"], {})
-            enrich_mapping_with_previous_properties(
-                new_queue_mapping, old_queue_mapping
-            )
+            enrich_mapping_with_previous_properties(new_queue_mapping, old_queue_mapping)
 
             enrich_mapping_with_previous_targets(
                 new_sub_mapping=new_queue_mapping,
@@ -259,9 +234,7 @@ def enrich_mappings_with_existing_attributes(
 
             if new_inbox_mapping := new_queue_mapping.get("inbox", None):
                 old_inbox_mapping = old_queue_mapping.get("inbox", {})
-                enrich_mapping_with_previous_properties(
-                    new_inbox_mapping, old_inbox_mapping
-                )
+                enrich_mapping_with_previous_properties(new_inbox_mapping, old_inbox_mapping)
 
                 enrich_mapping_with_previous_targets(
                     new_sub_mapping=new_queue_mapping["inbox"],
@@ -286,9 +259,7 @@ def extract_target_ids(submapping: dict) -> list[int]:
     return target_ids
 
 
-def extract_sources_targets(
-    mapping: dict, include_organization=True
-) -> tuple[dict, dict]:
+def extract_sources_targets(mapping: dict, include_organization=True) -> tuple[dict, dict]:
     if not mapping:
         mapping = create_empty_mapping()
 

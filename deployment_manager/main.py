@@ -1,17 +1,16 @@
 import importlib.metadata
+
 import click
 
 from deployment_manager.commands.deploy.deploy import deploy
 from deployment_manager.commands.document.document import generate_documentation_wrapper
+from deployment_manager.commands.download.download import download_project_wrapper
 from deployment_manager.commands.hook.hook import hook
-from deployment_manager.commands.download.download import (
-    download_project_wrapper,
-)
 from deployment_manager.commands.initialize import init_project
 from deployment_manager.commands.llm_chat.llm_chat import llm_chat_wrapper
 from deployment_manager.commands.purge.purge import purge_object_types_wrapper
-from deployment_manager.commands.upload.upload import upload_project_wrapper
 from deployment_manager.commands.update import update_application
+from deployment_manager.commands.upload.upload import upload_project_wrapper
 
 
 @click.group(context_settings={"max_content_width": 120})

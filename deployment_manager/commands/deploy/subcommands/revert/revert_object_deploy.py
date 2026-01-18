@@ -1,30 +1,16 @@
 import asyncio
 from typing import Optional
-from pydantic import BaseModel, Field
-from deployment_manager.commands.deploy.subcommands.run.helpers import (
-    DeployYaml,
-)
-from deployment_manager.commands.deploy.subcommands.run.models import (
-    Target,
-    TargetWithDefault,
-)
-from rich import print as pprint
-
 
 from anyio import Path
+from pydantic import BaseModel, Field
+from rich import print as pprint
+
+from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
+from deployment_manager.commands.deploy.subcommands.run.models import SubObjectException, Target, TargetWithDefault
+from deployment_manager.utils.consts import display_error, display_info, display_warning, settings
+from deployment_manager.utils.functions import gather_with_concurrency
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
-
-from deployment_manager.commands.deploy.subcommands.run.models import (
-    SubObjectException,
-)
-from deployment_manager.utils.consts import (
-    display_error,
-    display_info,
-    display_warning,
-    settings,
-)
-from deployment_manager.utils.functions import gather_with_concurrency
 
 
 class NonExistentObjectException(Exception): ...
@@ -127,9 +113,7 @@ class RevertObjectDeploy(BaseModel):
                 f"{settings.PLAN_PRINT_STR if self.plan_only else ''} {settings.DELETE_PRINT_STR} {self.display_type}: {self.target_display_label(remote_object.get('name', 'no-name'), remote_object.get('id', 'no-id'))}"
             )
         except NonExistentObjectException:
-            display_warning(
-                f"{self.display_type} [purple]{target.id}[/purple] already does not exist on remote."
-            )
+            display_warning(f"{self.display_type} [purple]{target.id}[/purple] already does not exist on remote.")
             self.yaml_reference["targets"][target.index]["id"] = None
         except Exception as e:
             display_error(
@@ -187,9 +171,7 @@ class RevertSchemaDeploy(RevertObjectDeploy):
             await super().delete_remote(target)
         except APIClientError as e:
             if e.status_code == 409:
-                display_warning(
-                    f"{self.display_type} [purple]{target.id}[/purple] referenced by another queue."
-                )
+                display_warning(f"{self.display_type} [purple]{target.id}[/purple] referenced by another queue.")
 
 
 class RevertInboxDeploy(RevertObjectDeploy):
@@ -210,9 +192,7 @@ class RevertQueueDeploy(RevertObjectDeploy):
     type: Resource = Resource.Queue
 
     schema_release: RevertSchemaDeploy = Field(alias="schema")
-    inbox_release: Optional[RevertInboxDeploy] = Field(
-        default_factory=lambda: EmptyRevertObjectDeploy(), alias="inbox"
-    )
+    inbox_release: Optional[RevertInboxDeploy] = Field(default_factory=lambda: EmptyRevertObjectDeploy(), alias="inbox")
 
     async def ensure_queues_deleted(self):
         if not self.plan_only:
@@ -246,9 +226,7 @@ class RevertQueueDeploy(RevertObjectDeploy):
                 f"{settings.PLAN_PRINT_STR if self.plan_only else ''} {settings.DELETE_PRINT_STR} {self.display_type}: {self.target_display_label(remote_object.get('name', 'no-name'), remote_object.get('id', 'no-id'))}"
             )
         except NonExistentObjectException:
-            display_warning(
-                f"{self.display_type} [purple]{target.id}[/purple] already does not exist on remote."
-            )
+            display_warning(f"{self.display_type} [purple]{target.id}[/purple] already does not exist on remote.")
             self.yaml_reference["targets"][target.index]["id"] = None
         except Exception as e:
             display_error(

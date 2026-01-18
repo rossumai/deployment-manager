@@ -1,22 +1,14 @@
-from pydantic import HttpUrl, ValidationError
 import questionary
-
-from deployment_manager.common.questionary_functions import ask_async_with_interruption
-from rossum_api import APIClientError, ElisAPIClient
-from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
-    Credentials,
-)
-from deployment_manager.common.read_write import (
-    read_prd_cred_file,
-    read_prd_project_config,
-    write_prd_cred_file,
-)
-from deployment_manager.utils.consts import display_error, settings
 from anyio import Path
+from pydantic import HttpUrl, ValidationError
 
-
-from rossum_api.models.user import User
+from deployment_manager.commands.deploy.subcommands.run.upload_helpers import Credentials
+from deployment_manager.common.questionary_functions import ask_async_with_interruption
+from deployment_manager.common.read_write import read_prd_cred_file, read_prd_project_config, write_prd_cred_file
+from deployment_manager.utils.consts import display_error, settings
+from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.models.group import Group
+from rossum_api.models.user import User
 
 
 class InvalidCredentialsException(Exception): ...
@@ -59,9 +51,7 @@ async def get_org_id_from_config(base_path: Path, org_name: str):
             return ""
 
         return int(
-            config_data.get(settings.CONFIG_KEY_DIRECTORIES, {})
-            .get(org_name, {})
-            .get(settings.CONFIG_KEY_ORG_ID, "")
+            config_data.get(settings.CONFIG_KEY_DIRECTORIES, {}).get(org_name, {}).get(settings.CONFIG_KEY_ORG_ID, "")
         )
     except Exception:
         ...
@@ -95,10 +85,12 @@ async def get_token_from_cred_file(org_path: Path, api_url: str):
 async def get_api_url_from_user(type: str = "Rossum", default: str = ""):
     if default is None:
         default = ""
-    api_url = await ask_async_with_interruption(questionary.text(
-        f"What is the {type} API URL (e.g., {settings.DEPLOY_DEFAULT_TARGET_URL}):",
-        default=default,
-    ))
+    api_url = await ask_async_with_interruption(
+        questionary.text(
+            f"What is the {type} API URL (e.g., {settings.DEPLOY_DEFAULT_TARGET_URL}):",
+            default=default,
+        )
+    )
 
     try:
         HttpUrl(api_url)
@@ -114,11 +106,7 @@ async def get_token_from_user(name: str = "Rossum"):
 
 
 def is_user_admin(user: User, user_roles: list[Group]):
-    admin_urls = [
-        role.url
-        for role in user_roles
-        if role.name in ["admin", "organization_group_admin"]
-    ]
+    admin_urls = [role.url for role in user_roles if role.name in ["admin", "organization_group_admin"]]
     for user_role_url in user.groups:
         if user_role_url in admin_urls:
             return True
@@ -147,14 +135,10 @@ async def validate_credentials(credentials: Credentials):
         raise Exception(f"No {settings.CONFIG_KEY_TOKEN} in credentials")
 
     try:
-        await ElisAPIClient(base_url=credentials.url, token=credentials.token).request(
-            "get", "auth/user"
-        )
+        await ElisAPIClient(base_url=credentials.url, token=credentials.token).request("get", "auth/user")
     except APIClientError as e:
         if e.status_code == 401:
-            raise InvalidCredentialsException(
-                f'Invalid API token "{credentials.token}" for URL "{credentials.url}"'
-            )
+            raise InvalidCredentialsException(f'Invalid API token "{credentials.token}" for URL "{credentials.url}"')
 
         raise e
 

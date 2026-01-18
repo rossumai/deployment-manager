@@ -1,10 +1,8 @@
 import re
+from enum import Enum, auto
 from typing import Any, Optional, Tuple
 
 from rossum_api.api_client import Resource
-
-from enum import Enum, auto
-from typing import Any, Optional, Tuple
 
 
 class ReferenceDetectionStatus(Enum):
@@ -13,9 +11,7 @@ class ReferenceDetectionStatus(Enum):
     UNKNOWN = auto()
 
 
-ROSSUM_URL_RE = re.compile(
-    r"^https?://(?:[\w-]+\.)*api\.rossum\.ai/(?:api/)?v1/(\w+)/(\d+)$"
-)
+ROSSUM_URL_RE = re.compile(r"^https?://(?:[\w-]+\.)*api\.rossum\.ai/(?:api/)?v1/(\w+)/(\d+)$")
 
 
 # Field name hints → known Resource types
@@ -32,9 +28,8 @@ FIELD_TO_RESOURCE = {
     "organization": Resource.Organization,
 }
 
-def detect_reference_with_type(
-    value: Any, field_name: str = ""
-) -> Tuple[ReferenceDetectionStatus, Optional[Resource]]:
+
+def detect_reference_with_type(value: Any, field_name: str = "") -> Tuple[ReferenceDetectionStatus, Optional[Resource]]:
     """
     Try to detect if a value is a likely reference to another object and return the referenced type.
 

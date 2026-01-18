@@ -1,21 +1,17 @@
 # types.py - Shared Interfaces to Break Circular Imports
-from typing import Optional, TYPE_CHECKING
-from pydantic import BaseModel
 import re
-from anyio import Path
+from typing import TYPE_CHECKING, Optional
+
 import questionary
+from anyio import Path
+from pydantic import BaseModel
+from rich import print as pprint
+
+from deployment_manager.commands.download.subdirectory import Subdirectory
 from rossum_api.api_client import Resource
 
-from rich import print as pprint
-from deployment_manager.commands.download.subdirectory import (
-    Subdirectory,
-)
-
-
 if TYPE_CHECKING:
-    from deployment_manager.commands.download.directory import (
-        DownloadOrganizationDirectory,
-    )
+    from deployment_manager.commands.download.directory import DownloadOrganizationDirectory
 
 
 # TODO: error handling? Level of objects vs level of object ?
@@ -76,10 +72,7 @@ class ObjectSaver(BaseModel):
         return f"{self.display_type} {self.display_label(object['name'], object['id'])}"
 
     async def get_subdir_from_user(self, object):
-        subdir_choices = [
-            questionary.Choice(title=subdir.name, value=subdir)
-            for subdir in self.subdirs
-        ]
+        subdir_choices = [questionary.Choice(title=subdir.name, value=subdir) for subdir in self.subdirs]
         pprint(
             self._get_message_for_subdir_selection(object),
             end=" ",

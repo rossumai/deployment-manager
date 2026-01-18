@@ -1,7 +1,7 @@
-from anyio import Path
-import pytest
 import io
 
+import pytest
+from anyio import Path
 
 from deployment_manager.commands.download.saver import WorkspaceSaver
 from deployment_manager.commands.download.subdirectory import Subdirectory
@@ -10,9 +10,7 @@ from deployment_manager.utils.functions import templatize_name_id
 
 
 @pytest.mark.asyncio
-async def test_workspace_path(
-    workspace_json: dict, tmp_path: Path, test_subdir: Subdirectory
-):
+async def test_workspace_path(workspace_json: dict, tmp_path: Path, test_subdir: Subdirectory):
     workspace_saver = WorkspaceSaver(
         base_path=tmp_path,
         objects=[workspace_json],
@@ -20,9 +18,7 @@ async def test_workspace_path(
         download_all=False,
         subdirs=[test_subdir],
     )
-    object_path = workspace_saver.construct_object_path(
-        subdir=test_subdir, object=workspace_json
-    )
+    object_path = workspace_saver.construct_object_path(subdir=test_subdir, object=workspace_json)
     assert object_path == (
         tmp_path
         / test_subdir.name
@@ -33,9 +29,7 @@ async def test_workspace_path(
 
 
 @pytest.mark.asyncio
-async def single_single_subdir_assignment(
-    workspace_json: dict, tmp_path: Path, test_subdir: Subdirectory
-):
+async def single_single_subdir_assignment(workspace_json: dict, tmp_path: Path, test_subdir: Subdirectory):
     workspace_saver = WorkspaceSaver(
         base_path=tmp_path,
         objects=[workspace_json],
@@ -94,9 +88,7 @@ async def test_unknown_subdir(
 
 
 @pytest.mark.asyncio
-async def test_save_workspace_fresh(
-    workspace_json: dict, tmp_path: Path, test_subdir: Subdirectory
-):
+async def test_save_workspace_fresh(workspace_json: dict, tmp_path: Path, test_subdir: Subdirectory):
     test_subdir.regex = "TEST"
     workspace_json["name"] = "WS [TEST]"
 
@@ -109,17 +101,13 @@ async def test_save_workspace_fresh(
     )
     await workspace_saver.save_downloaded_objects()
 
-    object_path = workspace_saver.construct_object_path(
-        subdir=test_subdir, object=workspace_json
-    )
+    object_path = workspace_saver.construct_object_path(subdir=test_subdir, object=workspace_json)
     saved_object = await read_object_from_json(object_path)
     assert saved_object == workspace_json
 
 
 @pytest.mark.asyncio
-async def test_save_workspace_ignores_unincluded_subdir(
-    workspace_json, tmp_path, test_subdir: Subdirectory
-):
+async def test_save_workspace_ignores_unincluded_subdir(workspace_json, tmp_path, test_subdir: Subdirectory):
     workspace_json["name"] = "WS [TEST]"
     test_subdir.include = False
 
@@ -135,9 +123,7 @@ async def test_save_workspace_ignores_unincluded_subdir(
     # Make sure the subdir was recognized
     assert workspace_json not in workspace_saver.objects_without_subdir
 
-    object_path = workspace_saver.construct_object_path(
-        subdir=test_subdir, object=workspace_json
-    )
+    object_path = workspace_saver.construct_object_path(subdir=test_subdir, object=workspace_json)
     assert not await object_path.exists()
 
 
@@ -168,9 +154,7 @@ async def test_get_subdir_from_user(
     monkeypatch.setattr("sys.stdin", io.StringIO("\n"))
     await workspace_saver.handle_objects_without_subdir()
 
-    object_path = workspace_saver.construct_object_path(
-        subdir=test_subdir, object=workspace_json
-    )
+    object_path = workspace_saver.construct_object_path(subdir=test_subdir, object=workspace_json)
     saved_object = await read_object_from_json(object_path)
     assert saved_object == workspace_json
 

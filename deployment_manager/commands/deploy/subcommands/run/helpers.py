@@ -1,26 +1,21 @@
-from datetime import datetime, timezone
 import re
+from datetime import datetime, timezone
 from typing import Any
-from anyio import Path
+
 import questionary
+from anyio import Path
 from ruamel.yaml import YAML
 
-from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
 from deployment_manager.commands.deploy.common.helpers import (
     get_api_url_from_config,
+    get_api_url_from_user,
     get_token_from_cred_file,
+    get_token_from_user,
     validate_credentials,
 )
-from deployment_manager.commands.deploy.common.helpers import get_api_url_from_user
-from deployment_manager.commands.deploy.common.helpers import get_token_from_user
-from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
-    Credentials,
-)
-from deployment_manager.utils.consts import (
-    QUEUE_ENGINE_ATTRIBUTES,
-    display_error,
-    settings,
-)
+from deployment_manager.commands.deploy.subcommands.run.upload_helpers import Credentials
+from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
+from deployment_manager.utils.consts import QUEUE_ENGINE_ATTRIBUTES, display_error, settings
 
 
 class DeployYaml:
@@ -58,9 +53,7 @@ def check_required_keys(release: dict):
 # TODO: more robust (all scenarios)
 # TODO: prompt user for new token and store it
 # TODO: username + password support
-async def get_url_and_credentials(
-    project_path: Path, org_name: str = "", type: str = "", yaml_data: dict = None
-):
+async def get_url_and_credentials(project_path: Path, org_name: str = "", type: str = "", yaml_data: dict = None):
     api_url = ""
     if type == settings.TARGET_DIRNAME and yaml_data:
         api_url = yaml_data.get(settings.DEPLOY_KEY_TARGET_URL, None)
@@ -68,15 +61,11 @@ async def get_url_and_credentials(
         api_url = yaml_data.get(settings.DEPLOY_KEY_SOURCE_URL, None)
 
     if not api_url and org_name:
-        api_url = await get_api_url_from_config(
-            base_path=project_path, org_name=org_name
-        )
+        api_url = await get_api_url_from_config(base_path=project_path, org_name=org_name)
     if not api_url:
         api_url = await get_api_url_from_user(type=type)
 
-    token = await get_token(
-        project_path=project_path, org_name=org_name, api_url=api_url, type=type
-    )
+    token = await get_token(project_path=project_path, org_name=org_name, api_url=api_url, type=type)
 
     try:
         credentials = Credentials(token=token, url=api_url)
@@ -113,18 +102,14 @@ async def get_new_deploy_file_path(
     suffix: str = "",
 ):
     if create_with_suffix:
-        after_deploy_file_path = deploy_file_path.with_stem(
-            f"{deploy_file_path.stem}{suffix}"
-        )
+        after_deploy_file_path = deploy_file_path.with_stem(f"{deploy_file_path.stem}{suffix}")
         if await after_deploy_file_path.exists():
             overwrite = await questionary.confirm(
                 f'File "{after_deploy_file_path}" already exists. Overwrite?',
                 default=False,
             ).ask_async()
             if not overwrite:
-                after_deploy_file_path = await get_filepath_from_user(
-                    deploy_file_path.parent
-                )
+                after_deploy_file_path = await get_filepath_from_user(deploy_file_path.parent)
     else:
         after_deploy_file_path = deploy_file_path
 
@@ -132,12 +117,7 @@ async def get_new_deploy_file_path(
 
 
 def generate_deploy_timestamp():
-    return (
-        datetime.now(timezone.utc)
-        .isoformat(timespec="microseconds")
-        .replace("+00:00", "")
-        + "Z"
-    )
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "") + "Z"
 
 
 def remove_queue_attributes_for_cross_org(queue_copy: dict):

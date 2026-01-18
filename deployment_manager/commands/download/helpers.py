@@ -1,18 +1,20 @@
 import json
 import shutil
-from typing import Any
-from anyio import Path
-import questionary
-from rossum_api.api_client import Resource
+from typing import TYPE_CHECKING, Any
 
-from deployment_manager.common.determine_path import (
-    determine_object_type_from_url,
-)
-from deployment_manager.common.read_write import (
-    read_object_from_json,
-    NON_VERSIONED_ATTRIBUTES_FILE_LOCK,
-)
+import questionary
+
+if TYPE_CHECKING:
+    from deployment_manager.commands.download.directory import (
+        DownloadOrganizationDirectory,
+    )
+
+from anyio import Path
+
+from deployment_manager.common.determine_path import determine_object_type_from_url
+from deployment_manager.common.read_write import NON_VERSIONED_ATTRIBUTES_FILE_LOCK, read_object_from_json
 from deployment_manager.utils.consts import display_warning, settings
+from rossum_api.api_client import Resource
 
 
 def replace_code_paths(file_paths: list[Path]):
@@ -45,19 +47,10 @@ async def should_write_object(
         if (
             (local_timestamp := local_file.get("modified_at", ""))
             != (remote_timestamp := remote_object.get("modified_at", ""))
-            or (
-                object_type == Resource.Queue
-                and local_file.get("hooks", []) != remote_object.get("hooks", [])
-            )
-            or (
-                object_type == Resource.Schema
-                and local_file.get("rules", []) != remote_object.get("rules", [])
-            )
+            or (object_type == Resource.Queue and local_file.get("hooks", []) != remote_object.get("hooks", []))
+            or (object_type == Resource.Schema and local_file.get("rules", []) != remote_object.get("rules", []))
         ):
-            if (
-                path in changed_files
-                and not parent_dir_reference.ignore_changed_file_warnings
-            ):
+            if path in changed_files and not parent_dir_reference.ignore_changed_file_warnings:
                 display_warning(
                     f"File [green]{path}[/green] has local unversioned changes [white](local: {local_timestamp} | remote: {remote_timestamp})[/white]."
                 )
@@ -84,17 +77,19 @@ async def delete_objects_non_versioned_attributes(path: Path):
         # outside subdirectory, no non_versioned_attribute allowed at this level
         return
 
-    subdir_path: Path = path.parents[-3] ## path to dir/subdir, resp. org/suborg
-    file_path_parts_from_subdir: tuple[str, ...] = path.parts[2:] # parts of path from dir/subdir, in list
-    non_versioned_file = subdir_path/settings.NON_VERSIONED_ATTRIBUTES_FILE_NAME
+    subdir_path: Path = path.parents[-3]  ## path to dir/subdir, resp. org/suborg
+    file_path_parts_from_subdir: tuple[str, ...] = path.parts[2:]  # parts of path from dir/subdir, in list
+    non_versioned_file = subdir_path / settings.NON_VERSIONED_ATTRIBUTES_FILE_NAME
     if await non_versioned_file.exists():
         async with NON_VERSIONED_ATTRIBUTES_FILE_LOCK:
-            with open(non_versioned_file, 'r') as f:
+            with open(non_versioned_file, "r") as f:
                 data = json.load(f)
 
             # searching for the key in json
             parent = data
-            for path_part in file_path_parts_from_subdir[:-1]:  # Go up to the second-to-last key. For the last one, del will be called later.
+            for path_part in file_path_parts_from_subdir[
+                :-1
+            ]:  # Go up to the second-to-last key. For the last one, del will be called later.
                 if path_part in parent:
                     parent = parent[path_part]
                 else:
@@ -110,7 +105,7 @@ async def delete_objects_non_versioned_attributes(path: Path):
                 return
 
             # if the key was found and deleted, write updated non_versioned_attributes file
-            with open(non_versioned_file, 'w') as f:
+            with open(non_versioned_file, "w") as f:
                 json.dump(data, f, indent=4)
 
 
@@ -123,14 +118,8 @@ async def delete_empty_folders(root: Path):
 
         if await current_dir.is_dir():
             # Check if the directory has subdirectories or files
-            subdirs = [
-                subdir
-                async for subdir in current_dir.iterdir()
-                if await subdir.is_dir()
-            ]
-            files = [
-                file async for file in current_dir.iterdir() if await file.is_file()
-            ]
+            subdirs = [subdir async for subdir in current_dir.iterdir() if await subdir.is_dir()]
+            files = [file async for file in current_dir.iterdir() if await file.is_file()]
 
             # If no files or valid subdirectories, delete the directory
             if not files and not subdirs:

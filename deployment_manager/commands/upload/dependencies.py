@@ -1,10 +1,9 @@
 import os
+
+from anyio import Path
 from rich.prompt import Confirm
-from deployment_manager.common.determine_path import (
-    determine_object_type_from_path,
-    determine_object_type_from_url,
-)
-from rossum_api import ElisAPIClient
+
+from deployment_manager.common.determine_path import determine_object_type_from_url
 from deployment_manager.common.read_write import (
     create_custom_hook_code_path,
     create_formula_directory_path,
@@ -16,16 +15,8 @@ from deployment_manager.common.read_write import (
     write_str,
 )
 from deployment_manager.common.schema import find_schema_id
-from deployment_manager.utils.consts import (
-    GIT_CHARACTERS,
-    display_error,
-    display_warning,
-    settings,
-)
-
-
-from anyio import Path
-
+from deployment_manager.utils.consts import GIT_CHARACTERS, display_warning, settings
+from rossum_api import ElisAPIClient
 from rossum_api.api_client import APIClientError, Resource
 
 
@@ -89,9 +80,7 @@ async def merge_formula_changes(changes: list[tuple[str, Path]]):
             if formula_fields:
                 formula_directory_path = create_formula_directory_path(path)
                 for field_id, code in formula_fields:
-                    await create_formula_file(
-                        formula_directory_path / f"{field_id}.py", code
-                    )
+                    await create_formula_file(formula_directory_path / f"{field_id}.py", code)
 
     return merged_changes
 
@@ -114,9 +103,7 @@ async def merge_hook_changes(changes: list[tuple[str, Path]], org_path: Path):
             # If the JSON hook file also had changed code, it will get overwritten!
             with open(path, "r") as file:
                 code_str = file.read()
-                object_path = org_path / (
-                    Path(str(path).removesuffix(".py").removesuffix(".js") + ".json")
-                )
+                object_path = org_path / (Path(str(path).removesuffix(".py").removesuffix(".js") + ".json"))
                 hook = await read_object_from_json(object_path)
                 hook["config"]["code"] = code_str
                 await write_object_to_json(object_path, hook)
@@ -159,17 +146,13 @@ async def mark_unstaged_objects_as_updated(changes, org_path, client: ElisAPICli
     for change in changes:
         path: Path
         op, path = change
-        if (
-            op == GIT_CHARACTERS.CREATED or op == GIT_CHARACTERS.CREATED_STAGED
-        ) and path.suffix == ".json":
+        if (op == GIT_CHARACTERS.CREATED or op == GIT_CHARACTERS.CREATED_STAGED) and path.suffix == ".json":
             object_path = org_path / path
             object = await read_object_from_json(object_path)
 
             id, url = object.get("id", None), object.get("url", None)
             if not id or not url:
-                display_warning(
-                    f"Skipping uncommitted object without ID or URL: ({object_path})"
-                )
+                display_warning(f"Skipping uncommitted object without ID or URL: ({object_path})")
                 continue
 
             obj = None
@@ -190,9 +173,7 @@ async def mark_unstaged_objects_as_updated(changes, org_path, client: ElisAPICli
                 op = GIT_CHARACTERS.UPDATED
                 changes_updated.append((op, path))
             elif is_non_creatable_object:
-                display_warning(
-                    f"Creating organization or inbox is not supported: ({path})"
-                )
+                display_warning(f"Creating organization or inbox is not supported: ({path})")
                 continue
             # Object does not exist on remote -> keep it as create
             elif not is_change_existing(change, changes_updated):
@@ -214,9 +195,7 @@ async def cascade_delete_ops(path, change, changes_updated, org_path):
             file_set.add(rel_file)
     for object in file_set:
         new_path = Path("source") / org_path / Path(object)
-        if (
-            new_path.stem == "inbox"
-        ):  # ignore deleting inboxes, it will be deleted when queue is deleted
+        if new_path.stem == "inbox":  # ignore deleting inboxes, it will be deleted when queue is deleted
             continue
         op_obj = ("D", new_path)
         if not is_change_existing(op_obj, changes_updated):
@@ -236,13 +215,9 @@ async def evaluate_delete_dependencies(changes, org_path):
                     "You are about to delete a workspace - the tool will cascade delete all associated queues/inboxes with the workspace. Are you sure you want to proceed?",
                 ):
                     continue
-                changes_updated = await cascade_delete_ops(
-                    path, change, changes_updated, org_path
-                )
+                changes_updated = await cascade_delete_ops(path, change, changes_updated, org_path)
             elif str(path).endswith("queue.json"):
-                changes_updated = await cascade_delete_ops(
-                    path, change, changes_updated, org_path
-                )
+                changes_updated = await cascade_delete_ops(path, change, changes_updated, org_path)
             else:
                 if not is_change_existing(change, changes_updated):
                     changes_updated.append(change)

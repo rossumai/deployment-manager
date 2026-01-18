@@ -497,9 +497,9 @@ Optionally, you can provide an already created payload, otherwise a new one is c
 Goal of this functionality is to allow the prd user to update his local python function with a python script from remote repository in a simple way.
 ##### Creating a template
 ```
-prd2 hook sync template        
+prd2 hook sync template
 ```
-This command interactively creates a config file for future sync. It asks user to input the path to local .py file and the remote .py file. 
+This command interactively creates a config file for future sync. It asks user to input the path to local .py file and the remote .py file.
 For the remote file, user can use either relative path from the repository, or full URL. When using relative path, script will be downloaded from the `master` branch.
 User also needs to have an SSH key set to access private git repositories.
 

@@ -1,16 +1,13 @@
 import asyncio
 import copy
+import json
+import logging
+import os
 from dataclasses import dataclass
+
 import boto3
 from botocore.config import Config
-from botocore.exceptions import (
-    UnauthorizedSSOTokenError,
-    NoCredentialsError,
-    ClientError,
-)
-import json
-import os
-import logging
+from botocore.exceptions import ClientError, NoCredentialsError, UnauthorizedSSOTokenError
 
 from deployment_manager.utils.consts import display_error, display_info
 
@@ -18,14 +15,10 @@ logging.getLogger("botocore.credentials").setLevel(logging.CRITICAL)
 
 MODEL_ID = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 
-MODEL_PRICING_MAP = {
-    "us.anthropic.claude-3-7-sonnet-20250219-v1:0": {"input": 0.003, "output": 0.015}
-}
+MODEL_PRICING_MAP = {"us.anthropic.claude-3-7-sonnet-20250219-v1:0": {"input": 0.003, "output": 0.015}}
 
 
-def display_tokens_and_cost(
-    message: str, input_tokens_total: int, output_tokens_total: int, price_total: float
-):
+def display_tokens_and_cost(message: str, input_tokens_total: int, output_tokens_total: int, price_total: float):
     display_info(
         f"{message}\nInput tokens used: {input_tokens_total}\nOutput tokens used: {output_tokens_total}\nPricing: {price_total} $"
     )
@@ -48,9 +41,7 @@ class LLMHelper:
             connect_timeout=20,
         )
 
-        self.bedrock_runtime = self.session.client(
-            "bedrock-runtime", region_name="us-west-2", config=config
-        )
+        self.bedrock_runtime = self.session.client("bedrock-runtime", region_name="us-west-2", config=config)
 
         self.payload_basis = {
             "anthropic_version": "bedrock-2023-05-31",
@@ -71,9 +62,7 @@ class LLMHelper:
         payload["messages"] = [{"role": "user", "content": prompt}]
 
         def blocking_call():
-            response = self.bedrock_runtime.invoke_model(
-                modelId=MODEL_ID, body=json.dumps(payload)
-            )
+            response = self.bedrock_runtime.invoke_model(modelId=MODEL_ID, body=json.dumps(payload))
             response_body = json.loads(response["body"].read())
             usage = response_body["usage"]
 
@@ -94,9 +83,7 @@ class LLMHelper:
             sts.get_caller_identity()
             return True
         except UnauthorizedSSOTokenError:
-            display_error(
-                "SSO credentials have expired. Run `aws sso login --profile rossum-dev`."
-            )
+            display_error("SSO credentials have expired. Run `aws sso login --profile rossum-dev`.")
             return False
         except NoCredentialsError:
             display_error(

@@ -1,10 +1,7 @@
 from anyio import Path
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
-    DeployObject,
-)
+
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
 from deployment_manager.utils.consts import CustomResource
-
-
 from deployment_manager.utils.functions import templatize_name_id
 from rossum_api.api_client import Resource
 
@@ -21,11 +18,7 @@ class RuleDeployObject(DeployObject):
 
     @property
     def path(self) -> Path:
-        return (
-            self.parent_schema.path.parent
-            / "rules"
-            / f"{templatize_name_id(self.name, self.id)}.json"
-        )
+        return self.parent_schema.path.parent / "rules" / f"{templatize_name_id(self.name, self.id)}.json"
 
     def get_object_in_yaml(self):
         parent_yaml_reference = self.parent_schema.yaml_reference
@@ -35,9 +28,7 @@ class RuleDeployObject(DeployObject):
                 return rule
         return None
 
-    async def override_references_in_target_object_data(
-        self, data_attribute, target, use_dummy_references
-    ):
+    async def override_references_in_target_object_data(self, data_attribute, target, use_dummy_references):
         data = getattr(target, data_attribute)
         # previous_schema_url = data["schema"]
 

@@ -1,28 +1,18 @@
 from __future__ import annotations
-from curses.ascii import isdigit
-import re
-from typing import TYPE_CHECKING
 
-from typing import Any
-from deployment_manager.commands.deploy.subcommands.run.helpers import (
-    create_object_label,
-    traverse_object,
-)
-from deployment_manager.commands.deploy.subcommands.run.models import (
-    LookupTable,
-    ReverseLookupTable,
-)
-from deployment_manager.utils.consts import display_warning, settings
+import copy
+import re
+from curses.ascii import isdigit
+from typing import TYPE_CHECKING, Any
+
+from deployment_manager.commands.deploy.subcommands.run.helpers import create_object_label, traverse_object
+from deployment_manager.commands.deploy.subcommands.run.models import LookupTable, ReverseLookupTable
+from deployment_manager.utils.consts import display_warning
 from deployment_manager.utils.functions import extract_id_from_url
 from rossum_api.api_client import Resource
 
-
-import copy
-
 if TYPE_CHECKING:
-    from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
-        DeployObject,
-    )
+    from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
 
 
 class ReferenceReplacer:
@@ -53,9 +43,7 @@ class ReferenceReplacer:
             if key not in target_object:
                 continue
 
-            for parent, key_in_parent, value in traverse_object(
-                target_object, key, target_object[key]
-            ):
+            for parent, key_in_parent, value in traverse_object(target_object, key, target_object[key]):
                 for source_id, types_dict in lookup_table.items():
                     # source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
                     # if not re.search(source_id_regex, str(value)):
@@ -67,18 +55,14 @@ class ReferenceReplacer:
                         display_warning(
                             f'Could not override source_id "{source_id}" to its target equivalent in {self.type.value} "{target_object_label}". There are different types of objects with the same ID ({list(types_dict.keys())}).',
                         )
-                        self.remove_id_from_list(
-                            object=parent, key=key_in_parent, value=value
-                        )
+                        self.remove_id_from_list(object=parent, key=key_in_parent, value=value)
                         continue
 
                     elif not len(types_dict.keys()):
                         display_warning(
                             f'Could not override source_id "{source_id}" to its target equivalent in {self.type.value} "{target_object_label}". No target IDs found.',
                         )
-                        self.remove_id_from_list(
-                            object=parent, key=key_in_parent, value=value
-                        )
+                        self.remove_id_from_list(object=parent, key=key_in_parent, value=value)
                         continue
 
                     targets = list(types_dict.values())[0]
@@ -108,9 +92,7 @@ class ReferenceReplacer:
                                 f"For overriding source_id '{source_id}' in {self.type.value} '{target_object_label}', There are multiple target IDs that could be assigned. The first one was used.",
                             )
 
-    def replace_id_in_object(
-        self, object: dict, key: str, value: str | int, source_id: int, target_id: int
-    ):
+    def replace_id_in_object(self, object: dict, key: str, value: str | int, source_id: int, target_id: int):
         if isinstance(object[key], list):
             if value in object[key]:
                 value_index = object[key].index(value)
@@ -234,14 +216,8 @@ class ReferenceReplacer:
         keep_dependencies_without_equivalent: bool = False,
     ):
         # The list is either copied and URLs are replaced, or they are simply added
-        new_urls = (
-            copy.deepcopy(object.get(dependency_name, []))
-            if keep_dependencies_without_equivalent
-            else []
-        )
-        for source_index, source_dependency_url in enumerate(
-            object.get(dependency_name, [])
-        ):
+        new_urls = copy.deepcopy(object.get(dependency_name, [])) if keep_dependencies_without_equivalent else []
+        for source_index, source_dependency_url in enumerate(object.get(dependency_name, [])):
             new_url = self._replace_reference_in_url(
                 source_dependency_url=source_dependency_url,
                 reverse_lookup_table=reverse_lookup_table,
@@ -276,9 +252,7 @@ class ReferenceReplacer:
     ):
         if isinstance(value, str) or isinstance(value, int):
             value = str(value)
-            for target_id, source_id in reverse_lookup_table.get(
-                reference_type, {}
-            ).items():
+            for target_id, source_id in reverse_lookup_table.get(reference_type, {}).items():
                 if target_id in value:
                     value = value.replace(target_id, str(source_id))
 

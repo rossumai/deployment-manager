@@ -1,11 +1,9 @@
 import re
+
 import jmespath
 
-
 from deployment_manager.utils.consts import settings
-from deployment_manager.utils.functions import (
-    flatten,
-)
+from deployment_manager.utils.functions import flatten
 from rossum_api.api_client import Resource
 
 
@@ -13,7 +11,6 @@ class AttributeOverrideException(Exception): ...
 
 
 class AttributeOverrider:
-
     def __init__(self, type: Resource):
         self.type = type
 
@@ -34,17 +31,13 @@ class AttributeOverrider:
                 continue
 
             if isinstance(new_value, str):
-                source_regex, parsed_new_value = parse_regex_attribute_override(
-                    new_value
-                )
+                source_regex, parsed_new_value = parse_regex_attribute_override(new_value)
 
                 if not source_regex:
                     override_parent[key] = parsed_new_value
                 else:
                     pattern = re.compile(source_regex)
-                    override_parent[key] = recursive_override(
-                        override_parent[key], pattern, parsed_new_value
-                    )
+                    override_parent[key] = recursive_override(override_parent[key], pattern, parsed_new_value)
             # Overwriting dicts -> merge keys, overwrite only the provided ones
             elif isinstance(new_value, dict):
                 override_parent[key] = {**override_parent[key], **new_value}
@@ -127,21 +120,14 @@ class AttributeOverrider:
         if len(reversed_values) == 1:
             return {key_query: reversed_values[0]}
         else:
-            return {
-                key_query: reversed_values
-            }  # list of values if multiple elements matched
+            return {key_query: reversed_values}  # list of values if multiple elements matched
 
 
 def recursive_override(data, search_string, replace_string):
     if isinstance(data, dict):
-        return {
-            k: recursive_override(v, search_string, replace_string)
-            for k, v in data.items()
-        }
+        return {k: recursive_override(v, search_string, replace_string) for k, v in data.items()}
     elif isinstance(data, list):
-        return [
-            recursive_override(elem, search_string, replace_string) for elem in data
-        ]
+        return [recursive_override(elem, search_string, replace_string) for elem in data]
     elif isinstance(data, str):
         return re.sub(search_string, replace_string, data)
     else:
@@ -206,8 +192,6 @@ def perform_search(parent: str, object: dict):
         search = [search]
 
     if not len(search) or not search[0]:
-        raise AttributeOverrideException(
-            f'JMESPath query "{parent}" returned no result.'
-        )
+        raise AttributeOverrideException(f'JMESPath query "{parent}" returned no result.')
 
     return search

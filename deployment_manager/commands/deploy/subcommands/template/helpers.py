@@ -1,23 +1,14 @@
 from copy import deepcopy
 from itertools import zip_longest
 from typing import Any
-from deployment_manager.commands.deploy.subcommands.run.attribute_override import (
-    create_regex_override_syntax,
-)
-from deployment_manager.common.read_write import (
-    read_object_from_json,
-    read_prd_project_config,
-)
-from pydantic import BaseModel
+
 import questionary
 from anyio import Path
+from pydantic import BaseModel
 
-from deployment_manager.utils.consts import (
-    CustomResource,
-    display_error,
-    display_warning,
-    settings,
-)
+from deployment_manager.commands.deploy.subcommands.run.attribute_override import create_regex_override_syntax
+from deployment_manager.common.read_write import read_object_from_json, read_prd_project_config
+from deployment_manager.utils.consts import CustomResource, display_error, display_warning, settings
 from deployment_manager.utils.functions import (
     extract_id_from_url,
     find_all_hook_paths_in_destination,
@@ -66,9 +57,7 @@ unselected_hooks: # List hook IDs that should not be deployed, even if they belo
 """
 
 
-async def prepare_choices(
-    paths: list[Path], preselected_ids: list = None, preselect_all: bool = False
-):
+async def prepare_choices(paths: list[Path], preselected_ids: list = None, preselect_all: bool = False):
     if not preselected_ids:
         preselected_ids = []
     choices = []
@@ -88,19 +77,14 @@ async def prepare_choices(
     return sorted(choices, key=lambda choice: choice.value["id"])
 
 
-async def get_dir_from_user(
-    project_path: Path, type: str, config: dict, default: str = None
-):
+async def get_dir_from_user(project_path: Path, type: str, config: dict, default: str = None):
     dir_candidates = [
         dir_path
         for dir_path in config.get(settings.CONFIG_KEY_DIRECTORIES, {}).keys()
         if await (Path(project_path) / dir_path).exists()
     ]
 
-    dir_choices = [
-        questionary.Choice(title=str(Path(project_path / path)))
-        for path in dir_candidates
-    ]
+    dir_choices = [questionary.Choice(title=str(Path(project_path / path))) for path in dir_candidates]
     # Target dirname is not required (it might not exist unlike the source one)
     if type.casefold() == settings.TARGET_DIRNAME:
         dir_choices.append(questionary.Choice(title="N/A", value=""))
@@ -116,9 +100,7 @@ async def get_dir_from_user(
     return selected_dir
 
 
-async def get_dir_and_subdir_from_user(
-    project_path: Path, type: str, default: str = ""
-):
+async def get_dir_and_subdir_from_user(project_path: Path, type: str, default: str = ""):
     config = await read_prd_project_config(project_path)
 
     if not config:
@@ -129,9 +111,7 @@ async def get_dir_and_subdir_from_user(
 
     source_dir = default.split("/")[0]
 
-    selected_dir = await get_dir_from_user(
-        project_path=project_path, type=type, default=source_dir, config=config
-    )
+    selected_dir = await get_dir_from_user(project_path=project_path, type=type, default=source_dir, config=config)
     if not selected_dir:
         return ""
 
@@ -143,10 +123,7 @@ async def get_dir_and_subdir_from_user(
         .keys()
         if await (Path(selected_dir) / subdir_path).exists()
     ]
-    subdir_choices = [
-        questionary.Choice(title=str(Path(selected_dir) / path))
-        for path in subdir_candidates
-    ]
+    subdir_choices = [questionary.Choice(title=str(Path(selected_dir) / path)) for path in subdir_candidates]
 
     # Reset default if it is not found in the current options
     if default not in [choice.title for choice in subdir_choices]:
@@ -163,10 +140,7 @@ async def get_dir_and_subdir_from_user(
 
 async def find_hooks_for_queues(source_path: Path, queues: list[dict]):
     hook_paths = await find_all_hook_paths_in_destination(source_path)
-    all_hooks = [
-        {**await read_object_from_json(hook_path), "path": hook_path}
-        for hook_path in hook_paths
-    ]
+    all_hooks = [{**await read_object_from_json(hook_path), "path": hook_path} for hook_path in hook_paths]
     found_hook_ids = set()
     found_hooks = []
 
@@ -188,9 +162,7 @@ async def find_queue_paths_for_workspaces(ws_paths: list[Path]):
         if not (await (ws_path / "queues").exists()):
             continue
         ws_queue_paths = [
-            queue_path
-            async for queue_path in (ws_path / "queues").iterdir()
-            if await queue_path.is_dir()
+            queue_path async for queue_path in (ws_path / "queues").iterdir() if await queue_path.is_dir()
         ]
         for ws_queue_path in ws_queue_paths:
             queue_path_to_file = ws_queue_path / "queue.json"
@@ -216,11 +188,7 @@ async def find_rule_template_paths_for_dir(base_dir: Path):
     rule_template_dir = base_dir / CustomResource.RuleTemplate.value
     if not (await rule_template_dir.exists()):
         return []
-    return [
-        rule_path
-        async for rule_path in (rule_template_dir).iterdir()
-        if await rule_path.is_file()
-    ]
+    return [rule_path async for rule_path in (rule_template_dir).iterdir() if await rule_path.is_file()]
 
 
 DEFAULT_TARGETS = [{"id": None}]
@@ -232,9 +200,7 @@ def prepare_deploy_file_objects(
     extra_attributes: dict = {},
     objects_in_previous_file: list[dict] = [],
 ):
-    previous_objects_by_id = {
-        object["id"]: object for object in objects_in_previous_file
-    }
+    previous_objects_by_id = {object["id"]: object for object in objects_in_previous_file}
 
     deploy_objects = []
     for object in objects:
@@ -243,14 +209,11 @@ def prepare_deploy_file_objects(
             **previous_object,
             "id": object["id"],
             "name": object["name"],
-            **{
-                key: previous_object.get(key, value)
-                for key, value in extra_attributes.items()
-            },
+            **{key: previous_object.get(key, value) for key, value in extra_attributes.items()},
             settings.DEPLOY_KEY_BASE_PATH: str(object["path"].parent.parent.parent),
-            settings.DEPLOY_KEY_TARGETS: previous_objects_by_id.get(
-                object["id"], {}
-            ).get(settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)),
+            settings.DEPLOY_KEY_TARGETS: previous_objects_by_id.get(object["id"], {}).get(
+                settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)
+            ),
         }
         if not include_path:
             deploy_representation.pop(settings.DEPLOY_KEY_BASE_PATH)
@@ -266,9 +229,7 @@ def prepare_subqueue_deploy_file_object(
     deploy_representation = {
         **previous_object,
         "id": object["id"],
-        settings.DEPLOY_KEY_TARGETS: previous_object.get(
-            settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)
-        ),
+        settings.DEPLOY_KEY_TARGETS: previous_object.get(settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)),
     }
     if include_name:
         deploy_representation["name"] = object["name"]
@@ -286,11 +247,7 @@ async def get_workspaces_from_user(
         previous_deploy_file_workspaces = []
     selected_ws_ids = [ws["id"] for ws in previous_deploy_file_workspaces]
     ws_paths = await find_ws_paths_for_dir(source_path)
-    ws_paths = [
-        ws_path / "workspace.json"
-        for ws_path in ws_paths
-        if await (ws_path / "workspace.json").exists()
-    ]
+    ws_paths = [ws_path / "workspace.json" for ws_path in ws_paths if await (ws_path / "workspace.json").exists()]
     if not ws_paths:
         display_warning("No workspaces in the selected subdir.")
         return [], []
@@ -301,9 +258,7 @@ async def get_workspaces_from_user(
     )
     deploy_file_workspaces = [ws.value for ws in ws_choices if ws.checked]
     if interactive or not selected_ws_ids:
-        deploy_file_workspaces = await questionary.checkbox(
-            "Select workspaces:", choices=ws_choices
-        ).ask_async()
+        deploy_file_workspaces = await questionary.checkbox("Select workspaces:", choices=ws_choices).ask_async()
 
     return prepare_deploy_file_objects(
         objects=deploy_file_workspaces,
@@ -345,23 +300,17 @@ async def get_queues_from_user(
         objects_in_previous_file=previous_deploy_file_queues,
     )
 
-    previous_queues_by_id = {
-        object["id"]: object for object in previous_deploy_file_queues
-    }
+    previous_queues_by_id = {object["id"]: object for object in previous_deploy_file_queues}
     for queue in deploy_file_queues:
         # No point letting the user select a schema or inbox, each queue should just get its schema
-        await get_schema_for_queue(
-            queue=queue, previous_queues_by_id=previous_queues_by_id
-        )
+        await get_schema_for_queue(queue=queue, previous_queues_by_id=previous_queues_by_id)
         if schema := queue.get(settings.DEPLOY_KEY_SCHEMA, None):
             await get_rules_for_schema(
                 schema=schema,
                 queue=queue,
                 previous_queues_by_id=previous_queues_by_id,
             )
-        await get_inbox_for_queue(
-            queue=queue, previous_queues_by_id=previous_queues_by_id
-        )
+        await get_inbox_for_queue(queue=queue, previous_queues_by_id=previous_queues_by_id)
 
     return deploy_file_queues, selected_queues
 
@@ -382,13 +331,9 @@ async def get_schema_for_queue(queue: dict, previous_queues_by_id: dict):
 
     schema_object = await read_object_from_json(schema_path)
 
-    previous_schema = previous_queues_by_id.get(queue["id"], {}).get(
-        settings.DEPLOY_KEY_SCHEMA, {}
-    )
+    previous_schema = previous_queues_by_id.get(queue["id"], {}).get(settings.DEPLOY_KEY_SCHEMA, {})
 
-    deploy_schema_object = prepare_subqueue_deploy_file_object(
-        object=schema_object, previous_object=previous_schema
-    )
+    deploy_schema_object = prepare_subqueue_deploy_file_object(object=schema_object, previous_object=previous_schema)
     queue[settings.DEPLOY_KEY_SCHEMA] = deploy_schema_object
 
 
@@ -434,13 +379,9 @@ async def get_inbox_for_queue(queue: dict, previous_queues_by_id: dict):
 
     inbox_object = await read_object_from_json(inbox_path)
 
-    previous_inbox = previous_queues_by_id.get(queue["id"], {}).get(
-        settings.DEPLOY_KEY_INBOX, {}
-    )
+    previous_inbox = previous_queues_by_id.get(queue["id"], {}).get(settings.DEPLOY_KEY_INBOX, {})
 
-    deploy_inbox_object = prepare_subqueue_deploy_file_object(
-        object=inbox_object, previous_object=previous_inbox
-    )
+    deploy_inbox_object = prepare_subqueue_deploy_file_object(object=inbox_object, previous_object=previous_inbox)
     queue[settings.DEPLOY_KEY_INBOX] = deploy_inbox_object
 
 
@@ -456,16 +397,10 @@ async def get_hooks_from_user(
     if not unselected_hook_ids:
         unselected_hook_ids = []
     selected_hook_ids = [hook["id"] for hook in previous_deploy_file_hooks]
-    hook_ids_for_selected_queues = [
-        hook["id"] for hook in await find_hooks_for_queues(source_path, queues)
-    ]
+    hook_ids_for_selected_queues = [hook["id"] for hook in await find_hooks_for_queues(source_path, queues)]
     # Take all hooks for the selected queues and any extra hooks in the preexisting file
     # Automatically remove hooks that were previously unselected by the user (during previous deploy file creation)
-    preselected_hook_ids = (
-        set(hook_ids_for_selected_queues)
-        .union(selected_hook_ids)
-        .difference(unselected_hook_ids)
-    )
+    preselected_hook_ids = set(hook_ids_for_selected_queues).union(selected_hook_ids).difference(unselected_hook_ids)
     hook_paths = await find_all_hook_paths_in_destination(source_path)
     if not hook_paths:
         display_warning("No hooks in the selected subdir.")
@@ -528,9 +463,7 @@ async def get_multi_targets_from_user(deploy_file_object: dict):
                 )
                 for object in objects
             ]
-            selected_objects = await questionary.checkbox(
-                "Select objects:", choices=object_choices
-            ).ask_async()
+            selected_objects = await questionary.checkbox("Select objects:", choices=object_choices).ask_async()
             target_count = await questionary.text(
                 "Specify number of targets:",
                 validate=lambda x: check_input_integer(x),
@@ -579,23 +512,17 @@ async def get_attribute_overrides_from_user():
         settings.DEPLOY_KEY_HOOKS,
     ]
     overrides = []
-    while await questionary.confirm(
-        "Do you want to add a regex attribute override?", default=True
-    ).ask_async():
+    while await questionary.confirm("Do you want to add a regex attribute override?", default=True).ask_async():
         override_objects = await questionary.checkbox(
             "Select objects:",
             choices=[questionary.Choice(title=option) for option in override_options],
         ).ask_async()
-        override_attribute = await questionary.text(
-            "Input attribute/JMESPath:"
-        ).ask_async()
+        override_attribute = await questionary.text("Input attribute/JMESPath:").ask_async()
         # TODO: escaping test
         override_source_regex = await questionary.text(
             "Input source REGEX to override (empty value will be understood as 'replace everything'):"
         ).ask_async()
-        override_target = await questionary.text(
-            "Input new STRING (e.g., 'PROD'):"
-        ).ask_async()
+        override_target = await questionary.text("Input new STRING (e.g., 'PROD'):").ask_async()
 
         overrides.append(
             AttributeOverride(
@@ -617,9 +544,7 @@ async def get_secrets_from_user(deploy_file_object: dict, previous_secrets_file:
         questionary.Choice(
             title=f"{hook.get('name', 'no-name')} ({hook.get('id', 'no-id')})",
             value=hook,
-            checked=templatize_name_id(
-                hook.get("name", "no-name"), hook.get("id", "no-id")
-            )
+            checked=templatize_name_id(hook.get("name", "no-name"), hook.get("id", "no-id"))
             in previous_secrets_file.keys(),
         )
         for hook in hooks
@@ -628,30 +553,22 @@ async def get_secrets_from_user(deploy_file_object: dict, previous_secrets_file:
     if not object_choices:
         return {}
 
-    selected_hooks = await questionary.checkbox(
-        "Select hooks for secrets:", choices=object_choices
-    ).ask_async()
+    selected_hooks = await questionary.checkbox("Select hooks for secrets:", choices=object_choices).ask_async()
 
     secrets = {}
 
     for selected_hook in selected_hooks:
-        key = templatize_name_id(
-            selected_hook.get("name", "no-name"), selected_hook.get("id", "no-id")
-        )
+        key = templatize_name_id(selected_hook.get("name", "no-name"), selected_hook.get("id", "no-id"))
         # Preserve previous secrets and create empty dicts for new entries
         secrets[key] = {**previous_secrets_file.get(key, {})}
 
     return secrets
 
 
-def add_override_to_deploy_file_objects(
-    override: AttributeOverride, root_deploy_file_object: dict
-):
+def add_override_to_deploy_file_objects(override: AttributeOverride, root_deploy_file_object: dict):
     for object_type in override.object_types:
         if object_type not in root_deploy_file_object:
-            display_warning(
-                f'Could not find object type "{object_type}" in the deploy file. Skipping.'
-            )
+            display_warning(f'Could not find object type "{object_type}" in the deploy file. Skipping.')
             continue
 
         for object in root_deploy_file_object[object_type]:
@@ -726,9 +643,7 @@ def add_targets_from_mapping(mapping: dict, deploy_file: dict):
     )
 
 
-def add_targets_for_objects(
-    mapping_objects: list, deploy_objects: list, object_type: str
-):
+def add_targets_for_objects(mapping_objects: list, deploy_objects: list, object_type: str):
     try:
         mapping_objects_by_id = {ws["id"]: ws for ws in mapping_objects}
         for deploy_object in deploy_objects:
@@ -739,15 +654,11 @@ def add_targets_for_objects(
             deploy_targets = deploy_object.get(settings.DEPLOY_KEY_TARGETS, [])
 
             new_deploy_targets = []
-            for deploy_target, mapping_target in zip_longest(
-                deploy_targets, mapping_ws.get("targets", [])
-            ):
+            for deploy_target, mapping_target in zip_longest(deploy_targets, mapping_ws.get("targets", [])):
                 deploy_target_id = deploy_target.get("id", None)
                 mapping_target_id = mapping_target.get("target_id", None)
                 deploy_attribute_override = deploy_target.get("attribute_override", {})
-                mapping_attribute_override = mapping_target.get(
-                    "attribute_override", {}
-                )
+                mapping_attribute_override = mapping_target.get("attribute_override", {})
                 new_target = {
                     "id": deploy_target_id if deploy_target_id else mapping_target_id,
                     "attribute_override": {
@@ -776,9 +687,7 @@ async def get_rule_templates_from_user(
 ):
     if not previous_deploy_file_rule_templates:
         previous_deploy_file_rule_templates = []
-    selected_rule_template_ids = [
-        template["id"] for template in previous_deploy_file_rule_templates
-    ]
+    selected_rule_template_ids = [template["id"] for template in previous_deploy_file_rule_templates]
     rule_template_paths = await find_rule_template_paths_for_dir(source_path)
     if not rule_template_paths:
         return [], []
@@ -787,9 +696,7 @@ async def get_rule_templates_from_user(
         paths=rule_template_paths,
         preselected_ids=selected_rule_template_ids,
     )
-    deploy_file_rule_templates = [
-        template.value for template in rule_template_choices if template.checked
-    ]
+    deploy_file_rule_templates = [template.value for template in rule_template_choices if template.checked]
     if interactive or not selected_rule_template_ids:
         deploy_file_rule_templates = await questionary.checkbox(
             f"Select {CustomResource.RuleTemplate.value}:",

@@ -3,21 +3,14 @@ import json
 import re
 import subprocess
 import tempfile
+
 import jmespath
 
-from rossum_api.api_client import Resource
-
-from deployment_manager.commands.deploy.subcommands.run.helpers import (
-    traverse_object,
-)
-from deployment_manager.commands.deploy.subcommands.run.models import (
-    LookupTable,
-)
-from deployment_manager.commands.deploy.subcommands.run.models import Target
+from deployment_manager.commands.deploy.subcommands.run.helpers import traverse_object
+from deployment_manager.commands.deploy.subcommands.run.models import LookupTable, Target
 from deployment_manager.utils.consts import display_warning, settings
-from deployment_manager.utils.functions import (
-    flatten,
-)
+from deployment_manager.utils.functions import flatten
+from rossum_api.api_client import Resource
 
 
 class AttributeOverrideException(Exception): ...
@@ -44,9 +37,7 @@ class AttributeOverrider:
             if key not in target.data:
                 continue
 
-            for parent, key_in_parent, value in traverse_object(
-                target.data, key, target.data[key]
-            ):
+            for parent, key_in_parent, value in traverse_object(target.data, key, target.data[key]):
                 for source_id, types_dict in lookup_table.items():
                     # source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
                     # if not re.search(source_id_regex, str(value)):
@@ -58,18 +49,14 @@ class AttributeOverrider:
                         display_warning(
                             f'Could not override source_id "{source_id}" to its target equivalent in {self.type.value} "{target.id}". There are different types of objects with the same ID ({list(types_dict.keys())}).',
                         )
-                        self.remove_id_from_list(
-                            object=parent, key=key_in_parent, value=value
-                        )
+                        self.remove_id_from_list(object=parent, key=key_in_parent, value=value)
                         continue
 
                     elif not len(types_dict.keys()):
                         display_warning(
                             f'Could not override source_id "{source_id}" to its target equivalent in {self.type.value} "{target.id}". No target IDs found.',
                         )
-                        self.remove_id_from_list(
-                            object=parent, key=key_in_parent, value=value
-                        )
+                        self.remove_id_from_list(object=parent, key=key_in_parent, value=value)
                         continue
 
                     targets = list(types_dict.values())[0]
@@ -99,9 +86,7 @@ class AttributeOverrider:
                                 f"For overriding source_id '{source_id}' in {self.type.value} '{target.id}', There are multiple target IDs that could be assigned. The first one was used.",
                             )
 
-    def replace_id_in_object(
-        self, object: dict, key: str, value: str | int, source_id: int, target_id: int
-    ):
+    def replace_id_in_object(self, object: dict, key: str, value: str | int, source_id: int, target_id: int):
         if isinstance(object[key], list):
             value_index = object[key].index(value)
             if value_index > -1:
@@ -294,8 +279,6 @@ def perform_search(parent: str, object: dict):
         search = [search]
 
     if not len(search) or not search[0]:
-        raise AttributeOverrideException(
-            f'JMESPath query "{parent}" returned no result.'
-        )
+        raise AttributeOverrideException(f'JMESPath query "{parent}" returned no result.')
 
     return search

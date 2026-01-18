@@ -2,10 +2,11 @@ from urllib.parse import urlparse
 
 import questionary
 from anyio import Path
-from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
-from deployment_manager.utils.consts import display_error, display_info, settings
 from rich import print as pprint
 from ruamel.yaml import YAML
+
+from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
+from deployment_manager.utils.consts import display_error, display_info, settings
 
 
 async def create_or_append_sync_template(old_hooks_file: Path = "") -> None:
@@ -18,9 +19,7 @@ async def create_or_append_sync_template(old_hooks_file: Path = "") -> None:
     hooks = []
     while (
         not len(hooks)
-        or await questionary.confirm(
-            "Would you like to specify another hook to this template file?"
-        ).ask_async()
+        or await questionary.confirm("Would you like to specify another hook to this template file?").ask_async()
     ):
         local_path, errors = None, []
         while not local_path or errors:
@@ -56,8 +55,7 @@ async def create_or_append_sync_template(old_hooks_file: Path = "") -> None:
     org_path = Path("./")
     sync_filepath = await get_filepath_from_user(
         org_path,
-        default=str(old_hooks_file)
-        or str(Path(settings.DEFAULT_HOOK_SYNC_PARENT) / "deployment.yaml"),
+        default=str(old_hooks_file) or str(Path(settings.DEFAULT_HOOK_SYNC_PARENT) / "deployment.yaml"),
         should_confirm_overwrite=not bool(old_hooks_file),
     )
 
@@ -65,9 +63,7 @@ async def create_or_append_sync_template(old_hooks_file: Path = "") -> None:
     with open(sync_filepath, "w") as f:
         YAML().dump(hooks, f)
 
-    display_info(
-        f"Deploy file saved to [green]{sync_filepath}[/green]. Use it by running:"
-    )
+    display_info(f"Deploy file saved to [green]{sync_filepath}[/green]. Use it by running:")
     pprint(
         f'\n  {settings.NEW_COMMAND_NAME} {settings.HOOK_COMMAND_NAME} {settings.HOOK_SYNC_COMMAND_NAME} {settings.DEPLOY_RUN_COMMAND_NAME} "{sync_filepath}"\n'
     )
