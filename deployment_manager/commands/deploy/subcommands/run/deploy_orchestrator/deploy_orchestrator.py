@@ -7,18 +7,27 @@ from anyio import Path
 from pydantic import BaseModel
 
 from deployment_manager.commands.deploy.common.helpers import get_token_owner_from_user
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.hook_deploy_object import HookDeployObject
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.inbox_deploy_object import InboxDeployObject
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
+    DeployObject,
+)
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.hook_deploy_object import (
+    HookDeployObject,
+)
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.inbox_deploy_object import (
+    InboxDeployObject,
+)
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.organization_deploy_object import (
     OrganizationDeployObject,
 )
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.queue_deploy_object import QueueDeployObject
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.rule_deploy_object import RuleDeployObject
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.rule_template_deploy_object import (
-    RuleTemplateDeployObject,
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.queue_deploy_object import (
+    QueueDeployObject,
 )
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.schema_deploy_object import SchemaDeployObject
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.rule_deploy_object import (
+    RuleDeployObject,
+)
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.schema_deploy_object import (
+    SchemaDeployObject,
+)
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.workspace_deploy_object import (
     WorkspaceDeployObject,
 )
@@ -30,7 +39,13 @@ from deployment_manager.commands.deploy.subcommands.run.models import (
     ReverseLookupTable,
     Target,
 )
-from deployment_manager.utils.consts import CustomResource, display_error, display_info, display_warning, settings
+from deployment_manager.utils.consts import (
+    CustomResource,
+    display_error,
+    display_info,
+    display_warning,
+    settings,
+)
 from deployment_manager.utils.functions import gather_with_concurrency
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
@@ -71,7 +86,7 @@ class DeployOrchestrator(BaseModel):
     workspaces: list[WorkspaceDeployObject] = []
     queues: list[QueueDeployObject] = []
     hooks: list[HookDeployObject] = []
-    rule_templates: list[RuleTemplateDeployObject] = []
+    rules: list[RuleDeployObject] = []
 
     lookup_table: LookupTable = {}
     reverse_lookup_table: ReverseLookupTable = {}
@@ -92,7 +107,7 @@ class DeployOrchestrator(BaseModel):
         return [
             self.organization,
             *self.hooks,
-            *self.rule_templates,
+            *self.rules,
             *self.workspaces,
             *self.queues,
         ]
@@ -117,7 +132,6 @@ class DeployOrchestrator(BaseModel):
             return
 
         schemas = [queue.schema_deploy_object for queue in self.queues]
-        rules = [rule for schema in schemas for rule in schema.rule_deploy_objects]
         inboxes = [queue.inbox_deploy_object for queue in self.queues]
 
         deploy_state_objects = [
@@ -125,8 +139,7 @@ class DeployOrchestrator(BaseModel):
             (Resource.Hook, self.hooks),
             (Resource.Queue, self.queues),
             (Resource.Schema, schemas),
-            (CustomResource.Rule, rules),
-            (CustomResource.RuleTemplate, self.rule_templates),
+            (CustomResource.Rule, self.rules),
             (Resource.Inbox, inboxes),
             (Resource.Workspace, self.workspaces),
         ]
@@ -227,19 +240,16 @@ class DeployOrchestrator(BaseModel):
             await gather_with_concurrency(
                 *[
                     deploy_object.deploy_target_objects(data_attribute=data_attribute)
-                    for deploy_object in self.rule_templates
-                ]
-            )
-
-            await gather_with_concurrency(
-                *[
-                    deploy_object.deploy_target_objects(data_attribute=data_attribute)
                     for deploy_object in self.workspaces
                 ]
             )
 
             await gather_with_concurrency(
                 *[deploy_object.deploy_target_objects(data_attribute=data_attribute) for deploy_object in self.queues]
+            )
+
+            await gather_with_concurrency(
+                *[deploy_object.deploy_target_objects(data_attribute=data_attribute) for deploy_object in self.rules]
             )
 
             display_info(f"{'First' if is_first else 'Second'} deploy finished.")
@@ -286,8 +296,8 @@ class DeployOrchestrator(BaseModel):
         for hook in self.hooks:
             lookup_table[hook.id][Resource.Hook] = hook.targets
 
-        for rule_template in self.rule_templates:
-            lookup_table[rule_template.id][CustomResource.RuleTemplate] = rule_template.targets
+        for rule in self.rules:
+            lookup_table[rule.id][CustomResource.Rule] = rule.targets
 
         for workspace in self.workspaces:
             lookup_table[workspace.id][Resource.Workspace] = workspace.targets
@@ -296,8 +306,6 @@ class DeployOrchestrator(BaseModel):
             lookup_table[queue.id][Resource.Queue] = queue.targets
 
             lookup_table[queue.schema_deploy_object.id][Resource.Schema] = queue.schema_deploy_object.targets
-            for rule in queue.schema_deploy_object.rule_deploy_objects:
-                lookup_table[rule.id][CustomResource.Rule] = rule.targets
 
             lookup_table[queue.inbox_deploy_object.id][Resource.Inbox] = queue.inbox_deploy_object.targets
 
@@ -331,5 +339,4 @@ QueueDeployObject.model_rebuild()
 SchemaDeployObject.model_rebuild()
 InboxDeployObject.model_rebuild()
 RuleDeployObject.model_rebuild()
-RuleTemplateDeployObject.model_rebuild()
 Target.model_rebuild()

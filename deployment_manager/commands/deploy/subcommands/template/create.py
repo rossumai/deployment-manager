@@ -4,7 +4,10 @@ import questionary
 from anyio import Path
 from rich import print as pprint
 
-from deployment_manager.commands.deploy.common.helpers import get_api_url_from_config, get_api_url_from_user
+from deployment_manager.commands.deploy.common.helpers import (
+    get_api_url_from_config,
+    get_api_url_from_user,
+)
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
 from deployment_manager.commands.deploy.subcommands.template.helpers import (
     add_override_to_deploy_file_objects,
@@ -15,13 +18,16 @@ from deployment_manager.commands.deploy.subcommands.template.helpers import (
     get_hooks_from_user,
     get_multi_targets_from_user,
     get_queues_from_user,
-    get_rule_templates_from_user,
+    get_rules_from_user,
     get_secrets_from_user,
     get_workspaces_from_user,
 )
 from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
 from deployment_manager.common.mapping import read_mapping
-from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
+from deployment_manager.common.read_write import (
+    read_object_from_json,
+    write_object_to_json,
+)
 from deployment_manager.utils.consts import display_error, display_info, settings
 from rossum_api import ElisAPIClient
 
@@ -123,14 +129,14 @@ async def create_deploy_template(
     deploy_file_object[settings.DEPLOY_KEY_HOOKS] = selected_hooks
     deploy_file_object[settings.DEPLOY_KEY_UNSELECTED_HOOK_IDS] = unselected_hooks
 
-    # Rule templates
-    rule_templates = deploy_file_object.get(settings.DEPLOY_KEY_RULE_TEMPLATES, [])
-    selected_rule_templates, rule_template_paths = await get_rule_templates_from_user(
-        previous_deploy_file_rule_templates=rule_templates,
+    # Rules
+    rules = deploy_file_object.get(settings.DEPLOY_KEY_RULES, [])
+    selected_rules = await get_rules_from_user(
+        previous_deploy_file_rules=rules,
         source_path=source_path,
         interactive=interactive,
     )
-    deploy_file_object[settings.DEPLOY_KEY_RULE_TEMPLATES] = selected_rule_templates
+    deploy_file_object[settings.DEPLOY_KEY_RULES] = selected_rules
 
     # Multi-target specification
     if interactive:

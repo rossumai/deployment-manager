@@ -250,7 +250,6 @@ class Settings:
     DEPLOY_KEY_RULES = "rules"
     DEPLOY_KEY_INBOX = "inbox"
     DEPLOY_KEY_HOOKS = "hooks"
-    DEPLOY_KEY_RULE_TEMPLATES = "rule_templates"
 
     UPDATE_PRINT_STR: str = "[blue]UPDATE[/blue]"
     CREATE_PRINT_STR: str = "[green]CREATE[/green]"
@@ -355,6 +354,5 @@ initialize_settings()
 
 class CustomResource(Enum):
     Rule = "rules"
-    RuleTemplate = "rule_templates"
     Workflow = "workflows"
     WorkflowStep = "workflow_steps"

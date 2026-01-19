@@ -318,58 +318,44 @@ class FormulaSaver(BaseModel):
         return self.formula_directory_path / f"{field_id}.py"
 
 
-class RuleSaver(SchemaSaver):
+class RuleSaver(ObjectSaver):
     type: Resource = CustomResource.Rule
-    schemas: list[dict]
+    queues: list[dict]
 
-    async def save_downloaded_objects(self):
-        for object in self.objects:
-            subdir = self.find_subdir_of_object(object)
-            if not subdir:
-                self.objects_without_subdir.append(object)
-                continue
-            # The subdir should not be pulled, disregard the current object
-            elif not subdir.include:
-                continue
-            await self.save_downloaded_object(object, subdir)
+    def find_subdir_of_object(self, object: dict):
+        parent = self.find_parent_object(object)
+        if parent:
+            # If you know the parent's subdir, you can use its subdir
+            subdir = self.subdirs_by_object_id.get(parent["id"])
+            return subdir if subdir else super().find_subdir_of_object(parent)
 
-    def find_parent_object(self, child):
-        return self.find_schema(child)
-
-    def find_schema(self, rule: dict):
-        rule_schema = rule.get("schema", [None])
-        # The rule might not have any schema assigned
-        if not rule_schema:
-            return None
-
-        for schema in self.schemas:
-            if schema["url"] == rule_schema:
-                return schema
+        subdir = super().find_subdir_of_object(object)
+        if subdir:
+            return subdir
 
         return None
 
-    def construct_object_path(
-        self,
-        subdir: Subdirectory,
-        rule: dict,
-    ) -> Path:
-        schema_for_rule = self.find_schema(rule)
-        if not schema_for_rule:
-            return
-        queue_for_schema = self.find_queue(schema_for_rule)
-        if not queue_for_schema:
-            return
-        workspace_for_queue = self.find_workspace_for_queue(queue_for_schema)
-        if not workspace_for_queue:
-            return
+    def find_parent_object(self, child):
+        return self.find_queue_for_rule(child)
 
+    def find_queue_for_rule(self, rule: dict):
+        rule_queues = rule.get("queues", [])
+        # The rule might not have any queues assigned
+        if not rule_queues:
+            return None
+
+        # Use the first queue to determine the subdir
+        # If a rule spans multiple subdirs, this will use the first one
+        for queue in self.queues:
+            if queue["url"] in rule_queues:
+                return queue
+
+        return None
+
+    def construct_object_path(self, subdir: Subdirectory, rule: dict) -> Path:
         object_path = (
             self.base_path
             / subdir.name
-            / "workspaces"
-            / templatize_name_id(workspace_for_queue["name"], workspace_for_queue["id"])
-            / "queues"
-            / templatize_name_id(queue_for_schema["name"], queue_for_schema["id"])
             / Settings.RULES_DIR_NAME
             / f'{templatize_name_id(rule["name"], rule["id"])}.json'
         )
@@ -385,33 +371,6 @@ class RuleSaver(SchemaSaver):
             await write_object_to_json(
                 object_path,
                 rule,
-                self.type,
-                log_message=f"Pulled {self.display_type} {object_path}",
-            )
-
-
-class RuleTemplateSaver(ObjectSaver):
-    type: Resource = CustomResource.RuleTemplate
-
-    def construct_object_path(self, subdir: Subdirectory, rule_template: dict) -> Path:
-        object_path = (
-            self.base_path
-            / subdir.name
-            / "rule_templates"
-            / f'{templatize_name_id(rule_template["name"], rule_template["id"])}.json'
-        )
-        return object_path
-
-    async def save_downloaded_object(self, rule_template: dict, subdir: Subdirectory):
-        object_path = self.construct_object_path(subdir=subdir, rule_template=rule_template)
-        if not object_path:
-            return
-        if self.download_all or await should_write_object(
-            object_path, rule_template, self.changed_files, self.parent_dir_reference
-        ):
-            await write_object_to_json(
-                object_path,
-                rule_template,
                 self.type,
                 log_message=f"Pulled {self.display_type} {object_path}",
             )
