@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from deployment_manager.commands.deploy.subcommands.run.attribute_override import create_regex_override_syntax
 from deployment_manager.common.read_write import read_object_from_json, read_prd_project_config
-from deployment_manager.utils.consts import CustomResource, display_error, display_warning, settings
+from deployment_manager.utils.consts import display_error, display_warning, settings
 from deployment_manager.utils.functions import (
     extract_id_from_url,
     find_all_hook_paths_in_destination,
@@ -52,6 +52,8 @@ workspaces:
 queues:
 
 hooks:
+
+rules:
 
 unselected_hooks: # List hook IDs that should not be deployed, even if they belong to selected queues
 """
@@ -181,14 +183,11 @@ async def find_ws_paths_for_dir(base_dir: Path):
 
 
 async def find_rule_paths_for_dir(base_dir: Path):
-    return [rule_path async for rule_path in (base_dir).iterdir()]
-
-
-async def find_rule_template_paths_for_dir(base_dir: Path):
-    rule_template_dir = base_dir / CustomResource.RuleTemplate.value
-    if not (await rule_template_dir.exists()):
+    """Find all rule JSON files in the top-level rules/ directory."""
+    rules_dir = base_dir / settings.RULES_DIR_NAME
+    if not await rules_dir.exists():
         return []
-    return [rule_path async for rule_path in (rule_template_dir).iterdir() if await rule_path.is_file()]
+    return [rule_path async for rule_path in rules_dir.iterdir() if await rule_path.is_file()]
 
 
 DEFAULT_TARGETS = [{"id": None}]
@@ -304,12 +303,6 @@ async def get_queues_from_user(
     for queue in deploy_file_queues:
         # No point letting the user select a schema or inbox, each queue should just get its schema
         await get_schema_for_queue(queue=queue, previous_queues_by_id=previous_queues_by_id)
-        if schema := queue.get(settings.DEPLOY_KEY_SCHEMA, None):
-            await get_rules_for_schema(
-                schema=schema,
-                queue=queue,
-                previous_queues_by_id=previous_queues_by_id,
-            )
         await get_inbox_for_queue(queue=queue, previous_queues_by_id=previous_queues_by_id)
 
     return deploy_file_queues, selected_queues
@@ -337,33 +330,47 @@ async def get_schema_for_queue(queue: dict, previous_queues_by_id: dict):
     queue[settings.DEPLOY_KEY_SCHEMA] = deploy_schema_object
 
 
-async def get_rules_for_schema(queue: dict, schema: dict, previous_queues_by_id: dict):
-    rules_path = (
-        Path(queue[settings.DEPLOY_KEY_BASE_PATH])
-        / settings.DEPLOY_KEY_QUEUES
-        / templatize_name_id(queue["name"], queue["id"])
-        / settings.RULES_DIR_NAME
+async def get_rules_from_user(
+    source_path: Path,
+    interactive: bool,
+    previous_deploy_file_rules: list[dict] = None,
+):
+    """Get rules from the top-level rules/ directory."""
+    if not previous_deploy_file_rules:
+        previous_deploy_file_rules = []
+    selected_rule_ids = [rule["id"] for rule in previous_deploy_file_rules]
+    rule_paths = await find_rule_paths_for_dir(source_path)
+    if not rule_paths:
+        return []
+
+    # Filter out rules that use deprecated schema-based assignment
+    valid_rule_paths = []
+    for rule_path in rule_paths:
+        rule_data = await read_object_from_json(rule_path)
+        if rule_data.get("schema"):
+            display_warning(
+                f"Rule '{rule_data.get('name', 'unknown')}' ({rule_data.get('id', 'unknown')}) "
+                "uses deprecated schema-based assignment and will be excluded. "
+                "Please update the rule to use queue-based assignment."
+            )
+            continue
+        valid_rule_paths.append(rule_path)
+
+    if not valid_rule_paths:
+        return []
+
+    rule_choices = await prepare_choices(
+        paths=valid_rule_paths,
+        preselected_ids=selected_rule_ids,
+        preselect_all=len(selected_rule_ids) == 0,
     )
+    deploy_file_rules = [rule.value for rule in rule_choices if rule.checked]
+    if interactive or not selected_rule_ids:
+        deploy_file_rules = await questionary.checkbox(
+            "Modify selection of the rules:", choices=rule_choices
+        ).ask_async()
 
-    if not (await rules_path.exists()):
-        return
-
-    previous_rules = (
-        previous_queues_by_id.get(queue["id"], {})
-        .get(settings.DEPLOY_KEY_SCHEMA, {})
-        .get(settings.DEPLOY_KEY_RULES, [])
-    )
-    deploy_rule_objects = []
-    for rule_path in await find_rule_paths_for_dir(rules_path):
-        rule_object = await read_object_from_json(rule_path)
-
-        previous_rule = find_rule(rules=previous_rules, rule_id=rule_object["id"])
-        deploy_rule_object = prepare_subqueue_deploy_file_object(
-            object=rule_object, previous_object=previous_rule, include_name=True
-        )
-        deploy_rule_objects.append(deploy_rule_object)
-
-    schema[settings.DEPLOY_KEY_RULES] = deploy_rule_objects
+    return prepare_deploy_file_objects(objects=deploy_file_rules, objects_in_previous_file=previous_deploy_file_rules)
 
 
 async def get_inbox_for_queue(queue: dict, previous_queues_by_id: dict):
@@ -446,6 +453,7 @@ async def get_multi_targets_from_user(deploy_file_object: dict):
         settings.DEPLOY_KEY_WORKSPACES,
         settings.DEPLOY_KEY_QUEUES,
         settings.DEPLOY_KEY_HOOKS,
+        settings.DEPLOY_KEY_RULES,
     ]
 
     for object_type in multi_target_options:
@@ -477,10 +485,6 @@ async def get_multi_targets_from_user(deploy_file_object: dict):
                     schema = selected_object.get(settings.DEPLOY_KEY_SCHEMA, None)
                     if schema:
                         add_multi_targets_to_object(schema, target_count)
-                        rules = schema.get(settings.DEPLOY_KEY_RULES, [])
-                        if rules:
-                            for rule in rules:
-                                add_multi_targets_to_object(rule, target_count)
 
                     inbox = selected_object.get(settings.DEPLOY_KEY_INBOX, None)
                     if inbox:
@@ -510,6 +514,7 @@ async def get_attribute_overrides_from_user():
         settings.DEPLOY_KEY_WORKSPACES,
         settings.DEPLOY_KEY_QUEUES,
         settings.DEPLOY_KEY_HOOKS,
+        settings.DEPLOY_KEY_RULES,
     ]
     overrides = []
     while await questionary.confirm("Do you want to add a regex attribute override?", default=True).ask_async():
@@ -671,39 +676,3 @@ def add_targets_for_objects(mapping_objects: list, deploy_objects: list, object_
             deploy_object[settings.DEPLOY_KEY_TARGETS] = new_deploy_targets
     except Exception as e:
         display_error(f"Error while adding targets to deploy file {object_type} ^", e)
-
-
-def find_rule(rules, rule_id):
-    for rule in rules:
-        if rule["id"] == rule_id:
-            return rule
-    return {}
-
-
-async def get_rule_templates_from_user(
-    source_path: Path,
-    interactive: bool,
-    previous_deploy_file_rule_templates: list[dict] = None,
-):
-    if not previous_deploy_file_rule_templates:
-        previous_deploy_file_rule_templates = []
-    selected_rule_template_ids = [template["id"] for template in previous_deploy_file_rule_templates]
-    rule_template_paths = await find_rule_template_paths_for_dir(source_path)
-    if not rule_template_paths:
-        return [], []
-
-    rule_template_choices = await prepare_choices(
-        paths=rule_template_paths,
-        preselected_ids=selected_rule_template_ids,
-    )
-    deploy_file_rule_templates = [template.value for template in rule_template_choices if template.checked]
-    if interactive or not selected_rule_template_ids:
-        deploy_file_rule_templates = await questionary.checkbox(
-            f"Select {CustomResource.RuleTemplate.value}:",
-            choices=rule_template_choices,
-        ).ask_async()
-
-    return prepare_deploy_file_objects(
-        objects=deploy_file_rule_templates,
-        objects_in_previous_file=previous_deploy_file_rule_templates,
-    ), [template["path"] for template in deploy_file_rule_templates]
