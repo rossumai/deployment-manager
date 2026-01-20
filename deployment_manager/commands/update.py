@@ -1,14 +1,13 @@
 import importlib
+import subprocess
 import sys
 
-import httpx
-import subprocess
-import questionary
-
 import click
-
+import httpx
+import questionary
 from packaging.version import parse as parse_version
-from deployment_manager.utils.consts import settings, display_info, display_error
+
+from deployment_manager.utils.consts import display_error, display_info, settings
 from deployment_manager.utils.functions import coro
 
 
@@ -84,16 +83,12 @@ async def update_application(version_tag: str = None):
 async def get_latest_version() -> tuple[str | None, str | None]:
     repo_owner = settings.GITHUB_DEPLOYMENT_MANAGER_REPO_OWNER
     repo_name = settings.GITHUB_DEPLOYMENT_MANAGER_REPO_NAME
-    api_url = settings.GITHUB_DEFAULT_LATEST_RELEASE_URL.format(
-        repo_owner=repo_owner, repo_name=repo_name
-    )
+    api_url = settings.GITHUB_DEFAULT_LATEST_RELEASE_URL.format(repo_owner=repo_owner, repo_name=repo_name)
 
     async with httpx.AsyncClient() as client:
         response = await client.get(api_url)
         if response.status_code != httpx.codes.OK:
-            display_error(
-                f"Github API request failed with status code {response.status_code}"
-            )
+            display_error(f"Github API request failed with status code {response.status_code}")
             return None, None
         release_info = response.json()
         latest_version_str = release_info.get("tag_name", "").lstrip("vV")
@@ -114,14 +109,10 @@ async def get_specific_version(version_tag: str) -> str | None:
     async with httpx.AsyncClient() as client:
         response = await client.get(api_url)
         if response.status_code == httpx.codes.NOT_FOUND:
-            display_error(
-                f"Could not find any version with tag {version_tag} (API url: {api_url})"
-            )
+            display_error(f"Could not find any version with tag {version_tag} (API url: {api_url})")
             return None
         elif response.status_code != httpx.codes.OK:
-            display_error(
-                f"Github API request failed with status code {response.status_code}"
-            )
+            display_error(f"Github API request failed with status code {response.status_code}")
             return None
 
         release_info = response.json()

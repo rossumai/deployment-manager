@@ -1,12 +1,11 @@
 import os
 from unittest.mock import AsyncMock
-from anyio import Path
-import pytest
 
+import pytest
+from anyio import Path
 
 from deployment_manager.commands.download.saver import WorkspaceSaver
 from deployment_manager.commands.download.subdirectory import (
-    SubdirectoriesDict,
     Subdirectory,
     create_subdir_configuration,
 )
@@ -21,9 +20,7 @@ from tests.upload.utils import initialize_git_repo
 
 
 @pytest.fixture
-def test_workspace_path(
-    workspace_json: dict, tmp_path: Path, test_subdir: Subdirectory
-):
+def test_workspace_path(workspace_json: dict, tmp_path: Path, test_subdir: Subdirectory):
     workspace_saver = WorkspaceSaver(
         base_path=tmp_path,
         objects=[workspace_json],
@@ -31,9 +28,7 @@ def test_workspace_path(
         download_all=False,
         subdirs=[test_subdir],
     )
-    object_path = workspace_saver.construct_object_path(
-        subdir=test_subdir, object=workspace_json
-    )
+    object_path = workspace_saver.construct_object_path(subdir=test_subdir, object=workspace_json)
     assert object_path == (
         tmp_path
         / test_subdir.name
@@ -44,9 +39,7 @@ def test_workspace_path(
 
 
 @pytest.mark.asyncio
-async def test_detect_subdir(
-    workspace_json: dict, tmp_path: Path, test_subdir: Subdirectory
-):
+async def test_detect_subdir(workspace_json: dict, tmp_path: Path, test_subdir: Subdirectory):
     TEST_ORG_NAME = "test-org"
 
     workspace_saver = WorkspaceSaver(
@@ -57,9 +50,7 @@ async def test_detect_subdir(
         subdirs=[test_subdir],
     )
     await workspace_saver.save_downloaded_objects()
-    object_path = workspace_saver.construct_object_path(
-        subdir=test_subdir, object=workspace_json
-    )
+    object_path = workspace_saver.construct_object_path(subdir=test_subdir, object=workspace_json)
     initialize_git_repo(tmp_path)
 
     workspace_json["name"] = "Testing change"
@@ -71,9 +62,7 @@ async def test_detect_subdir(
         upload_all=False,
         force=False,
         indexed_only=False,
-        subdirectories={
-            test_subdir.name: {"include": True, "object_ids": [workspace_json["id"]]}
-        },
+        subdirectories={test_subdir.name: {"include": True, "object_ids": [workspace_json["id"]]}},
         org_id=-1,
         api_base="https://example.com",
     )
@@ -87,9 +76,7 @@ async def test_detect_subdir(
     assert upload_dir.changed_objects == [
         ChangedObject(
             operation=GIT_CHARACTERS.UPDATED,
-            path=object_path.relative_to(
-                tmp_path
-            ),  # The paths from git status are not absolute
+            path=object_path.relative_to(tmp_path),  # The paths from git status are not absolute
             data=workspace_json,
         )
     ]
@@ -109,9 +96,7 @@ async def test_detect_ignores_unincluded_subdir(
         subdirs=[prod_subdir],
     )
     await workspace_saver.save_downloaded_objects()
-    object_path = workspace_saver.construct_object_path(
-        subdir=test_subdir, object=workspace_json
-    )
+    object_path = workspace_saver.construct_object_path(subdir=test_subdir, object=workspace_json)
     initialize_git_repo(tmp_path)
 
     workspace_json["name"] = "Testing change"

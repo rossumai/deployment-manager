@@ -1,8 +1,4 @@
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
-    DeployObject,
-)
-
-
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
 from deployment_manager.utils.consts import CustomResource
 from rossum_api.api_client import Resource
 
@@ -10,9 +6,7 @@ from rossum_api.api_client import Resource
 class RuleTemplateDeployObject(DeployObject):
     type: CustomResource = CustomResource.RuleTemplate
 
-    async def override_references_in_target_object_data(
-        self, data_attribute, target, use_dummy_references
-    ):
+    async def override_references_in_target_object_data(self, data_attribute, target, use_dummy_references):
         data = getattr(target, data_attribute)
 
         self.ref_replacer.replace_reference_url(
@@ -36,6 +30,4 @@ class RuleTemplateDeployObject(DeployObject):
             object_type=CustomResource.Rule,
             use_dummy_references=use_dummy_references,
         )
-        await self.persist_target_only_references(
-            target=target, data_attribute=data_attribute, dependency_name="rules"
-        )
+        await self.persist_target_only_references(target=target, data_attribute=data_attribute, dependency_name="rules")

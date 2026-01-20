@@ -1,12 +1,9 @@
-from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
-from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
-from deployment_manager.commands.deploy.subcommands.template.helpers import (
-    create_deploy_file_template,
-)
-from deployment_manager.utils.consts import settings
-
-
 from anyio import Path
+
+from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
+from deployment_manager.commands.deploy.subcommands.template.helpers import create_deploy_file_template
+from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
+from deployment_manager.utils.consts import settings
 
 
 async def init_deploy_template_file(

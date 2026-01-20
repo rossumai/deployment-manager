@@ -66,6 +66,15 @@ build-backend = "poetry_dynamic_versioning.backend"
 
 [tool.ruff]
 exclude = ["dummy_project", "dist", "rossum_api"]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+fixable = ["ALL"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["deployment_manager"]
 
 [tool.pytest]
 env_files = [".env"]

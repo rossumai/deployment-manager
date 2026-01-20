@@ -1,45 +1,26 @@
 from anyio import Path
 from pydantic import BaseModel
-from deployment_manager.commands.upload.models import PushException
-from rossum_api import ElisAPIClient
-from rossum_api.api_client import Resource
-from deployment_manager.commands.deploy.common.helpers import (
-    validate_credentials,
-)
 from rich import print as pprint
 from rich.panel import Panel
+
+from deployment_manager.commands.deploy.common.helpers import validate_credentials
 from deployment_manager.commands.deploy.subcommands.run.helpers import get_token
-from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
-    Credentials,
-)
+from deployment_manager.commands.deploy.subcommands.run.upload_helpers import Credentials
+from deployment_manager.commands.download.directory import OrganizationDirectory
 from deployment_manager.commands.upload.dependencies import (
     mark_unstaged_objects_as_updated,
     merge_formula_changes,
     merge_hook_changes,
 )
-
-from deployment_manager.common.determine_path import (
-    determine_object_type_from_url,
-)
-from deployment_manager.common.modified_at import check_modified_timestamp
-from deployment_manager.common.read_write import (
-    read_object_from_json,
-    write_object_to_json,
-)
-from deployment_manager.utils.consts import (
-    GIT_CHARACTERS,
-    CustomResource,
-    display_error,
-    display_warning,
-    settings,
-)
-
-from deployment_manager.commands.download.directory import OrganizationDirectory
+from deployment_manager.commands.upload.models import PushException
+from deployment_manager.common.determine_path import determine_object_type_from_url
 from deployment_manager.common.git import get_changed_file_paths
-from deployment_manager.utils.functions import (
-    find_all_object_paths,
-    gather_with_concurrency,
-)
+from deployment_manager.common.modified_at import check_modified_timestamp
+from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
+from deployment_manager.utils.consts import GIT_CHARACTERS, CustomResource, display_error, display_warning, settings
+from deployment_manager.utils.functions import find_all_object_paths, gather_with_concurrency
+from rossum_api import ElisAPIClient
+from rossum_api.api_client import Resource
 
 
 class ChangedObject(BaseModel):
@@ -116,21 +97,15 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             self.client = ElisAPIClient(base_url=self.api_base, token=token)
 
     async def prepare_changed_objects(self):
-        changes = get_changed_file_paths(
-            self.project_path / self.name, indexed_only=self.indexed_only
-        )
+        changes = get_changed_file_paths(self.project_path / self.name, indexed_only=self.indexed_only)
         if not changes:
-            display_warning(
-                f"No changes to {settings.UPLOAD_COMMAND_NAME} found in {self.org_path}."
-            )
+            display_warning(f"No changes to {settings.UPLOAD_COMMAND_NAME} found in {self.org_path}.")
             return
 
         changes = await merge_hook_changes(changes, self.project_path)
         # changes = await evaluate_delete_dependencies(changes, org_path)
         changes = await merge_formula_changes(changes)
-        changes = await mark_unstaged_objects_as_updated(
-            changes, self.project_path, self.client
-        )
+        changes = await mark_unstaged_objects_as_updated(changes, self.project_path, self.client)
 
         # Include files from all subdirs, the non-included subdir objects will be filtered out later
         if self.upload_all:
@@ -190,11 +165,7 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             )
             return
 
-        pprint(
-            Panel(
-                f"Pushing objects to {self.display_label} (Total objects: {len(requests)})"
-            )
-        )
+        pprint(Panel(f"Pushing objects to {self.display_label} (Total objects: {len(requests)})"))
         # Update with concurrency limit
         await gather_with_concurrency(*requests)
 
@@ -242,9 +213,7 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             if object.type == Resource.Queue:
                 object.data.pop("inbox", None)
 
-            result = await self.client._http_client.update(
-                object.type, object.id, object.data
-            )
+            result = await self.client._http_client.update(object.type, object.id, object.data)
 
             # Just to update the timestamp
             await write_object_to_json(
@@ -259,9 +228,7 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             self.request_errors.append(object.create_failure_message(str(e)))
 
             if self.upload_all:
-                pprint(
-                    Panel(f"Recreating {object.display_type} {object.display_label}")
-                )
+                pprint(Panel(f"Recreating {object.display_type} {object.display_label}"))
                 return await self.make_create_request(object=object)
 
     async def make_create_request(self, object: ChangedObject):

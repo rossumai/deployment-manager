@@ -1,12 +1,12 @@
 import asyncio
 import logging
-from anyio import Path
 
-from rossum_api import ElisAPIClient
-from rossum_api.api_client import Resource
+from anyio import Path
 
 from deployment_manager.common.mapping import read_mapping, write_mapping
 from deployment_manager.utils.consts import settings
+from rossum_api import ElisAPIClient
+from rossum_api.api_client import Resource
 
 
 async def create_self_targetting_org(tmp_path: Path, undo=False):
@@ -15,9 +15,7 @@ async def create_self_targetting_org(tmp_path: Path, undo=False):
         mapping["organization"]["targets"] = []
         settings.IS_PROJECT_IN_SAME_ORG = False
     else:
-        mapping["organization"]["targets"] = [
-            {"target_id": mapping["organization"]["id"]}
-        ]
+        mapping["organization"]["targets"] = [{"target_id": mapping["organization"]["id"]}]
         settings.IS_PROJECT_IN_SAME_ORG = True
 
     await write_mapping(tmp_path / settings.MAPPING_FILENAME, mapping)
@@ -55,21 +53,13 @@ async def delete_migrated_objects(ids_to_retain: list[dict], client: ElisAPIClie
             to_delete["inboxes"].append(inbox.id)
 
     try:
-        await asyncio.gather(
-            *[
-                client._http_client.delete(Resource.Hook, hook_id)
-                for hook_id in to_delete["hooks"]
-            ]
-        )
+        await asyncio.gather(*[client._http_client.delete(Resource.Hook, hook_id) for hook_id in to_delete["hooks"]])
     except Exception as e:
         logging.exception(f"Error while deleting hooks: {e}")
 
     try:
         await asyncio.gather(
-            *[
-                client._http_client.delete(Resource.Inbox, inbox_id)
-                for inbox_id in to_delete["inboxes"]
-            ]
+            *[client._http_client.delete(Resource.Inbox, inbox_id) for inbox_id in to_delete["inboxes"]]
         )
     except Exception as e:
         logging.exception(f"Error while deleting inboxes: {e}")
@@ -77,9 +67,7 @@ async def delete_migrated_objects(ids_to_retain: list[dict], client: ElisAPIClie
     try:
         await asyncio.gather(
             *[
-                client._http_client._request(
-                    "DELETE", f"queues/{queue_id}", params={"delete_after": "0"}
-                )
+                client._http_client._request("DELETE", f"queues/{queue_id}", params={"delete_after": "0"})
                 for queue_id in to_delete["queues"]
             ]
         )
@@ -87,18 +75,11 @@ async def delete_migrated_objects(ids_to_retain: list[dict], client: ElisAPIClie
         logging.exception(f"Error while deleting queues: {e}")
 
     try:
-        await asyncio.gather(
-            *[
-                client.delete_workspace(workspace_id)
-                for workspace_id in to_delete["workspaces"]
-            ]
-        )
+        await asyncio.gather(*[client.delete_workspace(workspace_id) for workspace_id in to_delete["workspaces"]])
     except Exception as e:
         logging.exception(f"Error while deleting workspaces: {e}")
 
     try:
-        await asyncio.gather(
-            *[client.delete_schema(schema_id) for schema_id in to_delete["schemas"]]
-        )
+        await asyncio.gather(*[client.delete_schema(schema_id) for schema_id in to_delete["schemas"]])
     except Exception as e:
         logging.exception(f"Error while deleting schemas: {e}")

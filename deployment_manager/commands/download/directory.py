@@ -1,17 +1,14 @@
 from collections import defaultdict
 from typing import Optional
+
 from anyio import Path
 from pydantic import BaseModel
 from rich import print as pprint
+from rich.panel import Panel
 
-
-from deployment_manager.commands.deploy.common.helpers import (
-    validate_credentials,
-)
+from deployment_manager.commands.deploy.common.helpers import validate_credentials
 from deployment_manager.commands.deploy.subcommands.run.helpers import get_token
-from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
-    Credentials,
-)
+from deployment_manager.commands.deploy.subcommands.run.upload_helpers import Credentials
 from deployment_manager.commands.download.downloader import Downloader
 from deployment_manager.commands.download.helpers import (
     delete_empty_folders,
@@ -32,32 +29,15 @@ from deployment_manager.commands.download.saver import (
     WorkflowStepSaver,
     WorkspaceSaver,
 )
-from deployment_manager.commands.download.subdirectory import (
-    SubdirectoriesDict,
-    Subdirectory,
-)
+from deployment_manager.commands.download.subdirectory import SubdirectoriesDict, Subdirectory
 from deployment_manager.commands.download.types import ObjectSaver
 from deployment_manager.common.determine_path import determine_object_type_from_url
-from deployment_manager.utils.consts import (
-    CustomResource,
-    display_error,
-    settings,
-)
-
 from deployment_manager.common.git import get_changed_file_paths
-from deployment_manager.common.read_write import (
-    read_object_from_json,
-    write_object_to_json,
-)
-from deployment_manager.utils.functions import (
-    find_all_object_paths,
-    gather_with_concurrency,
-)
-
-from rich.panel import Panel
+from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
+from deployment_manager.utils.consts import CustomResource, display_error, settings
+from deployment_manager.utils.functions import find_all_object_paths, gather_with_concurrency
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
-from rossum_api.models.hook import Hook
 
 
 class DownloadException(Exception): ...
@@ -171,19 +151,11 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                     downloader.download_remote_objects(type=Resource.EmailTemplate),
                     downloader.download_remote_objects(type=Resource.Inbox),
                     downloader.download_remote_objects(type=Resource.Schema),
-                    downloader.download_remote_objects(
-                        type=CustomResource.Rule, check_access=True
-                    ),
-                    downloader.download_remote_objects(
-                        type=CustomResource.RuleTemplate, check_access=True
-                    ),
+                    downloader.download_remote_objects(type=CustomResource.Rule, check_access=True),
+                    downloader.download_remote_objects(type=CustomResource.RuleTemplate, check_access=True),
                     downloader.download_remote_objects(type=Resource.Hook),
-                    downloader.download_remote_objects(
-                        type=CustomResource.Workflow, check_access=True
-                    ),
-                    downloader.download_remote_objects(
-                        type=CustomResource.WorkflowStep, check_access=True
-                    ),
+                    downloader.download_remote_objects(type=CustomResource.Workflow, check_access=True),
+                    downloader.download_remote_objects(type=CustomResource.WorkflowStep, check_access=True),
                 ],
             )
 
@@ -357,13 +329,9 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
 
     async def download_and_save_organization_object(self):
         try:
-            organization = await self.client._http_client.fetch_one(
-                Resource.Organization, self.org_id
-            )
+            organization = await self.client._http_client.fetch_one(Resource.Organization, self.org_id)
             org_file_path = self.project_path / self.name / "organization.json"
-            if self.download_all or await should_write_object(
-                org_file_path, organization, self.changed_files, self
-            ):
+            if self.download_all or await should_write_object(org_file_path, organization, self.changed_files, self):
                 await write_object_to_json(
                     org_file_path,
                     organization,
@@ -444,45 +412,25 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
         # Objects with same IDs and different paths should get the local (previous) version removed
         match object_type:
             case Resource.Hook:
-                remote_path = self.hook_saver.construct_object_path(
-                    subdir, remote_object
-                )
+                remote_path = self.hook_saver.construct_object_path(subdir, remote_object)
             case Resource.Schema:
-                remote_path = self.schema_saver.construct_object_path(
-                    subdir, remote_object
-                )
+                remote_path = self.schema_saver.construct_object_path(subdir, remote_object)
             case CustomResource.Rule:
-                remote_path = self.rule_saver.construct_object_path(
-                    subdir, remote_object
-                )
+                remote_path = self.rule_saver.construct_object_path(subdir, remote_object)
             case CustomResource.RuleTemplate:
-                remote_path = self.rule_template_saver.construct_object_path(
-                    subdir, remote_object
-                )
+                remote_path = self.rule_template_saver.construct_object_path(subdir, remote_object)
             case Resource.Inbox:
-                remote_path = self.inbox_saver.construct_object_path(
-                    subdir, remote_object
-                )
+                remote_path = self.inbox_saver.construct_object_path(subdir, remote_object)
             case Resource.Queue:
-                remote_path = self.queue_saver.construct_object_path(
-                    subdir, remote_object
-                )
+                remote_path = self.queue_saver.construct_object_path(subdir, remote_object)
             case Resource.EmailTemplate:
-                remote_path = self.email_template_saver.construct_object_path(
-                    subdir, remote_object
-                )
+                remote_path = self.email_template_saver.construct_object_path(subdir, remote_object)
             case Resource.Workspace:
-                remote_path = self.workspace_saver.construct_object_path(
-                    subdir, remote_object
-                )
+                remote_path = self.workspace_saver.construct_object_path(subdir, remote_object)
             case CustomResource.Workflow:
-                remote_path = self.workflow_saver.construct_object_path(
-                    subdir, remote_object
-                )
+                remote_path = self.workflow_saver.construct_object_path(subdir, remote_object)
             case CustomResource.WorkflowStep:
-                remote_path = self.workflow_step_saver.construct_object_path(
-                    subdir, remote_object
-                )
+                remote_path = self.workflow_step_saver.construct_object_path(subdir, remote_object)
             case _:
                 return ""
 

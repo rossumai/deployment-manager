@@ -1,7 +1,7 @@
 import click
-from rossum_api import ElisAPIClient
 
 from deployment_manager.utils.consts import settings, validate_token
+from rossum_api import ElisAPIClient
 
 
 async def create_and_validate_client(

@@ -1,68 +1,40 @@
-import asyncio
-from collections import defaultdict
 import json
-from anyio import Path
 import pathlib
+from collections import defaultdict
+
 import questionary
+from anyio import Path
+from pydantic import BaseModel
+
 from deployment_manager.commands.deploy.common.helpers import get_token_owner_from_user
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
-    DeployObject,
-)
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.hook_deploy_object import (
-    HookDeployObject,
-)
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.inbox_deploy_object import (
-    InboxDeployObject,
-)
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.hook_deploy_object import HookDeployObject
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.inbox_deploy_object import InboxDeployObject
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.organization_deploy_object import (
     OrganizationDeployObject,
 )
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.queue_deploy_object import (
-    QueueDeployObject,
-)
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.rule_deploy_object import (
-    RuleDeployObject,
-)
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.queue_deploy_object import QueueDeployObject
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.rule_deploy_object import RuleDeployObject
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.rule_template_deploy_object import (
     RuleTemplateDeployObject,
 )
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.schema_deploy_object import (
-    SchemaDeployObject,
-)
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.schema_deploy_object import SchemaDeployObject
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.workspace_deploy_object import (
     WorkspaceDeployObject,
 )
-from deployment_manager.commands.deploy.subcommands.run.helpers import (
-    DeployYaml,
-)
-
+from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
+from deployment_manager.commands.deploy.subcommands.run.merge.state import DeployState
 from deployment_manager.commands.deploy.subcommands.run.models import (
     DeployException,
     LookupTable,
     ReverseLookupTable,
     Target,
 )
-
-
-from deployment_manager.commands.deploy.subcommands.run.merge.state import (
-    DeployState,
-)
-
-from deployment_manager.utils.consts import (
-    CustomResource,
-    display_error,
-    display_info,
-    display_warning,
-    settings,
-)
+from deployment_manager.utils.consts import CustomResource, display_error, display_info, display_warning, settings
 from deployment_manager.utils.functions import gather_with_concurrency
-
-
-from pydantic import BaseModel
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
 from rossum_api.models.organization import Organization
-
 
 # TODO: dummy refs not in diff -> conflict if org.workspaces is 1 and we are creating another
 # TODO: purge should clean up state file as well
@@ -128,16 +100,11 @@ class DeployOrchestrator(BaseModel):
     def __init__(self, **data):
         super().__init__(**data)
 
-        if (
-            self.secrets_file
-            and (secrets_file_path := pathlib.Path(self.secrets_file)).exists()
-        ):
+        if self.secrets_file and (secrets_file_path := pathlib.Path(self.secrets_file)).exists():
             # Read and parse the secrets file
             self.secrets = json.loads(secrets_file_path.read_text())
 
-        self.deploy_state = DeployState.load_deploy_state(
-            path=pathlib.Path(self.deploy_state_file)
-        )
+        self.deploy_state = DeployState.load_deploy_state(path=pathlib.Path(self.deploy_state_file))
 
         self.organization = OrganizationDeployObject(
             id=self.source_org.id,
@@ -174,10 +141,7 @@ class DeployOrchestrator(BaseModel):
         await self.ensure_token_owner()
 
         await gather_with_concurrency(
-            *[
-                deploy_object.initialize_deploy_object(deploy_file=self)
-                for deploy_object in self.deploy_objects
-            ],
+            *[deploy_object.initialize_deploy_object(deploy_file=self) for deploy_object in self.deploy_objects],
         )
 
         for deploy_object in self.deploy_objects:
@@ -189,10 +153,7 @@ class DeployOrchestrator(BaseModel):
     async def initialize_target_objects(self):
         try:
             await gather_with_concurrency(
-                *[
-                    deploy_object.initialize_target_objects()
-                    for deploy_object in self.deploy_objects
-                ],
+                *[deploy_object.initialize_target_objects() for deploy_object in self.deploy_objects],
             )
         except Exception as e:
             display_error(f"Error during initialization of target objects: {e}")
@@ -203,9 +164,7 @@ class DeployOrchestrator(BaseModel):
 
             await gather_with_concurrency(
                 *[
-                    deploy_object.override_references(
-                        data_attribute="visualized_plan_data", use_dummy_references=True
-                    )
+                    deploy_object.override_references(data_attribute="visualized_plan_data", use_dummy_references=True)
                     for deploy_object in self.deploy_objects
                 ]
             )
@@ -218,10 +177,7 @@ class DeployOrchestrator(BaseModel):
             self.reverse_lookup_table = self.create_reverse_lookup_table()
 
             for object in self.deploy_objects:
-                if (
-                    isinstance(object, OrganizationDeployObject)
-                    and not self.patch_target_org
-                ):
+                if isinstance(object, OrganizationDeployObject) and not self.patch_target_org:
                     continue
                 await object.compare_target_objects()
 
@@ -230,12 +186,8 @@ class DeployOrchestrator(BaseModel):
                 display_warning(
                     "Conflicts detected: please go to the files listed above and resolve them.\n\n[bold]Do not exit this command, otherwise, you might be prompted to resolve the conflict again when source is compared to remote target.[/bold]"
                 )
-                if not await questionary.confirm(
-                    "Confirm that conflicts were resolved."
-                ).ask_async():
-                    raise DeployException(
-                        "Please rerun the command once conflicts were resolved."
-                    )
+                if not await questionary.confirm("Confirm that conflicts were resolved.").ask_async():
+                    raise DeployException("Please rerun the command once conflicts were resolved.")
 
             # Objects need to be reloaded from source and everything reapplied for them
             for object in self.deploy_objects:
@@ -244,22 +196,15 @@ class DeployOrchestrator(BaseModel):
 
                 await object.initialize_deploy_object(deploy_file=self)
                 await object.initialize_target_objects()
-                await object.override_references(
-                    data_attribute="visualized_plan_data", use_dummy_references=True
-                )
+                await object.override_references(data_attribute="visualized_plan_data", use_dummy_references=True)
         except Exception as e:
-            display_error(
-                f"Error during comparison of prepared target objects with their remote versions: {e}"
-            )
+            display_error(f"Error during comparison of prepared target objects with their remote versions: {e}")
             raise
 
     async def show_deploy_plan(self):
         try:
             for object in self.deploy_objects:
-                if (
-                    isinstance(object, OrganizationDeployObject)
-                    and not self.patch_target_org
-                ):
+                if isinstance(object, OrganizationDeployObject) and not self.patch_target_org:
                     continue
                 await object.visualize_changes()
         except Exception as e:
@@ -273,15 +218,10 @@ class DeployOrchestrator(BaseModel):
             display_info(f"{'First' if is_first else 'Second'} deploy started.")
 
             if self.patch_target_org:
-                await self.organization.deploy_target_objects(
-                    data_attribute=data_attribute
-                )
+                await self.organization.deploy_target_objects(data_attribute=data_attribute)
 
             await gather_with_concurrency(
-                *[
-                    deploy_object.deploy_target_objects(data_attribute=data_attribute)
-                    for deploy_object in self.hooks
-                ]
+                *[deploy_object.deploy_target_objects(data_attribute=data_attribute) for deploy_object in self.hooks]
             )
 
             await gather_with_concurrency(
@@ -299,18 +239,13 @@ class DeployOrchestrator(BaseModel):
             )
 
             await gather_with_concurrency(
-                *[
-                    deploy_object.deploy_target_objects(data_attribute=data_attribute)
-                    for deploy_object in self.queues
-                ]
+                *[deploy_object.deploy_target_objects(data_attribute=data_attribute) for deploy_object in self.queues]
             )
 
             display_info(f"{'First' if is_first else 'Second'} deploy finished.")
 
         except Exception as e:
-            display_error(
-                f"Error during {'first' if is_first else 'second'} deploy: {e}"
-            )
+            display_error(f"Error during {'first' if is_first else 'second'} deploy: {e}")
             raise
 
     # TODO: for perfect safety, comparison should be done after first deploy (what if someone on remote changed something in the middle of deploy?)
@@ -335,30 +270,24 @@ class DeployOrchestrator(BaseModel):
         for deploy_object in self.deploy_objects:
             attr = getattr(deploy_object, attribute_name)
             if attr:
-                error_objects.append(
-                    f"{deploy_object.display_type} {deploy_object.display_label}"
-                )
+                error_objects.append(f"{deploy_object.display_type} {deploy_object.display_label}")
 
             if error_objects:
                 raise DeployException(
-                    f"Error occurred for the following deploy objects, see error details above:\n"
+                    "Error occurred for the following deploy objects, see error details above:\n"
                     + "\n".join(error_objects)
                 )
 
     def create_lookup_table(self):
         lookup_table = defaultdict(dict)
 
-        lookup_table[self.organization.id][Resource.Organization] = (
-            self.organization.targets
-        )
+        lookup_table[self.organization.id][Resource.Organization] = self.organization.targets
 
         for hook in self.hooks:
             lookup_table[hook.id][Resource.Hook] = hook.targets
 
         for rule_template in self.rule_templates:
-            lookup_table[rule_template.id][CustomResource.RuleTemplate] = (
-                rule_template.targets
-            )
+            lookup_table[rule_template.id][CustomResource.RuleTemplate] = rule_template.targets
 
         for workspace in self.workspaces:
             lookup_table[workspace.id][Resource.Workspace] = workspace.targets
@@ -366,15 +295,11 @@ class DeployOrchestrator(BaseModel):
         for queue in self.queues:
             lookup_table[queue.id][Resource.Queue] = queue.targets
 
-            lookup_table[queue.schema_deploy_object.id][Resource.Schema] = (
-                queue.schema_deploy_object.targets
-            )
+            lookup_table[queue.schema_deploy_object.id][Resource.Schema] = queue.schema_deploy_object.targets
             for rule in queue.schema_deploy_object.rule_deploy_objects:
                 lookup_table[rule.id][CustomResource.Rule] = rule.targets
 
-            lookup_table[queue.inbox_deploy_object.id][Resource.Inbox] = (
-                queue.inbox_deploy_object.targets
-            )
+            lookup_table[queue.inbox_deploy_object.id][Resource.Inbox] = queue.inbox_deploy_object.targets
 
         return lookup_table
 
@@ -394,9 +319,7 @@ class DeployOrchestrator(BaseModel):
         for queue in self.yaml.data.get(settings.DEPLOY_KEY_QUEUES, []):
             if not (queue_id := queue.get("id", None)):
                 continue
-            queue[settings.DEPLOY_KEY_IGNORE_DEPLOY_WARNINGS] = ignore_warning_map.get(
-                queue_id, False
-            )
+            queue[settings.DEPLOY_KEY_IGNORE_DEPLOY_WARNINGS] = ignore_warning_map.get(queue_id, False)
 
 
 # Pydantic needs this

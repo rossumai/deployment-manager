@@ -1,29 +1,21 @@
-import json
 import os
 import shutil
 from typing import Any
+
 from anyio import Path
 from pydantic import BaseModel
 
 from deployment_manager.commands.download.helpers import delete_objects_non_versioned_attributes
-from rossum_api.api_client import Resource
-
+from deployment_manager.commands.download.subdirectory import Subdirectory
 from deployment_manager.common.determine_path import determine_object_type_from_url
 from deployment_manager.common.read_write import (
     create_custom_hook_code_path,
     create_formula_directory_path,
     find_formula_fields_in_schema,
     read_object_from_json,
-    NON_VERSIONED_ATTRIBUTES_FILE_LOCK
 )
-from deployment_manager.utils.consts import (
-    CustomResource,
-    display_warning,
-    settings,
-)
-from deployment_manager.commands.download.subdirectory import (
-    Subdirectory,
-)
+from deployment_manager.utils.consts import CustomResource, display_warning
+from rossum_api.api_client import Resource
 
 
 # TODO: error handling? Level of objects vs level of object ?
@@ -42,7 +34,6 @@ class ObjectRemover(BaseModel):
 
     @staticmethod
     async def construct_remover(object_path: Path, id_objects_map, **kwargs):
-
         local_object = await read_object_from_json(object_path)
         url, id = local_object.get("url", ""), local_object.get("id", "")
         # Clearly not a Rossum object, just ignore
@@ -101,9 +92,7 @@ class SchemaRemover(ObjectRemover):
 
         # Check if individual formula fields are still in the schema
         if not removed_schema:
-            remote_formula_fields = find_formula_fields_in_schema(
-                self.remote_object["content"]
-            )
+            remote_formula_fields = find_formula_fields_in_schema(self.remote_object["content"])
             remote_field_ids = [ff[0] for ff in remote_formula_fields]
             local_formula_dir = create_formula_directory_path(self.local_path)
             if not local_formula_dir or not await local_formula_dir.exists():
@@ -125,8 +114,6 @@ class HookRemover(ObjectRemover):
     async def delete_object(self):
         await super().delete_object()
 
-        hook_code_path = create_custom_hook_code_path(
-            hook_path=self.local_path, hook=self.local_object
-        )
+        hook_code_path = create_custom_hook_code_path(hook_path=self.local_path, hook=self.local_object)
         if hook_code_path and await hook_code_path.exists():
             os.remove(hook_code_path)

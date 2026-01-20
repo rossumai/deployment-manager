@@ -1,8 +1,7 @@
 import dataclasses
 import filecmp
-from anyio import Path
 
-from rossum_api.models import Schema, Hook, Workspace, Queue, Inbox, Organization
+from anyio import Path
 
 from deployment_manager.common.mapping import (
     extract_source_target_pairs,
@@ -10,12 +9,13 @@ from deployment_manager.common.mapping import (
     read_mapping,
 )
 from deployment_manager.common.read_write import read_object_from_json
+from deployment_manager.utils.consts import settings
 from deployment_manager.utils.functions import (
     detemplatize_name_id,
     extract_id_from_url,
     templatize_name_id,
 )
-from deployment_manager.utils.consts import settings
+from rossum_api.models import Hook, Inbox, Organization, Queue, Schema, Workspace
 
 
 def is_object_equal(object_one: dict, object_two: dict):
@@ -79,11 +79,7 @@ def are_dir_trees_equal(dir1: Path, dir2: Path):
     """
 
     dirs_cmp = filecmp.dircmp(dir1, dir2)
-    if (
-        len(dirs_cmp.left_only) > 0
-        or len(dirs_cmp.right_only) > 0
-        or len(dirs_cmp.funny_files) > 0
-    ):
+    if len(dirs_cmp.left_only) > 0 or len(dirs_cmp.right_only) > 0 or len(dirs_cmp.funny_files) > 0:
         return False
     for common_dir in dirs_cmp.common_dirs:
         new_dir1 = dir1 / common_dir
@@ -137,9 +133,7 @@ async def ensure_source_objects_have_target_counter_part(mapping: dict, tmp_path
 
 async def ensure_hooks_have_same_dependency_graph(mapping: dict, tmp_path: Path):
     source_target_pairs = extract_source_target_pairs(mapping)
-    async for source_hook_path in (
-        tmp_path / settings.SOURCE_DIRNAME / "hooks"
-    ).iterdir():
+    async for source_hook_path in (tmp_path / settings.SOURCE_DIRNAME / "hooks").iterdir():
         if source_hook_path.suffix != ".json":
             continue
         source_hook = await read_object_from_json(source_hook_path)
@@ -156,10 +150,6 @@ async def ensure_hooks_have_same_dependency_graph(mapping: dict, tmp_path: Path)
         remapped_source_hook_ids = []
         for hook_url in source_hook["run_after"]:
             hook_id = extract_id_from_url(hook_url)
-            remapped_source_hook_ids.append(
-                hook_url.replace(
-                    str(hook_id), str(source_target_pairs["hooks"][hook_id])
-                )
-            )
+            remapped_source_hook_ids.append(hook_url.replace(str(hook_id), str(source_target_pairs["hooks"][hook_id])))
         source_hook["run_after"] = remapped_source_hook_ids
         assert source_hook["run_after"] == target_hook["run_after"]

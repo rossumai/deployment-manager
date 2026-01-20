@@ -1,7 +1,7 @@
 from anyio import Path
-from rossum_api.api_client import Resource
 
 from deployment_manager.utils.consts import CustomResource
+from rossum_api.api_client import Resource
 
 
 def determine_object_type_from_path(path: Path) -> Resource:

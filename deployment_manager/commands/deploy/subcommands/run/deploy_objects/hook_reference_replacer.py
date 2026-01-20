@@ -1,11 +1,7 @@
 import dataclasses
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.reference_replacer import (
-    ReferenceReplacer,
-)
-from deployment_manager.commands.deploy.subcommands.run.models import (
-    LookupTable,
-    ReverseLookupTable,
-)
+
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.reference_replacer import ReferenceReplacer
+from deployment_manager.commands.deploy.subcommands.run.models import LookupTable, ReverseLookupTable
 from deployment_manager.utils.consts import display_error
 from deployment_manager.utils.functions import extract_id_from_url
 from rossum_api.api_client import Resource
@@ -43,15 +39,13 @@ class HookReferenceReplacer(ReferenceReplacer):
             # In situations where this could be a problem, there are special warnings (e.g., forgotten hooks for queues)
             if not new_url:
                 # Middle hook between A->B->C might not have been deployed so link A->C
-                predecessor_of_predecessor_urls = (
-                    await self.find_missing_hook_run_after(
-                        predecessor_url=source_dependency_url,
-                        reverse_lookup_table=reverse_lookup_table,
-                        lookup_table=lookup_table,
-                        target_objects_count=target_objects_count,
-                        target_index=target_index,
-                        use_dummy_references=use_dummy_references,
-                    )
+                predecessor_of_predecessor_urls = await self.find_missing_hook_run_after(
+                    predecessor_url=source_dependency_url,
+                    reverse_lookup_table=reverse_lookup_table,
+                    lookup_table=lookup_table,
+                    target_objects_count=target_objects_count,
+                    target_index=target_index,
+                    use_dummy_references=use_dummy_references,
                 )
                 new_urls.extend(predecessor_of_predecessor_urls)
             else:
@@ -68,16 +62,13 @@ class HookReferenceReplacer(ReferenceReplacer):
         target_index: int,
         use_dummy_references: bool = True,
     ):
-
         # The predecessor hook was ignored, it has no targets equivalent
         # Take the predecessor's source and find its predecessor (if none, stop)
         # Find the predecessors' target and put that into run_after for this hook
         # If there is no target, repeat from line one
         try:
             predecessor_id = extract_id_from_url(predecessor_url)
-            predecessor = await self.parent_object_reference.deploy_file.source_client.retrieve_hook(
-                predecessor_id
-            )
+            predecessor = await self.parent_object_reference.deploy_file.source_client.retrieve_hook(predecessor_id)
             return await self.replace_hook_run_after_list(
                 object=dataclasses.asdict(predecessor),
                 reverse_lookup_table=reverse_lookup_table,

@@ -1,9 +1,16 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0  # Use the latest stable version
+    rev: v4.4.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
 
   - repo: local
     hooks:
@@ -12,4 +19,4 @@ repos:
         entry: pytest
         language: system
         pass_filenames: false
-        args: [tests/]  # Specify the tests directory
+        args: [tests/]

@@ -1,8 +1,8 @@
 import asyncio
-from functools import wraps
 import re
-from anyio import Path
+from functools import wraps
 
+from anyio import Path
 from click import progressbar
 
 
@@ -111,10 +111,7 @@ async def gather_with_concurrency(*coros, n=None):
 
 async def find_object_in_project(object: dict, base_path: Path):
     file_name = templatize_name_id(object["name"], object["id"])
-    return (
-        await (base_path / file_name).exists()
-        or await (base_path / (file_name + ".json")).exists()
-    )
+    return await (base_path / file_name).exists() or await (base_path / (file_name + ".json")).exists()
 
 
 def find_object_by_key(key: str, value: str, objects: list):
@@ -146,8 +143,4 @@ async def find_all_schema_paths_in_destination(destination_path: Path):
     if not (await schemas_dir.exists()):
         return []
 
-    return [
-        schema_path
-        async for schema_path in schemas_dir.iterdir()
-        if await schema_path.is_file()
-    ]
+    return [schema_path async for schema_path in schemas_dir.iterdir() if await schema_path.is_file()]

@@ -1,8 +1,8 @@
 from anyio import Path
 from pydantic import BaseModel
-from rossum_api.api_client import Resource
 
 from deployment_manager.commands.download.helpers import should_write_object
+from deployment_manager.commands.download.subdirectory import Subdirectory
 from deployment_manager.commands.download.types import ObjectSaver
 from deployment_manager.common.read_write import (
     create_custom_hook_code_path,
@@ -12,17 +12,9 @@ from deployment_manager.common.read_write import (
     write_object_to_json,
     write_str,
 )
-from deployment_manager.utils.consts import (
-    CustomResource,
-    Settings,
-    display_warning,
-)
-from deployment_manager.utils.functions import (
-    templatize_name_id,
-)
-from deployment_manager.commands.download.subdirectory import (
-    Subdirectory,
-)
+from deployment_manager.utils.consts import CustomResource, Settings, display_warning
+from deployment_manager.utils.functions import templatize_name_id
+from rossum_api.api_client import Resource
 
 
 class WorkspaceSaver(ObjectSaver):
@@ -74,7 +66,6 @@ class QueueSaver(ObjectSaver):
     def construct_object_path(self, subdir: Subdirectory, queue: dict) -> Path:
         workspace_for_queue = self.find_workspace_for_queue(queue)
         if not workspace_for_queue:
-
             return
 
         object_path = (
@@ -153,19 +144,14 @@ class EmailTemplateSaver(QueueSaver):
 
         queue = self.find_queue(object)
         if queue:
-            return (
-                message
-                + f", for [yellow]queue[/yellow]: {self.display_label(queue['name'], queue['id'])}"
-            )
+            return message + f", for [yellow]queue[/yellow]: {self.display_label(queue['name'], queue['id'])}"
         return message
 
     async def save_downloaded_object(self, email_template: dict, subdir: Subdirectory):
         if not email_template.get("queue", None):
             return
 
-        object_path = self.construct_object_path(
-            subdir=subdir, email_template=email_template
-        )
+        object_path = self.construct_object_path(subdir=subdir, email_template=email_template)
         if not object_path:
             return
         if self.download_all or await should_write_object(
@@ -252,7 +238,6 @@ class SchemaSaver(QueueSaver):
 
     def find_queue(self, schema: dict):
         schema_queues = schema.get("queues", [None])
-        warning_message = f"Could not find queue for {self.display_type} {self.display_label(schema.get('name', 'no-name'), schema.get('id', 'no-id'))}. The object will not be saved locally."
         # The schema might not have any queues assigned ([])
         if not schema_queues:
             # display_warning(warning_message)
@@ -307,9 +292,7 @@ class SchemaSaver(QueueSaver):
                 log_message=f"Pulled {self.display_type} {object_path}",
             )
 
-            formula_saver = FormulaSaver(
-                parent_schema_path=object_path, parent_schema=schema
-            )
+            formula_saver = FormulaSaver(parent_schema_path=object_path, parent_schema=schema)
             await formula_saver.save_downloaded_objects()
 
 
@@ -329,9 +312,7 @@ class FormulaSaver(BaseModel):
     async def save_downloaded_objects(self):
         formula_fields = find_formula_fields_in_schema(self.parent_schema["content"])
         for field_id, code in formula_fields:
-            await create_formula_file(
-                self.construct_object_path(field_id=field_id), code
-            )
+            await create_formula_file(self.construct_object_path(field_id=field_id), code)
 
     def construct_object_path(self, field_id):
         return self.formula_directory_path / f"{field_id}.py"
@@ -440,12 +421,7 @@ class HookSaver(ObjectSaver):
     type: Resource = Resource.Hook
 
     def construct_object_path(self, subdir: Subdirectory, hook: dict) -> Path:
-        object_path = (
-            self.base_path
-            / subdir.name
-            / "hooks"
-            / f'{templatize_name_id(hook["name"], hook["id"])}.json'
-        )
+        object_path = self.base_path / subdir.name / "hooks" / f'{templatize_name_id(hook["name"], hook["id"])}.json'
         return object_path
 
     async def save_downloaded_object(self, hook: dict, subdir: Subdirectory):
@@ -464,9 +440,7 @@ class HookSaver(ObjectSaver):
 
             custom_hook_code_path = create_custom_hook_code_path(object_path, hook)
             if custom_hook_code_path:
-                await write_str(
-                    custom_hook_code_path, hook.get("config", {}).get("code", None)
-                )
+                await write_str(custom_hook_code_path, hook.get("config", {}).get("code", None))
 
 
 class WorkflowSaver(ObjectSaver):
@@ -518,25 +492,20 @@ class WorkflowStepSaver(ObjectSaver):
     def construct_object_path(self, subdir: Subdirectory, workflow_step: dict) -> Path:
         workflow_for_workflow_step = self.find_workflow_for_workflow_step(workflow_step)
         if not workflow_for_workflow_step:
-
             return
 
         object_path = (
             self.base_path
             / subdir.name
             / "workflows"
-            / templatize_name_id(
-                workflow_for_workflow_step["name"], workflow_for_workflow_step["id"]
-            )
+            / templatize_name_id(workflow_for_workflow_step["name"], workflow_for_workflow_step["id"])
             / "workflow_steps"
             / f'{templatize_name_id(workflow_step["name"], workflow_step["id"])}.json'
         )
         return object_path
 
     async def save_downloaded_object(self, workflow_step: dict, subdir: Subdirectory):
-        object_path = self.construct_object_path(
-            subdir=subdir, workflow_step=workflow_step
-        )
+        object_path = self.construct_object_path(subdir=subdir, workflow_step=workflow_step)
         if not object_path:
             return
         if self.download_all or await should_write_object(

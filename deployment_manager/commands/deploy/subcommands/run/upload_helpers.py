@@ -1,16 +1,12 @@
 from pydantic import BaseModel
-from rossum_api import ElisAPIClient
-from rossum_api.api_client import Resource
 from rich import print
 from rich.panel import Panel
 
-from deployment_manager.utils.functions import (
-    find_object_by_id,
-)
 from deployment_manager.common.modified_at import check_modified_timestamp
-from deployment_manager.utils.consts import (
-    settings,
-)
+from deployment_manager.utils.consts import settings
+from deployment_manager.utils.functions import find_object_by_id
+from rossum_api import ElisAPIClient
+from rossum_api.api_client import Resource
 
 
 class TargetObjectNotFoundException(Exception):
@@ -44,19 +40,13 @@ async def upload_organization(
         return local_target_organization
 
     if organization["id"] == target_organization_id:
-        print(
-            Panel(
-                f"Skipping organization {settings.MIGRATE_COMMAND_NAME} - they are the same."
-            )
-        )
+        print(Panel(f"Skipping organization {settings.MIGRATE_COMMAND_NAME} - they are the same."))
         return local_target_organization
 
     # Use only a subset of org fields where it makes sense to migrate
     organization_fields = {k: organization[k] for k in settings.ORGANIZATION_FIELDS}
 
-    return await client._http_client.update(
-        Resource.Organization, id_=target_organization_id, data=organization_fields
-    )
+    return await client._http_client.update(Resource.Organization, id_=target_organization_id, data=organization_fields)
 
 
 async def upload_inbox(
@@ -72,16 +62,12 @@ async def upload_inbox(
         if not local_object:
             raise TargetObjectNotFoundException(target_id)
 
-        local_remote_timestamp_synced = await check_modified_timestamp(
-            client, Resource.Inbox, target_id, local_object
-        )
+        local_remote_timestamp_synced = await check_modified_timestamp(client, Resource.Inbox, target_id, local_object)
         if not force and not local_remote_timestamp_synced:
             errors[target_id] = (Resource.Inbox, local_object.get("name", ""))
             return local_object
 
-        result = await client._http_client.update(
-            Resource.Inbox, id_=target_id, data=inbox
-        )
+        result = await client._http_client.update(Resource.Inbox, id_=target_id, data=inbox)
         print(f'Released (updated) inbox "{inbox['id']}" -> "{target_id}".')
         return result
     else:

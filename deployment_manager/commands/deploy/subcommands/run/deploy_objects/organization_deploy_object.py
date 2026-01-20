@@ -1,8 +1,6 @@
 from anyio import Path
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
-    DeployObject,
-)
 
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
 from deployment_manager.commands.deploy.subcommands.run.models import Target
 from rossum_api.api_client import Resource
 
@@ -26,9 +24,7 @@ class OrganizationDeployObject(DeployObject):
     async def initialize_target_object_data(self, data, target):
         data["name"] = self.deploy_file.target_org.name
 
-    async def override_references_in_target_object_data(
-        self, data_attribute, target, use_dummy_references
-    ):
+    async def override_references_in_target_object_data(self, data_attribute, target, use_dummy_references):
         data = getattr(target, data_attribute)
         self.ref_replacer.replace_list_of_reference_urls(
             object=data,
