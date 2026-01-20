@@ -1,13 +1,11 @@
 from anyio import Path
-from pydantic import Field
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.rule_deploy_object import RuleDeployObject
-from deployment_manager.commands.deploy.subcommands.run.models import SubObjectException, Target
+from deployment_manager.commands.deploy.subcommands.run.models import Target
 from deployment_manager.common.read_write import find_fields_in_schema, read_formula_file
 from deployment_manager.common.schema import find_schema_id
-from deployment_manager.utils.consts import CustomResource, display_error, settings
-from deployment_manager.utils.functions import gather_with_concurrency, templatize_name_id
+from deployment_manager.utils.consts import CustomResource, settings
+from deployment_manager.utils.functions import templatize_name_id
 from rossum_api.api_client import Resource
 
 
@@ -16,8 +14,6 @@ class SchemaDeployObject(DeployObject):
     name: str = ""
 
     overwrite_ignored_fields: bool = False
-
-    rule_deploy_objects: list[RuleDeployObject] = Field(default_factory=lambda: [], alias="rules")
 
     parent_queue: DeployObject = None
 
@@ -38,24 +34,6 @@ class SchemaDeployObject(DeployObject):
 
         await self.update_formula_fields_code()
 
-        await gather_with_concurrency(
-            *[
-                object.initialize_deploy_object(deploy_file=deploy_file, parent_schema=self)
-                for object in self.rule_deploy_objects
-            ]
-        )
-
-        for rule in self.rule_deploy_objects:
-            if rule.initialize_failed:
-                self.initialize_failed = True
-                raise SubObjectException()
-
-    # Overrides the parent method
-    async def initialize_target_objects(self):
-        await super().initialize_target_objects()
-
-        await gather_with_concurrency(*[object.initialize_target_objects() for object in self.rule_deploy_objects])
-
     async def initialize_target_object_data(self, data: dict, target: Target):
         if "name" not in target.attribute_override:
             # Use the target queue's name for the schema unless user specified explicit schema.name override
@@ -69,19 +47,6 @@ class SchemaDeployObject(DeployObject):
         if not self.overwrite_ignored_fields:
             # Ignore should preceed attribute override, so that override can win if it is defined
             await self.use_schema_ai_fields_from_remote(schema=data, target=target)
-
-    async def override_references(self, data_attribute, use_dummy_references):
-        await super().override_references(data_attribute, use_dummy_references)
-
-        await gather_with_concurrency(
-            *[
-                object.override_references(
-                    data_attribute=data_attribute,
-                    use_dummy_references=use_dummy_references,
-                )
-                for object in self.rule_deploy_objects
-            ]
-        )
 
     async def override_references_in_target_object_data(self, data_attribute, target: Target, use_dummy_references):
         data = getattr(target, data_attribute)
@@ -117,33 +82,6 @@ class SchemaDeployObject(DeployObject):
             remote_target = await self.get_remote_object(target.id)
             if not remote_target.get("rules", []):
                 data.pop("rules", None)
-
-    async def visualize_changes(self):
-        await super().visualize_changes()
-
-        for rule in self.rule_deploy_objects:
-            await rule.visualize_changes()
-
-    async def deploy_target_objects(self, data_attribute):
-        try:
-            await super().deploy_target_objects(data_attribute)
-
-            await gather_with_concurrency(
-                *[object.deploy_target_objects(data_attribute=data_attribute) for object in self.rule_deploy_objects]
-            )
-
-            for rule in self.rule_deploy_objects:
-                if rule.deploy_failed:
-                    raise SubObjectException()
-
-        except SubObjectException:
-            self.deploy_failed = True
-        except Exception as e:
-            display_error(
-                f"Error while deploying {self.display_type} {self.display_label}: {e}",
-                e,
-            )
-            self.deploy_failed = True
 
     async def update_formula_fields_code(self):
         """Checks if there is not newer code in the associated formula fields and uses that for release.

@@ -40,6 +40,9 @@ class QueueDeployObject(DeployObject):
     ):
         await super().initialize_deploy_object(deploy_file)
 
+        # Ignore read-only 'rules' field
+        self.ignored_attributes.append("rules")
+
         await self.schema_deploy_object.initialize_deploy_object(
             deploy_file=self.deploy_file,
             parent_queue=self,
@@ -73,6 +76,9 @@ class QueueDeployObject(DeployObject):
     async def initialize_target_object_data(self, data: dict, target: Target):
         if not self.deploy_file.is_same_org:
             remove_queue_attributes_for_cross_org(queue_copy=data)
+
+        # Remove read-only 'rules' field
+        data.pop("rules", None)
 
         if not self.overwrite_ignored_fields:
             # Ignore should preceed attribute override, so that override can win if it is defined
@@ -223,14 +229,6 @@ class QueueDeployObject(DeployObject):
                 f"{self.display_type} {self.display_label} has {queue_targets_len} targets while its {self.schema_deploy_object.display_type} has {schema_targets_len}. Please make the target counts equal."
             )
             mismatch_found = True
-
-        for rule in self.schema_deploy_object.rule_deploy_objects:
-            rule_targets_len = len(rule.targets)
-            if queue_targets_len != rule_targets_len:
-                display_error(
-                    f"{self.display_type} {self.display_label} has {queue_targets_len} targets while one of its [yellow]schema rules[/yellow] ({rule.display_label}) has {rule_targets_len}. Please make the target counts equal."
-                )
-                mismatch_found = True
 
         inbox_targets_len = len(self.inbox_deploy_object.targets)
         queue_has_inbox = bool(self.data.get("inbox", "")) and self.inbox_deploy_object.id
