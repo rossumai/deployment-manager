@@ -33,4 +33,3 @@ return a structured markdown table with the following aspects (omit any urls fro
 - "Events" = in the "description column" write on which events is the hook triggered
 - "Related Extensions" = in the "description column" list hooks that are listed in ‘run_after’ attribute. Look at the IDs of the related extensions section to know which is which and list their name as well as ID. Return bullet points list printed in <ul><li></li></ul>, sorted A-Z, with extension names delimited in ``.
 - "Active Queues" = in the "description column", return bullet points list printed in <ul><li></li></ul> of only the human readable name (queue_id) where this extension applies, omit any URLs, sort queue names A-Z
-

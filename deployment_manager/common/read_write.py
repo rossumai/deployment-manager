@@ -2,24 +2,21 @@ import asyncio
 import dataclasses
 import json
 from typing import Any
+
 import aiofiles
+import yaml
 from anyio import Path
 from rich import print
-from rossum_api.api_client import Resource
-import yaml
 from ruamel.yaml import YAML
 
-
-from deployment_manager.utils.consts import settings
 from deployment_manager.common.determine_path import determine_object_type_from_path
-
+from deployment_manager.utils.consts import settings
+from rossum_api.api_client import Resource
 
 NON_VERSIONED_ATTRIBUTES_FILE_LOCK = asyncio.Lock()
 
 
-async def write_object_to_json(
-    path: Path, object: dict, type: Resource = None, log_message: str = ""
-):
+async def write_object_to_json(path: Path, object: dict, type: Resource = None, log_message: str = ""):
     if dataclasses.is_dataclass(object):
         object = dataclasses.asdict(object)
     if path.parent:
@@ -54,7 +51,9 @@ async def write_non_versioned_attribute(path, object_, key):
     # `non_versioned_attributes` file we need to find is always saved on org/suborg level
     # That's why it's always -3. then, we can load org/suborg/non_versioned_object_attributes.json
     subdir_path = path.parents[-3]  # path to dir/subdir, or organization/suborganization
-    non_versioned_attributes_file = subdir_path / settings.NON_VERSIONED_ATTRIBUTES_FILE_NAME  # file is saved in root for each subdirectory
+    non_versioned_attributes_file = (
+        subdir_path / settings.NON_VERSIONED_ATTRIBUTES_FILE_NAME
+    )  # file is saved in root for each subdirectory
 
     # avoid simultaneous write to the same file
     async with NON_VERSIONED_ATTRIBUTES_FILE_LOCK:
@@ -99,15 +98,11 @@ async def create_local_object(path: Path, object: dict):
         if formula_fields:
             formula_directory_path = create_formula_directory_path(path, object)
             for field_id, code in formula_fields:
-                await create_formula_file(
-                    formula_directory_path / f"{field_id}.py", code
-                )
+                await create_formula_file(formula_directory_path / f"{field_id}.py", code)
     elif object_type == Resource.Hook:
         custom_hook_code_path = create_custom_hook_code_path(path, object)
         if custom_hook_code_path:
-            await write_str(
-                custom_hook_code_path, object.get("config", {}).get("code", None)
-            )
+            await write_str(custom_hook_code_path, object.get("config", {}).get("code", None))
 
 
 def find_formula_fields_in_schema(node: Any) -> list[tuple[str, str]]:
@@ -149,9 +144,7 @@ def find_fields_in_schema(node: Any) -> list[tuple[dict]]:
 
 
 def create_custom_hook_code_path(hook_path: Path, hook: object):
-    if hook.get("extension_source", "") != "rossum_store" and hook.get(
-        "config", {}
-    ).get("code", None):
+    if hook.get("extension_source", "") != "rossum_store" and hook.get("config", {}).get("code", None):
         hook_runtime = hook["config"].get("runtime")
         extension = ".py" if "python" in hook_runtime else ".js"
         return hook_path.with_suffix(extension)
@@ -181,8 +174,10 @@ async def read_non_versioned_attribute_data(path, object_):
         return
 
     # fore more clarity of how this works, read comments in the `write_non_versioned_attribute` function
-    subdir_path = path.parents[-3] # path to dir/subdir, or organization/suborganization
-    non_versioned_attributes_file = subdir_path / settings.NON_VERSIONED_ATTRIBUTES_FILE_NAME  # file is saved in root for each subdirectory
+    subdir_path = path.parents[-3]  # path to dir/subdir, or organization/suborganization
+    non_versioned_attributes_file = (
+        subdir_path / settings.NON_VERSIONED_ATTRIBUTES_FILE_NAME
+    )  # file is saved in root for each subdirectory
     if await non_versioned_attributes_file.exists():
         non_versioned_data = {}
         # locking the file while reading to be sure other process won't write in the meantime

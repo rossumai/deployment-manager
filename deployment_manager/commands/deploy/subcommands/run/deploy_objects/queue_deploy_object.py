@@ -1,37 +1,20 @@
 from typing import Optional
+
+import questionary
 from anyio import Path
 from pydantic import Field
-import questionary
-from rossum_api.api_client import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
     DeployObject,
     EmptyDeployObject,
 )
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.inbox_deploy_object import (
-    InboxDeployObject,
-)
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.schema_deploy_object import (
-    SchemaDeployObject,
-)
-from deployment_manager.commands.deploy.subcommands.run.helpers import (
-    remove_queue_attributes_for_cross_org,
-)
-from deployment_manager.commands.deploy.subcommands.run.models import (
-    SubObjectException,
-    Target,
-)
-
-from deployment_manager.utils.consts import (
-    QUEUE_ENGINE_ATTRIBUTES,
-    display_error,
-    display_warning,
-    settings,
-)
-from deployment_manager.utils.functions import (
-    extract_id_from_url,
-    templatize_name_id,
-)
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.inbox_deploy_object import InboxDeployObject
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.schema_deploy_object import SchemaDeployObject
+from deployment_manager.commands.deploy.subcommands.run.helpers import remove_queue_attributes_for_cross_org
+from deployment_manager.commands.deploy.subcommands.run.models import SubObjectException, Target
+from deployment_manager.utils.consts import QUEUE_ENGINE_ATTRIBUTES, display_error, display_warning
+from deployment_manager.utils.functions import extract_id_from_url, templatize_name_id
+from rossum_api.api_client import Resource
 
 
 class QueueDeployObject(DeployObject):
@@ -57,6 +40,9 @@ class QueueDeployObject(DeployObject):
     ):
         await super().initialize_deploy_object(deploy_file)
 
+        # Ignore read-only 'rules' field
+        self.ignored_attributes.append("rules")
+
         await self.schema_deploy_object.initialize_deploy_object(
             deploy_file=self.deploy_file,
             parent_queue=self,
@@ -73,20 +59,12 @@ class QueueDeployObject(DeployObject):
         self.collect_workflow_warning()
         self.collect_engine_warnings()
 
-        if (
-            self.schema_deploy_object.initialize_failed
-            or self.inbox_deploy_object.initialize_failed
-        ):
+        if self.schema_deploy_object.initialize_failed or self.inbox_deploy_object.initialize_failed:
             self.initialize_failed = True
 
     @property
     def path(self) -> Path:
-        return (
-            Path(self.base_path)
-            / "queues"
-            / templatize_name_id(self.name, self.id)
-            / "queue.json"
-        )
+        return Path(self.base_path) / "queues" / templatize_name_id(self.name, self.id) / "queue.json"
 
     # Overrides the parent method
     async def initialize_target_objects(self):
@@ -98,6 +76,9 @@ class QueueDeployObject(DeployObject):
     async def initialize_target_object_data(self, data: dict, target: Target):
         if not self.deploy_file.is_same_org:
             remove_queue_attributes_for_cross_org(queue_copy=data)
+
+        # Remove read-only 'rules' field
+        data.pop("rules", None)
 
         if not self.overwrite_ignored_fields:
             # Ignore should preceed attribute override, so that override can win if it is defined
@@ -113,9 +94,7 @@ class QueueDeployObject(DeployObject):
             data_attribute=data_attribute, use_dummy_references=use_dummy_references
         )
 
-    async def override_references_in_target_object_data(
-        self, data_attribute, target, use_dummy_references
-    ):
+    async def override_references_in_target_object_data(self, data_attribute, target, use_dummy_references):
         data = getattr(target, data_attribute)
         # previous_workspace_url = data["workspace"]
         # previous_schema_url = data["schema"]
@@ -200,9 +179,7 @@ class QueueDeployObject(DeployObject):
             use_dummy_references=use_dummy_references,
         )
 
-        await self.persist_target_only_references(
-            target=target, data_attribute=data_attribute, dependency_name="hooks"
-        )
+        await self.persist_target_only_references(target=target, data_attribute=data_attribute, dependency_name="hooks")
         await self.persist_target_only_references(
             target=target, data_attribute=data_attribute, dependency_name="webhooks"
         )
@@ -215,18 +192,14 @@ class QueueDeployObject(DeployObject):
 
     async def deploy_target_objects(self, data_attribute):
         try:
-            await self.schema_deploy_object.deploy_target_objects(
-                data_attribute=data_attribute
-            )
+            await self.schema_deploy_object.deploy_target_objects(data_attribute=data_attribute)
 
             if self.schema_deploy_object.deploy_failed:
                 raise SubObjectException()
 
             await super().deploy_target_objects(data_attribute)
 
-            await self.inbox_deploy_object.deploy_target_objects(
-                data_attribute=data_attribute
-            )
+            await self.inbox_deploy_object.deploy_target_objects(data_attribute=data_attribute)
 
             if self.inbox_deploy_object.deploy_failed:
                 raise SubObjectException()
@@ -240,10 +213,7 @@ class QueueDeployObject(DeployObject):
             self.deploy_failed = True
 
     def verify_queue_settings_are_compatible(self):
-        if (
-            self.keep_hook_dependencies_without_equivalent
-            and not self.deploy_file.is_same_org
-        ):
+        if self.keep_hook_dependencies_without_equivalent and not self.deploy_file.is_same_org:
             raise Exception(
                 f'{self.display_type} {self.display_label} Cannot use "keep_hook_dependencies_without_equivalent: true" if source/target organizations are different.'
             )
@@ -260,18 +230,8 @@ class QueueDeployObject(DeployObject):
             )
             mismatch_found = True
 
-        for rule in self.schema_deploy_object.rule_deploy_objects:
-            rule_targets_len = len(rule.targets)
-            if queue_targets_len != rule_targets_len:
-                display_error(
-                    f"{self.display_type} {self.display_label} has {queue_targets_len} targets while one of its [yellow]schema rules[/yellow] ({rule.display_label}) has {rule_targets_len}. Please make the target counts equal."
-                )
-                mismatch_found = True
-
         inbox_targets_len = len(self.inbox_deploy_object.targets)
-        queue_has_inbox = (
-            bool(self.data.get("inbox", "")) and self.inbox_deploy_object.id
-        )
+        queue_has_inbox = bool(self.data.get("inbox", "")) and self.inbox_deploy_object.id
         if queue_has_inbox and queue_targets_len != inbox_targets_len:
             display_error(
                 f"{self.display_type} {self.display_label} has {queue_targets_len} targets while its {self.inbox_deploy_object.display_type} has {inbox_targets_len}. Please make the target counts equal."
@@ -279,9 +239,7 @@ class QueueDeployObject(DeployObject):
             mismatch_found = True
 
         if mismatch_found:
-            raise SubObjectException(
-                "Incorrect inbox/schema target count vs queue target count"
-            )
+            raise SubObjectException("Incorrect inbox/schema target count vs queue target count")
 
     def collect_unassigned_hooks_warning(self):
         if self.deploy_file.ignore_all_deploy_warnings or self.ignore_deploy_warnings:
@@ -290,9 +248,7 @@ class QueueDeployObject(DeployObject):
         queue_hook_urls = self.data.get("hooks", [])
         queue_hook_ids = [extract_id_from_url(url) for url in queue_hook_urls]
 
-        deployed_hook_ids = set(hook.id for hook in self.deploy_file.hooks) | set(
-            self.deploy_file.unselected_hooks
-        )
+        deployed_hook_ids = set(hook.id for hook in self.deploy_file.hooks) | set(self.deploy_file.unselected_hooks)
 
         for queue_hook_id in queue_hook_ids:
             if queue_hook_id not in deployed_hook_ids:
@@ -302,11 +258,7 @@ class QueueDeployObject(DeployObject):
                 return
 
     def collect_workflow_warning(self):
-        if (
-            self.deploy_file.ignore_all_deploy_warnings
-            or self.ignore_deploy_warnings
-            or self.deploy_file.is_same_org
-        ):
+        if self.deploy_file.ignore_all_deploy_warnings or self.ignore_deploy_warnings or self.deploy_file.is_same_org:
             return
 
         if self.data.get("workflows", []):
@@ -315,11 +267,7 @@ class QueueDeployObject(DeployObject):
             )
 
     def collect_engine_warnings(self):
-        if (
-            self.deploy_file.ignore_all_deploy_warnings
-            or self.ignore_deploy_warnings
-            or self.deploy_file.is_same_org
-        ):
+        if self.deploy_file.ignore_all_deploy_warnings or self.ignore_deploy_warnings or self.deploy_file.is_same_org:
             return
 
         for attr in QUEUE_ENGINE_ATTRIBUTES:
@@ -363,12 +311,8 @@ class QueueDeployObject(DeployObject):
             queue["automation_level"] = target_queue.automation_level
             queue["default_score_threshold"] = target_queue.default_score_threshold
 
-            queue.get("settings", {})["columns"] = target_queue.settings.get(
-                "columns", []
-            )
-            queue.get("settings", {})["annotation_list_table"] = (
-                target_queue.settings.get("annotation_list_table", {})
-            )
+            queue.get("settings", {})["columns"] = target_queue.settings.get("columns", [])
+            queue.get("settings", {})["annotation_list_table"] = target_queue.settings.get("annotation_list_table", {})
 
         except Exception as e:
-            raise Exception(f"Error while ignoring queue AI fields") from e
+            raise Exception("Error while ignoring queue AI fields") from e

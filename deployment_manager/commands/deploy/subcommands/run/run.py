@@ -1,16 +1,13 @@
-from anyio import Path
-import anyio
-from pydantic import ValidationError
-import questionary
 from dataclasses import fields
+
+import anyio
+import questionary
+from anyio import Path
+from pydantic import ValidationError
+
 from deployment_manager.commands.deploy.subcommands.run.deploy_orchestrator.deploy_orchestrator import (
     DeployOrchestrator,
 )
-from deployment_manager.commands.deploy.subcommands.run.merge.state import DeployState
-from deployment_manager.commands.deploy.subcommands.run.models import DeployException
-from rossum_api import APIClientError, ElisAPIClient
-from rossum_api.models.organization import Organization
-
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
     check_required_keys,
@@ -18,17 +15,14 @@ from deployment_manager.commands.deploy.subcommands.run.helpers import (
     get_new_deploy_file_path,
     get_url_and_credentials,
 )
-
-from deployment_manager.commands.deploy.subcommands.run.reverse_override import (
-    reverse_source_target_in_yaml,
-)
+from deployment_manager.commands.deploy.subcommands.run.merge.state import DeployState
+from deployment_manager.commands.deploy.subcommands.run.models import DeployException
+from deployment_manager.commands.deploy.subcommands.run.reverse_override import reverse_source_target_in_yaml
 from deployment_manager.commands.download.download import download_destinations
 from deployment_manager.common.read_write import read_object_from_json
-from deployment_manager.utils.consts import (
-    display_error,
-    display_info,
-    settings,
-)
+from deployment_manager.utils.consts import display_error, display_info, settings
+from rossum_api import APIClientError, ElisAPIClient
+from rossum_api.models.organization import Organization
 
 
 async def deploy_release_file(
@@ -38,7 +32,7 @@ async def deploy_release_file(
     target_client: ElisAPIClient = None,
     auto_apply_plan: bool = False,
     prefer: str = None,
-    no_rebase: bool =False,
+    no_rebase: bool = False,
     # auto_delete: bool = False,
     commit: bool = False,
     commit_message: str = "",
@@ -73,9 +67,7 @@ async def deploy_release_file(
         )
         if not source_credentials:
             return
-        source_client = ElisAPIClient(
-            base_url=source_credentials.url, token=source_credentials.token
-        )
+        source_client = ElisAPIClient(base_url=source_credentials.url, token=source_credentials.token)
 
     source_org_path = project_path / source_org_name / "organization.json"
     if not await source_org_path.exists():
@@ -83,11 +75,7 @@ async def deploy_release_file(
         return
     source_org_dict = await read_object_from_json(source_org_path)
     source_org = Organization(
-        **{
-            k: v
-            for k, v in source_org_dict.items()
-            if k in {f.name for f in fields(Organization)}
-        }
+        **{k: v for k, v in source_org_dict.items() if k in {f.name for f in fields(Organization)}}
     )
 
     target_dir_subdir = yaml.data.get(settings.DEPLOY_KEY_TARGET_DIR, "")
@@ -102,28 +90,20 @@ async def deploy_release_file(
         )
         if not target_credentials:
             return
-        target_client = ElisAPIClient(
-            base_url=target_credentials.url, token=target_credentials.token
-        )
+        target_client = ElisAPIClient(base_url=target_credentials.url, token=target_credentials.token)
 
     target_org_path: Path = project_path / target_org_name / "organization.json"
     if await target_org_path.exists():
         target_org_dict = await read_object_from_json(target_org_path)
         target_org = Organization(
-            **{
-                k: v
-                for k, v in target_org_dict.items()
-                if k in {f.name for f in fields(Organization)}
-            }
+            **{k: v for k, v in target_org_dict.items() if k in {f.name for f in fields(Organization)}}
         )
     else:
         target_org_choices = []
         async for org in target_client.list_all_organizations():
             target_org_choices.append(questionary.Choice(title=org.name, value=org))
         if len(target_org_choices) > 1:
-            target_org = await questionary.select(
-                "Select target organization:", choices=target_org_choices
-            ).ask_async()
+            target_org = await questionary.select("Select target organization:", choices=target_org_choices).ask_async()
         else:
             target_org = target_org_choices[0].value
 
@@ -189,9 +169,7 @@ async def deploy_release_file(
         return
 
     if not auto_apply_plan and not (
-        await questionary.confirm(
-            "Do you wish to apply the plan?", default=False
-        ).ask_async()
+        await questionary.confirm("Do you wish to apply the plan?", default=False).ask_async()
     ):
         return
 

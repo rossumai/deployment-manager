@@ -1,23 +1,13 @@
-from pydantic import BaseModel
 import questionary
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.attribute_override import (
-    AttributeOverrider,
-)
+from anyio import Path
+from pydantic import BaseModel
+from rich import print as pprint
+
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.attribute_override import AttributeOverrider
+from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml, get_url_and_credentials
 from deployment_manager.commands.download.downloader import Downloader
 from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
-from deployment_manager.commands.deploy.subcommands.run.helpers import (
-    DeployYaml,
-    get_url_and_credentials,
-)
-from deployment_manager.utils.consts import (
-    display_error,
-    display_info,
-    display_warning,
-    settings,
-)
-
-from rich import print as pprint
-from anyio import Path
+from deployment_manager.utils.consts import display_error, display_info, display_warning, settings
 from deployment_manager.utils.functions import extract_id_from_url, templatize_name_id
 from rossum_api import ElisAPIClient
 from rossum_api.api_client import Resource
@@ -53,9 +43,7 @@ class DeployFileReverser(BaseModel):
         )
         if not source_credentials:
             return
-        self.source_client = ElisAPIClient(
-            base_url=source_credentials.url, token=source_credentials.token
-        )
+        self.source_client = ElisAPIClient(base_url=source_credentials.url, token=source_credentials.token)
 
         target_dir_subdir = self.yaml.data.get(settings.DEPLOY_KEY_TARGET_DIR, "")
         target_org_name = target_dir_subdir.split("/")[0]
@@ -68,9 +56,7 @@ class DeployFileReverser(BaseModel):
         )
         if not target_credentials:
             return
-        self.target_client = ElisAPIClient(
-            base_url=target_credentials.url, token=target_credentials.token
-        )
+        self.target_client = ElisAPIClient(base_url=target_credentials.url, token=target_credentials.token)
 
         self.source_path = self.project_path / source_dir_subdir
         self.target_path = self.project_path / target_dir_subdir
@@ -84,12 +70,8 @@ class DeployFileReverser(BaseModel):
         deploy_file_object[settings.DEPLOY_KEY_LAST_DEPLOYED_AT] = None
         deploy_file_object[settings.DEPLOY_KEY_UNSELECTED_HOOK_IDS] = []
 
-        source_dir_and_subdir = deploy_file_object.get(
-            settings.DEPLOY_KEY_SOURCE_DIR, None
-        )
-        target_dir_and_subdir = deploy_file_object.get(
-            settings.DEPLOY_KEY_TARGET_DIR, None
-        )
+        source_dir_and_subdir = deploy_file_object.get(settings.DEPLOY_KEY_SOURCE_DIR, None)
+        target_dir_and_subdir = deploy_file_object.get(settings.DEPLOY_KEY_TARGET_DIR, None)
 
         (
             deploy_file_object[settings.DEPLOY_KEY_SOURCE_DIR],
@@ -107,11 +89,9 @@ class DeployFileReverser(BaseModel):
             deploy_file_object[settings.DEPLOY_KEY_TARGET_URL],
         ) = (target_url, source_url)
 
-        deploy_file_object[settings.DEPLOY_KEY_WORKSPACES] = (
-            await self.reverse_object_type(
-                type=Resource.Workspace,
-                deploy_file_object=deploy_file_object,
-            )
+        deploy_file_object[settings.DEPLOY_KEY_WORKSPACES] = await self.reverse_object_type(
+            type=Resource.Workspace,
+            deploy_file_object=deploy_file_object,
         )
 
         deploy_file_object[settings.DEPLOY_KEY_QUEUES] = await self.reverse_object_type(
@@ -132,9 +112,7 @@ class DeployFileReverser(BaseModel):
         )
 
         default_deploy_name = f"reverse_{self.input_file_path.stem}.yaml"
-        deploy_file_path = (
-            self.project_path / settings.DEFAULT_DEPLOY_PARENT / default_deploy_name
-        )
+        deploy_file_path = self.project_path / settings.DEFAULT_DEPLOY_PARENT / default_deploy_name
         if await deploy_file_path.exists():
             deploy_file_path = await get_filepath_from_user(
                 self.project_path,
@@ -142,9 +120,7 @@ class DeployFileReverser(BaseModel):
             )
 
         state_file_name = f"reverse_{deploy_file_path.stem}.json"
-        state_file_path = (
-            self.project_path / settings.DEFAULT_DEPLOY_STATE_PARENT / state_file_name
-        )
+        state_file_path = self.project_path / settings.DEFAULT_DEPLOY_STATE_PARENT / state_file_name
         if await state_file_path.exists():
             state_file_path = await get_filepath_from_user(
                 self.project_path,
@@ -154,9 +130,7 @@ class DeployFileReverser(BaseModel):
 
         await self.yaml.save_to_file(deploy_file_path)
 
-        display_info(
-            f"Deploy file saved to [green]{deploy_file_path}[/green]. Use it by running:"
-        )
+        display_info(f"Deploy file saved to [green]{deploy_file_path}[/green]. Use it by running:")
 
         pprint(
             f"\n  {settings.NEW_COMMAND_NAME} {settings.DEPLOY_COMMAND_NAME} {settings.DEPLOY_RUN_COMMAND_NAME} {deploy_file_path}\n"
@@ -170,42 +144,26 @@ class DeployFileReverser(BaseModel):
         source_objects = deploy_file_object.get(type.value, [])
         reversed_source_objects = []
 
-        remote_target_objects = await target_downloader.download_remote_objects(
-            type=type
-        )
-        remote_source_objects = await source_downloader.download_remote_objects(
-            type=type
-        )
+        remote_target_objects = await target_downloader.download_remote_objects(type=type)
+        remote_source_objects = await source_downloader.download_remote_objects(type=type)
 
         for source_object in source_objects:
-            source_object_id, source_object_name = source_object.get(
-                "id", ""
-            ), source_object.get("name", "")
+            source_object_id, source_object_name = source_object.get("id", ""), source_object.get("name", "")
             if not source_object_id:
-                display_warning(
-                    f"No source ID for {type.value} {source_object_name} - skipping."
-                )
+                display_warning(f"No source ID for {type.value} {source_object_name} - skipping.")
                 continue
 
             source_targets = source_object.get(settings.DEPLOY_KEY_TARGETS, [])
             if len(source_targets) == 0:
-                display_warning(
-                    f"No targets for {type.value} {source_object_name} ({source_object_id}) - skipping."
-                )
+                display_warning(f"No targets for {type.value} {source_object_name} ({source_object_id}) - skipping.")
                 continue
 
-            target_choices = self.prepare_target_choices(
-                targets=source_targets, remote_targets=remote_target_objects
-            )
+            target_choices = self.prepare_target_choices(targets=source_targets, remote_targets=remote_target_objects)
             if not target_choices:
-                display_warning(
-                    f"No target ID specified for {type.value} {source_object_name} - skipping."
-                )
+                display_warning(f"No target ID specified for {type.value} {source_object_name} - skipping.")
                 continue
             elif len(source_targets) > 1:
-                display_warning(
-                    f"{source_object_name} ({source_object_id}) has multiple targets."
-                )
+                display_warning(f"{source_object_name} ({source_object_id}) has multiple targets.")
                 selected_target_index = await questionary.select(
                     "Select which target should be used as source",
                     choices=target_choices,
@@ -224,54 +182,40 @@ class DeployFileReverser(BaseModel):
                 settings.DEPLOY_KEY_TARGETS: [{"id": source_object_id}],
             }
 
-            if attribute_overrides := selected_target.get(
-                settings.DEPLOY_KEY_OVERRIDES, {}
-            ):
+            if attribute_overrides := selected_target.get(settings.DEPLOY_KEY_OVERRIDES, {}):
                 remote_source = next(
                     (x for x in remote_source_objects if source_object_id == x["id"]),
                     None,
                 )
                 # If source does not exist, we preserve the attribute override even though there will be the same value since we might be using target even as source
-                reversed_object[settings.DEPLOY_KEY_TARGETS][0][
-                    settings.DEPLOY_KEY_OVERRIDES
-                ] = overrider.reverse_attributes_v2(
-                    source_object=remote_source if remote_source else remote_target,
-                    target_object=remote_target,
-                    attribute_overrides=attribute_overrides,
+                reversed_object[settings.DEPLOY_KEY_TARGETS][0][settings.DEPLOY_KEY_OVERRIDES] = (
+                    overrider.reverse_attributes_v2(
+                        source_object=remote_source if remote_source else remote_target,
+                        target_object=remote_target,
+                        attribute_overrides=attribute_overrides,
+                    )
                 )
 
             if type == Resource.Queue:
                 try:
                     workspace_url = remote_target["workspace"]
                     workspace_id = extract_id_from_url(workspace_url)
-                    workspace = await self.target_client.retrieve_workspace(
-                        workspace_id
-                    )
+                    workspace = await self.target_client.retrieve_workspace(workspace_id)
                     reversed_object[settings.DEPLOY_KEY_BASE_PATH] = str(
-                        self.target_path
-                        / "workspaces"
-                        / templatize_name_id(workspace.name, workspace.id)
+                        self.target_path / "workspaces" / templatize_name_id(workspace.name, workspace.id)
                     )
                 except Exception:
-                    display_warning(
-                        f"Could not fetch workspace {workspace_id} for queue {reversed_object}"
-                    )
+                    display_warning(f"Could not fetch workspace {workspace_id} for queue {reversed_object}")
 
-            source_schema, source_inbox = source_object.get(
-                settings.DEPLOY_KEY_SCHEMA, {}
-            ), source_object.get(settings.DEPLOY_KEY_INBOX, {})
+            source_schema, source_inbox = (
+                source_object.get(settings.DEPLOY_KEY_SCHEMA, {}),
+                source_object.get(settings.DEPLOY_KEY_INBOX, {}),
+            )
 
             if source_schema:
-                source_schema_targets = source_schema.get(
-                    settings.DEPLOY_KEY_TARGETS, []
-                )
-                if (
-                    not source_schema_targets
-                    or len(source_schema_targets) < selected_target_index
-                ):
-                    display_error(
-                        f"Target schema found for {reversed_object['id']} - skipping"
-                    )
+                source_schema_targets = source_schema.get(settings.DEPLOY_KEY_TARGETS, [])
+                if not source_schema_targets or len(source_schema_targets) < selected_target_index:
+                    display_error(f"Target schema found for {reversed_object['id']} - skipping")
                     continue
                 selected_target_schema = source_schema_targets[selected_target_index]
                 reversed_object[settings.DEPLOY_KEY_SCHEMA] = {
@@ -281,10 +225,7 @@ class DeployFileReverser(BaseModel):
 
             if source_inbox:
                 source_inbox_targets = source_inbox.get(settings.DEPLOY_KEY_TARGETS, [])
-                if (
-                    source_inbox_targets
-                    and len(source_inbox_targets) >= selected_target_index
-                ):
+                if source_inbox_targets and len(source_inbox_targets) >= selected_target_index:
                     selected_target_inbox = source_inbox_targets[selected_target_index]
                     reversed_object[settings.DEPLOY_KEY_INBOX] = {
                         "id": selected_target_inbox["id"],
@@ -305,14 +246,10 @@ class DeployFileReverser(BaseModel):
                 None,
             )
             if not remote_target:
-                display_warning(
-                    f"No remote target found for target ID {local_target_id}."
-                )
+                display_warning(f"No remote target found for target ID {local_target_id}.")
                 continue
 
             remote_target_label = f'{remote_target["name"]} ({remote_target['id']})'
-            choices.append(
-                questionary.Choice(title=remote_target_label, value=target_index)
-            )
+            choices.append(questionary.Choice(title=remote_target_label, value=target_index))
 
         return choices

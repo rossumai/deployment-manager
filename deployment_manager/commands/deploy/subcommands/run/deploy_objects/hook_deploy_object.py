@@ -1,26 +1,18 @@
 from copy import deepcopy
+
 import questionary
 from rich import print as pprint
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
-    DeployObject,
-)
+
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.hook_reference_replacer import (
     HookReferenceReplacer,
 )
-
-
-from deployment_manager.commands.deploy.subcommands.run.merge.merge import (
-    get_nested_value,
-    prompt_conflict_resolution,
-)
+from deployment_manager.commands.deploy.subcommands.run.merge.merge import get_nested_value, prompt_conflict_resolution
 from deployment_manager.commands.deploy.subcommands.run.models import Target
 from deployment_manager.common.read_write import write_str
 from deployment_manager.utils.consts import display_error, settings
-
-from rossum_api.api_client import Resource
-
-
 from deployment_manager.utils.functions import extract_id_from_url, templatize_name_id
+from rossum_api.api_client import Resource
 
 
 class HookDeployObject(DeployObject):
@@ -35,9 +27,7 @@ class HookDeployObject(DeployObject):
         self.ref_replacer = HookReferenceReplacer(self)
 
         self.hook_template_url = (deploy_file.hook_templates.get(self.id, None),)
-        self.secrets = deploy_file.secrets.get(
-            templatize_name_id(self.name, self.id), {}
-        )
+        self.secrets = deploy_file.secrets.get(templatize_name_id(self.name, self.id), {})
         await self.update_hook_code()
 
         if self.is_creating_targets:
@@ -47,15 +37,12 @@ class HookDeployObject(DeployObject):
         if self.secrets:
             data["secrets"] = self.secrets
 
-    async def override_references_in_target_object_data(
-        self, data_attribute, target, use_dummy_references
-    ):
+    async def override_references_in_target_object_data(self, data_attribute, target, use_dummy_references):
         data = getattr(target, data_attribute)
         # Change token owner to TARGET user (important for cross-org migrations)
         if not self.deploy_file.is_same_org:
             data["token_owner"] = (
-                self.deploy_file.client._http_client.base_url
-                + f"/users/{self.deploy_file.token_owner_id}"
+                self.deploy_file.client._http_client.base_url + f"/users/{self.deploy_file.token_owner_id}"
             )
 
         self.ref_replacer.replace_list_of_reference_urls(
@@ -99,9 +86,7 @@ class HookDeployObject(DeployObject):
             target.data_from_remote = result
             target.update_after_first_create()
 
-            pprint(
-                f"{settings.CREATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}."
-            )
+            pprint(f"{settings.CREATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}.")
             return result
         except Exception as e:
             display_error(
@@ -122,12 +107,9 @@ class HookDeployObject(DeployObject):
     async def get_hook_template_from_user(self, hook_templates: list):
         # Use only for private webhooks
 
-        if self.data.get("type", None) != "function" and self.data.get(
-            "config", {}
-        ).get("private", None):
+        if self.data.get("type", None) != "function" and self.data.get("config", {}).get("private", None):
             template_choices = [
-                questionary.Choice(title=template["name"], value=template["url"])
-                for template in hook_templates
+                questionary.Choice(title=template["name"], value=template["url"]) for template in hook_templates
             ]
             template_choices = sorted(template_choices, key=lambda choice: choice.title)
             template_choices.append(questionary.Choice(title="N/A", value=None))
@@ -175,9 +157,7 @@ class HookDeployObject(DeployObject):
         # Do not try patching the type of extension in case it changed (e.g., SF to lambda)
         hook.pop("type", None)
 
-        return await self.deploy_file.client._http_client.update(
-            resource=self.type, id_=created_hook["id"], data=hook
-        )
+        return await self.deploy_file.client._http_client.update(resource=self.type, id_=created_hook["id"], data=hook)
 
     async def find_template_for_hook(self):
         if self.data.get("hook_template", None) and self.deploy_file.is_same_org:
@@ -185,10 +165,7 @@ class HookDeployObject(DeployObject):
 
         target_hook_template_match_url = None
         target_hook_templates = [
-            item
-            async for item in self.deploy_file.client._http_client.fetch_all_by_url(
-                "hook_templates"
-            )
+            item async for item in self.deploy_file.client._http_client.fetch_all_by_url("hook_templates")
         ]
 
         if self.data.get("hook_template", None):
@@ -217,17 +194,13 @@ class HookDeployObject(DeployObject):
         """Checks if there is not newer code in the associated file and uses that for release.
         The original hook file is not modified.
         """
-        if self.data.get("extension_source", "") != "rossum_store" and (
-            self.data.get("config", {}).get("code", None)
-        ):
+        if self.data.get("extension_source", "") != "rossum_store" and (self.data.get("config", {}).get("code", None)):
             suffix = ".py" if "python" in self.data["config"].get("runtime") else ".js"
             code_path = self.path.with_suffix(suffix)
             new_code = await code_path.read_text()
             self.data["config"]["code"] = new_code
 
-    async def resolve_code_conflict(
-        self, attribute_path: str, last_applied: dict, target_val: str
-    ):
+    async def resolve_code_conflict(self, attribute_path: str, last_applied: dict, target_val: str):
         if attribute_path != "config.code":
             return False
 

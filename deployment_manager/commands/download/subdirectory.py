@@ -1,4 +1,5 @@
 from typing import Annotated
+
 from pydantic import BaseModel, BeforeValidator
 
 
@@ -11,10 +12,7 @@ class Subdirectory(BaseModel):
 
 
 def create_subdir_configuration(subdirs):
-    return {
-        name: Subdirectory(name=name, **value if value else {})
-        for name, value in subdirs.items()
-    }
+    return {name: Subdirectory(name=name, **value if value else {}) for name, value in subdirs.items()}
 
 
 SubdirectoriesDict = Annotated[

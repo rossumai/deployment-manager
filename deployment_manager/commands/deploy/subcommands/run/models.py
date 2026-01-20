@@ -1,8 +1,9 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
-from typing import Annotated, Union
+
 import uuid
-from pydantic import AliasChoices, BaseModel, BeforeValidator, Field, field_validator
+from typing import TYPE_CHECKING, Annotated, Union
+
+from pydantic import BaseModel, BeforeValidator, Field, field_validator
 
 from rossum_api.api_client import Resource
 
@@ -13,9 +14,7 @@ type ReverseLookupTable = dict[Resource, dict[str, int]]
 
 
 if TYPE_CHECKING:
-    from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
-        DeployObject,
-    )
+    from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
 
 
 class Target(BaseModel):
@@ -86,9 +85,7 @@ def convert_int_id_to_class(model, val):
     return val
 
 
-TargetWithDefault = Annotated[
-    Target, BeforeValidator(lambda x: convert_int_id_to_class(Target, x))
-]
+TargetWithDefault = Annotated[Target, BeforeValidator(lambda x: convert_int_id_to_class(Target, x))]
 
 
 class SubObjectException(Exception): ...

@@ -1,45 +1,33 @@
 from copy import deepcopy
-import questionary
-from deployment_manager.commands.deploy.common.helpers import get_token_owner_from_user
-from deployment_manager.commands.deploy.subcommands.run.helpers import (
-    DeployYaml,
-)
-from deployment_manager.utils.consts import display_warning, settings
-
 
 import jmespath
-from rossum_api import ElisAPIClient
-from rossum_api.models.organization import Organization
-from rossum_api.api_client import Resource
 
+from deployment_manager.commands.deploy.common.helpers import get_token_owner_from_user
+from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
+from deployment_manager.utils.consts import display_warning, settings
 from deployment_manager.utils.functions import flatten, templatize_name_id
+from rossum_api import ElisAPIClient
+from rossum_api.api_client import Resource
+from rossum_api.models.organization import Organization
 
 
 class ObjectConfigReverser:
     prev_source_client: ElisAPIClient
     prev_target_client: ElisAPIClient
 
-    def __init__(
-        self, prev_source_client: ElisAPIClient, prev_target_client: ElisAPIClient
-    ):
+    def __init__(self, prev_source_client: ElisAPIClient, prev_target_client: ElisAPIClient):
         self.prev_source_client = prev_source_client
         self.prev_target_client = prev_target_client
 
     async def reverse_config(self, object: dict, type: Resource):
         if target_len := len(object.get("targets", [])) != 1:
-            display_warning(
-                f"Cannot reverse object {object}: it has {target_len} and not 1."
-            )
+            display_warning(f"Cannot reverse object {object}: it has {target_len} and not 1.")
             return
 
         prev_source_id = object["id"]
         prev_target_id = object["targets"][0]["id"]
-        prev_target_object = await self.prev_target_client._http_client.fetch_one(
-            resource=type, id_=prev_target_id
-        )
-        prev_source_object = await self.prev_source_client._http_client.fetch_one(
-            resource=type, id_=prev_source_id
-        )
+        prev_target_object = await self.prev_target_client._http_client.fetch_one(resource=type, id_=prev_target_id)
+        prev_source_object = await self.prev_source_client._http_client.fetch_one(resource=type, id_=prev_source_id)
 
         object["id"] = prev_target_id
         object["name"] = prev_target_object.get("name", "")
@@ -50,9 +38,7 @@ class ObjectConfigReverser:
             attribute_override=object["targets"][0].get("attribute_override", {}),
         )
 
-    def reverse_attribute_override(
-        self, prev_source_object: dict, attribute_override: dict
-    ):
+    def reverse_attribute_override(self, prev_source_object: dict, attribute_override: dict):
         for attribute, prev_value in attribute_override.items():
             result = jmespath.search(attribute, prev_source_object)
             if not result:
@@ -69,28 +55,20 @@ class QueueConfigReverse(ObjectConfigReverser):
     prev_source_dir: str
     prev_target_dir: str
 
-    def __init__(
-        self, prev_source_client, prev_target_client, prev_source_dir, prev_target_dir
-    ):
+    def __init__(self, prev_source_client, prev_target_client, prev_source_dir, prev_target_dir):
         super().__init__(prev_source_client, prev_target_client)
         self.prev_source_dir = prev_source_dir
         self.prev_target_dir = prev_target_dir
 
     async def reverse_config(self, object: dict, type: Resource):
         if target_len := len(object.get("targets", [])) != 1:
-            display_warning(
-                f"Cannot reverse object {object}: it has {target_len} and not 1."
-            )
+            display_warning(f"Cannot reverse object {object}: it has {target_len} and not 1.")
             return
 
         prev_source_id = object["id"]
         prev_target_id = object["targets"][0]["id"]
-        prev_target_object = await self.prev_target_client._http_client.fetch_one(
-            resource=type, id_=prev_target_id
-        )
-        prev_source_object = await self.prev_source_client._http_client.fetch_one(
-            resource=type, id_=prev_source_id
-        )
+        prev_target_object = await self.prev_target_client._http_client.fetch_one(resource=type, id_=prev_target_id)
+        prev_source_object = await self.prev_source_client._http_client.fetch_one(resource=type, id_=prev_source_id)
 
         object["id"] = prev_target_id
         object["name"] = prev_target_object.get("name", "")
@@ -101,39 +79,23 @@ class QueueConfigReverse(ObjectConfigReverser):
             attribute_override=object["targets"][0].get("attribute_override", {}),
         )
         prev_base_path = object[settings.DEPLOY_KEY_BASE_PATH]
-        new_base_path = prev_base_path.replace(
-            self.prev_source_dir, self.prev_target_dir
-        )
+        new_base_path = prev_base_path.replace(self.prev_source_dir, self.prev_target_dir)
 
-        prev_source_ws = await self.prev_source_client.request_json(
-            method="GET", url=prev_source_object["workspace"]
-        )
-        prev_ws_name_id = templatize_name_id(
-            prev_source_ws["name"], prev_source_ws["id"]
-        )
-        prev_target_ws = await self.prev_target_client.request_json(
-            method="GET", url=prev_target_object["workspace"]
-        )
-        new_ws_name_id = templatize_name_id(
-            prev_target_ws["name"], prev_target_ws["id"]
-        )
+        prev_source_ws = await self.prev_source_client.request_json(method="GET", url=prev_source_object["workspace"])
+        prev_ws_name_id = templatize_name_id(prev_source_ws["name"], prev_source_ws["id"])
+        prev_target_ws = await self.prev_target_client.request_json(method="GET", url=prev_target_object["workspace"])
+        new_ws_name_id = templatize_name_id(prev_target_ws["name"], prev_target_ws["id"])
         new_base_path = new_base_path.replace(prev_ws_name_id, new_ws_name_id)
 
         object[settings.DEPLOY_KEY_BASE_PATH] = new_base_path
 
-        await self.reverse_sub_object_config(
-            object=object[settings.DEPLOY_KEY_SCHEMA], type=Resource.Schema
-        )
-        await self.reverse_sub_object_config(
-            object=object[settings.DEPLOY_KEY_INBOX], type=Resource.Inbox
-        )
+        await self.reverse_sub_object_config(object=object[settings.DEPLOY_KEY_SCHEMA], type=Resource.Schema)
+        await self.reverse_sub_object_config(object=object[settings.DEPLOY_KEY_INBOX], type=Resource.Inbox)
 
     async def reverse_sub_object_config(self, object: dict, type: Resource):
         prev_source_id = object["id"]
         prev_target_id = object["targets"][0]["id"]
-        prev_source_object = await self.prev_source_client._http_client.fetch_one(
-            resource=type, id_=prev_source_id
-        )
+        prev_source_object = await self.prev_source_client._http_client.fetch_one(resource=type, id_=prev_source_id)
 
         object["id"] = prev_target_id
         object["targets"][0]["id"] = prev_source_id
@@ -176,9 +138,7 @@ async def reverse_source_target_in_yaml(
     yaml.data[settings.DEPLOY_KEY_TOKEN_OWNER] = token_owner_id
 
     # Reverse objects
-    reverser = ObjectConfigReverser(
-        prev_source_client=prev_source_client, prev_target_client=prev_target_client
-    )
+    reverser = ObjectConfigReverser(prev_source_client=prev_source_client, prev_target_client=prev_target_client)
     queue_reverser = QueueConfigReverse(
         prev_source_client=prev_source_client,
         prev_target_client=prev_target_client,

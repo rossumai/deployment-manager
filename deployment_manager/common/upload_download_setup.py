@@ -1,4 +1,5 @@
 from anyio import Path
+
 from deployment_manager.commands.download.directory import OrganizationDirectory
 from deployment_manager.utils.consts import display_warning, settings
 
@@ -6,9 +7,7 @@ ConfiguredDirectories = dict[str, OrganizationDirectory]
 
 
 def check_unique_org_ids(configured_directories: ConfiguredDirectories):
-    unique_org_ids = set(
-        dir_config.org_id for dir_config in configured_directories.values()
-    )
+    unique_org_ids = set(dir_config.org_id for dir_config in configured_directories.values())
     if len(unique_org_ids) != len(configured_directories.values()):
         display_warning(
             "Configured directories do not have unique org IDs. If you want to have multiple directories for the same organization, use subdirectories."
@@ -25,15 +24,9 @@ def expand_destinations(
     """Expands the given destinations to include all subdirectories"""
     expanded_destinations = []
     for destination in destinations:
-        dir_name = (
-            str(destination.name)
-            if destination.parent == project_path
-            else str(destination.parent)
-        )
+        dir_name = str(destination.name) if destination.parent == project_path else str(destination.parent)
         if dir_name not in configured_directories:
-            display_warning(
-                f'Destination "{destination}" not configured in {settings.CONFIG_FILENAME}. Skipping.'
-            )
+            display_warning(f'Destination "{destination}" not configured in {settings.CONFIG_FILENAME}. Skipping.')
             continue
 
         # Only the "org-level" destination was specified
@@ -41,10 +34,7 @@ def expand_destinations(
         if destination.parent == project_path:
             dir_config = configured_directories.get(destination.name, {})
             expanded_destinations.extend(
-                [
-                    str(project_path / destination / subdir)
-                    for subdir in dir_config.subdirectories.keys()
-                ]
+                [str(project_path / destination / subdir) for subdir in dir_config.subdirectories.keys()]
             )
 
         else:

@@ -1,10 +1,8 @@
 from anyio import Path
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
-    DeployObject,
-)
-from rossum_api.api_client import Resource
 
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
 from deployment_manager.utils.functions import templatize_name_id
+from rossum_api.api_client import Resource
 
 
 class WorkspaceDeployObject(DeployObject):
@@ -19,9 +17,7 @@ class WorkspaceDeployObject(DeployObject):
             / "workspace.json"
         )
 
-    async def override_references_in_target_object_data(
-        self, data_attribute, target, use_dummy_references
-    ):
+    async def override_references_in_target_object_data(self, data_attribute, target, use_dummy_references):
         data = getattr(target, data_attribute)
         data["organization"] = self.deploy_file.target_org.url
 

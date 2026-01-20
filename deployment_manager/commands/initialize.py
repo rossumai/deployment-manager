@@ -1,12 +1,12 @@
-from copy import deepcopy
 import os
-from anyio import Path
 import subprocess
-import questionary
-from rich import print
-from rich.panel import Panel
+from copy import deepcopy
 
 import click
+import questionary
+from anyio import Path
+from rich import print
+from rich.panel import Panel
 
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
 from deployment_manager.utils.consts import settings
@@ -35,12 +35,10 @@ async def init_project(name: Path):
         f"\n**/{settings.CREDENTIALS_FILENAME}",
         f"\n**/{settings.DEFAULT_DEPLOY_SECRETS_PARENT}/",
         f"\n**/**/{settings.NON_VERSIONED_ATTRIBUTES_FILE_NAME}",
-        f"\n**/{settings.DEFAULT_HOOK_SYNC_PARENT}/"
+        f"\n**/{settings.DEFAULT_HOOK_SYNC_PARENT}/",
     ]
 
-    git_ignore_contents = (
-        await git_ignore_path.read_text() if await git_ignore_path.exists() else ""
-    )
+    git_ignore_contents = await git_ignore_path.read_text() if await git_ignore_path.exists() else ""
 
     with open(name / ".gitignore", "a") as wf:
         for ignore_line in credentials_ignore_lines:
@@ -61,15 +59,11 @@ async def init_project(name: Path):
 
     while (
         not len(directories)
-        or await questionary.confirm(
-            "Would you like to specify another **ORG-LEVEL** directory?"
-        ).ask_async()
+        or await questionary.confirm("Would you like to specify another **ORG-LEVEL** directory?").ask_async()
     ):
         org_dir_name = await questionary.text("ORG-LEVEL directory name:").ask_async()
         org_id = await questionary.text("ORG ID:").ask_async()
-        api_base_url = await questionary.text(
-            f"Base API URL: (e.g., {settings.DEPLOY_DEFAULT_TARGET_URL})"
-        ).ask_async()
+        api_base_url = await questionary.text(f"Base API URL: (e.g., {settings.DEPLOY_DEFAULT_TARGET_URL})").ask_async()
         token = await questionary.text("API token:").ask_async()
         directories[org_dir_name] = {
             settings.DOWNLOAD_KEY_ORG_ID: org_id,
@@ -93,9 +87,7 @@ async def init_project(name: Path):
     for org_dir, token in credentials.items():
         credentials_yaml = DeployYaml("{}")
         credentials_yaml.data = {settings.CONFIG_KEY_TOKEN: token}
-        await credentials_yaml.save_to_file(
-            name / org_dir / settings.CREDENTIALS_FILENAME
-        )
+        await credentials_yaml.save_to_file(name / org_dir / settings.CREDENTIALS_FILENAME)
 
     print(Panel(f'Initialized a new PRD directory in "{name}"'))
 
@@ -104,9 +96,7 @@ async def add_subdirs(directories: dict, org_dir_name: str):
     subdirs = directories[org_dir_name][settings.CONFIG_KEY_SUBDIRECTORIES]
     while (
         not len(subdirs)
-        or await questionary.confirm(
-            f"Would you like to specify another **SUBDIR** inside {org_dir_name}?"
-        ).ask_async()
+        or await questionary.confirm(f"Would you like to specify another **SUBDIR** inside {org_dir_name}?").ask_async()
     ):
         subdir_name = await questionary.text("SUBDIR name:").ask_async()
         subdir_regex = await questionary.text("subdir regex (OPTIONAL):").ask_async()

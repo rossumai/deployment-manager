@@ -1,19 +1,19 @@
-from enum import Enum, StrEnum
 import json
 import logging
 import os
-from pathlib import Path
 import re
 import sys
+from enum import Enum, StrEnum
+from pathlib import Path
+
 import click
 import httpx
-
-from rich.prompt import Prompt
+import yaml
 from rich.console import Console
 from rich.panel import Panel
-from rossum_api.api_client import Resource
-import yaml
+from rich.prompt import Prompt
 
+from rossum_api.api_client import Resource
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.ERROR)
@@ -56,9 +56,7 @@ def validate_token(base_url: str, token: str, destination: str):
     is_token_valid = req.status_code == 200
 
     if not is_token_valid:
-        new_token = Prompt.ask(
-            f"Token for {base_url} is invalid or expired. Provide a new one"
-        )
+        new_token = Prompt.ask(f"Token for {base_url} is invalid or expired. Provide a new one")
         req = httpx.get(
             url=base_url + "/auth/user",
             headers={"Authorization": f"Bearer {new_token}"},
@@ -109,9 +107,7 @@ class Settings:
         credentials = json.loads(cred_path.read_text())
 
         if not isinstance(credentials, dict):
-            raise click.ClickException(
-                f"{self.CREDENTIALS_FILENAME} is not a valid dictionary."
-            )
+            raise click.ClickException(f"{self.CREDENTIALS_FILENAME} is not a valid dictionary.")
 
         config_path = Path("./") / self.CONFIG_FILENAME
         if not config_path.exists():
@@ -119,18 +115,12 @@ class Settings:
         config = yaml.safe_load(config_path.open("r"))
 
         if not isinstance(config, dict):
-            raise click.ClickException(
-                f"{self.CONFIG_FILENAME} is not a valid dictionary."
-            )
+            raise click.ClickException(f"{self.CONFIG_FILENAME} is not a valid dictionary.")
 
         self.SOURCE_API_BASE = config.get("source_api_base")
 
-        self.SOURCE_USERNAME = credentials.get(self.SOURCE_DIRNAME, {}).get(
-            "username", None
-        )
-        self.SOURCE_PASSWORD = credentials.get(self.SOURCE_DIRNAME, {}).get(
-            "password", None
-        )
+        self.SOURCE_USERNAME = credentials.get(self.SOURCE_DIRNAME, {}).get("username", None)
+        self.SOURCE_PASSWORD = credentials.get(self.SOURCE_DIRNAME, {}).get("password", None)
         self.SOURCE_TOKEN = credentials.get(self.SOURCE_DIRNAME, {}).get("token", None)
 
         if not config.get("use_same_org_as_target", False):
@@ -141,15 +131,9 @@ class Settings:
                 )
             self.TARGET_API_BASE = config.get("target_api_base")
 
-            self.TARGET_USERNAME = credentials.get(self.TARGET_DIRNAME, {}).get(
-                "username", None
-            )
-            self.TARGET_PASSWORD = credentials.get(self.TARGET_DIRNAME, {}).get(
-                "password", None
-            )
-            self.TARGET_TOKEN = credentials.get(self.TARGET_DIRNAME, {}).get(
-                "token", None
-            )
+            self.TARGET_USERNAME = credentials.get(self.TARGET_DIRNAME, {}).get("username", None)
+            self.TARGET_PASSWORD = credentials.get(self.TARGET_DIRNAME, {}).get("password", None)
+            self.TARGET_TOKEN = credentials.get(self.TARGET_DIRNAME, {}).get("token", None)
         else:
             self.IS_PROJECT_IN_SAME_ORG = True
 
@@ -267,7 +251,6 @@ class Settings:
     DEPLOY_KEY_INBOX = "inbox"
     DEPLOY_KEY_HOOKS = "hooks"
     DEPLOY_KEY_ENGINES = "engines"
-    DEPLOY_KEY_RULE_TEMPLATES = "rule_templates"
 
     UPDATE_PRINT_STR: str = "[blue]UPDATE[/blue]"
     CREATE_PRINT_STR: str = "[green]CREATE[/green]"
@@ -315,14 +298,14 @@ class Settings:
     RULES_DIR_NAME: str = "rules"
     EMAIL_TEMPLATES_DIR_NAME: str = "email_templates"
 
-    GITHUB_DEFAULT_LATEST_RELEASE_URL = (
-        "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
-    )
+    GITHUB_DEFAULT_LATEST_RELEASE_URL = "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
     GITHUB_SPECIFIC_RELEASE_URL = "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/{version_tag}"
     GITHUB_DEPLOYMENT_MANAGER_REPO_OWNER = "rossumai"
     GITHUB_DEPLOYMENT_MANAGER_REPO_NAME = "deployment-manager"
 
-    GITLAB_SERVERLESS_FUNCTIONS_URL = "https://gitlab.rossum.cloud/elis-connectors/elis-serverless-functions/-/blob/master"
+    GITLAB_SERVERLESS_FUNCTIONS_URL = (
+        "https://gitlab.rossum.cloud/elis-connectors/elis-serverless-functions/-/blob/master"
+    )
 
     @property
     def SOURCE_API_URL(self):
@@ -374,6 +357,5 @@ initialize_settings()
 
 class CustomResource(Enum):
     Rule = "rules"
-    RuleTemplate = "rule_templates"
     Workflow = "workflows"
     WorkflowStep = "workflow_steps"

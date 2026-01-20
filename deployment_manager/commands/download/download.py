@@ -1,13 +1,10 @@
 import os
 import subprocess
-from anyio import Path
 
 import click
-from deployment_manager.commands.download.directory import (
-    DownloadOrganizationDirectory,
-)
+from anyio import Path
 
-
+from deployment_manager.commands.download.directory import DownloadOrganizationDirectory
 from deployment_manager.common.read_write import read_prd_project_config
 from deployment_manager.common.upload_download_setup import (
     check_unique_org_ids,
@@ -15,10 +12,7 @@ from deployment_manager.common.upload_download_setup import (
     mark_subdirectories_to_include,
 )
 from deployment_manager.utils.consts import display_error, display_warning, settings
-from deployment_manager.utils.functions import (
-    apply_concurrency_override,
-    coro,
-)
+from deployment_manager.utils.functions import apply_concurrency_override, coro
 
 # TODO: fix foreign JSONs in the subdir (mongo.json...)
 
@@ -98,9 +92,7 @@ async def download_destinations(
     skip_objects_without_subdir: bool = False,
 ):
     if not destinations:
-        display_warning(
-            f"No destinations specified to {settings.DOWNLOAD_COMMAND_NAME}."
-        )
+        display_warning(f"No destinations specified to {settings.DOWNLOAD_COMMAND_NAME}.")
         return
 
     if not project_path:

@@ -1,7 +1,7 @@
 import subprocess
-from anyio import Path
 
 import click
+from anyio import Path
 from rich import print as pprint
 from rich.panel import Panel
 
@@ -14,15 +14,8 @@ from deployment_manager.common.upload_download_setup import (
     expand_destinations,
     mark_subdirectories_to_include,
 )
-from deployment_manager.utils.consts import (
-    display_error,
-    display_warning,
-    settings,
-)
-from deployment_manager.utils.functions import (
-    apply_concurrency_override,
-    coro,
-)
+from deployment_manager.utils.consts import display_error, display_warning, settings
+from deployment_manager.utils.functions import apply_concurrency_override, coro
 
 
 @click.command(
@@ -78,9 +71,7 @@ Only source files are taken into account by default.
     help="Maximum concurrent API requests (default: 5, or PRD2_CONCURRENCY env var).",
 )
 @coro
-async def upload_project_wrapper(
-    destinations, all, force, indexed_only, commit, message, concurrency
-):
+async def upload_project_wrapper(destinations, all, force, indexed_only, commit, message, concurrency):
     apply_concurrency_override(concurrency)
     # To be able to run the command progammatically without the CLI decorators
     await upload_destinations(

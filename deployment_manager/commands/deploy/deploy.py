@@ -1,27 +1,12 @@
 import click
 from anyio import Path
 
-from deployment_manager.commands.deploy.subcommands.revert.revert import (
-    revert_release_file,
-)
-from deployment_manager.commands.deploy.subcommands.run.run import (
-    deploy_release_file,
-)
-
-from deployment_manager.commands.deploy.subcommands.template.create import (
-    create_deploy_template,
-)
-
-from deployment_manager.commands.deploy.subcommands.template.reverse import (
-    DeployFileReverser,
-)
-from deployment_manager.utils.consts import (
-    settings,
-)
-from deployment_manager.utils.functions import (
-    apply_concurrency_override,
-    coro,
-)
+from deployment_manager.commands.deploy.subcommands.revert.revert import revert_release_file
+from deployment_manager.commands.deploy.subcommands.run.run import deploy_release_file
+from deployment_manager.commands.deploy.subcommands.template.create import create_deploy_template
+from deployment_manager.commands.deploy.subcommands.template.reverse import DeployFileReverser
+from deployment_manager.utils.consts import settings
+from deployment_manager.utils.functions import apply_concurrency_override, coro
 
 
 @click.group(
@@ -78,7 +63,7 @@ async def create_deploy_template_wrapper(
     type=click.Path(path_type=Path, exists=True),
 )
 @coro
-async def create_deploy_template_wrapper(
+async def update_deploy_template_wrapper(
     deploy_file: Path = None,
     interactive: bool = False,
     mapping_file: Path = None,
@@ -127,9 +112,7 @@ If these objects don't exist, they get created.
 # )
 @click.option(
     "--prefer",
-    type=click.Choice(
-        [settings.SOURCE_DIRNAME, settings.TARGET_DIRNAME], case_sensitive=False
-    ),
+    type=click.Choice([settings.SOURCE_DIRNAME, settings.TARGET_DIRNAME], case_sensitive=False),
     default=None,
     help=f"When resolving merge conflicts, prefer {settings.SOURCE_DIRNAME} or {settings.TARGET_DIRNAME} values. If unset, neither is preferred and conflicts will be raised.",
 )

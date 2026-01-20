@@ -1,8 +1,6 @@
 from anyio import Path
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
-    DeployObject,
-)
 
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
 from rossum_api.api_client import Resource
 
 
@@ -32,9 +30,7 @@ class InboxDeployObject(DeployObject):
         # Should either create a new one or it is already present
         data.pop("email", None)
 
-    async def override_references_in_target_object_data(
-        self, data_attribute, target, use_dummy_references
-    ):
+    async def override_references_in_target_object_data(self, data_attribute, target, use_dummy_references):
         data = getattr(target, data_attribute)
         # previous_queue_urls = data.get("queues", [])
 

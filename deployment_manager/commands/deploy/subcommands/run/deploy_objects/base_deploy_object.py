@@ -1,29 +1,23 @@
 from __future__ import annotations
+
 import json
 from typing import TYPE_CHECKING
-import asyncio
 
 import questionary
 
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.attribute_override import (
-    AttributeOverrider,
-)
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.deploy_differ import (
-    DeployObjectDiffer,
-)
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.attribute_override import AttributeOverrider
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.deploy_differ import DeployObjectDiffer
 from deployment_manager.commands.deploy.subcommands.run.merge.detect_reference import (
     ReferenceDetectionStatus,
     detect_reference_with_type,
 )
 from deployment_manager.commands.deploy.subcommands.run.merge.merge import (
     create_rebase_diff,
+    deep_three_way_merge,
     get_nested_value,
     prompt_conflict_resolution,
     prompt_rebase_field,
     set_nested_value,
-)
-from deployment_manager.commands.deploy.subcommands.run.merge.merge import (
-    deep_three_way_merge,
 )
 
 if TYPE_CHECKING:
@@ -33,37 +27,25 @@ if TYPE_CHECKING:
 
 from copy import deepcopy
 
+from anyio import Path
 from pydantic import BaseModel
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.reference_replacer import (
-    ReferenceReplacer,
-)
-from deployment_manager.commands.deploy.subcommands.run.helpers import (
-    create_object_label,
-)
+from rich import print as pprint
+from rich.console import Console
+from rich.panel import Panel
+
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.reference_replacer import ReferenceReplacer
+from deployment_manager.commands.deploy.subcommands.run.helpers import create_object_label
 from deployment_manager.commands.deploy.subcommands.run.models import (
     NonExistentObjectException,
     PathNotFoundException,
     Target,
     TargetWithDefault,
 )
-from deployment_manager.common.read_write import (
-    read_object_from_json,
-    write_object_to_json,
-)
-from rich import print as pprint
-from rich.panel import Panel
-from rich.console import Console
-
-
-from anyio import Path
+from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
+from deployment_manager.utils.consts import display_error, display_warning, settings
+from deployment_manager.utils.functions import gather_with_concurrency, templatize_name_id
 from rossum_api import APIClientError
 from rossum_api.api_client import Resource
-
-from deployment_manager.utils.consts import display_error, display_warning, settings
-from deployment_manager.utils.functions import (
-    gather_with_concurrency,
-    templatize_name_id,
-)
 
 console = Console()
 
@@ -104,9 +86,7 @@ class DeployObject(BaseModel):
         self.rebase_none = self.deploy_file.no_rebase
 
         self.overrider = AttributeOverrider(type=self.type)
-        self.ref_replacer = ReferenceReplacer(
-            type=self.type, parent_object_reference=self
-        )
+        self.ref_replacer = ReferenceReplacer(type=self.type, parent_object_reference=self)
 
         try:
             self.data = await read_object_from_json(self.path, False)
@@ -122,11 +102,7 @@ class DeployObject(BaseModel):
         self.ignored_attributes = [
             *settings.DEPLOY_NON_DIFFED_KEYS.get(self.type, []),
             *settings.NON_PULLED_KEYS_PER_OBJECT.get(self.type, []),
-            *(
-                settings.DEPLOY_CROSS_ORG_NON_DIFFED_KEYS.get(self.type, [])
-                if not self.deploy_file.is_same_org
-                else []
-            ),
+            *(settings.DEPLOY_CROSS_ORG_NON_DIFFED_KEYS.get(self.type, []) if not self.deploy_file.is_same_org else []),
         ]
 
         self.sort_list_attributes = settings.DEPLOY_SORT_LIST_KEYS.get(self.type, [])
@@ -145,9 +121,7 @@ class DeployObject(BaseModel):
                 try:
                     await self.get_remote_object(target.id)
                 except NonExistentObjectException:
-                    display_error(
-                        f"{self.display_type} {target.display_label} does not exist on remote."
-                    )
+                    display_error(f"{self.display_type} {target.display_label} does not exist on remote.")
                     raise
 
             data_copy = deepcopy(self.data)
@@ -160,18 +134,14 @@ class DeployObject(BaseModel):
                 source_base_url=self.deploy_file.source_client._http_client.base_url,
                 target_base_url=self.deploy_file.client._http_client.base_url,
             )
-            data_copy["url"] = data_copy["url"].replace(
-                str(data_copy["id"]), str(target.id)
-            )
+            data_copy["url"] = data_copy["url"].replace(str(data_copy["id"]), str(target.id))
             data_copy["id"] = target.id
 
             # Should be run before attribute override - e.g., schema's name override is sometimes added dynamically in this method
             # Some methods also ignore attributes - explicit attr override is a way to overrule that ignore as long as it runs after this method
             await self.initialize_target_object_data(data=data_copy, target=target)
 
-            self.overrider.override_attributes_v2(
-                object=data_copy, attribute_overrides=target.attribute_override
-            )
+            self.overrider.override_attributes_v2(object=data_copy, attribute_overrides=target.attribute_override)
 
             target.pre_reference_replace_data = data_copy
             target.visualized_plan_data = deepcopy(data_copy)
@@ -189,9 +159,7 @@ class DeployObject(BaseModel):
     @property
     def path(self) -> Path:
         return (
-            Path(self.deploy_file.source_dir_path)
-            / self.type.value
-            / f"{templatize_name_id(self.name, self.id)}.json"
+            Path(self.deploy_file.source_dir_path) / self.type.value / f"{templatize_name_id(self.name, self.id)}.json"
         )
 
     @property
@@ -222,9 +190,7 @@ class DeployObject(BaseModel):
 
     async def get_remote_object(self, remote_object_id):
         try:
-            return await self.deploy_file.client._http_client.fetch_one(
-                self.type, remote_object_id
-            )
+            return await self.deploy_file.client._http_client.fetch_one(self.type, remote_object_id)
         except APIClientError as e:
             if e.status_code == 404:
                 raise NonExistentObjectException(
@@ -235,14 +201,10 @@ class DeployObject(BaseModel):
     def update_targets(self):
         for target in self.targets:
             # In case of errors, do not overwrite the existing target ID, the object still exists
-            if target.data_from_remote and (
-                new_id := target.data_from_remote.get("id", None)
-            ):
+            if target.data_from_remote and (new_id := target.data_from_remote.get("id", None)):
                 target.id = new_id
                 self.yaml_reference["targets"][target.index]["id"] = target.id
-            self.yaml_reference["targets"][target.index]["attribute_override"] = (
-                target.attribute_override
-            )
+            self.yaml_reference["targets"][target.index]["attribute_override"] = target.attribute_override
 
     async def deploy_target_objects(self, data_attribute: str):
         requests = []
@@ -262,13 +224,9 @@ class DeployObject(BaseModel):
             )
 
             if target.exists_on_remote:
-                requests.append(
-                    self.update_remote(data_attribute=data_attribute, target=target)
-                )
+                requests.append(self.update_remote(data_attribute=data_attribute, target=target))
             else:
-                requests.append(
-                    self.create_remote(data_attribute=data_attribute, target=target)
-                )
+                requests.append(self.create_remote(data_attribute=data_attribute, target=target))
 
         await gather_with_concurrency(*requests)
         # asyncio.gather returns results in the same order as they were put in
@@ -282,17 +240,13 @@ class DeployObject(BaseModel):
             # Temporary fix because some objects like rules fail if ID is sent
             create_copy.pop("id", None)
 
-            result = await self.deploy_file.client._http_client.create(
-                self.type, create_copy
-            )
+            result = await self.deploy_file.client._http_client.create(self.type, create_copy)
             # Remember last_applied only if the API call succeeds
             target.last_applied_data = self.scrub_attributes(data)
             target.data_from_remote = result
             target.update_after_first_create()
 
-            pprint(
-                f"{settings.CREATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}."
-            )
+            pprint(f"{settings.CREATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}.")
         except Exception as e:
             display_error(
                 f"Error while creating {self.display_type} {self.display_label} ^",
@@ -316,9 +270,7 @@ class DeployObject(BaseModel):
             target.last_applied_data = self.scrub_attributes(data)
             target.data_from_remote = result
 
-            pprint(
-                f"{settings.UPDATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}."
-            )
+            pprint(f"{settings.UPDATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}.")
         except Exception as e:
             display_error(
                 f'Error while updating {self.display_type} {self.display_label} -> "{target.id}: {e}',
@@ -330,9 +282,7 @@ class DeployObject(BaseModel):
     async def delete_remote(self, target: Target):
         try:
             if not self.plan_only:
-                await self.deploy_file.client._http_client.delete(
-                    self.type, id_=target.id
-                )
+                await self.deploy_file.client._http_client.delete(self.type, id_=target.id)
 
             pprint(
                 f"{settings.PLAN_PRINT_STR if self.plan_only else ''} {settings.DELETE_PRINT_STR} {self.display_type}: [purple]({target.id})[/purple]."
@@ -344,9 +294,7 @@ class DeployObject(BaseModel):
             )
             self.deploy_failed = True
 
-    async def override_references(
-        self, data_attribute: str, use_dummy_references: bool
-    ):
+    async def override_references(self, data_attribute: str, use_dummy_references: bool):
         for target in self.targets:
             data = getattr(target, data_attribute)
 
@@ -370,9 +318,7 @@ class DeployObject(BaseModel):
         """Method for specific deploy_objects (e.g., hooks) to add their custom logic"""
         ...
 
-    async def persist_target_only_references(
-        self, target: Target, data_attribute: str, dependency_name: str
-    ):
+    async def persist_target_only_references(self, target: Target, data_attribute: str, dependency_name: str):
         """For lists of references, adds back any references that were not overriden and that are target-only"""
         if not target.exists_on_remote:
             return
@@ -445,9 +391,7 @@ class DeployObject(BaseModel):
 
                     # Target-only drift - should the value be saved in source? -> ask user
 
-                    ref_status, reference_type = detect_reference_with_type(
-                        value=target_val, field_name=path
-                    )
+                    ref_status, reference_type = detect_reference_with_type(value=target_val, field_name=path)
                     if ref_status in [
                         ReferenceDetectionStatus.DEFINITELY_REFERENCE,
                         ReferenceDetectionStatus.UNKNOWN,
@@ -461,11 +405,7 @@ class DeployObject(BaseModel):
                                 target_base_url=self.deploy_file.client._http_client.base_url,
                             )
                         else:
-                            target_val = (
-                                ReferenceReplacer.reverse_unknown_reference_type(
-                                    target_val
-                                )
-                            )
+                            target_val = ReferenceReplacer.reverse_unknown_reference_type(target_val)
 
                     source_val = get_nested_value(self.data, path)
 
@@ -510,9 +450,7 @@ class DeployObject(BaseModel):
                         await write_object_to_json(self.path, self.data)
 
                         data_copy = deepcopy(self.data)
-                        self.overrider.override_attributes_v2(
-                            data_copy, target.attribute_override
-                        )
+                        self.overrider.override_attributes_v2(data_copy, target.attribute_override)
                         initial_value = get_nested_value(self.data, path)
                         post_override_value = get_nested_value(data_copy, path)
                         if initial_value != post_override_value:
@@ -529,9 +467,7 @@ class DeployObject(BaseModel):
                             for key in keys_to_delete:
                                 target.attribute_override.pop(key, None)
                             self.update_targets()
-                            await self.deploy_file.yaml.save_to_file(
-                                self.deploy_file.deploy_file_path
-                            )
+                            await self.deploy_file.yaml.save_to_file(self.deploy_file.deploy_file_path)
 
                 # Only do it for the first target if there are conflicts with multiple of them
                 if conflicts:
@@ -556,9 +492,7 @@ class DeployObject(BaseModel):
                             continue
 
                         # Target-only drift - should the value be saved in source? -> ask user
-                        ref_status, reference_type = detect_reference_with_type(
-                            value=target_val, field_name=path
-                        )
+                        ref_status, reference_type = detect_reference_with_type(value=target_val, field_name=path)
                         if ref_status in [
                             ReferenceDetectionStatus.DEFINITELY_REFERENCE,
                             ReferenceDetectionStatus.UNKNOWN,
@@ -572,11 +506,7 @@ class DeployObject(BaseModel):
                                     target_base_url=self.deploy_file.client._http_client.base_url,
                                 )
                             else:
-                                target_val = (
-                                    ReferenceReplacer.reverse_unknown_reference_type(
-                                        target_val
-                                    )
-                                )
+                                target_val = ReferenceReplacer.reverse_unknown_reference_type(target_val)
 
                         set_nested_value(source_with_target_values, path, target_val)
 
@@ -615,16 +545,12 @@ class DeployObject(BaseModel):
             self.sort_lists(target.visualized_plan_data)
 
             plan_label = f"{settings.PLAN_PRINT_STR} {settings.UPDATE_PRINT_STR if target.exists_on_remote else settings.CREATE_PRINT_STR}"
-            diff = DeployObjectDiffer.create_override_diff(
-                overriden_object_data, target.visualized_plan_data
-            )
+            diff = DeployObjectDiffer.create_override_diff(overriden_object_data, target.visualized_plan_data)
             colorized_diff = DeployObjectDiffer.parse_diff(diff)
             message = f"{plan_label} {self.display_type} {self.create_source_to_target_string(target.visualized_plan_data)}:\n{colorized_diff if colorized_diff else ''}"
             pprint(Panel(message))
 
-    async def resolve_code_conflict(
-        self, attribute_path: str, last_applied: dict, target_val: str
-    ): ...
+    async def resolve_code_conflict(self, attribute_path: str, last_applied: dict, target_val: str): ...
 
     async def apply_code_rebase(self, attribute_path: str, target_val: str): ...
 

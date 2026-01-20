@@ -1,12 +1,11 @@
-from copy import deepcopy
 import difflib
 import json
 import subprocess
 import tempfile
+from copy import deepcopy
 
 
 class DeployObjectDiffer:
-
     @classmethod
     def create_override_diff(cls, before_object: dict, after_object: dict):
         """Displays both implicit and explicit overrides (the explicit applied already when uploading the file itself)"""
@@ -32,21 +31,15 @@ class DeployObjectDiffer:
             before_code = before_code.splitlines()
             after_code = after_code.splitlines()
 
-            code_diff = difflib.unified_diff(
-                before_code, after_code, fromfile="before", tofile="after", lineterm=""
-            )
+            code_diff = difflib.unified_diff(before_code, after_code, fromfile="before", tofile="after", lineterm="")
             code_diff = "\n".join(list(code_diff))
 
             if code_diff:
                 code_diff = f"{'*'*80}\nconfig.code diff:\n{'*'*80}\n{code_diff}"
 
         with tempfile.NamedTemporaryFile() as tf1, tempfile.NamedTemporaryFile() as tf2:
-            tf1.write(
-                bytes(json.dumps(before_object_copy, indent=2, sort_keys=True), "UTF-8")
-            )
-            tf2.write(
-                bytes(json.dumps(after_object_copy, indent=2, sort_keys=True), "UTF-8")
-            )
+            tf1.write(bytes(json.dumps(before_object_copy, indent=2, sort_keys=True), "UTF-8"))
+            tf2.write(bytes(json.dumps(after_object_copy, indent=2, sort_keys=True), "UTF-8"))
             # Has to be manually seeked back to start
             tf1.seek(0)
             tf2.seek(0)
@@ -68,11 +61,7 @@ class DeployObjectDiffer:
         split_lines = []
 
         for line in diff.splitlines():
-            if (
-                line.startswith("--- ")
-                or line.startswith("+++ ")
-                or (line.startswith("@@ ") and line.endswith(" @@"))
-            ):
+            if line.startswith("--- ") or line.startswith("+++ ") or (line.startswith("@@ ") and line.endswith(" @@")):
                 continue
             split_lines.append(line)
 

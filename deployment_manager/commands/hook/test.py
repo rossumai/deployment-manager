@@ -1,11 +1,9 @@
 import json
+
 from anyio import Path
-from rossum_api import ElisAPIClient
 from rich import print as pprint
 
-from deployment_manager.commands.deploy.subcommands.run.helpers import (
-    get_url_and_credentials,
-)
+from deployment_manager.commands.deploy.subcommands.run.helpers import get_url_and_credentials
 from deployment_manager.commands.hook.helpers import (
     get_org_name_from_hook_path,
     get_project_path_from_hook_path,
@@ -15,6 +13,7 @@ from deployment_manager.commands.hook.payload import generate_hook_payload
 from deployment_manager.common.read_write import read_object_from_json
 from deployment_manager.utils.consts import display_error
 from deployment_manager.utils.functions import detemplatize_name_id
+from rossum_api import ElisAPIClient
 
 
 async def test_hook(
@@ -36,9 +35,7 @@ async def test_hook(
             client = ElisAPIClient(base_url=credentials.url, token=credentials.token)
 
         if not payload_path:
-            payload = await generate_hook_payload(
-                hook_path=hook_path, annotation_url=annotation_url
-            )
+            payload = await generate_hook_payload(hook_path=hook_path, annotation_url=annotation_url)
             if not payload:
                 return
         else:
@@ -62,9 +59,7 @@ async def test_hook(
         if latest_code_str:
             request_body["config"] = {"runtime": runtime, "code": latest_code_str}
 
-        result = await client._http_client.request_json(
-            method="POST", url=f"hooks/{hook_id}/test", json=request_body
-        )
+        result = await client._http_client.request_json(method="POST", url=f"hooks/{hook_id}/test", json=request_body)
 
         pprint("[bold]### RETURN: ###[/bold]")
         pprint(json.dumps(result.get("response", {}), indent=4))

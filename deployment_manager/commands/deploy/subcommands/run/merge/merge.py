@@ -1,15 +1,9 @@
 import difflib
 import json
-import re
 import subprocess
 import tempfile
 
 import questionary
-from rich.panel import Panel
-
-from deployment_manager.commands.deploy.subcommands.run.merge.detect_reference import (
-    ReferenceDetectionStatus,
-)
 
 
 def is_primitive(val):
@@ -106,11 +100,7 @@ def deep_three_way_merge(
             continue
 
         # If all values are dicts → recurse
-        if (
-            isinstance(s_val, dict)
-            and isinstance(t_val, dict)
-            and isinstance(l_val, dict)
-        ):
+        if isinstance(s_val, dict) and isinstance(t_val, dict) and isinstance(l_val, dict):
             sub_merged, sub_conflicts, sub_rebases = deep_three_way_merge(
                 last_applied=l_val,
                 source=s_val,
@@ -217,7 +207,6 @@ async def prompt_rebase_field(label, path):
 
 
 async def prompt_conflict_resolution(target_str, last_applied_str, object_path):
-
     # The command requires 3 local files -> create temp files
     with tempfile.NamedTemporaryFile() as f1, tempfile.NamedTemporaryFile() as f2:
         f1.write(last_applied_str.encode("utf-8"))

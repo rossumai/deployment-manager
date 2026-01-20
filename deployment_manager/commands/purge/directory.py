@@ -1,21 +1,15 @@
 import asyncio
+
 import questionary
-from rossum_api import APIClientError, ElisAPIClient
-from rossum_api.api_client import Resource
 from rich import print as pprint
 from rich.panel import Panel
 
-from deployment_manager.commands.download.downloader import Downloader
-
-from deployment_manager.utils.consts import (
-    display_error,
-    display_info,
-    display_warning,
-    settings,
-)
-
 from deployment_manager.commands.download.directory import OrganizationDirectory
+from deployment_manager.commands.download.downloader import Downloader
+from deployment_manager.utils.consts import display_error, display_info, display_warning, settings
 from deployment_manager.utils.functions import extract_id_from_url
+from rossum_api import APIClientError, ElisAPIClient
+from rossum_api.api_client import Resource
 
 ALL_OBJECT_TYPES = [
     Resource.Schema.value,
@@ -62,27 +56,21 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
         return f"[yellow]{type.value[:-2 if type in [Resource.Inbox] else -1]}[/yellow]"
 
     def all_subdirs_included(self):
-        return all(
-            subdir.include for subdir in self.subdirectories.values()
-        ) or not len(self.subdirectories.keys())
+        return all(subdir.include for subdir in self.subdirectories.values()) or not len(self.subdirectories.keys())
 
     async def get_remote_objects_by_type(self):
         object_types = self.purged_object_types
         if settings.ALL_OBJECTS in self.purged_object_types:
             object_types = ALL_OBJECT_TYPES
 
-        object_types = sorted(
-            object_types, key=lambda x: OBJECT_PRIORITIES.get(x, float("inf"))
-        )
+        object_types = sorted(object_types, key=lambda x: OBJECT_PRIORITIES.get(x, float("inf")))
 
         for object_type in object_types:
             if object_type == settings.UNUSED_SCHEMAS:
                 self.objects.extend(await self.download_unused_schemas())
             else:
                 object_type_as_enum = OBJECT_TYPE_MAPPING.get(object_type)
-                self.objects.extend(
-                    await self.download_objects_by_type(type=object_type_as_enum)
-                )
+                self.objects.extend(await self.download_objects_by_type(type=object_type_as_enum))
 
     def keep_only_objects_of_included_subdirs(self):
         kept_objects = []
@@ -109,17 +97,13 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
 
     async def download_objects_by_type(self, type: Resource):
         objects = []
-        for object in await Downloader(client=self.client).download_remote_objects(
-            type=type
-        ):
+        for object in await Downloader(client=self.client).download_remote_objects(type=type):
             objects.append({**object, "type": type})
         return objects
 
     async def download_unused_schemas(self):
         schemas = []
-        for schema in await Downloader(client=self.client).download_remote_objects(
-            type=Resource.Schema
-        ):
+        for schema in await Downloader(client=self.client).download_remote_objects(type=Resource.Schema):
             if not len(schema.get("queues")):
                 schemas.append({**schema, "type": Resource.Schema})
         return schemas
@@ -166,7 +150,6 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
             return
 
         try:
-
             await self.delete_objects()
         except Exception as e:
             display_error(f"Error while deleting objects in {self.name}: {str(e)}")
@@ -176,18 +159,13 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
         for object in self.objects:
             type, object_id = object.get("type", ""), object.get("id", "no-id")
             if not type:
-                display_warning(
-                    f"Unknown type for {object.get('name', 'no-name')} - skipping"
-                )
+                display_warning(f"Unknown type for {object.get('name', 'no-name')} - skipping")
                 continue
             elif not object_id:
-                display_warning(
-                    f"Unknown ID for {object.get('name', 'no-name')} - skipping"
-                )
+                display_warning(f"Unknown ID for {object.get('name', 'no-name')} - skipping")
                 continue
 
             try:
-
                 # Queues have a "cooldown" period for deletion which needs to be overriden
                 if type == Resource.Queue:
                     (
@@ -217,9 +195,7 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
                             if queue_deleted_count == len(queues):
                                 break
                             # Deleting queues (even when providing 'delete_after': 0) is asynchronous, wait for a short while
-                            display_info(
-                                "Waiting for queues to be deleted in the API..."
-                            )
+                            display_info("Waiting for queues to be deleted in the API...")
                             await asyncio.sleep(5)
 
                     await self.client._http_client.delete(resource=type, id_=object_id)
@@ -232,6 +208,4 @@ class PurgeOrganizationDirectory(OrganizationDirectory):
                     display_warning(
                         f"{self.display_type(type)} [purple]{object_id}[/purple] already does not exist on remote."
                     )
-                display_error(
-                    f"Error while deleting {self.display_type(type)} [purple]{object_id}[/purple]: {e}"
-                )
+                display_error(f"Error while deleting {self.display_type(type)} [purple]{object_id}[/purple]: {e}")

@@ -41,11 +41,7 @@ def parse_git_file_url(file_url):
             # e.g., group/subgroup/repo/-/blob/branch/path/to/file
             repo_path_segments = []
             for i, part in enumerate(path_parts):
-                if (
-                    part == "-"
-                    and i + 1 < len(path_parts)
-                    and path_parts[i + 1] == "blob"
-                ):
+                if part == "-" and i + 1 < len(path_parts) and path_parts[i + 1] == "blob":
                     repo_path_segments = path_parts[:i]
                     branch = path_parts[i + 2]
                     file_path = "/".join(path_parts[i + 3 :])
@@ -54,12 +50,8 @@ def parse_git_file_url(file_url):
                 user_repo_combined = "/".join(repo_path_segments)
                 ssh_repo_url = f"git@{hostname}:{user_repo_combined}.git"
                 return ssh_repo_url, branch, file_path
-        elif len(path_parts) >= 4 and (
-            path_parts[2] == "blob"
-        ):  # Older GitLab or simpler paths
-            user_repo_combined = "/".join(
-                path_parts[0:2]
-            )  # Adjust if more segments are part of repo name
+        elif len(path_parts) >= 4 and (path_parts[2] == "blob"):  # Older GitLab or simpler paths
+            user_repo_combined = "/".join(path_parts[0:2])  # Adjust if more segments are part of repo name
             branch = path_parts[3]
             file_path = "/".join(path_parts[4:])
             ssh_repo_url = f"git@{hostname}:{user_repo_combined}.git"
@@ -75,9 +67,7 @@ def parse_git_file_url(file_url):
             ssh_repo_url = f"git@bitbucket.org:{user}/{repo}.git"
             return ssh_repo_url, branch, file_path
 
-    display_error(
-        f"Warning: Could not parse URL '{file_url}' into Git repository components."
-    )
+    display_error(f"Warning: Could not parse URL '{file_url}' into Git repository components.")
     return None, None, None
 
 
@@ -95,9 +85,7 @@ def get_git_file_content_from_url_ssh(file_url):
     ssh_repo_url, branch, file_path = parse_git_file_url(file_url)
 
     if not all([ssh_repo_url, branch, file_path]):
-        print(
-            f"Failed to parse the file URL: {file_url}. Cannot proceed with Git command."
-        )
+        print(f"Failed to parse the file URL: {file_url}. Cannot proceed with Git command.")
         return None
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -125,15 +113,11 @@ def get_git_file_content_from_url_ssh(file_url):
                 "--no-cone",
                 file_path,
             ]
-            subprocess.run(
-                sparse_set_command, capture_output=True, check=True, cwd=temp_dir
-            )
+            subprocess.run(sparse_set_command, capture_output=True, check=True, cwd=temp_dir)
 
             # Checkout the branch, gt will now download and write only the file specified in the previous step.
             checkout_command = ["git", "checkout", branch]
-            subprocess.run(
-                checkout_command, capture_output=True, check=True, cwd=temp_dir
-            )
+            subprocess.run(checkout_command, capture_output=True, check=True, cwd=temp_dir)
 
             # Construct the full path to the now-existing file
             full_file_path = os.path.join(temp_dir, file_path)
@@ -142,9 +126,7 @@ def get_git_file_content_from_url_ssh(file_url):
                 with open(full_file_path, "rb") as f:
                     return f.read()
             else:
-                display_error(
-                    f"Error: File '{file_path}' not found after sparse checkout. Check file path and branch."
-                )
+                display_error(f"Error: File '{file_path}' not found after sparse checkout. Check file path and branch.")
                 return None
 
         except subprocess.CalledProcessError as e:
@@ -155,9 +137,7 @@ def get_git_file_content_from_url_ssh(file_url):
             )
             return None
         except FileNotFoundError:
-            display_error(
-                "Error: 'git' command not found. Make sure Git is installed and in your PATH."
-            )
+            display_error("Error: 'git' command not found. Make sure Git is installed and in your PATH.")
             return None
         except Exception as e:
             display_error(f"An unexpected error occurred: {e}")

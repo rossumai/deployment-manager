@@ -1,34 +1,20 @@
-import dataclasses
-from anyio import Path
-from langchain_aws import AmazonKnowledgeBasesRetriever, ChatBedrockConverse
-from langchain_core.tools import tool
 import json
 from typing import AsyncGenerator
-from langchain_core.messages import (
-    AIMessage,
-    ToolMessage,
-    HumanMessage,
-    SystemMessage,
-    BaseMessage,
-)
 
 # from langchain_core.messages.utils import count_tokens_approximately # Will replace with LLM's counter
 import httpx
-from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
-    Credentials,
-)
-from deployment_manager.commands.document.llm_helper import MODEL_ID
-from deployment_manager.utils.consts import display_error
-from deployment_manager.utils.functions import (
-    extract_id_from_url,
-    find_all_object_paths,
-)
-from rossum_api.elis_api_client import ElisAPIClient
-from deployment_manager.utils.consts import (
-    settings,
-)
-from langchain_core.messages.utils import count_tokens_approximately
+from anyio import Path
 from langchain.memory import ConversationSummaryBufferMemory
+from langchain_aws import AmazonKnowledgeBasesRetriever, ChatBedrockConverse
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages.utils import count_tokens_approximately
+from langchain_core.tools import tool
+
+from deployment_manager.commands.deploy.subcommands.run.upload_helpers import Credentials
+from deployment_manager.commands.document.llm_helper import MODEL_ID
+from deployment_manager.utils.consts import display_error, settings
+from deployment_manager.utils.functions import extract_id_from_url, find_all_object_paths
+from rossum_api.elis_api_client import ElisAPIClient
 
 # No longer strictly needed for direct message passing but good for prompt templates
 # from langchain_core.prompts import MessagesPlaceholder
@@ -75,12 +61,7 @@ class ConversationSolver:
 
     @property
     def documentation_base_path(self):
-        return (
-            self.project_path
-            / self.dir_name
-            / self.subdir_name
-            / settings.DOCUMENTATION_FOLDER_NAME
-        )
+        return self.project_path / self.dir_name / self.subdir_name / settings.DOCUMENTATION_FOLDER_NAME
 
     @property
     def data_storage_api_url(self):
@@ -90,17 +71,13 @@ class ConversationSolver:
         elif "api.elis.rossum.ai" in self.client._http_client.base_url:
             return "https://elis.rossum.ai" + COMMON_SUFFIX
         else:
-            return (
-                self.client._http_client.base_url.replace("/api/v1", "") + COMMON_SUFFIX
-            )
+            return self.client._http_client.base_url.replace("/api/v1", "") + COMMON_SUFFIX
 
     def _debug_print(self, message: str):
         if self.show_debug:
             print(message)
 
-    def __init__(
-        self, creds: Credentials, project_path: Path, dir_name: str, subdir_name: str
-    ):
+    def __init__(self, creds: Credentials, project_path: Path, dir_name: str, subdir_name: str):
         self.client = ElisAPIClient(token=creds.token, base_url=creds.url)
 
         self.project_path = project_path
@@ -134,9 +111,7 @@ class ConversationSolver:
             memory_key="chat_history",
             return_messages=True,
         )
-        self.memory.chat_memory.add_message(
-            SystemMessage(content=self.system_prompt_content)
-        )
+        self.memory.chat_memory.add_message(SystemMessage(content=self.system_prompt_content))
 
         self.tools = self.setup_tools()
         self.llm_with_tools = self.llm.bind_tools(self.tools)
@@ -149,15 +124,13 @@ class ConversationSolver:
         self.object_jsons = await self.gather_object_json()
 
     async def gather_object_json(self):
-        all_file_paths = await find_all_object_paths(
-            self.project_path / self.dir_name / self.subdir_name
-        )
+        all_file_paths = await find_all_object_paths(self.project_path / self.dir_name / self.subdir_name)
 
         object_jsons = {}
         for path in all_file_paths:
             file_content = await Path(path).read_text()
             object = json.loads(file_content)
-            object_url = object.get('url', '')
+            object_url = object.get("url", "")
             if not object_url:
                 continue
             object_jsons.update({extract_id_from_url(object_url): object})
@@ -199,9 +172,7 @@ class ConversationSolver:
                 async with httpx.AsyncClient() as client:
                     req = await client.post(
                         url=self.data_storage_api_url + "/data/aggregate",
-                        headers={
-                            "Authorization": f"Bearer {self.client._http_client.token}"
-                        },
+                        headers={"Authorization": f"Bearer {self.client._http_client.token}"},
                         json={"collectionName": collection_name, "pipeline": pipeline},
                     )
                     req.raise_for_status()
@@ -245,10 +216,7 @@ class ConversationSolver:
 
             """
             async for queue_path in (self.documentation_base_path / "queues").iterdir():
-                if (
-                    queue_path.stem
-                    == f"{queue_id}_{settings.DOCUMENTATION_INTERNAL_SUFFIX}"
-                ):
+                if queue_path.stem == f"{queue_id}_{settings.DOCUMENTATION_INTERNAL_SUFFIX}":
                     return await queue_path.read_text()
             return "no such queue documented"
 
@@ -313,9 +281,7 @@ class ConversationSolver:
                 id: ID of the document
             """
             try:
-                annotation = await self.client.request_json(
-                    method="GET", url=f"annotations/{id}"
-                )
+                annotation = await self.client.request_json(method="GET", url=f"annotations/{id}")
                 return annotation
             except Exception as e:
                 display_error(f"Error while getting annotation: {e}")
@@ -335,9 +301,7 @@ class ConversationSolver:
                 )
                 found_schema_ids = {}
                 for schema_id in schema_ids:
-                    found_schema_ids[schema_id] = find_by_schema_id(
-                        annotation_content["content"], schema_id
-                    )
+                    found_schema_ids[schema_id] = find_by_schema_id(annotation_content["content"], schema_id)
                 return found_schema_ids
             except Exception as e:
                 display_error(f"Error while getting annotation content: {e}")
@@ -377,57 +341,39 @@ class ConversationSolver:
         # --- Pre-check user input token length ---
         user_input_message = HumanMessage(content=user_input)
         user_input_tokens = self._get_messages_tokens([user_input_message])
-        max_allowed_for_single_message = int(
-            self.memory.max_token_limit * self.MAX_INDIVIDUAL_MESSAGE_FRACTION
-        )
+        max_allowed_for_single_message = int(self.memory.max_token_limit * self.MAX_INDIVIDUAL_MESSAGE_FRACTION)
 
         if user_input_tokens > max_allowed_for_single_message:
             # If the user input is too large, attempt to summarize it
-            self._debug_print(
-                f"DEBUG: User input too long ({user_input_tokens} tokens). Summarizing..."
-            )
+            self._debug_print(f"DEBUG: User input too long ({user_input_tokens} tokens). Summarizing...")
             yield f"--- Your input was too long ({user_input_tokens} tokens) and has been summarized to fit the conversation memory. ---\n\n"
             try:
                 # Use a separate LLM call to summarize the user's input
                 summary_prompt = f"Summarize the following text concisely to fit within {max_allowed_for_single_message} tokens, retaining all key information:\n\n{user_input}"
-                summary_result = await self.summary_llm.ainvoke(
-                    [HumanMessage(content=summary_prompt)]
-                )
+                summary_result = await self.summary_llm.ainvoke([HumanMessage(content=summary_prompt)])
 
                 user_input_message = HumanMessage(content=summary_result.content)
                 current_input_tokens = self._get_messages_tokens([user_input_message])
                 self.total_input_tokens += current_input_tokens
-                self._debug_print(
-                    f"DEBUG: User input summarized to {current_input_tokens} tokens."
-                )
+                self._debug_print(f"DEBUG: User input summarized to {current_input_tokens} tokens.")
             except Exception as e:
-                self._debug_print(
-                    f"DEBUG: Failed to summarize user input: {e}. Using truncated input instead."
-                )
+                self._debug_print(f"DEBUG: Failed to summarize user input: {e}. Using truncated input instead.")
                 # Fallback to simple truncation if summarization fails
                 user_input_message = HumanMessage(
                     content=user_input[: max_allowed_for_single_message * 4] + "..."
                 )  # Rough character estimate for tokens
-                yield f"--- Failed to summarize your input. It has been truncated to fit the conversation memory. ---\n\n"
+                yield "--- Failed to summarize your input. It has been truncated to fit the conversation memory. ---\n\n"
 
-        self.memory.chat_memory.add_message(
-            user_input_message
-        )  # Add the original or processed user message
+        self.memory.chat_memory.add_message(user_input_message)  # Add the original or processed user message
 
         while True:
-            messages_for_llm = self.memory.load_memory_variables({})[
-                self.memory.memory_key
-            ]
+            messages_for_llm = self.memory.load_memory_variables({})[self.memory.memory_key]
 
             # Calculate input tokens for the current turn, which is the entire message history from memory
             current_input_tokens = self._get_messages_tokens(messages_for_llm)
             self.total_input_tokens += current_input_tokens
-            self._debug_print(
-                f"DEBUG: Current turn input tokens: {current_input_tokens}"
-            )
-            self._debug_print(
-                f"DEBUG: Total input tokens so far: {self.total_input_tokens}"
-            )
+            self._debug_print(f"DEBUG: Current turn input tokens: {current_input_tokens}")
+            self._debug_print(f"DEBUG: Total input tokens so far: {self.total_input_tokens}")
 
             llm_stream = self.llm_with_tools.astream(messages_for_llm)
 
@@ -443,11 +389,7 @@ class ConversationSolver:
             if hasattr(first_chunk, "content") and first_chunk.content is not None:
                 if isinstance(first_chunk.content, list):
                     for part in first_chunk.content:
-                        if (
-                            isinstance(part, dict)
-                            and part.get("type") == "text"
-                            and "text" in part
-                        ):
+                        if isinstance(part, dict) and part.get("type") == "text" and "text" in part:
                             yield part["text"]
                 elif isinstance(first_chunk.content, str):
                     yield first_chunk.content
@@ -458,11 +400,7 @@ class ConversationSolver:
                 if hasattr(chunk, "content") and chunk.content is not None:
                     if isinstance(chunk.content, list):
                         for part in chunk.content:
-                            if (
-                                isinstance(part, dict)
-                                and part.get("type") == "text"
-                                and "text" in part
-                            ):
+                            if isinstance(part, dict) and part.get("type") == "text" and "text" in part:
                                 yield part["text"]
                     elif isinstance(chunk.content, str):
                         yield chunk.content
@@ -475,14 +413,10 @@ class ConversationSolver:
             )
             self.memory.chat_memory.add_message(final_ai_message_for_history)
 
-            ai_response_tokens = self._get_messages_tokens(
-                [final_ai_message_for_history]
-            )
+            ai_response_tokens = self._get_messages_tokens([final_ai_message_for_history])
             self.total_output_tokens += ai_response_tokens
             self._debug_print(f"DEBUG: AI response output tokens: {ai_response_tokens}")
-            self._debug_print(
-                f"DEBUG: Total output tokens so far: {self.total_output_tokens}"
-            )
+            self._debug_print(f"DEBUG: Total output tokens so far: {self.total_output_tokens}")
 
             self._debug_print(
                 f"DEBUG: Final AIMessage for history (full content): {final_ai_message_for_history.content}"
@@ -492,9 +426,7 @@ class ConversationSolver:
             )
 
             if not final_ai_message_for_history.tool_calls:
-                self._debug_print(
-                    "DEBUG: No tool calls in final AI message. Breaking loop."
-                )
+                self._debug_print("DEBUG: No tool calls in final AI message. Breaking loop.")
                 break
 
             self._debug_print("DEBUG: Executing tool calls...")
@@ -504,22 +436,16 @@ class ConversationSolver:
                 tool_id = tool_call.get("id")
 
                 if not tool_name or tool_args is None or not tool_id:
-                    self._debug_print(
-                        f"DEBUG: Malformed tool call found: {tool_call}. Skipping."
-                    )
+                    self._debug_print(f"DEBUG: Malformed tool call found: {tool_call}. Skipping.")
                     yield f"--- Tool Error: Malformed tool call received: {tool_call} ---\n\n"
-                    self.memory.chat_memory.add_ai_message(
-                        f"Malformed tool call: {tool_call}"
-                    )
+                    self.memory.chat_memory.add_ai_message(f"Malformed tool call: {tool_call}")
                     continue
 
                 self._debug_print(
                     f"DEBUG: Attempting to execute tool: name={tool_name}, args={tool_args}, id={tool_id}"
                 )
 
-                selected_tool = next(
-                    (t for t in self.tools if t.name == tool_name), None
-                )
+                selected_tool = next((t for t in self.tools if t.name == tool_name), None)
 
                 if selected_tool:
                     self._debug_print(f"DEBUG: Tool '{tool_name}' found.")
@@ -527,9 +453,7 @@ class ConversationSolver:
                     try:
                         tool_output = await selected_tool.ainvoke(tool_args)
                         tool_output_str = (
-                            json.dumps(tool_output)
-                            if isinstance(tool_output, (dict, list))
-                            else str(tool_output)
+                            json.dumps(tool_output) if isinstance(tool_output, (dict, list)) else str(tool_output)
                         )
 
                         # --- Post-check tool output token length ---
@@ -544,33 +468,24 @@ class ConversationSolver:
                             try:
                                 # Use a separate LLM call to summarize the tool's output
                                 summary_prompt = f"Summarize the following tool output concisely to fit within {max_allowed_for_single_message} tokens, retaining all key information:\n\n{tool_output_str}"
-                                summary_result = await self.summary_llm.ainvoke(
-                                    [HumanMessage(content=summary_prompt)]
-                                )
+                                summary_result = await self.summary_llm.ainvoke([HumanMessage(content=summary_prompt)])
                                 tool_output_str = summary_result.content
                                 tool_message = ToolMessage(
                                     content=tool_output_str,
                                     tool_call_id=tool_id,
                                 )
 
-                                current_input_tokens = self._get_messages_tokens(
-                                    [tool_message]
-                                )
+                                current_input_tokens = self._get_messages_tokens([tool_message])
 
-                                self._debug_print(
-                                    f"DEBUG: Tool output summarized to {current_input_tokens} tokens."
-                                )
+                                self._debug_print(f"DEBUG: Tool output summarized to {current_input_tokens} tokens.")
                             except Exception as e:
                                 self._debug_print(
                                     f"DEBUG: Failed to summarize tool output: {e}. Using truncated output instead."
                                 )
                                 tool_output_str = (
-                                    tool_output_str[
-                                        : max_allowed_for_single_message * 4
-                                    ]
-                                    + "..."
+                                    tool_output_str[: max_allowed_for_single_message * 4] + "..."
                                 )  # Rough char estimate
-                                yield f"--- Failed to summarize tool output. It has been truncated to fit the conversation memory. ---\n\n"
+                                yield "--- Failed to summarize tool output. It has been truncated to fit the conversation memory. ---\n\n"
 
                         tool_message = ToolMessage(
                             content=tool_output_str,
@@ -582,9 +497,7 @@ class ConversationSolver:
                     except Exception as e:
                         error_msg = f"Error executing tool {tool_name}: {e}"
                         yield f"--- Tool Error: {error_msg} ---\n\n"
-                        error_tool_message = ToolMessage(
-                            content=error_msg, tool_call_id=tool_id
-                        )
+                        error_tool_message = ToolMessage(content=error_msg, tool_call_id=tool_id)
                         self.memory.chat_memory.add_message(error_tool_message)
                 else:
                     error_msg = f"Tool '{tool_name}' not found. This might indicate the model hallucinated a tool or the tool definition is missing."

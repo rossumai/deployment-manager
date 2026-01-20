@@ -5,9 +5,7 @@ from anyio import Path
 from deployment_manager.utils.consts import GIT_CHARACTERS
 
 
-def get_changed_file_paths(
-    destination: str, indexed_only=False
-) -> list[tuple[str, Path]]:
+def get_changed_file_paths(destination: str, indexed_only=False) -> list[tuple[str, Path]]:
     # The -s flag is there to show a simplified list of changes
     # The -u flag is there to show each individual file (and not a subdir)
     # The change in git config is because of potential 'unusual' (non-ASCII) characters in paths
