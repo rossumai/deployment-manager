@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import re
-from curses.ascii import isdigit
 from typing import TYPE_CHECKING, Any
 
 from deployment_manager.commands.deploy.subcommands.run.helpers import create_object_label, traverse_object
@@ -19,7 +18,7 @@ class ReferenceReplacer:
     type: Resource
     parent_object_reference: "DeployObject"
 
-    IMPLICIT_OVERRIDE_KEYS = ["settings", "metadata"]
+    IMPLICIT_OVERRIDE_KEYS = ["settings", "metadata", "actions"]
 
     def __init__(self, parent_object_reference: DeployObject, type: Resource):
         self.parent_object_reference = parent_object_reference
@@ -27,6 +26,11 @@ class ReferenceReplacer:
 
     def replace_base_url(self, url: str, source_base_url: str, target_base_url: str):
         return url.replace(source_base_url, target_base_url)
+
+    @staticmethod
+    def _is_valid_id(id_val) -> bool:
+        """Check if an ID is a valid numeric ID (not a dummy UUID)."""
+        return isinstance(id_val, int) or (isinstance(id_val, str) and id_val.isdigit())
 
     def replace_references_in_unstructured_attributes(
         self,
@@ -98,14 +102,14 @@ class ReferenceReplacer:
                 value_index = object[key].index(value)
                 new_value = str(value).replace(str(source_id), str(target_id))
                 # Convert value back to int if applicable
-                if isinstance(value, int) and all(isdigit(c) for c in new_value):
+                if isinstance(value, int) and new_value.isdigit():
                     new_value = int(new_value)
                 object[key][value_index] = new_value
         else:
             new_value = str(value).replace(str(source_id), str(target_id))
             # Convert value back to int if applicable
             # Only do it if the new ID can be converted - dummy references cannot for instance
-            if isinstance(value, int) and all(isdigit(c) for c in new_value):
+            if isinstance(value, int) and new_value.isdigit():
                 new_value = int(new_value)
             object[key] = new_value
         # Using lambdas for sub() because of quotes inside strings
@@ -150,8 +154,11 @@ class ReferenceReplacer:
         else:
             selected_target = target_dependency_objects[0]
 
-        # New object is referenced
-        if not selected_target.exists_on_remote and not use_dummy_references:
+        # New object is referenced - skip if it doesn't exist yet and we're not using dummy refs
+        # Also check if the ID is a real numeric ID (indicating successful creation)
+        # as exists_on_remote might not be set correctly in some edge cases
+        target_id_is_valid = self._is_valid_id(selected_target.id)
+        if not selected_target.exists_on_remote and not target_id_is_valid and not use_dummy_references:
             return
 
         target_id_str = str(selected_target.id)
