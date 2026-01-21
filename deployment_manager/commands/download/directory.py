@@ -21,6 +21,7 @@ from deployment_manager.commands.download.saver import (
     EmailTemplateSaver,
     HookSaver,
     InboxSaver,
+    LabelSaver,
     QueueSaver,
     RuleSaver,
     SchemaSaver,
@@ -99,6 +100,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
     schema_saver: Optional["SchemaSaver"] = None
     rule_saver: Optional["RuleSaver"] = None
     hook_saver: Optional["HookSaver"] = None
+    label_saver: Optional["LabelSaver"] = None
     workflow_saver: Optional["WorkflowSaver"] = None
     workflow_step_saver: Optional["WorkflowStepSaver"] = None
 
@@ -139,6 +141,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 schemas_for_mapping,
                 rules_for_mapping,
                 hooks_for_mapping,
+                labels_for_mapping,
                 workflows_for_mapping,
                 workflow_steps_for_mapping,
             ) = await gather_with_concurrency(
@@ -150,6 +153,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                     downloader.download_remote_objects(type=Resource.Schema),
                     downloader.download_remote_objects(type=CustomResource.Rule, check_access=True),
                     downloader.download_remote_objects(type=Resource.Hook),
+                    downloader.download_remote_objects(type=Resource.Label),
                     downloader.download_remote_objects(type=CustomResource.Workflow, check_access=True),
                     downloader.download_remote_objects(type=CustomResource.WorkflowStep, check_access=True),
                 ],
@@ -262,6 +266,18 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             self.hook_saver.subdirs_by_object_id = subdirs_by_object_id
             await self.hook_saver.save_downloaded_objects()
 
+            self.label_saver = LabelSaver(
+                parent_dir_reference=self,
+                base_path=self.project_path / self.name,
+                objects=labels_for_mapping,
+                changed_files=self.changed_files,
+                download_all=self.download_all,
+                skip_objects_without_subdir=self.skip_objects_without_subdir,
+                subdirs=subdir_list,
+            )
+            self.label_saver.subdirs_by_object_id = subdirs_by_object_id
+            await self.label_saver.save_downloaded_objects()
+
             self.workflow_saver = WorkflowSaver(
                 parent_dir_reference=self,
                 base_path=self.project_path / self.name,
@@ -296,6 +312,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                     *schemas_for_mapping,
                     *rules_for_mapping,
                     *hooks_for_mapping,
+                    *labels_for_mapping,
                     *workflows_for_mapping,
                     *workflow_steps_for_mapping,
                 ]
@@ -394,6 +411,8 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
         match object_type:
             case Resource.Hook:
                 remote_path = self.hook_saver.construct_object_path(subdir, remote_object)
+            case Resource.Label:
+                remote_path = self.label_saver.construct_object_path(subdir, remote_object)
             case Resource.Schema:
                 remote_path = self.schema_saver.construct_object_path(subdir, remote_object)
             case CustomResource.Rule:
@@ -422,6 +441,7 @@ WorkspaceSaver.model_rebuild()
 QueueSaver.model_rebuild()
 EmailTemplateSaver.model_rebuild()
 HookSaver.model_rebuild()
+LabelSaver.model_rebuild()
 WorkflowSaver.model_rebuild()
 WorkflowStepSaver.model_rebuild()
 SchemaSaver.model_rebuild()

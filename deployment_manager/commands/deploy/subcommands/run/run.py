@@ -184,6 +184,7 @@ async def deploy_release_file(
         await release.run_deploy(is_first=False)
 
         await release.save_deploy_state()
+        await release.save_auto_mappings()
     except Exception as e:
         deploy_error = True
         display_error(
