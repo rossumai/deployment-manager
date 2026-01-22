@@ -281,10 +281,7 @@ class Settings:
         ],
     }
     # Non-diffed only if cross-org
-    # Note: "engine" is handled via reference replacement, but dedicated_engine/generic_engine are not yet supported
-    DEPLOY_CROSS_ORG_NON_DIFFED_KEYS: dict = {
-        Resource.Queue: ["workflows", *QUEUE_ENGINE_ATTRIBUTES]
-    }
+    DEPLOY_CROSS_ORG_NON_DIFFED_KEYS: dict = {Resource.Queue: ["workflows", *QUEUE_ENGINE_ATTRIBUTES]}
 
     # List attributes that should be sorted before diff so not get false positive diffs (e.g., hook.queues)
     DEPLOY_SORT_LIST_KEYS: dict = {

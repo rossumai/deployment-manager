@@ -12,7 +12,7 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.inbox_dep
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.schema_deploy_object import SchemaDeployObject
 from deployment_manager.commands.deploy.subcommands.run.helpers import remove_queue_attributes_for_cross_org
 from deployment_manager.commands.deploy.subcommands.run.models import SubObjectException, Target
-from deployment_manager.utils.consts import display_error, display_warning
+from deployment_manager.utils.consts import QUEUE_ENGINE_ATTRIBUTES, display_error, display_warning
 from deployment_manager.utils.functions import extract_id_from_url, templatize_name_id
 from rossum_api.api_client import Resource
 
@@ -294,7 +294,7 @@ class QueueDeployObject(DeployObject):
                 )
                 return
 
-        for attr in ["dedicated_engine", "generic_engine"]:
+        for attr in QUEUE_ENGINE_ATTRIBUTES:
             if self.data.get(attr, None):
                 self.pending_warnings.append(
                     f"{self.display_type} {self.display_label} has '{attr}' defined. Please make sure to create and assign it manually for the target."
