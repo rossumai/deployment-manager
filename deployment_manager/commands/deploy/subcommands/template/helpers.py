@@ -359,8 +359,31 @@ async def get_schema_for_queue(queue: dict, previous_queues_by_id: dict):
     queue[settings.DEPLOY_KEY_SCHEMA] = deploy_schema_object
 
 
+async def find_rules_for_queues(source_path: Path, queues: list[dict]) -> set[int]:
+    """Find rule IDs that reference any of the selected queues."""
+    rule_paths = await find_rule_paths_for_dir(source_path)
+    selected_queue_ids = {queue.get("id") for queue in queues}
+    matching_rule_ids = set()
+
+    for rule_path in rule_paths:
+        rule_data = await read_object_from_json(rule_path)
+        # Skip schema-based rules
+        if rule_data.get("schema"):
+            continue
+        # Check if any of the rule's queues match the selected queues
+        rule_queue_urls = rule_data.get("queues", [])
+        for queue_url in rule_queue_urls:
+            queue_id = extract_id_from_url(queue_url)
+            if queue_id and queue_id in selected_queue_ids:
+                matching_rule_ids.add(rule_data.get("id"))
+                break
+
+    return matching_rule_ids
+
+
 async def get_rules_from_user(
     source_path: Path,
+    queues: list[dict],
     interactive: bool,
     previous_deploy_file_rules: list[dict] = None,
 ):
@@ -371,6 +394,9 @@ async def get_rules_from_user(
     rule_paths = await find_rule_paths_for_dir(source_path)
     if not rule_paths:
         return []
+
+    # Find rules that reference the selected queues
+    rule_ids_for_selected_queues = await find_rules_for_queues(source_path, queues)
 
     # Filter out rules that use deprecated schema-based assignment
     valid_rule_paths = []
@@ -388,10 +414,13 @@ async def get_rules_from_user(
     if not valid_rule_paths:
         return []
 
+    # Pre-select rules that belong to selected queues (similar to hooks behavior)
+    # Also include any previously selected rules
+    preselected_rule_ids = rule_ids_for_selected_queues.union(set(selected_rule_ids))
+
     rule_choices = await prepare_choices(
         paths=valid_rule_paths,
-        preselected_ids=selected_rule_ids,
-        preselect_all=len(selected_rule_ids) == 0,
+        preselected_ids=list(preselected_rule_ids),
     )
     deploy_file_rules = [rule.value for rule in rule_choices if rule.checked]
     if interactive or not selected_rule_ids:

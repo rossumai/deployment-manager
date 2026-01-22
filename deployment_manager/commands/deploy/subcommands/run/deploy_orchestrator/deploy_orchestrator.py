@@ -5,10 +5,14 @@ from collections import defaultdict
 import questionary
 from anyio import Path
 from pydantic import BaseModel
+from ruamel.yaml import YAML
 
 from deployment_manager.commands.deploy.common.helpers import get_token_owner_from_user
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
     DeployObject,
+)
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.email_template_deploy_object import (
+    EmailTemplateDeployObject,
 )
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.engine_deploy_object import (
     EngineDeployObject,
@@ -21,6 +25,9 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.hook_depl
 )
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.inbox_deploy_object import (
     InboxDeployObject,
+)
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.label_deploy_object import (
+    LabelDeployObject,
 )
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.organization_deploy_object import (
     OrganizationDeployObject,
@@ -44,6 +51,7 @@ from deployment_manager.commands.deploy.subcommands.run.models import (
     LookupTable,
     ReverseLookupTable,
     Target,
+    TargetWithDefault,
 )
 from deployment_manager.utils.consts import (
     CustomResource,
@@ -52,7 +60,7 @@ from deployment_manager.utils.consts import (
     display_warning,
     settings,
 )
-from deployment_manager.utils.functions import gather_with_concurrency
+from deployment_manager.utils.functions import extract_id_from_url, gather_with_concurrency
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.api_client import Resource
 from rossum_api.models.organization import Organization
@@ -92,6 +100,8 @@ class DeployOrchestrator(BaseModel):
     workspaces: list[WorkspaceDeployObject] = []
     queues: list[QueueDeployObject] = []
     hooks: list[HookDeployObject] = []
+    labels: list[LabelDeployObject] = []
+    email_templates: list[EmailTemplateDeployObject] = []
     rules: list[RuleDeployObject] = []
     engines: list[EngineDeployObject] = []
 
@@ -105,6 +115,9 @@ class DeployOrchestrator(BaseModel):
 
     ignore_all_deploy_warnings: bool = False
 
+    # Auto-loaded dependency mappings (source_id -> target_id)
+    auto_mappings: dict = {}
+
     @property
     def is_same_org(self):
         return self.source_org.id == self.target_org.id
@@ -114,6 +127,8 @@ class DeployOrchestrator(BaseModel):
         return [
             self.organization,
             *self.hooks,
+            *self.labels,
+            *self.email_templates,
             *self.rules,
             *self.engines,
             *self.workspaces,
@@ -129,10 +144,71 @@ class DeployOrchestrator(BaseModel):
 
         self.deploy_state = DeployState.load_deploy_state(path=pathlib.Path(self.deploy_state_file))
 
+        # Load auto-mappings for auto-loaded dependencies
+        self.auto_mappings = self.load_auto_mappings()
+
         self.organization = OrganizationDeployObject(
             id=self.source_org.id,
             name=self.source_org.name,
         )
+
+    def get_auto_mappings_path(self) -> pathlib.Path:
+        """Get path to the .auto/{deploy_file_name}.yaml file."""
+        # Convert anyio.Path to pathlib.Path for sync operations
+        deploy_path = pathlib.Path(str(self.deploy_file_path))
+        auto_dir = deploy_path.parent / ".auto"
+        auto_file = auto_dir / deploy_path.name
+        return auto_file
+
+    def load_auto_mappings(self) -> dict:
+        """Load auto-dependency mappings from .auto/{deploy_file_name}.yaml."""
+        auto_file = self.get_auto_mappings_path()
+        try:
+            if not auto_file.exists():
+                return {}
+
+            yaml = YAML()
+            with open(auto_file, "r") as f:
+                mappings = yaml.load(f) or {}
+            return mappings
+        except FileNotFoundError:
+            return {}
+        except Exception as e:
+            display_warning(f"Could not load auto-mappings from {auto_file}: {e}")
+            return {}
+
+    async def save_auto_mappings(self):
+        """Save auto-loaded dependency mappings to .auto/{deploy_file_name}.yaml."""
+        # Build global mappings from auto-loaded labels and email_templates
+        # Using global mappings (not per-rule) so that if rules are added/removed,
+        # the target IDs are still found for shared dependencies
+        mappings = {"labels": {}, "email_templates": {}}
+
+        # Collect all label mappings
+        for label in self.labels:
+            if label.targets and label.targets[0].id:
+                mappings["labels"][label.id] = label.targets[0].id
+
+        # Collect all email_template mappings
+        for email_template in self.email_templates:
+            if email_template.targets and email_template.targets[0].id:
+                mappings["email_templates"][email_template.id] = email_template.targets[0].id
+
+        # Save to file if there are any mappings
+        if mappings["labels"] or mappings["email_templates"]:
+            auto_file = self.get_auto_mappings_path()
+            auto_dir = auto_file.parent
+
+            # Create .auto directory if it doesn't exist
+            auto_dir.mkdir(exist_ok=True)
+
+            try:
+                yaml = YAML()
+                yaml.indent(mapping=2, sequence=4, offset=2)
+                with open(auto_file, "w") as f:
+                    yaml.dump(mappings, f)
+            except Exception as e:
+                display_warning(f"Could not save auto-mappings to {auto_file}: {e}")
 
     async def save_deploy_state(self):
         """Save the last applied config for all deployed resources."""
@@ -150,6 +226,8 @@ class DeployOrchestrator(BaseModel):
         deploy_state_objects = [
             (Resource.Organization, [self.organization]),
             (Resource.Hook, self.hooks),
+            (Resource.Label, self.labels),
+            (Resource.EmailTemplate, self.email_templates),
             (Resource.Engine, self.engines),
             (Resource.EngineField, engine_fields),
             (Resource.Queue, self.queues),
@@ -164,6 +242,84 @@ class DeployOrchestrator(BaseModel):
         )
 
         await self.deploy_state.write_deploy_state(Path(self.deploy_state_file))
+
+    async def resolve_non_creatable_email_templates(self):
+        """Resolve target IDs for non-creatable email template types.
+
+        Non-creatable types (rejection_default, email_with_no_processable_attachments)
+        are auto-created with every queue. After queues are deployed, we need to:
+        1. Query the target queue's email templates
+        2. Find the one matching by type
+        3. Update our email template target with that ID
+        4. Update the lookup table for rule reference replacement
+        """
+        for email_template in self.email_templates:
+            if not email_template.non_creatable:
+                continue
+
+            source_queue_url = email_template.data.get("queue")
+            if not source_queue_url:
+                display_warning(
+                    f"Non-creatable email template {email_template.display_label} has no queue reference, skipping"
+                )
+                continue
+
+            source_queue_id = extract_id_from_url(source_queue_url)
+            email_type = email_template.data.get("type")
+
+            # Find the queue deploy object for this source queue
+            queue_deploy_obj = None
+            for queue in self.queues:
+                if queue.id == source_queue_id:
+                    queue_deploy_obj = queue
+                    break
+
+            if not queue_deploy_obj:
+                display_warning(
+                    f"Could not find queue {source_queue_id} for email template {email_template.display_label}. "
+                    "The email template reference may not be replaced correctly."
+                )
+                continue
+
+            # For each target queue, find the matching email template by type
+            for i, queue_target in enumerate(queue_deploy_obj.targets):
+                target_queue_id = queue_target.id
+                if not target_queue_id:
+                    display_warning(
+                        f"Target queue ID not available for email template {email_template.display_label}, skipping"
+                    )
+                    continue
+
+                try:
+                    # Query target queue's email templates (fetch_all returns async generator)
+                    target_template_id = None
+                    async for template in self.client._http_client.fetch_all(
+                        Resource.EmailTemplate,
+                        params={"queue": target_queue_id},
+                    ):
+                        if template.get("type") == email_type:
+                            target_template_id = template["id"]
+                            break
+
+                    if target_template_id:
+                        # Update the email template target
+                        if i < len(email_template.targets):
+                            email_template.targets[i].id = target_template_id
+                        else:
+                            # Add new target if needed
+                            email_template.targets.append(TargetWithDefault(id=target_template_id))
+
+                        display_info(
+                            f"Resolved non-creatable email template {email_template.display_label} "
+                            f"(type: {email_type}) -> target ID {target_template_id}"
+                        )
+                    else:
+                        display_warning(
+                            f"Could not find email template with type '{email_type}' on target queue {target_queue_id}"
+                        )
+
+                except Exception as e:
+                    display_warning(f"Could not fetch email templates for target queue {target_queue_id}: {e}")
 
     async def initialize_deploy_objects(self):
         await self.ensure_token_owner()
@@ -260,6 +416,10 @@ class DeployOrchestrator(BaseModel):
             )
 
             await gather_with_concurrency(
+                *[deploy_object.deploy_target_objects(data_attribute=data_attribute) for deploy_object in self.labels]
+            )
+
+            await gather_with_concurrency(
                 *[
                     deploy_object.deploy_target_objects(data_attribute=data_attribute)
                     for deploy_object in self.workspaces
@@ -269,6 +429,35 @@ class DeployOrchestrator(BaseModel):
             await gather_with_concurrency(
                 *[deploy_object.deploy_target_objects(data_attribute=data_attribute) for deploy_object in self.queues]
             )
+
+            # After queues are deployed (first phase), resolve non-creatable email template targets
+            if is_first:
+                await self.resolve_non_creatable_email_templates()
+                # Re-override email template references with the updated lookup table (queue refs)
+                await gather_with_concurrency(
+                    *[
+                        et.override_references(data_attribute="second_deploy_data", use_dummy_references=False)
+                        for et in self.email_templates
+                    ]
+                )
+
+            # Email templates must be deployed AFTER queues (they require queue reference)
+            await gather_with_concurrency(
+                *[
+                    deploy_object.deploy_target_objects(data_attribute=data_attribute)
+                    for deploy_object in self.email_templates
+                ]
+            )
+
+            # After email templates are deployed (first phase), re-override rule references
+            # Now the email template targets have their IDs from deployment
+            if is_first:
+                await gather_with_concurrency(
+                    *[
+                        rule.override_references(data_attribute="second_deploy_data", use_dummy_references=False)
+                        for rule in self.rules
+                    ]
+                )
 
             await gather_with_concurrency(
                 *[deploy_object.deploy_target_objects(data_attribute=data_attribute) for deploy_object in self.rules]
@@ -318,6 +507,12 @@ class DeployOrchestrator(BaseModel):
         for hook in self.hooks:
             lookup_table[hook.id][Resource.Hook] = hook.targets
 
+        for label in self.labels:
+            lookup_table[label.id][Resource.Label] = label.targets
+
+        for email_template in self.email_templates:
+            lookup_table[email_template.id][Resource.EmailTemplate] = email_template.targets
+
         for engine in self.engines:
             lookup_table[engine.id][Resource.Engine] = engine.targets
 
@@ -362,6 +557,8 @@ class DeployOrchestrator(BaseModel):
 DeployOrchestrator.model_rebuild()
 OrganizationDeployObject.model_rebuild()
 HookDeployObject.model_rebuild()
+LabelDeployObject.model_rebuild()
+EmailTemplateDeployObject.model_rebuild()
 EngineDeployObject.model_rebuild()
 EngineFieldDeployObject.model_rebuild()
 WorkspaceDeployObject.model_rebuild()

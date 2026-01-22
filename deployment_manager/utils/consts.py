@@ -250,6 +250,8 @@ class Settings:
     DEPLOY_KEY_RULES = "rules"
     DEPLOY_KEY_INBOX = "inbox"
     DEPLOY_KEY_HOOKS = "hooks"
+    DEPLOY_KEY_LABELS = "labels"
+    DEPLOY_KEY_EMAIL_TEMPLATES = "email_templates"
     DEPLOY_KEY_ENGINES = "engines"
 
     UPDATE_PRINT_STR: str = "[blue]UPDATE[/blue]"

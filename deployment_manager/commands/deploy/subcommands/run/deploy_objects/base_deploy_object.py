@@ -88,16 +88,18 @@ class DeployObject(BaseModel):
         self.overrider = AttributeOverrider(type=self.type)
         self.ref_replacer = ReferenceReplacer(type=self.type, parent_object_reference=self)
 
-        try:
-            self.data = await read_object_from_json(self.path, False)
-        except PathNotFoundException:
-            self.initialize_failed = True
-            display_error(
-                f"Could not load object data from: [green]{self.path}[/green]. Is the object name in deploy file in-sync with its local path?"
-            )
-        except Exception as e:
-            self.initialize_failed = True
-            display_error(f"Could not read data from: [green]{self.path}[/green]: {e}")
+        # Only read from filesystem if data wasn't already provided (e.g., from auto-loading)
+        if not self.data:
+            try:
+                self.data = await read_object_from_json(self.path, False)
+            except PathNotFoundException:
+                self.initialize_failed = True
+                display_error(
+                    f"Could not load object data from: [green]{self.path}[/green]. Is the object name in deploy file in-sync with its local path?"
+                )
+            except Exception as e:
+                self.initialize_failed = True
+                display_error(f"Could not read data from: [green]{self.path}[/green]: {e}")
 
         self.ignored_attributes = [
             *settings.DEPLOY_NON_DIFFED_KEYS.get(self.type, []),
@@ -203,8 +205,12 @@ class DeployObject(BaseModel):
             # In case of errors, do not overwrite the existing target ID, the object still exists
             if target.data_from_remote and (new_id := target.data_from_remote.get("id", None)):
                 target.id = new_id
-                self.yaml_reference["targets"][target.index]["id"] = target.id
-            self.yaml_reference["targets"][target.index]["attribute_override"] = target.attribute_override
+                # Only update yaml_reference if it exists (auto-loaded objects don't have yaml_reference)
+                if self.yaml_reference:
+                    self.yaml_reference["targets"][target.index]["id"] = target.id
+            # Only update yaml_reference if it exists (auto-loaded objects don't have yaml_reference)
+            if self.yaml_reference:
+                self.yaml_reference["targets"][target.index]["attribute_override"] = target.attribute_override
 
     async def deploy_target_objects(self, data_attribute: str):
         requests = []

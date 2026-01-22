@@ -402,6 +402,28 @@ class HookSaver(ObjectSaver):
                 await write_str(custom_hook_code_path, hook.get("config", {}).get("code", None))
 
 
+class LabelSaver(ObjectSaver):
+    type: Resource = Resource.Label
+
+    def construct_object_path(self, subdir: Subdirectory, label: dict) -> Path:
+        object_path = self.base_path / subdir.name / "labels" / f'{templatize_name_id(label["name"], label["id"])}.json'
+        return object_path
+
+    async def save_downloaded_object(self, label: dict, subdir: Subdirectory):
+        object_path = self.construct_object_path(subdir=subdir, label=label)
+        if not object_path:
+            return
+        if self.download_all or await should_write_object(
+            object_path, label, self.changed_files, self.parent_dir_reference
+        ):
+            await write_object_to_json(
+                object_path,
+                label,
+                self.type,
+                log_message=f"Pulled {self.display_type} {object_path}",
+            )
+
+
 class WorkflowSaver(ObjectSaver):
     type: Resource = CustomResource.Workflow
 

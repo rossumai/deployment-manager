@@ -36,6 +36,8 @@ class ResourceDeployments(BaseModel):
 class DeployState(BaseModel):
     organizations: Dict[int, ResourceDeployments] = Field(default_factory=dict)
     hooks: Dict[int, ResourceDeployments] = Field(default_factory=dict)
+    labels: Dict[int, ResourceDeployments] = Field(default_factory=dict)
+    email_templates: Dict[int, ResourceDeployments] = Field(default_factory=dict)
     schemas: Dict[int, ResourceDeployments] = Field(default_factory=dict)
     rules: Dict[int, ResourceDeployments] = Field(default_factory=dict)
     queues: Dict[int, ResourceDeployments] = Field(default_factory=dict)

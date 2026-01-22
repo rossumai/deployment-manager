@@ -66,6 +66,7 @@ class Resource(Enum):
     Group = "groups"
     Hook = "hooks"
     Inbox = "inboxes"
+    Label = "labels"
     Organization = "organizations"
     Queue = "queues"
     Schema = "schemas"

@@ -135,6 +135,7 @@ async def create_deploy_template(
     selected_rules = await get_rules_from_user(
         previous_deploy_file_rules=rules,
         source_path=source_path,
+        queues=selected_queues,
         interactive=interactive,
     )
     deploy_file_object[settings.DEPLOY_KEY_RULES] = selected_rules
