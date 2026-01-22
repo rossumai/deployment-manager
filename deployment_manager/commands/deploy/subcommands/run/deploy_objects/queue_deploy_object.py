@@ -12,7 +12,7 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.inbox_dep
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.schema_deploy_object import SchemaDeployObject
 from deployment_manager.commands.deploy.subcommands.run.helpers import remove_queue_attributes_for_cross_org
 from deployment_manager.commands.deploy.subcommands.run.models import SubObjectException, Target
-from deployment_manager.utils.consts import QUEUE_ENGINE_ATTRIBUTES, display_error, display_warning
+from deployment_manager.utils.consts import display_error, display_warning
 from deployment_manager.utils.functions import extract_id_from_url, templatize_name_id
 from rossum_api.api_client import Resource
 
@@ -184,19 +184,18 @@ class QueueDeployObject(DeployObject):
             target=target, data_attribute=data_attribute, dependency_name="webhooks"
         )
 
-        for engine_attr in QUEUE_ENGINE_ATTRIBUTES:
-            self.ref_replacer.replace_reference_url(
-                object=data,
-                target_index=target.index,
-                target_objects_count=len(self.targets),
-                dependency_name=engine_attr,
-                lookup_table=self.deploy_file.lookup_table,
-                reverse_lookup_table=self.deploy_file.reverse_lookup_table,
-                object_type=Resource.Engine,
-                keep_dependency_without_equivalent=self.deploy_file.is_same_org,
-                use_dummy_references=use_dummy_references,
-                allow_empty_reference=True,
-            )
+        self.ref_replacer.replace_reference_url(
+            object=data,
+            target_index=target.index,
+            target_objects_count=len(self.targets),
+            dependency_name="engine",
+            lookup_table=self.deploy_file.lookup_table,
+            reverse_lookup_table=self.deploy_file.reverse_lookup_table,
+            object_type=Resource.Engine,
+            keep_dependency_without_equivalent=self.deploy_file.is_same_org,
+            use_dummy_references=use_dummy_references,
+            allow_empty_reference=True,
+        )
 
     async def visualize_changes(self):
         await super().visualize_changes()
@@ -284,7 +283,18 @@ class QueueDeployObject(DeployObject):
         if self.deploy_file.ignore_all_deploy_warnings or self.ignore_deploy_warnings or self.deploy_file.is_same_org:
             return
 
-        for attr in QUEUE_ENGINE_ATTRIBUTES:
+        deployed_engine_ids = set(engine.id for engine in self.deploy_file.engines)
+
+        engine_url = self.data.get("engine", None)
+        if engine_url:
+            engine_id = extract_id_from_url(engine_url)
+            if engine_id not in deployed_engine_ids:
+                self.pending_warnings.append(
+                    f"{self.display_type} {self.display_label} has 'engine' ([purple]{engine_id}[/purple]) that is not in the deploy file."
+                )
+                return
+
+        for attr in ["dedicated_engine", "generic_engine"]:
             if self.data.get(attr, None):
                 self.pending_warnings.append(
                     f"{self.display_type} {self.display_label} has '{attr}' defined. Please make sure to create and assign it manually for the target."

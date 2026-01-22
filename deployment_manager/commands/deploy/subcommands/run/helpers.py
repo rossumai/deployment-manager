@@ -15,7 +15,7 @@ from deployment_manager.commands.deploy.common.helpers import (
 )
 from deployment_manager.commands.deploy.subcommands.run.upload_helpers import Credentials
 from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
-from deployment_manager.utils.consts import QUEUE_ENGINE_ATTRIBUTES, display_error, settings
+from deployment_manager.utils.consts import display_error, settings
 
 
 class DeployYaml:
