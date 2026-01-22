@@ -184,6 +184,20 @@ class QueueDeployObject(DeployObject):
             target=target, data_attribute=data_attribute, dependency_name="webhooks"
         )
 
+        for engine_attr in QUEUE_ENGINE_ATTRIBUTES:
+            self.ref_replacer.replace_reference_url(
+                object=data,
+                target_index=target.index,
+                target_objects_count=len(self.targets),
+                dependency_name=engine_attr,
+                lookup_table=self.deploy_file.lookup_table,
+                reverse_lookup_table=self.deploy_file.reverse_lookup_table,
+                object_type=Resource.Engine,
+                keep_dependency_without_equivalent=self.deploy_file.is_same_org,
+                use_dummy_references=use_dummy_references,
+                allow_empty_reference=True,
+            )
+
     async def visualize_changes(self):
         await super().visualize_changes()
 

@@ -436,7 +436,8 @@ class EngineSaver(ObjectSaver):
             self.base_path
             / subdir.name
             / "engines"
-            / f'{templatize_name_id(engine["name"], engine["id"])}.json'
+            / templatize_name_id(engine["name"], engine["id"])
+            / "engine.json"
         )
         return object_path
 
@@ -450,6 +451,61 @@ class EngineSaver(ObjectSaver):
             await write_object_to_json(
                 object_path,
                 engine,
+                self.type,
+                log_message=f"Pulled {self.display_type} {object_path}",
+            )
+
+
+class EngineFieldSaver(ObjectSaver):
+    type: Resource = Resource.EngineField
+    engines: list[dict]
+
+    def find_subdir_of_object(self, object: dict):
+        parent = self.find_parent_object(object)
+        if parent:
+            subdir = self.subdirs_by_object_id.get(parent["id"])
+            return subdir if subdir else super().find_subdir_of_object(parent)
+
+        subdir = super().find_subdir_of_object(object)
+        if subdir:
+            return subdir
+
+        return None
+
+    def find_parent_object(self, child):
+        return self.find_engine_for_engine_field(child)
+
+    def find_engine_for_engine_field(self, engine_field: dict):
+        for engine in self.engines:
+            if engine["url"] == engine_field.get("engine", None):
+                return engine
+        return None
+
+    def construct_object_path(self, subdir: Subdirectory, engine_field: dict) -> Path:
+        engine = self.find_engine_for_engine_field(engine_field)
+        if not engine:
+            return
+
+        object_path = (
+            self.base_path
+            / subdir.name
+            / "engines"
+            / templatize_name_id(engine["name"], engine["id"])
+            / "engine_fields"
+            / f'{templatize_name_id(engine_field["name"], engine_field["id"])}.json'
+        )
+        return object_path
+
+    async def save_downloaded_object(self, engine_field: dict, subdir: Subdirectory):
+        object_path = self.construct_object_path(subdir=subdir, engine_field=engine_field)
+        if not object_path:
+            return
+        if self.download_all or await should_write_object(
+            object_path, engine_field, self.changed_files, self.parent_dir_reference
+        ):
+            await write_object_to_json(
+                object_path,
+                engine_field,
                 self.type,
                 log_message=f"Pulled {self.display_type} {object_path}",
             )

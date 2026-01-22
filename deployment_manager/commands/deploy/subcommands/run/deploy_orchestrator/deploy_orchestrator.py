@@ -13,6 +13,9 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_depl
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.engine_deploy_object import (
     EngineDeployObject,
 )
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.engine_field_deploy_object import (
+    EngineFieldDeployObject,
+)
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.hook_deploy_object import (
     HookDeployObject,
 )
@@ -138,11 +141,17 @@ class DeployOrchestrator(BaseModel):
 
         schemas = [queue.schema_deploy_object for queue in self.queues]
         inboxes = [queue.inbox_deploy_object for queue in self.queues]
+        engine_fields = [
+            engine_field
+            for engine in self.engines
+            for engine_field in engine.engine_field_deploy_objects
+        ]
 
         deploy_state_objects = [
             (Resource.Organization, [self.organization]),
             (Resource.Hook, self.hooks),
             (Resource.Engine, self.engines),
+            (Resource.EngineField, engine_fields),
             (Resource.Queue, self.queues),
             (Resource.Schema, schemas),
             (CustomResource.Rule, self.rules),
@@ -312,6 +321,9 @@ class DeployOrchestrator(BaseModel):
         for engine in self.engines:
             lookup_table[engine.id][Resource.Engine] = engine.targets
 
+            for engine_field in engine.engine_field_deploy_objects:
+                lookup_table[engine_field.id][Resource.EngineField] = engine_field.targets
+
         for rule in self.rules:
             lookup_table[rule.id][CustomResource.Rule] = rule.targets
 
@@ -351,6 +363,7 @@ DeployOrchestrator.model_rebuild()
 OrganizationDeployObject.model_rebuild()
 HookDeployObject.model_rebuild()
 EngineDeployObject.model_rebuild()
+EngineFieldDeployObject.model_rebuild()
 WorkspaceDeployObject.model_rebuild()
 QueueDeployObject.model_rebuild()
 SchemaDeployObject.model_rebuild()

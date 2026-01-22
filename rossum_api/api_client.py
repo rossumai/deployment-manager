@@ -74,6 +74,7 @@ class Resource(Enum):
     User = "users"
     Workspace = "workspaces"
     Engine = "engines"
+    EngineField = "engine_fields"
 
 
 class APIClientError(Exception):

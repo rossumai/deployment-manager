@@ -14,3 +14,6 @@ temp_project
 **/credentials.json
 **/credentials.yaml
 **/deploy_secrets/
+
+**/**/non_versioned_object_attributes.json
+**/hook_sync_configs/

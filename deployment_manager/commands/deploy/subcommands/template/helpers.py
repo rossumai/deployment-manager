@@ -196,10 +196,26 @@ async def find_engine_paths_for_dir(base_dir: Path):
     engine_dir = base_dir / Resource.Engine.value
     if not (await engine_dir.exists()):
         return []
+    engine_paths = []
+    async for engine_subdir in engine_dir.iterdir():
+        if await engine_subdir.is_dir():
+            engine_json = engine_subdir / "engine.json"
+            if await engine_json.exists():
+                engine_paths.append(engine_json)
+        elif await engine_subdir.is_file() and engine_subdir.name.endswith(".json"):
+            engine_paths.append(engine_subdir)
+    return engine_paths
+
+
+async def find_engine_field_paths_for_engine(engine_path: Path):
+    """Find all engine field JSON files for a given engine."""
+    engine_fields_dir = engine_path.parent / "engine_fields"
+    if not await engine_fields_dir.exists():
+        return []
     return [
-        engine_path
-        async for engine_path in (engine_dir).iterdir()
-        if await engine_path.is_file()
+        field_path
+        async for field_path in engine_fields_dir.iterdir()
+        if await field_path.is_file() and field_path.name.endswith(".json")
     ]
 
 
@@ -725,7 +741,49 @@ async def get_engines_from_user(
             choices=engine_choices,
         ).ask_async()
 
-    return prepare_deploy_file_objects(
+    prepared_engines = prepare_deploy_file_objects(
         objects=deploy_file_engines,
         objects_in_previous_file=previous_deploy_file_engines,
-    ), [engine["path"] for engine in deploy_file_engines]
+    )
+
+    previous_engines_by_id = {engine["id"]: engine for engine in previous_deploy_file_engines}
+    for engine, prepared_engine in zip(deploy_file_engines, prepared_engines):
+        engine_path = engine.get("path")
+        engine_field_paths = await find_engine_field_paths_for_engine(engine_path)
+        previous_engine = previous_engines_by_id.get(engine["id"], {})
+        previous_engine_fields = previous_engine.get("engine_fields", [])
+
+        if engine_field_paths:
+            engine_fields = []
+            for field_path in engine_field_paths:
+                field_data = await read_object_from_json(field_path)
+                engine_fields.append({**field_data, "path": field_path})
+
+            prepared_engine["engine_fields"] = prepare_engine_fields_for_deploy(
+                engine_fields=engine_fields,
+                previous_engine_fields=previous_engine_fields,
+            )
+        prepared_engine["base_path"] = str(engine_path.parent)
+
+    return prepared_engines, [engine["path"] for engine in deploy_file_engines]
+
+
+def prepare_engine_fields_for_deploy(engine_fields: list[dict], previous_engine_fields: list[dict] = None):
+    """Prepare engine fields for deploy file format."""
+    if not previous_engine_fields:
+        previous_engine_fields = []
+    previous_fields_by_id = {field["id"]: field for field in previous_engine_fields}
+
+    deploy_fields = []
+    for field in engine_fields:
+        previous_field = previous_fields_by_id.get(field["id"], {})
+        deploy_field = {
+            **previous_field,
+            "id": field["id"],
+            "name": field["name"],
+            settings.DEPLOY_KEY_TARGETS: previous_field.get(
+                settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)
+            ),
+        }
+        deploy_fields.append(deploy_field)
+    return deploy_fields
