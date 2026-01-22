@@ -15,8 +15,7 @@ from deployment_manager.commands.deploy.common.helpers import (
 )
 from deployment_manager.commands.deploy.subcommands.run.upload_helpers import Credentials
 from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
-from deployment_manager.utils.consts import display_error, settings
-
+from deployment_manager.utils.consts import QUEUE_ENGINE_ATTRIBUTES, display_error, settings
 
 class DeployYaml:
     RELEASE_KEYWORD_REGEX = re.compile(r"^release(_(\w)+)?$")
@@ -121,9 +120,10 @@ def generate_deploy_timestamp():
 
 
 def remove_queue_attributes_for_cross_org(queue_copy: dict):
-    # Workflows cannot be created through the deploy API and must be ignored cross-org
-    # Engine attributes are now handled via reference replacement in QueueDeployObject
+    # These attributes cannot be created through the API and so if used cross-org, they can only be ignored
     queue_copy.pop("workflows", None)
+    for attr in QUEUE_ENGINE_ATTRIBUTES:
+        queue_copy.pop(attr, None)
 
 
 def create_object_label(name: str, id: str | int):

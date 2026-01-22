@@ -84,7 +84,7 @@ class GIT_CHARACTERS(StrEnum):
     CREATED_STAGED = "A"
 
 
-QUEUE_ENGINE_ATTRIBUTES = ["dedicated_engine", "engine", "generic_engine"]
+QUEUE_ENGINE_ATTRIBUTES = ["dedicated_engine", "generic_engine"]
 
 settings = None
 
@@ -283,7 +283,7 @@ class Settings:
     # Non-diffed only if cross-org
     # Note: "engine" is handled via reference replacement, but dedicated_engine/generic_engine are not yet supported
     DEPLOY_CROSS_ORG_NON_DIFFED_KEYS: dict = {
-        Resource.Queue: ["workflows", "dedicated_engine", "generic_engine"]
+        Resource.Queue: ["workflows", *QUEUE_ENGINE_ATTRIBUTES]
     }
 
     # List attributes that should be sorted before diff so not get false positive diffs (e.g., hook.queues)
