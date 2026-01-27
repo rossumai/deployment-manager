@@ -3,6 +3,7 @@ from rich import print as pprint
 from rich.panel import Panel
 
 from deployment_manager.commands.deploy.subcommands.revert.revert_object_deploy import (
+    RevertEngineDeploy,
     RevertHookDeploy,
     RevertObjectDeploy,
     RevertQueueDeploy,
@@ -29,6 +30,7 @@ class RevertDeployFile(BaseModel):
     workspaces: list[RevertWorkspaceDeploy] = []
     queues: list[RevertQueueDeploy] = []
     hooks: list[RevertHookDeploy] = []
+    engines: list[RevertEngineDeploy] = []
 
     async def display_reverted_organization(self):
         if not self.deployed_org_id:
@@ -58,6 +60,23 @@ class RevertDeployFile(BaseModel):
 
         await gather_with_concurrency(*[hook_release.revert() for hook_release in self.hooks])
         self.detect_revert_phase_exceptions(self.hooks)
+
+    async def revert_engines(self):
+        await gather_with_concurrency(
+            *[
+                engine_release.initialize(
+                    yaml=self.yaml,
+                    client=self.client,
+                    plan_only=self.plan_only,
+                )
+                for engine_release in self.engines
+            ]
+        )
+
+        await gather_with_concurrency(
+            *[engine_release.revert() for engine_release in self.engines]
+        )
+        self.detect_revert_phase_exceptions(self.engines)
 
     async def revert_workspaces(self):
         await gather_with_concurrency(

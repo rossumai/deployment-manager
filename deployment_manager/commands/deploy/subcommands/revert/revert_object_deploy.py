@@ -149,6 +149,10 @@ class RevertHookDeploy(RevertObjectDeploy):
     type: Resource = Resource.Hook
 
 
+class RevertEngineDeploy(RevertObjectDeploy):
+    type: Resource = Resource.Engine
+
+
 class RevertWorkspaceDeploy(RevertObjectDeploy):
     type: Resource = Resource.Workspace
 
