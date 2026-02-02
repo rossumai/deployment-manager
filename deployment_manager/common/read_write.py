@@ -16,6 +16,29 @@ from rossum_api.api_client import Resource
 NON_VERSIONED_ATTRIBUTES_FILE_LOCK = asyncio.Lock()
 
 
+# Fields containing URL lists that have no semantic ordering and can be safely sorted
+SORTABLE_LIST_FIELDS = {"queues", "schemas"}
+
+
+def sort_lists_in_object(obj: Any, parent_key: str = None) -> Any:
+    """Recursively sort specific URL-list fields in an object for consistent JSON output.
+
+    This prevents spurious diffs when the API returns lists in different orders.
+    Only sorts lists for keys in SORTABLE_LIST_FIELDS. Other lists (like run_after,
+    children, etc.) are preserved in their original order.
+    """
+    if isinstance(obj, dict):
+        return {k: sort_lists_in_object(v, parent_key=k) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        # Only sort if this is a known sortable field and all elements are strings
+        if parent_key in SORTABLE_LIST_FIELDS and obj and all(isinstance(item, str) for item in obj):
+            return sorted(obj)
+        # Otherwise, recursively process list items but preserve order
+        return [sort_lists_in_object(item, parent_key=None) for item in obj]
+    else:
+        return obj
+
+
 async def write_object_to_json(path: Path, object: dict, type: Resource = None, log_message: str = ""):
     if dataclasses.is_dataclass(object):
         object = dataclasses.asdict(object)
@@ -34,6 +57,8 @@ async def write_object_to_json(path: Path, object: dict, type: Resource = None, 
                     non_versioned_key_written = await write_non_versioned_attribute(path, object, key)
                     if non_versioned_key_written:
                         del object[key]
+    # Sort string lists for consistent output (prevents spurious diffs from API order changes)
+    object = sort_lists_in_object(object)
     with open(path, "w") as wf:
         json.dump(object, wf, indent=2)
 
