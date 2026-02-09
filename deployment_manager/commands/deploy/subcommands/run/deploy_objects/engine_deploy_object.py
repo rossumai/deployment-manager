@@ -17,9 +17,7 @@ class EngineDeployObject(DeployObject):
     type: Resource = Resource.Engine
     base_path: str = ""
 
-    engine_field_deploy_objects: list[EngineFieldDeployObject] = Field(
-        default_factory=list, alias="engine_fields"
-    )
+    engine_field_deploy_objects: list[EngineFieldDeployObject] = Field(default_factory=list, alias="engine_fields")
 
     async def initialize_deploy_object(self, deploy_file):
         await super().initialize_deploy_object(deploy_file)
@@ -37,10 +35,7 @@ class EngineDeployObject(DeployObject):
         if self.base_path:
             return Path(self.base_path) / "engine.json"
         return (
-            Path(self.deploy_file.source_dir_path)
-            / "engines"
-            / templatize_name_id(self.name, self.id)
-            / "engine.json"
+            Path(self.deploy_file.source_dir_path) / "engines" / templatize_name_id(self.name, self.id) / "engine.json"
         )
 
     async def initialize_target_objects(self):
@@ -57,9 +52,7 @@ class EngineDeployObject(DeployObject):
                 data_attribute=data_attribute, use_dummy_references=use_dummy_references
             )
 
-    async def override_references_in_target_object_data(
-        self, data_attribute, target, use_dummy_references
-    ):
+    async def override_references_in_target_object_data(self, data_attribute, target, use_dummy_references):
         data = getattr(target, data_attribute)
 
         self.ref_replacer.replace_reference_url(

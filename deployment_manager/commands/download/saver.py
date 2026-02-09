@@ -455,11 +455,7 @@ class EngineSaver(ObjectSaver):
 
     def construct_object_path(self, subdir: Subdirectory, engine: dict) -> Path:
         object_path = (
-            self.base_path
-            / subdir.name
-            / "engines"
-            / templatize_name_id(engine["name"], engine["id"])
-            / "engine.json"
+            self.base_path / subdir.name / "engines" / templatize_name_id(engine["name"], engine["id"]) / "engine.json"
         )
         return object_path
 

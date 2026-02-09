@@ -104,11 +104,9 @@ class DeployFileReverser(BaseModel):
             deploy_file_object=deploy_file_object,
         )
 
-        deploy_file_object[settings.DEPLOY_KEY_ENGINES] = (
-            await self.reverse_object_type(
-                type=Resource.Engine,
-                deploy_file_object=deploy_file_object,
-            )
+        deploy_file_object[settings.DEPLOY_KEY_ENGINES] = await self.reverse_object_type(
+            type=Resource.Engine,
+            deploy_file_object=deploy_file_object,
         )
 
         default_deploy_name = f"reverse_{self.input_file_path.stem}.yaml"
