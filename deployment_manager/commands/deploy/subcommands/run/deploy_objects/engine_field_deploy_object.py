@@ -43,20 +43,12 @@ class EngineFieldDeployObject(DeployObject):
     @property
     def path(self) -> Path:
         if self.parent_engine:
-            return (
-                self.parent_engine.path.parent
-                / "engine_fields"
-                / f"{templatize_name_id(self.name, self.id)}.json"
-            )
+            return self.parent_engine.path.parent / "engine_fields" / f"{templatize_name_id(self.name, self.id)}.json"
         return (
-            Path(self.deploy_file.source_dir_path)
-            / "engine_fields"
-            / f"{templatize_name_id(self.name, self.id)}.json"
+            Path(self.deploy_file.source_dir_path) / "engine_fields" / f"{templatize_name_id(self.name, self.id)}.json"
         )
 
-    async def override_references_in_target_object_data(
-        self, data_attribute, target, use_dummy_references
-    ):
+    async def override_references_in_target_object_data(self, data_attribute, target, use_dummy_references):
         data = getattr(target, data_attribute)
 
         self.ref_replacer.replace_reference_url(
