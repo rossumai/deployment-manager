@@ -80,6 +80,8 @@ class Target(BaseModel):
 
 
 def convert_int_id_to_class(model, val):
+    if isinstance(val, BaseModel):
+        return val
     if not isinstance(val, dict):
         return model(id=None)
     return val

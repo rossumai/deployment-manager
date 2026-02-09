@@ -111,77 +111,85 @@ class RuleDeployObject(DeployObject):
                     if email_template_id:
                         email_template_ids.add(email_template_id)
 
-        # Get already loaded IDs to avoid duplicates
-        existing_label_ids = {label.id for label in self.deploy_file.labels}
-        existing_email_template_ids = {et.id for et in self.deploy_file.email_templates}
-
         # Fetch and create label deploy objects
         for label_id in label_ids:
-            if label_id not in existing_label_ids:
-                try:
-                    label_data = await self.deploy_file.source_client._http_client.fetch_one(Resource.Label, label_id)
+            # Check at fetch time to handle concurrent rule initialization
+            if any(label.id == label_id for label in self.deploy_file.labels):
+                continue
+            try:
+                label_data = await self.deploy_file.source_client._http_client.fetch_one(Resource.Label, label_id)
 
-                    # Check if this label was previously deployed
-                    target_ids = self.get_target_ids_from_auto_mappings(Resource.Label, label_id)
-                    if target_ids:
-                        # Use existing target IDs from previous deployments
-                        targets = [TargetWithDefault(id=target_id) for target_id in target_ids]
-                    else:
-                        # Create new on target
-                        targets = [TargetWithDefault(id=None)]
+                # Re-check after async fetch to reduce duplicates from concurrent rules
+                if any(label.id == label_id for label in self.deploy_file.labels):
+                    continue
 
-                    label_deploy_obj = LabelDeployObject(
-                        id=label_id,
-                        name=label_data.get("name", f"label-{label_id}"),
-                        data=label_data,
-                        targets=targets,
-                    )
-                    await label_deploy_obj.initialize_deploy_object(deploy_file=self.deploy_file)
-                    self.deploy_file.labels.append(label_deploy_obj)
-                except Exception as e:
-                    display_warning(
-                        f"Could not load label {label_id} referenced in rule {self.display_label}: {e}. "
-                        "The reference may not be replaced correctly."
-                    )
+                # Check if this label was previously deployed
+                target_ids = self.get_target_ids_from_auto_mappings(Resource.Label, label_id)
+                if target_ids:
+                    # Use existing target IDs from previous deployments
+                    targets = [TargetWithDefault(id=target_id) for target_id in target_ids]
+                else:
+                    # Create new on target
+                    targets = [TargetWithDefault(id=None)]
+
+                label_deploy_obj = LabelDeployObject(
+                    id=label_id,
+                    name=label_data.get("name", f"label-{label_id}"),
+                    data=label_data,
+                    targets=targets,
+                )
+                await label_deploy_obj.initialize_deploy_object(deploy_file=self.deploy_file)
+                self.deploy_file.labels.append(label_deploy_obj)
+            except Exception as e:
+                display_warning(
+                    f"Could not load label {label_id} referenced in rule {self.display_label}: {e}. "
+                    "The reference may not be replaced correctly."
+                )
 
         # Fetch and create email template deploy objects
         for email_template_id in email_template_ids:
-            if email_template_id not in existing_email_template_ids:
-                try:
-                    email_template_data = await self.deploy_file.source_client._http_client.fetch_one(
-                        Resource.EmailTemplate, email_template_id
-                    )
+            # Check at fetch time to handle concurrent rule initialization
+            if any(et.id == email_template_id for et in self.deploy_file.email_templates):
+                continue
+            try:
+                email_template_data = await self.deploy_file.source_client._http_client.fetch_one(
+                    Resource.EmailTemplate, email_template_id
+                )
 
-                    # Check if this email template was previously deployed
-                    target_ids = self.get_target_ids_from_auto_mappings(Resource.EmailTemplate, email_template_id)
-                    if target_ids:
-                        # Use existing target IDs from previous deployments
-                        targets = [TargetWithDefault(id=target_id) for target_id in target_ids]
-                    else:
-                        # Match the parent queue's target count
-                        target_count = 1
-                        source_queue_url = email_template_data.get("queue")
-                        if source_queue_url:
-                            source_queue_id = extract_id_from_url(source_queue_url)
-                            for queue in self.deploy_file.queues:
-                                if queue.id == source_queue_id:
-                                    target_count = len(queue.targets)
-                                    break
-                        targets = [TargetWithDefault(id=None) for _ in range(target_count)]
+                # Re-check after async fetch to reduce duplicates from concurrent rules
+                if any(et.id == email_template_id for et in self.deploy_file.email_templates):
+                    continue
 
-                    email_template_deploy_obj = EmailTemplateDeployObject(
-                        id=email_template_id,
-                        name=email_template_data.get("name", f"email-template-{email_template_id}"),
-                        data=email_template_data,
-                        targets=targets,
-                    )
-                    await email_template_deploy_obj.initialize_deploy_object(deploy_file=self.deploy_file)
-                    self.deploy_file.email_templates.append(email_template_deploy_obj)
-                except Exception as e:
-                    display_warning(
-                        f"Could not load email template {email_template_id} referenced in rule {self.display_label}: {e}. "
-                        "The reference may not be replaced correctly."
-                    )
+                # Check if this email template was previously deployed
+                target_ids = self.get_target_ids_from_auto_mappings(Resource.EmailTemplate, email_template_id)
+                if target_ids:
+                    # Use existing target IDs from previous deployments
+                    targets = [TargetWithDefault(id=target_id) for target_id in target_ids]
+                else:
+                    # Match the parent queue's target count
+                    target_count = 1
+                    source_queue_url = email_template_data.get("queue")
+                    if source_queue_url:
+                        source_queue_id = extract_id_from_url(source_queue_url)
+                        for queue in self.deploy_file.queues:
+                            if queue.id == source_queue_id:
+                                target_count = len(queue.targets)
+                                break
+                    targets = [TargetWithDefault(id=None) for _ in range(target_count)]
+
+                email_template_deploy_obj = EmailTemplateDeployObject(
+                    id=email_template_id,
+                    name=email_template_data.get("name", f"email-template-{email_template_id}"),
+                    data=email_template_data,
+                    targets=targets,
+                )
+                await email_template_deploy_obj.initialize_deploy_object(deploy_file=self.deploy_file)
+                self.deploy_file.email_templates.append(email_template_deploy_obj)
+            except Exception as e:
+                display_warning(
+                    f"Could not load email template {email_template_id} referenced in rule {self.display_label}: {e}. "
+                    "The reference may not be replaced correctly."
+                )
 
     async def override_references_in_target_object_data(self, data_attribute, target, use_dummy_references):
         # Already overridden by orchestrator
