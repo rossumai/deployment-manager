@@ -761,9 +761,7 @@ async def get_engines_from_user(
         paths=engine_paths,
         preselected_ids=selected_engine_ids,
     )
-    deploy_file_engines = [
-        engine.value for engine in engine_choices if engine.checked
-    ]
+    deploy_file_engines = [engine.value for engine in engine_choices if engine.checked]
     if interactive or not selected_engine_ids:
         deploy_file_engines = await questionary.checkbox(
             f"Select {Resource.Engine.value}:",
@@ -810,9 +808,7 @@ def prepare_engine_fields_for_deploy(engine_fields: list[dict], previous_engine_
             **previous_field,
             "id": field["id"],
             "name": field["name"],
-            settings.DEPLOY_KEY_TARGETS: previous_field.get(
-                settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)
-            ),
+            settings.DEPLOY_KEY_TARGETS: previous_field.get(settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)),
         }
         deploy_fields.append(deploy_field)
     return deploy_fields

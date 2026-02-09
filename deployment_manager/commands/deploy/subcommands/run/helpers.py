@@ -15,6 +15,7 @@ from deployment_manager.commands.deploy.common.helpers import (
 )
 from deployment_manager.commands.deploy.subcommands.run.upload_helpers import Credentials
 from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
+from deployment_manager.common.read_write import write_prd_cred_file
 from deployment_manager.utils.consts import QUEUE_ENGINE_ATTRIBUTES, display_error, settings
 
 
@@ -82,6 +83,9 @@ async def get_token(project_path: Path, org_name: str, api_url: str, type: str =
     token = await get_token_from_cred_file(project_path / org_name, api_url=api_url)
     if not token:
         token = await get_token_from_user(name=type if type else org_name)
+        if token:
+            org_path = project_path / org_name
+            await write_prd_cred_file(org_path, {settings.CONFIG_KEY_TOKEN: token})
     return token
 
 

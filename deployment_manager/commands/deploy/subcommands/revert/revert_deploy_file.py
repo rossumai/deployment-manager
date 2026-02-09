@@ -73,9 +73,7 @@ class RevertDeployFile(BaseModel):
             ]
         )
 
-        await gather_with_concurrency(
-            *[engine_release.revert() for engine_release in self.engines]
-        )
+        await gather_with_concurrency(*[engine_release.revert() for engine_release in self.engines])
         self.detect_revert_phase_exceptions(self.engines)
 
     async def revert_workspaces(self):

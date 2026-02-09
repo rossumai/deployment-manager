@@ -217,11 +217,7 @@ class DeployOrchestrator(BaseModel):
 
         schemas = [queue.schema_deploy_object for queue in self.queues]
         inboxes = [queue.inbox_deploy_object for queue in self.queues]
-        engine_fields = [
-            engine_field
-            for engine in self.engines
-            for engine_field in engine.engine_field_deploy_objects
-        ]
+        engine_fields = [engine_field for engine in self.engines for engine_field in engine.engine_field_deploy_objects]
 
         deploy_state_objects = [
             (Resource.Organization, [self.organization]),
@@ -405,10 +401,7 @@ class DeployOrchestrator(BaseModel):
                 await self.organization.deploy_target_objects(data_attribute=data_attribute)
 
             await gather_with_concurrency(
-                *[
-                    deploy_object.deploy_target_objects(data_attribute=data_attribute)
-                    for deploy_object in self.engines
-                ]
+                *[deploy_object.deploy_target_objects(data_attribute=data_attribute) for deploy_object in self.engines]
             )
 
             await gather_with_concurrency(
