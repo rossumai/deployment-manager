@@ -1,0 +1,12 @@
+provider: gemini
+command: gemini
+prompt_prefix: "You are assisting with a PRD2 deployment. Summarize important events and prompt the user with next steps."
+log_path: logs
+asset_root: deployment_manager/ai_agent/assets
+tail_lines: 200
+interval_seconds: 1.0
+enable_tmux: true
+prompt_markers:
+  - "Do you wish to apply the plan?"
+fast_diff_summary: true
+use_stdin: true

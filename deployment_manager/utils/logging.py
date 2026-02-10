@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 import sys
 from typing import Any
@@ -9,6 +10,7 @@ from rich import reconfigure
 from rich.logging import RichHandler
 
 _LOG_HANDLE = None
+_LOG_PATH: Path | None = None
 _LAST_SECTION = None
 _PROMPT_ACTIVE = 0
 _ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
@@ -202,11 +204,18 @@ class TeeIO:
 
 
 def configure_logging(log_path: str | Path | None = None) -> None:
-    global _LOG_HANDLE
+    global _LOG_HANDLE, _LOG_PATH
 
+    env_log_path = os.environ.get("PRD2_LOG_PATH")
+    env_log_prefix = os.environ.get("PRD2_LOG_PREFIX")
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    default_log_path = Path("logs") / f"prd2_{timestamp}.log"
-    log_file = _resolve_log_path(log_path, default_log_path)
+    log_prefix = env_log_prefix or "prd2_user"
+    default_log_path = Path("logs") / f"{log_prefix}_{timestamp}.log"
+    if env_log_path:
+        log_file = _resolve_log_path(env_log_path, default_log_path)
+    else:
+        log_file = _resolve_log_path(log_path, default_log_path)
+    _LOG_PATH = log_file
     log_file.parent.mkdir(parents=True, exist_ok=True)
     _LOG_HANDLE = open(log_file, "w", encoding="utf-8", buffering=1)
     _LOG_HANDLE.write(f"--- Run started {datetime.now().isoformat(timespec='seconds')} ---\n")
@@ -227,3 +236,6 @@ def configure_logging(log_path: str | Path | None = None) -> None:
         force=True,
     )
     logging.getLogger("httpx").setLevel(logging.ERROR)
+
+def get_log_path() -> Path | None:
+    return _LOG_PATH

@@ -25,7 +25,12 @@ MIGRATE_PLANNING_MODE_OBJECT_PLACEHOLDER = "ID-WOULD-BE-CREATED"
 MAPPING_SELECTED_ATTRIBUTE = "selected"
 
 def _format_exception_message(exception: Exception) -> str:
-    return Text.from_exception(type(exception), exception, exception.__traceback__, show_locals=False).plain
+    try:
+        return Text.from_exception(type(exception), exception, exception.__traceback__, show_locals=False).plain
+    except AttributeError:
+        import traceback
+
+        return "".join(traceback.format_exception(type(exception), exception, exception.__traceback__))
 
 
 def display_error(error_msg: str, exception: Exception = None):
