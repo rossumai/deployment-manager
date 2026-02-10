@@ -9,6 +9,7 @@ from rich import reconfigure
 from rich.logging import RichHandler
 
 _LOG_HANDLE = None
+_LAST_SECTION = None
 _PROMPT_ACTIVE = 0
 _ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 _SECTION_OUTPUT = "PRD OUTPUT"
@@ -24,14 +25,40 @@ def _format_log_separator(title: str) -> str:
 
 
 def _write_log_section(title: str) -> None:
+    global _LAST_SECTION
+    if _LAST_SECTION == title:
+        return
     if _LOG_HANDLE:
         _LOG_HANDLE.write(_format_log_separator(title))
+    _LAST_SECTION = title
 
 
 def _format_prompt_entry(message: str | None, answer: Any) -> str:
     if message:
         return f"PROMPT {message} -> {answer!r}\n"
     return f"PROMPT -> {answer!r}\n"
+
+
+def _format_prompt_question(message: str | None) -> str:
+    if message:
+        return f"PROMPT {message}\n"
+    return "PROMPT\n"
+
+
+def _format_prompt_choices(choices: list | None) -> str:
+    if not choices:
+        return ""
+    lines = ["CHOICES:"]
+    for choice in choices:
+        label = None
+        if hasattr(choice, "title"):
+            label = getattr(choice, "title", None)
+        elif isinstance(choice, tuple) and choice:
+            label = choice[0]
+        if label is None:
+            label = choice
+        lines.append(f"- {label}")
+    return "\n".join(lines) + "\n"
 
 
 def _log_question_answer(question: object, answer: Any) -> None:
@@ -42,13 +69,24 @@ def _log_question_answer(question: object, answer: Any) -> None:
     _write_log_section(_SECTION_OUTPUT)
 
 
-def _wrap_questionary_prompt(prompt_fn):
+def _wrap_questionary_prompt(prompt_fn, prompt_name: str):
     if getattr(prompt_fn, "_prd2_wrapped", False):
         return prompt_fn
 
     def wrapper(message: str, *args, **kwargs):
+        choices = None
+        if prompt_name in {"select", "checkbox"}:
+            if len(args) > 1:
+                choices = args[1]
+            else:
+                choices = kwargs.get("choices")
         question = prompt_fn(message, *args, **kwargs)
         setattr(question, "_prd2_question", message)
+        _write_log_section(_SECTION_OUTPUT)
+        if _LOG_HANDLE:
+            _LOG_HANDLE.write(_format_prompt_question(message))
+            if choices is not None:
+                _LOG_HANDLE.write(_format_prompt_choices(list(choices)))
         return question
 
     wrapper._prd2_wrapped = True
@@ -65,39 +103,39 @@ def _enable_questionary_input_logging() -> None:
     for name in ("text", "confirm", "select", "checkbox", "password"):
         prompt_fn = getattr(questionary, name, None)
         if prompt_fn:
-            setattr(questionary, name, _wrap_questionary_prompt(prompt_fn))
+            setattr(questionary, name, _wrap_questionary_prompt(prompt_fn, name))
 
-    if not getattr(Question.ask, "_prd2_wrapped", False):
-        original_ask = Question.ask
+    if not getattr(Question.unsafe_ask, "_prd2_wrapped", False):
+        original_unsafe_ask = Question.unsafe_ask
 
-        def ask(self, *args, **kwargs):
+        def unsafe_ask(self, *args, **kwargs):
             global _PROMPT_ACTIVE
             _PROMPT_ACTIVE += 1
             try:
-                answer = original_ask(self, *args, **kwargs)
+                answer = original_unsafe_ask(self, *args, **kwargs)
             finally:
                 _PROMPT_ACTIVE -= 1
             _log_question_answer(self, answer)
             return answer
 
-        ask._prd2_wrapped = True
-        Question.ask = ask
+        unsafe_ask._prd2_wrapped = True
+        Question.unsafe_ask = unsafe_ask
 
-    if not getattr(Question.ask_async, "_prd2_wrapped", False):
-        original_ask_async = Question.ask_async
+    if not getattr(Question.unsafe_ask_async, "_prd2_wrapped", False):
+        original_unsafe_ask_async = Question.unsafe_ask_async
 
-        async def ask_async(self, *args, **kwargs):
+        async def unsafe_ask_async(self, *args, **kwargs):
             global _PROMPT_ACTIVE
             _PROMPT_ACTIVE += 1
             try:
-                answer = await original_ask_async(self, *args, **kwargs)
+                answer = await original_unsafe_ask_async(self, *args, **kwargs)
             finally:
                 _PROMPT_ACTIVE -= 1
             _log_question_answer(self, answer)
             return answer
 
-        ask_async._prd2_wrapped = True
-        Question.ask_async = ask_async
+        unsafe_ask_async._prd2_wrapped = True
+        Question.unsafe_ask_async = unsafe_ask_async
 
 def _resolve_log_path(log_path: str | Path | None, default_path: Path) -> Path:
     if log_path is None:
