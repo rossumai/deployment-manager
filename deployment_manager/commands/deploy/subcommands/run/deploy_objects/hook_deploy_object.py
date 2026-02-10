@@ -40,10 +40,13 @@ class HookDeployObject(DeployObject):
     async def override_references_in_target_object_data(self, data_attribute, target, use_dummy_references):
         data = getattr(target, data_attribute)
         # Change token owner to TARGET user (important for cross-org migrations or per-hook override)
-        token_owner_id = target.attribute_override.get("token_owner_id")
-        if token_owner_id or not self.deploy_file.is_same_org:
-            token_owner_id = token_owner_id or self.deploy_file.token_owner_id
-            data["token_owner"] = self.deploy_file.client._http_client.base_url + f"/users/{token_owner_id}"
+        token_owner_override = target.attribute_override.get("token_owner")
+        if token_owner_override:
+            data["token_owner"] = token_owner_override
+        elif not self.deploy_file.is_same_org:
+            data["token_owner"] = (
+                self.deploy_file.client._http_client.base_url + f"/users/{self.deploy_file.token_owner_id}"
+            )
 
         self.ref_replacer.replace_list_of_reference_urls(
             object=data,
