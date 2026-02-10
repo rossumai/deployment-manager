@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import re
 import sys
@@ -10,14 +9,11 @@ import click
 import httpx
 import yaml
 from rich.console import Console
+from rich.text import Text
 from rich.panel import Panel
 from rich.prompt import Prompt
 
 from rossum_api.api_client import Resource
-
-logging.basicConfig(level=logging.INFO)
-logging.getLogger("httpx").setLevel(logging.ERROR)
-
 
 API_SUFFIX_RE = re.compile(r"/api/v\d+$")
 
@@ -28,25 +24,25 @@ MIGRATE_PLANNING_MODE_OBJECT_PLACEHOLDER = "ID-WOULD-BE-CREATED"
 
 MAPPING_SELECTED_ATTRIBUTE = "selected"
 
+def _format_exception_message(exception: Exception) -> str:
+    return Text.from_exception(type(exception), exception, exception.__traceback__, show_locals=False).plain
+
 
 def display_error(error_msg: str, exception: Exception = None):
     console = Console()
     if exception:
-        logging.exception(exception)
+        console.print(_format_exception_message(exception))
     console.print(Panel(error_msg), style="bold red")
-
 
 def display_warning(msg: str, exception: Exception = None):
     console = Console()
     if exception:
-        logging.exception(exception)
+        console.print(_format_exception_message(exception))
     console.print(Panel(msg), style="bold yellow")
-
 
 def display_info(msg: str):
     console = Console()
     console.print(Panel(msg), style="bold")
-
 
 def validate_token(base_url: str, token: str, destination: str):
     req = httpx.get(
@@ -75,7 +71,6 @@ def validate_token(base_url: str, token: str, destination: str):
         else:
             raise click.ClickException(f"Token for {base_url} is invalid or expired.")
 
-
 class GIT_CHARACTERS(StrEnum):
     DELETED = "D"
     UPDATED = "M"
@@ -83,11 +78,9 @@ class GIT_CHARACTERS(StrEnum):
     CREATED = "??"
     CREATED_STAGED = "A"
 
-
 QUEUE_ENGINE_ATTRIBUTES = ["dedicated_engine", "generic_engine"]
 
 settings = None
-
 
 class Settings:
     def __init__(self):
@@ -315,9 +308,7 @@ class Settings:
     def TARGET_API_URL(self):
         return self.TARGET_API_BASE.rstrip("/")
 
-
 class PrdVersionException(Exception): ...
-
 
 def migrate_config():
     config_path = Path("./") / Settings.CONFIG_FILENAME
@@ -340,7 +331,6 @@ def migrate_config():
     with open(config_path, "w") as wf:
         yaml.dump(config, wf, sort_keys=False)
 
-
 def initialize_settings():
     global settings
     try:
@@ -351,9 +341,7 @@ def initialize_settings():
         display_error(f"Error while initializing PRD settings: {str(e)}", e)
         sys.exit(1)
 
-
 initialize_settings()
-
 
 class CustomResource(Enum):
     Rule = "rules"

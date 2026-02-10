@@ -47,7 +47,7 @@ from deployment_manager.utils.functions import gather_with_concurrency, templati
 from rossum_api import APIClientError
 from rossum_api.api_client import Resource
 
-console = Console()
+console = Console(stderr=True)
 
 
 # TODO: prebuilt exceptions that automatically reference the type/name/id of object
