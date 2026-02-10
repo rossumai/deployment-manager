@@ -5,7 +5,10 @@ from pathlib import Path
 import subprocess
 import time
 
+import asyncio
+
 from deployment_manager.ai_agent.config import AgentConfig, load_agent_config
+from deployment_manager.commands.document.llm_helper import LLMHelper
 from deployment_manager.utils.consts import display_info, display_warning
 from deployment_manager.utils.logging import get_log_path
 
@@ -102,6 +105,15 @@ def _run_gemini(command: str, prompt: str, use_stdin: bool) -> str:
     if not output:
         output = (result.stderr or "").strip()
     return output
+
+def _run_llm(prompt: str, model_id: str) -> str:
+    helper = LLMHelper(model_id=model_id)
+    if not helper.validate_credentials():
+        return "Missing or invalid AWS credentials for Bedrock."
+    response = asyncio.run(helper.run(prompt))
+    if response and response.text:
+        return response.text
+    return ""
 
 def _resolve_log_path(config: AgentConfig, log_path: Path | None = None) -> Path | None:
     if log_path is not None:
@@ -201,7 +213,7 @@ def run_agent_follow(options: AgentOptions, log_path: Path | None = None) -> Non
         if prompt_present and not prompt_consumed and config.fast_diff_summary:
             prompt = _build_prompt(config, log_excerpt)
             _append_ai_comm(comm_log_path, prompt, "", pending=True)
-            output = _run_gemini(config.command, prompt, config.use_stdin)
+            output = _run_llm(prompt, config.model_id)
             _append_ai_comm(comm_log_path, prompt, output)
             if output:
                 print("\n--- DIFF SUMMARY ---\n" + output + "\n")
@@ -212,7 +224,7 @@ def run_agent_follow(options: AgentOptions, log_path: Path | None = None) -> Non
 
         prompt = _build_prompt(config, log_excerpt)
         _append_ai_comm(comm_log_path, prompt, "", pending=True)
-        output = _run_gemini(config.command, prompt, config.use_stdin)
+        output = _run_llm(prompt, config.model_id)
         _append_ai_comm(comm_log_path, prompt, output)
         if output and output != last_summary:
             print("\n--- AI AGENT ---\n" + output + "\n")

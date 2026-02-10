@@ -13,6 +13,7 @@ class AgentConfig:
     provider: str
     command: str
     prompt_prefix: str
+    model_id: str
     agent_path: Path | None
     skills_path: Path
     log_path: Path
@@ -63,6 +64,7 @@ def load_agent_config(config_path: Path) -> AgentConfig:
 
     provider = str(data.get("provider") or "gemini")
     command = str(data.get("command") or "gemini")
+    model_id = str(data.get("model_id") or "us.anthropic.claude-3-7-sonnet-20250219-v1:0")
     prompt_prefix = str(
         data.get("prompt_prefix")
         or "You are assisting with a PRD2 deployment. Summarize important events and prompt the user with next steps."
@@ -107,6 +109,7 @@ def load_agent_config(config_path: Path) -> AgentConfig:
         provider=provider,
         command=command,
         prompt_prefix=prompt_prefix,
+        model_id=model_id,
         agent_path=agent_path,
         skills_path=skills_path,
         log_path=log_path,

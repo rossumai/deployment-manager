@@ -32,7 +32,7 @@ class ModelResponse:
 
 
 class LLMHelper:
-    def __init__(self):
+    def __init__(self, model_id: str | None = None):
         profile_name = os.environ.get("AWS_PROFILE") or "rossum-dev"
         self.session = boto3.Session(profile_name=profile_name)
         config = Config(
@@ -42,6 +42,8 @@ class LLMHelper:
         )
 
         self.bedrock_runtime = self.session.client("bedrock-runtime", region_name="us-west-2", config=config)
+
+        self.model_id = model_id or MODEL_ID
 
         self.payload_basis = {
             "anthropic_version": "bedrock-2023-05-31",
@@ -62,7 +64,7 @@ class LLMHelper:
         payload["messages"] = [{"role": "user", "content": prompt}]
 
         def blocking_call():
-            response = self.bedrock_runtime.invoke_model(modelId=MODEL_ID, body=json.dumps(payload))
+            response = self.bedrock_runtime.invoke_model(modelId=self.model_id, body=json.dumps(payload))
             response_body = json.loads(response["body"].read())
             usage = response_body["usage"]
 
