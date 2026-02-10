@@ -9,6 +9,7 @@ from rich import reconfigure
 from rich.logging import RichHandler
 
 _LOG_HANDLE = None
+_PROMPT_ACTIVE = 0
 _ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 _SECTION_OUTPUT = "PRD OUTPUT"
 _SECTION_INPUT = "USER INPUT"
@@ -70,7 +71,12 @@ def _enable_questionary_input_logging() -> None:
         original_ask = Question.ask
 
         def ask(self, *args, **kwargs):
-            answer = original_ask(self, *args, **kwargs)
+            global _PROMPT_ACTIVE
+            _PROMPT_ACTIVE += 1
+            try:
+                answer = original_ask(self, *args, **kwargs)
+            finally:
+                _PROMPT_ACTIVE -= 1
             _log_question_answer(self, answer)
             return answer
 
@@ -81,7 +87,12 @@ def _enable_questionary_input_logging() -> None:
         original_ask_async = Question.ask_async
 
         async def ask_async(self, *args, **kwargs):
-            answer = await original_ask_async(self, *args, **kwargs)
+            global _PROMPT_ACTIVE
+            _PROMPT_ACTIVE += 1
+            try:
+                answer = await original_ask_async(self, *args, **kwargs)
+            finally:
+                _PROMPT_ACTIVE -= 1
             _log_question_answer(self, answer)
             return answer
 
@@ -104,7 +115,8 @@ class TeeIO:
     def write(self, data: str) -> int:
         for stream in self._streams:
             if stream is _LOG_HANDLE:
-                stream.write(_strip_ansi(data))
+                if _PROMPT_ACTIVE <= 0:
+                    stream.write(_strip_ansi(data))
             else:
                 stream.write(data)
         return len(data)
