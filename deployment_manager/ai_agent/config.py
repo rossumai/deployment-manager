@@ -16,6 +16,7 @@ class AgentConfig:
     model_id: str
     agent_path: Path | None
     skills_path: Path
+    extra_skills_paths: tuple[Path, ...]
     log_path: Path
     asset_root: Path | None
     tail_lines: int = 200
@@ -95,6 +96,18 @@ def load_agent_config(config_path: Path) -> AgentConfig:
     if agent_path and not agent_path.exists():
         agent_path = None
     skills_path = _coerce_path(data.get("skills_path"), base_dir / "skills", base_dir)
+    extra_skills_paths: list[Path] = []
+    project_skills_path = data.get("project_skills_path")
+    if project_skills_path:
+        extra_skills_paths.append(_coerce_path(project_skills_path, Path.cwd(), base_dir))
+    else:
+        default_project_skills = Path.cwd() / "llm_skills"
+        if default_project_skills.exists():
+            extra_skills_paths.append(default_project_skills)
+    extra_skills_value = data.get("extra_skills_paths")
+    if isinstance(extra_skills_value, list):
+        for entry in extra_skills_value:
+            extra_skills_paths.append(_coerce_path(entry, Path.cwd(), base_dir))
     log_path_value = data.get("log_path")
     if log_path_value is None and _is_within(config_path, DEFAULT_AGENT_BASE):
         log_path = Path.cwd() / "logs"
@@ -124,6 +137,9 @@ def load_agent_config(config_path: Path) -> AgentConfig:
 
     if not skills_path.exists():
         display_warning(f"AI agent skills path does not exist: {skills_path}")
+    for extra_path in extra_skills_paths:
+        if not extra_path.exists():
+            display_warning(f"AI agent extra skills path does not exist: {extra_path}")
 
     return AgentConfig(
         provider=provider,
@@ -132,6 +148,7 @@ def load_agent_config(config_path: Path) -> AgentConfig:
         model_id=model_id,
         agent_path=agent_path,
         skills_path=skills_path,
+        extra_skills_paths=tuple(extra_skills_paths),
         log_path=log_path,
         asset_root=asset_root,
         tail_lines=tail_lines,

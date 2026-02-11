@@ -50,9 +50,12 @@ def _read_agent_instructions(config: AgentConfig) -> str:
         return ""
 
 def _read_skills(config: AgentConfig) -> str:
-    if not config.skills_path.exists():
-        return ""
-    skill_files = sorted(config.skills_path.glob("*.md"))
+    skill_paths = [config.skills_path, *config.extra_skills_paths]
+    skill_files: list[Path] = []
+    for skill_path in skill_paths:
+        if not skill_path.exists():
+            continue
+        skill_files.extend(sorted(skill_path.glob("*.md")))
     if not skill_files:
         return ""
     content = []
@@ -64,6 +67,11 @@ def _read_skills(config: AgentConfig) -> str:
         if skill_text:
             content.append(f"\n# Skill: {skill_file.name}\n{skill_text}")
     return "\n".join(content).strip()
+
+def _count_skills(skill_path: Path) -> int:
+    if not skill_path.exists():
+        return 0
+    return len([path for path in skill_path.glob("*.md") if path.is_file()])
 
 def _find_latest_log_file(log_dir: Path) -> Path | None:
     if not log_dir.exists():
@@ -1067,7 +1075,10 @@ def run_agent_follow(options: AgentOptions, log_path: Path | None = None) -> Non
         display_warning("No log path available for AI agent.")
         return
 
+    base_skill_count = _count_skills(config.skills_path)
+    extra_skill_count = sum(_count_skills(path) for path in config.extra_skills_paths)
     display_info("AI agent active. Watching logs for prompts and changes.")
+    display_info(f"Loaded {base_skill_count} base skill(s), {extra_skill_count} custom skill(s).")
 
     last_summary = ""
     offset = log_path.stat().st_size if log_path.exists() else 0

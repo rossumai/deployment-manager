@@ -7,6 +7,7 @@ asset_root: deployment_manager/ai_agent/assets
 tail_lines: 200
 interval_seconds: 1.0
 enable_tmux: true
+project_skills_path: llm_skills
 prompt_markers:
   - "Do you wish to apply the plan?"
 fast_diff_summary: true
