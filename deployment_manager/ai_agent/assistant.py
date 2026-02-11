@@ -347,6 +347,47 @@ def _load_latest_jsonl_event(log_path: Path, event_name: str) -> dict[str, objec
             return payload.get("data", {})
     return None
 
+def _scan_jsonl_log(log_path: Path) -> dict[str, list[str]]:
+    conflict_files: list[str] = []
+    conflicts: list[str] = []
+    warning_messages: list[str] = []
+    prompt_questions: list[str] = []
+    try:
+        lines = log_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    except OSError:
+        return {
+            "conflict_files": conflict_files,
+            "conflicts": conflicts,
+            "warning_messages": warning_messages,
+            "prompt_questions": prompt_questions,
+        }
+    for raw_line in lines:
+        try:
+            payload = json.loads(raw_line)
+        except json.JSONDecodeError:
+            continue
+        line = str(payload.get("text") or "").strip()
+        if not line:
+            continue
+        prompt_match = _PROMPT_QUESTION_RE.match(line)
+        if prompt_match:
+            prompt_questions.append(prompt_match.group("question"))
+        conflict_match = _CONFLICT_FILE_RE.search(line)
+        if conflict_match:
+            conflict_files.append(conflict_match.group("path"))
+        if line.startswith("Conflict between "):
+            conflicts.append(line)
+        elif line.startswith("Conflicts detected:"):
+            conflicts.append(line)
+        elif "has 'generic_engine' defined" in line:
+            warning_messages.append(line)
+    return {
+        "conflict_files": conflict_files,
+        "conflicts": conflicts,
+        "warning_messages": warning_messages,
+        "prompt_questions": prompt_questions,
+    }
+
 def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path | None = None) -> str:
     plan_counts: dict[str, dict[str, int]] = {}
     new_copy_counts: dict[str, int] = {}
@@ -611,6 +652,41 @@ def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path
         if is_jsonl and not context:
             context = _load_latest_jsonl_event(log_path, "deploy_context") or {}
         summary["context"] = context
+
+        if is_jsonl and log_path.exists():
+            jsonl_summary = _scan_jsonl_log(log_path)
+            for item in jsonl_summary["conflict_files"]:
+                if item not in conflict_files:
+                    conflict_files.append(item)
+            for item in jsonl_summary["conflicts"]:
+                if item not in warnings["conflicts"]:
+                    warnings["conflicts"].append(item)
+            for item in jsonl_summary["warning_messages"]:
+                if item not in warning_messages:
+                    warning_messages.append(item)
+                if item not in warnings["warnings"]:
+                    warnings["warnings"].append(item)
+                    _add_review_question(
+                        review_questions,
+                        review_questions_seen,
+                        "Ensure any referenced generic engines exist and are assigned in the target.",
+                    )
+            for item in jsonl_summary["prompt_questions"]:
+                if item not in prompt_questions:
+                    prompt_questions.append(item)
+            if jsonl_summary["conflict_files"] or jsonl_summary["conflicts"]:
+                _add_review_question(
+                    review_questions,
+                    review_questions_seen,
+                    "Resolve conflicts listed in the log before applying the plan.",
+                )
+            summary["warnings"] = warnings
+            summary["log"] = {
+                "conflict_files": conflict_files,
+                "warning_messages": warning_messages,
+                "prompt_questions": prompt_questions,
+                "review_questions": review_questions,
+            }
 
     deploy_file = summary["context"].get("deploy_file")
     if deploy_file:
