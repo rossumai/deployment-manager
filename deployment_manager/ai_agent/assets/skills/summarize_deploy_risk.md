@@ -16,6 +16,8 @@ Output:
 - Highlight multi-target mappings from `project.multi_target_sources`.
 - Highlight ID mismatches or unexpected target IDs in `plan.mappings` (source->target).
 - Call out repeated changes that touch critical fields or appear across all objects.
+- If `warnings.conflicts` is non-empty, flag that conflicts must be resolved before deploy.
+- If `warnings.warnings` contains queue engine warnings, mention manual action required.
 
 Notes:
 - Prefer structured summary JSON over raw log excerpts.

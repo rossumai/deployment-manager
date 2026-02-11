@@ -97,6 +97,22 @@ _PLAN_LINE_RE = re.compile(
 )
 _NEW_COPY_TYPE_RE = re.compile(r"/api/v1/(?P<type>[a-z_]+)/<NEW COPY>", re.IGNORECASE)
 _ID_SUFFIX_RE = re.compile(r"\[(\d+)\]")
+_CONFLICT_FILE_RE = re.compile(r"Conflict between source and remote target detected for:\s*(?P<path>.+)")
+_PROMPT_QUESTION_RE = re.compile(r"^(?:\?|PROMPT)\s+(?P<question>.+)")
+_DIFF_HIGHLIGHT_TOKENS = (
+    "trigger_condition",
+    "engine",
+    "score_threshold",
+    "queue_ids",
+    "hooks",
+    "rir_field_names",
+    "schema",
+    "inbox",
+)
+_SUSPICIOUS_DIFF_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("empty_len", re.compile(r"\blen\(\)")),
+    ("empty_sum", re.compile(r"\bsum\(\)")),
+)
 
 def _extract_ids_from_path(path: Path) -> list[int]:
     match = _ID_SUFFIX_RE.search(path.stem)
@@ -112,6 +128,51 @@ def _scan_object_dir(base_dir: Path, patterns: list[str]) -> dict[str, object]:
     for path in {p for p in paths if p.is_file()}:
         ids.extend(_extract_ids_from_path(path))
     return {"count": len(ids), "ids": sorted(set(ids))}
+
+def _add_review_question(questions: list[str], seen: set[str], question: str) -> None:
+    if question in seen:
+        return
+    questions.append(question)
+    seen.add(question)
+
+def _collect_diff_highlights(line: str, highlights: dict[str, dict[str, int]]) -> None:
+    if not line:
+        return
+    action = None
+    if line.startswith("+"):
+        action = "additions"
+        candidate = line[1:]
+    elif line.startswith("-"):
+        action = "deletions"
+        candidate = line[1:]
+    else:
+        candidate = line
+    lowered = candidate.lower()
+    for token in _DIFF_HIGHLIGHT_TOKENS:
+        if token in lowered:
+            entry = highlights.setdefault(token, {"additions": 0, "deletions": 0})
+            if action:
+                entry[action] += 1
+
+def _collect_suspicious_patterns(
+    line: str,
+    patterns: dict[str, dict[str, object]],
+    review_questions: list[str],
+    review_questions_seen: set[str],
+) -> None:
+    if not line:
+        return
+    for name, regex in _SUSPICIOUS_DIFF_PATTERNS:
+        if not regex.search(line):
+            continue
+        entry = patterns.setdefault(name, {"count": 0, "sample": line.strip()})
+        entry["count"] = int(entry["count"]) + 1
+        if name in {"empty_len", "empty_sum"}:
+            _add_review_question(
+                review_questions,
+                review_questions_seen,
+                "Review trigger conditions for empty len()/sum() expressions.",
+            )
 
 def _load_deploy_yaml(deploy_file: Path) -> dict:
     try:
@@ -293,8 +354,16 @@ def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path
     mappings: list[dict[str, object]] = []
     object_changes: dict[str, dict[str, object]] = {}
     context: dict[str, object] = {}
+    warnings: dict[str, list[str]] = {"conflicts": [], "warnings": []}
     diff_counts: dict[str, int] = {"additions": 0, "deletions": 0}
     diff_occurrences: dict[str, int] = {}
+    diff_highlights: dict[str, dict[str, int]] = {}
+    diff_suspicious: dict[str, dict[str, object]] = {}
+    conflict_files: list[str] = []
+    warning_messages: list[str] = []
+    prompt_questions: list[str] = []
+    review_questions: list[str] = []
+    review_questions_seen: set[str] = set()
     current_key: str | None = None
 
     for raw_line in log_excerpt.splitlines():
@@ -353,11 +422,25 @@ def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path
                     if stripped.startswith("+") and not stripped.startswith("+++"):
                         diff_counts["additions"] += 1
                         diff_occurrences[stripped] = diff_occurrences.get(stripped, 0) + 1
+                        _collect_diff_highlights(stripped, diff_highlights)
+                        _collect_suspicious_patterns(
+                            stripped,
+                            diff_suspicious,
+                            review_questions,
+                            review_questions_seen,
+                        )
                         diff_map = object_changes[current_key]["diff_lines"]
                         diff_map[stripped] = diff_map.get(stripped, 0) + 1
                     elif stripped.startswith("-") and not stripped.startswith("---"):
                         diff_counts["deletions"] += 1
                         diff_occurrences[stripped] = diff_occurrences.get(stripped, 0) + 1
+                        _collect_diff_highlights(stripped, diff_highlights)
+                        _collect_suspicious_patterns(
+                            stripped,
+                            diff_suspicious,
+                            review_questions,
+                            review_questions_seen,
+                        )
                         diff_map = object_changes[current_key]["diff_lines"]
                         diff_map[stripped] = diff_map.get(stripped, 0) + 1
                 continue
@@ -366,6 +449,32 @@ def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path
             line = _strip_log_artifacts(raw_line)
         if not line:
             continue
+
+        prompt_match = _PROMPT_QUESTION_RE.match(line)
+        if prompt_match:
+            prompt_questions.append(prompt_match.group("question"))
+
+        conflict_match = _CONFLICT_FILE_RE.search(line)
+        if conflict_match:
+            conflict_files.append(conflict_match.group("path"))
+            _add_review_question(
+                review_questions,
+                review_questions_seen,
+                "Resolve conflicts listed in the log before applying the plan.",
+            )
+
+        if line.startswith("Conflict between "):
+            warnings["conflicts"].append(line)
+        elif line.startswith("Conflicts detected:"):
+            warnings["conflicts"].append(line)
+        elif "has 'generic_engine' defined" in line:
+            warnings["warnings"].append(line)
+            warning_messages.append(line)
+            _add_review_question(
+                review_questions,
+                review_questions_seen,
+                "Ensure any referenced generic engines exist and are assigned in the target.",
+            )
 
         if "<NEW COPY>" in line:
             new_copy_total += 1
@@ -421,12 +530,26 @@ def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path
         if stripped.startswith("+") and not stripped.startswith("+++"):
             diff_counts["additions"] += 1
             diff_occurrences[stripped] = diff_occurrences.get(stripped, 0) + 1
+            _collect_diff_highlights(stripped, diff_highlights)
+            _collect_suspicious_patterns(
+                stripped,
+                diff_suspicious,
+                review_questions,
+                review_questions_seen,
+            )
             if current_key:
                 diff_map = object_changes[current_key]["diff_lines"]
                 diff_map[stripped] = diff_map.get(stripped, 0) + 1
         elif stripped.startswith("-") and not stripped.startswith("---"):
             diff_counts["deletions"] += 1
             diff_occurrences[stripped] = diff_occurrences.get(stripped, 0) + 1
+            _collect_diff_highlights(stripped, diff_highlights)
+            _collect_suspicious_patterns(
+                stripped,
+                diff_suspicious,
+                review_questions,
+                review_questions_seen,
+            )
             if current_key:
                 diff_map = object_changes[current_key]["diff_lines"]
                 diff_map[stripped] = diff_map.get(stripped, 0) + 1
@@ -456,6 +579,7 @@ def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path
 
     summary = {
         "context": context,
+        "warnings": warnings,
         "plan": {
             "counts": plan_counts,
             "new_copy_counts": new_copy_counts,
@@ -467,6 +591,14 @@ def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path
             "repeated_changes": repeated_changes,
             "common_changes": common_changes,
             "object_changes": object_change_list,
+            "highlights": diff_highlights,
+            "suspicious_patterns": diff_suspicious,
+        },
+        "log": {
+            "conflict_files": conflict_files,
+            "warning_messages": warning_messages,
+            "prompt_questions": prompt_questions,
+            "review_questions": review_questions,
         },
     }
     if log_path is not None:
@@ -581,6 +713,17 @@ def _append_ai_comm(comm_path: Path, prompt: str, response: str, pending: bool =
             handle.write(response)
         handle.write("\n=== End ===\n")
 
+def _build_prompt_for_summary(config: AgentConfig, summary_json: str) -> str:
+    agent_instructions = _read_agent_instructions(config)
+    skills_text = _read_skills(config)
+    base_prompt = config.prompt_prefix
+    if agent_instructions:
+        base_prompt = f"{base_prompt}\n\nAgent instructions:\n{agent_instructions}"
+    if skills_text:
+        base_prompt = f"{base_prompt}\n\nSkills:\n{skills_text}"
+    summary_block = f"\n\nStructured summary JSON:\n{summary_json}"
+    return f"{base_prompt}{summary_block}"
+
 def run_agent_once(options: AgentOptions, log_path: Path | None = None) -> str:
     config = load_agent_config(options.config_path)
     log_path = _resolve_log_path(config, log_path=log_path)
@@ -596,7 +739,7 @@ def run_agent_once(options: AgentOptions, log_path: Path | None = None) -> str:
         is_jsonl=log_path.suffix == ".jsonl",
         log_path=log_path,
     )
-    prompt = _build_prompt(config, "", summary_json=summary_json)
+    prompt = _build_prompt_for_summary(config, summary_json)
     return _run_gemini(config.command, prompt)
 
 def run_agent_follow(options: AgentOptions, log_path: Path | None = None) -> None:
@@ -662,7 +805,7 @@ def run_agent_follow(options: AgentOptions, log_path: Path | None = None) -> Non
                 time.sleep(config.interval_seconds)
                 continue
 
-        prompt = _build_prompt(config, "", summary_json=summary_json)
+        prompt = _build_prompt_for_summary(config, summary_json)
         _append_ai_comm(comm_log_path, prompt, "", pending=True)
         output = _run_llm(prompt, config.model_id)
         _append_ai_comm(comm_log_path, prompt, output)
