@@ -5,6 +5,7 @@ from anyio import Path
 from deployment_manager.commands.deploy.subcommands.revert.revert import revert_release_file
 from deployment_manager.commands.deploy.subcommands.run.run import deploy_release_file
 from deployment_manager.commands.deploy.subcommands.template.create import create_deploy_template
+from deployment_manager.commands.deploy.subcommands.template.enhance import enhance_deploy_template
 from deployment_manager.commands.deploy.subcommands.template.reverse import DeployFileReverser
 from deployment_manager.commands.deploy.ai_agent import ai_group, start_ai_agent, stop_ai_agent
 from deployment_manager.utils.consts import settings
@@ -75,6 +76,31 @@ async def update_deploy_template_wrapper(
         input_file_path=deploy_file,
         mapping_file_path=mapping_file,
         interactive=interactive,
+    )
+
+@template.command(
+    name=settings.DEPLOY_TEMPLATE_ENHANCE_COMMAND_NAME,
+    help="""Use LLM guidance to fill missing target IDs in a deploy file using local target data.""",
+)
+@click.argument("deploy_file", type=click.Path(path_type=Path, exists=True))
+@click.option(
+    "--model",
+    "model_id",
+    default=None,
+    help="Override the LLM model id for the enhance step.",
+)
+@coro
+async def enhance_deploy_template_wrapper(
+    deploy_file: Path,
+    model_id: str | None = None,
+    project_path: Path = None,
+):
+    if not project_path:
+        project_path = Path("./")
+    await enhance_deploy_template(
+        deploy_file_path=deploy_file,
+        project_path=project_path,
+        model_id=model_id,
     )
 
 

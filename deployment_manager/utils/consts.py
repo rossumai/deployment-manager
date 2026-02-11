@@ -191,6 +191,7 @@ class Settings:
     LLM_CHAT_COMMAND_NAME: str = "llm-chat"
     DEPLOY_TEMPLATE_CREATE_COMMAND_NAME: str = "create"
     DEPLOY_TEMPLATE_UPDATE_COMMAND_NAME: str = "update"
+    DEPLOY_TEMPLATE_ENHANCE_COMMAND_NAME: str = "enhance"
     DEPLOY_TEMPLATE_REVERSE_COMMAND_NAME: str = "reverse"
     HOOK_COMMAND_NAME: str = "hook"
     HOOK_PAYLOAD_COMMAND_NAME: str = "payload"
