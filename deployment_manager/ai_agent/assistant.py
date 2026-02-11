@@ -78,6 +78,12 @@ def _find_latest_log_file(log_dir: Path) -> Path | None:
         return None
     run_dirs.sort(key=lambda path: path.name)
     latest_run = run_dirs[-1]
+    preferred_raw = latest_run / "user_raw.jsonl"
+    if preferred_raw.exists():
+        return preferred_raw
+    preferred_raw = latest_run / "prd2_user_raw.jsonl"
+    if preferred_raw.exists():
+        return preferred_raw
     preferred = latest_run / "user.log"
     if preferred.exists():
         return preferred
@@ -90,6 +96,101 @@ _PLAN_LINE_RE = re.compile(
     r"PLAN:\s+(?P<action>UPDATE|CREATE|DELETE)\s+(?P<type>[a-zA-Z_]+)\s+\"(?P<source_name>.+)\s+\((?P<source_id>\d+)\)\"\s+->\s+\"(?P<target_name>.+)\s+\((?P<target_id>[^\)]+)\)\""
 )
 _NEW_COPY_TYPE_RE = re.compile(r"/api/v1/(?P<type>[a-z_]+)/<NEW COPY>", re.IGNORECASE)
+_ID_SUFFIX_RE = re.compile(r"\[(\d+)\]")
+
+def _extract_ids_from_path(path: Path) -> list[int]:
+    match = _ID_SUFFIX_RE.search(path.stem)
+    if not match:
+        return []
+    return [int(match.group(1))]
+
+def _scan_object_dir(base_dir: Path, object_dir: str) -> dict[str, object]:
+    dir_path = base_dir / object_dir
+    if not dir_path.exists():
+        return {"count": 0, "ids": []}
+    ids: list[int] = []
+    for path in dir_path.rglob("*.json"):
+        ids.extend(_extract_ids_from_path(path))
+    return {"count": len(ids), "ids": sorted(set(ids))}
+
+def _load_deploy_yaml(deploy_file: Path) -> dict:
+    try:
+        import yaml
+    except ImportError:
+        return {}
+    try:
+        return yaml.safe_load(deploy_file.read_text()) or {}
+    except Exception:
+        return {}
+
+def _resolve_project_root(deploy_file: Path, source_dir: str | None) -> Path:
+    if not source_dir:
+        return deploy_file.parent
+    candidate = deploy_file.parent / source_dir
+    if candidate.exists():
+        return deploy_file.parent
+    if deploy_file.parent.parent:
+        candidate = deploy_file.parent.parent / source_dir
+        if candidate.exists():
+            return deploy_file.parent.parent
+    return deploy_file.parent
+
+def _collect_project_context(deploy_file: Path, deploy_data: dict) -> dict[str, object]:
+    source_dir = deploy_data.get("source_dir")
+    target_dir = deploy_data.get("target_dir")
+    project_root = _resolve_project_root(deploy_file, source_dir)
+    source_base = project_root / source_dir if source_dir else None
+    target_base = project_root / target_dir if target_dir else None
+    object_dirs = {
+        "workspaces": "workspaces",
+        "queues": "queues",
+        "schemas": "schemas",
+        "inboxes": "inboxes",
+        "hooks": "hooks",
+        "rules": "rules",
+        "engines": "engines",
+        "labels": "labels",
+        "email_templates": "email_templates",
+    }
+    source_counts = {}
+    target_counts = {}
+    if source_base:
+        for key, folder in object_dirs.items():
+            source_counts[key] = _scan_object_dir(source_base, folder)
+    if target_base:
+        for key, folder in object_dirs.items():
+            target_counts[key] = _scan_object_dir(target_base, folder)
+
+    deploy_counts: dict[str, list[int]] = {}
+    for key, folder in object_dirs.items():
+        items = deploy_data.get(folder) or []
+        ids: list[int] = []
+        for item in items:
+            if isinstance(item, dict) and item.get("id") is not None:
+                ids.append(int(item["id"]))
+        deploy_counts[key] = sorted(set(ids))
+
+    missing_in_deploy = {}
+    for key, info in source_counts.items():
+        source_ids = set(info.get("ids", []))
+        deploy_ids = set(deploy_counts.get(key, []))
+        missing = sorted(source_ids - deploy_ids)
+        if missing:
+            missing_in_deploy[key] = {
+                "count": len(missing),
+                "sample_ids": missing[:10],
+            }
+
+    return {
+        "deploy_file": str(deploy_file),
+        "source_dir": source_dir,
+        "target_dir": target_dir,
+        "project_root": str(project_root),
+        "source_counts": source_counts,
+        "target_counts": target_counts,
+        "deploy_ids": {key: len(ids) for key, ids in deploy_counts.items()},
+        "missing_in_deploy": missing_in_deploy,
+    }
 
 def _strip_log_artifacts(line: str) -> str:
     if "│" in line:
@@ -99,18 +200,98 @@ def _strip_log_artifacts(line: str) -> str:
     line = line.replace("\x1b", "")
     return line.strip()
 
-def _build_summary_json(log_excerpt: str) -> str:
+def _load_latest_jsonl_event(log_path: Path, event_name: str) -> dict[str, object] | None:
+    try:
+        lines = log_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    except OSError:
+        return None
+    for line in reversed(lines):
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if payload.get("event") == event_name:
+            return payload.get("data", {})
+    return None
+
+def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path | None = None) -> str:
     plan_counts: dict[str, dict[str, int]] = {}
     new_copy_counts: dict[str, int] = {}
     new_copy_total = 0
     mappings: list[dict[str, object]] = []
     object_changes: dict[str, dict[str, object]] = {}
+    context: dict[str, object] = {}
     diff_counts: dict[str, int] = {"additions": 0, "deletions": 0}
     diff_occurrences: dict[str, int] = {}
     current_key: str | None = None
 
     for raw_line in log_excerpt.splitlines():
-        line = _strip_log_artifacts(raw_line)
+        if is_jsonl:
+            try:
+                payload = json.loads(raw_line)
+            except json.JSONDecodeError:
+                continue
+            if payload.get("event") == "deploy_context":
+                context.update(payload.get("data", {}))
+                continue
+            if payload.get("event") == "deploy_file":
+                context.update(payload.get("data", {}))
+                continue
+            if payload.get("event") == "plan_object":
+                data = payload.get("data", {})
+                obj_type = str(data.get("type") or "").lower()
+                action = str(data.get("action") or "").lower()
+                source_id = data.get("source_id")
+                target_id = data.get("target_id")
+                target_id_raw = str(data.get("target_id")) if data.get("target_id") is not None else ""
+                diff_text = data.get("diff") or ""
+                plan_counts.setdefault(obj_type, {})
+                if action:
+                    plan_counts[obj_type][action] = plan_counts[obj_type].get(action, 0) + 1
+                mappings.append(
+                    {
+                        "action": action,
+                        "type": obj_type,
+                        "source_id": source_id,
+                        "target_id": target_id,
+                        "target_id_raw": target_id_raw,
+                        "new_copy": "<NEW COPY>" in target_id_raw,
+                        "source_name": data.get("source_name"),
+                        "target_name": data.get("target_name"),
+                    }
+                )
+                current_key = f"{obj_type}:{source_id}:{target_id_raw}"
+                object_changes.setdefault(
+                    current_key,
+                    {
+                        "action": action,
+                        "type": obj_type,
+                        "source_id": source_id,
+                        "target_id": target_id,
+                        "target_id_raw": target_id_raw,
+                        "new_copy": "<NEW COPY>" in target_id_raw,
+                        "diff_lines": {},
+                    },
+                )
+                if "<NEW COPY>" in target_id_raw:
+                    new_copy_total += 1
+                    new_copy_counts[obj_type] = new_copy_counts.get(obj_type, 0) + 1
+                for diff_line in str(diff_text).splitlines():
+                    stripped = diff_line.lstrip()
+                    if stripped.startswith("+") and not stripped.startswith("+++"):
+                        diff_counts["additions"] += 1
+                        diff_occurrences[stripped] = diff_occurrences.get(stripped, 0) + 1
+                        diff_map = object_changes[current_key]["diff_lines"]
+                        diff_map[stripped] = diff_map.get(stripped, 0) + 1
+                    elif stripped.startswith("-") and not stripped.startswith("---"):
+                        diff_counts["deletions"] += 1
+                        diff_occurrences[stripped] = diff_occurrences.get(stripped, 0) + 1
+                        diff_map = object_changes[current_key]["diff_lines"]
+                        diff_map[stripped] = diff_map.get(stripped, 0) + 1
+                continue
+            line = payload.get("text", "")
+        else:
+            line = _strip_log_artifacts(raw_line)
         if not line:
             continue
 
@@ -202,6 +383,7 @@ def _build_summary_json(log_excerpt: str) -> str:
         object_change_list.append(obj_copy)
 
     summary = {
+        "context": context,
         "plan": {
             "counts": plan_counts,
             "new_copy_counts": new_copy_counts,
@@ -215,6 +397,22 @@ def _build_summary_json(log_excerpt: str) -> str:
             "object_changes": object_change_list,
         },
     }
+    if log_path is not None:
+        context_path = log_path.parent / "deploy_context.json"
+        if context_path.exists():
+            try:
+                context = json.loads(context_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                context = context
+        if is_jsonl and not context:
+            context = _load_latest_jsonl_event(log_path, "deploy_context") or {}
+        summary["context"] = context
+
+    deploy_file = summary["context"].get("deploy_file")
+    if deploy_file:
+        deploy_path = Path(str(deploy_file))
+        deploy_data = _load_deploy_yaml(deploy_path)
+        summary["project"] = _collect_project_context(deploy_path, deploy_data)
     return json.dumps(summary, ensure_ascii=True)
 
 def _build_prompt(config: AgentConfig, log_excerpt: str, summary_json: str | None = None) -> str:
@@ -277,6 +475,13 @@ def _run_llm(prompt: str, model_id: str) -> str:
 
 def _resolve_log_path(config: AgentConfig, log_path: Path | None = None) -> Path | None:
     if log_path is not None:
+        if log_path.is_file() and log_path.suffix == ".log":
+            raw_user = log_path.with_name("user_raw.jsonl")
+            if raw_user.exists():
+                return raw_user
+            raw_user = log_path.with_name("prd2_user_raw.jsonl")
+            if raw_user.exists():
+                return raw_user
         return log_path
     active_log = get_log_path()
     if active_log is not None:
@@ -314,7 +519,11 @@ def run_agent_once(options: AgentOptions, log_path: Path | None = None) -> str:
     if not log_excerpt:
         return "No log data available yet."
 
-    summary_json = _build_summary_json(log_excerpt)
+    summary_json = _build_summary_json(
+        log_excerpt,
+        is_jsonl=log_path.suffix == ".jsonl",
+        log_path=log_path,
+    )
     prompt = _build_prompt(config, "", summary_json=summary_json)
     return _run_gemini(config.command, prompt)
 
@@ -364,7 +573,11 @@ def run_agent_follow(options: AgentOptions, log_path: Path | None = None) -> Non
         if prompt_present and not last_prompt_present:
             display_info("User input detected. Summarizing context with AI agent.")
 
-        summary_json = _build_summary_json(log_excerpt)
+        summary_json = _build_summary_json(
+            log_excerpt,
+            is_jsonl=log_path.suffix == ".jsonl",
+            log_path=log_path,
+        )
         if prompt_present and not prompt_consumed and config.fast_diff_summary:
             prompt = _build_prompt(config, "", summary_json=summary_json)
             _append_ai_comm(comm_log_path, prompt, "", pending=True)

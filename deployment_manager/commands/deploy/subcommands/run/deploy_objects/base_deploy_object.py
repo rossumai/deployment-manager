@@ -44,6 +44,7 @@ from deployment_manager.commands.deploy.subcommands.run.models import (
 from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
 from deployment_manager.utils.consts import display_error, display_warning, settings
 from deployment_manager.utils.functions import gather_with_concurrency, templatize_name_id
+from deployment_manager.utils.logging import append_raw_event
 from rossum_api import APIClientError
 from rossum_api.api_client import Resource
 
@@ -550,11 +551,24 @@ class DeployObject(BaseModel):
 
             self.sort_lists(target.visualized_plan_data)
 
+            action = "update" if target.exists_on_remote else "create"
             plan_label = f"{settings.PLAN_PRINT_STR} {settings.UPDATE_PRINT_STR if target.exists_on_remote else settings.CREATE_PRINT_STR}"
             diff = DeployObjectDiffer.create_override_diff(overriden_object_data, target.visualized_plan_data)
             colorized_diff = DeployObjectDiffer.parse_diff(diff)
             message = f"{plan_label} {self.display_type} {self.create_source_to_target_string(target.visualized_plan_data)}:\n{colorized_diff if colorized_diff else ''}"
             pprint(Panel(message))
+            append_raw_event(
+                "plan_object",
+                {
+                    "action": action,
+                    "type": self.type.value,
+                    "source_id": self.id,
+                    "source_name": self.name,
+                    "target_id": target.visualized_plan_data.get("id"),
+                    "target_name": target.visualized_plan_data.get("name"),
+                    "diff": diff,
+                },
+            )
 
     async def resolve_code_conflict(self, attribute_path: str, last_applied: dict, target_val: str): ...
 

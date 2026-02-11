@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -12,16 +13,61 @@ from rich.logging import RichHandler
 _LOG_HANDLE = None
 _LOG_PATH: Path | None = None
 _RUN_LOG_DIR: Path | None = None
+_RAW_LOG_HANDLE = None
+_RAW_LOG_PATH: Path | None = None
 _LAST_SECTION = None
 _PROMPT_ACTIVE = 0
 _ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 _RUN_DIR_RE = re.compile(r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}")
 _SECTION_OUTPUT = "PRD OUTPUT"
 _SECTION_INPUT = "USER INPUT"
+_BOX_DRAWING_CHARS = set("╭╮╰╯─│┌┐└┘├┤┬┴┼━┃┏┓┗┛┣┫┳┻╋")
 
 
 def _strip_ansi(text: str) -> str:
     return _ANSI_ESCAPE_RE.sub("", text)
+
+def _strip_box_drawing(text: str) -> str:
+    stripped = text.strip()
+    if stripped and all(char in _BOX_DRAWING_CHARS for char in stripped):
+        return ""
+    if "│" in text:
+        parts = text.split("│")
+        if len(parts) >= 3:
+            text = "│".join(parts[1:-1])
+    return text.strip()
+
+def _append_raw_log(data: str) -> None:
+    if _RAW_LOG_HANDLE is None:
+        return
+    text = _strip_ansi(data)
+    for line in text.splitlines():
+        cleaned = _strip_box_drawing(line)
+        if not cleaned:
+            continue
+        payload = {
+            "section": _LAST_SECTION,
+            "text": cleaned,
+        }
+        _RAW_LOG_HANDLE.write(f"{json.dumps(payload, ensure_ascii=True)}\n")
+
+def append_raw_event(event: str, data: dict) -> None:
+    if _RAW_LOG_HANDLE is None:
+        return
+    payload = {
+        "event": event,
+        "data": data,
+    }
+    _RAW_LOG_HANDLE.write(f"{json.dumps(payload, ensure_ascii=True)}\n")
+
+def write_run_context(data: dict) -> None:
+    if _RUN_LOG_DIR is None:
+        return
+    context_path = _RUN_LOG_DIR / "deploy_context.json"
+    try:
+        context_path.write_text(json.dumps(data, ensure_ascii=True), encoding="utf-8")
+    except OSError:
+        return
 
 
 def _format_log_separator(title: str) -> str:
@@ -191,6 +237,7 @@ class TeeIO:
                     stream.write(_strip_ansi(data))
             else:
                 stream.write(data)
+        _append_raw_log(data)
         return len(data)
 
     def flush(self) -> None:
@@ -236,7 +283,7 @@ class TeeIO:
 
 
 def configure_logging(log_path: str | Path | None = None) -> None:
-    global _LOG_HANDLE, _LOG_PATH, _RUN_LOG_DIR
+    global _LOG_HANDLE, _LOG_PATH, _RUN_LOG_DIR, _RAW_LOG_HANDLE, _RAW_LOG_PATH
 
     env_log_path = os.environ.get("PRD2_LOG_PATH")
     env_log_prefix = os.environ.get("PRD2_LOG_PREFIX")
@@ -256,7 +303,12 @@ def configure_logging(log_path: str | Path | None = None) -> None:
     _LOG_PATH = log_file
     _RUN_LOG_DIR = run_dir
     _LOG_HANDLE = open(_LOG_PATH, "w", encoding="utf-8", buffering=1)
+    _RAW_LOG_PATH = run_dir / f"{log_basename}_raw.jsonl"
+    _RAW_LOG_HANDLE = open(_RAW_LOG_PATH, "w", encoding="utf-8", buffering=1)
     _LOG_HANDLE.write(f"--- Run started {datetime.now().isoformat(timespec='seconds')} ---\n")
+    _RAW_LOG_HANDLE.write(
+        f"{json.dumps({'event': 'run_start', 'timestamp': datetime.now().isoformat(timespec='seconds')}, ensure_ascii=True)}\n"
+    )
     _write_log_section(_SECTION_OUTPUT)
 
     sys.stdout = TeeIO(sys.__stdout__, _LOG_HANDLE)
