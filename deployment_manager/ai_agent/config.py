@@ -48,16 +48,27 @@ def _find_upwards(start_path: Path, filename: str) -> Path | None:
             return None
         current = current.parent
 
+def _is_within(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+    except ValueError:
+        return False
+    return True
+
 def load_agent_config(config_path: Path) -> AgentConfig:
     config_path = _normalize_path(config_path)
     if not config_path.exists():
         if not config_path.is_absolute():
-            resolved = _find_upwards(Path.cwd(), config_path.name)
-            if resolved:
-                config_path = resolved
+            default_config = DEFAULT_AGENT_BASE / config_path.name
+            if default_config.exists():
+                config_path = default_config
+            package_root = Path(__file__).resolve().parents[2]
             if not config_path.exists():
-                package_root = Path(__file__).resolve().parents[2]
                 resolved = _find_upwards(package_root, config_path.name)
+                if resolved:
+                    config_path = resolved
+            if not config_path.exists():
+                resolved = _find_upwards(Path.cwd(), config_path.name)
                 if resolved:
                     config_path = resolved
         if not config_path.exists():
@@ -84,7 +95,11 @@ def load_agent_config(config_path: Path) -> AgentConfig:
     if agent_path and not agent_path.exists():
         agent_path = None
     skills_path = _coerce_path(data.get("skills_path"), base_dir / "skills", base_dir)
-    log_path = _coerce_path(data.get("log_path"), base_dir / "logs", base_dir)
+    log_path_value = data.get("log_path")
+    if log_path_value is None and _is_within(config_path, DEFAULT_AGENT_BASE):
+        log_path = Path.cwd() / "logs"
+    else:
+        log_path = _coerce_path(log_path_value, base_dir / "logs", base_dir)
 
     if agent_path is None:
         default_agent = asset_root / "agent.md"
