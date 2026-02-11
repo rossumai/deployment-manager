@@ -21,6 +21,7 @@ from deployment_manager.commands.deploy.subcommands.run.reverse_override import 
 from deployment_manager.commands.download.download import download_destinations
 from deployment_manager.common.read_write import read_object_from_json
 from deployment_manager.utils.consts import display_error, display_info, settings
+from deployment_manager.utils.logging import write_run_context
 from rossum_api import APIClientError, ElisAPIClient
 from rossum_api.models.organization import Organization
 
@@ -39,6 +40,88 @@ async def deploy_release_file(
 ):
     deploy_file = await deploy_file_path.read_text()
     yaml = DeployYaml(deploy_file)
+
+    def summarize_targets(items: list[dict]) -> list[dict]:
+        summarized = []
+        for item in items or []:
+            targets = item.get("targets") or []
+            summarized.append(
+                {
+                    "id": item.get("id"),
+                    "name": item.get("name"),
+                    "targets": [target.get("id") for target in targets if isinstance(target, dict)],
+                    "attribute_override": item.get("attribute_override") or {},
+                    "target_overrides": [
+                        target.get("attribute_override")
+                        for target in targets
+                        if isinstance(target, dict) and target.get("attribute_override")
+                    ],
+                }
+            )
+        return summarized
+
+    def summarize_queues(items: list[dict]) -> list[dict]:
+        summarized = []
+        for item in items or []:
+            queue_entry = {
+                "id": item.get("id"),
+                "name": item.get("name"),
+                "targets": [target.get("id") for target in (item.get("targets") or []) if isinstance(target, dict)],
+                "attribute_override": item.get("attribute_override") or {},
+                "target_overrides": [
+                    target.get("attribute_override")
+                    for target in (item.get("targets") or [])
+                    if isinstance(target, dict) and target.get("attribute_override")
+                ],
+            }
+            schema = item.get("schema") or {}
+            inbox = item.get("inbox") or {}
+            if isinstance(schema, dict):
+                queue_entry["schema"] = {
+                    "id": schema.get("id"),
+                    "targets": [target.get("id") for target in (schema.get("targets") or []) if isinstance(target, dict)],
+                    "target_overrides": [
+                        target.get("attribute_override")
+                        for target in (schema.get("targets") or [])
+                        if isinstance(target, dict) and target.get("attribute_override")
+                    ],
+                }
+            if isinstance(inbox, dict):
+                queue_entry["inbox"] = {
+                    "id": inbox.get("id"),
+                    "targets": [target.get("id") for target in (inbox.get("targets") or []) if isinstance(target, dict)],
+                    "target_overrides": [
+                        target.get("attribute_override")
+                        for target in (inbox.get("targets") or [])
+                        if isinstance(target, dict) and target.get("attribute_override")
+                    ],
+                }
+            summarized.append(queue_entry)
+        return summarized
+
+    deploy_summary = {
+        "workspaces": summarize_targets(yaml.data.get("workspaces") or []),
+        "queues": summarize_queues(yaml.data.get("queues") or []),
+        "hooks": summarize_targets(yaml.data.get("hooks") or []),
+        "rules": summarize_targets(yaml.data.get("rules") or []),
+        "engines": summarize_targets(yaml.data.get("engines") or []),
+        "labels": summarize_targets(yaml.data.get("labels") or []),
+        "email_templates": summarize_targets(yaml.data.get("email_templates") or []),
+        "unselected_hooks": yaml.data.get("unselected_hooks") or [],
+        "deploy_state_file": yaml.data.get("deploy_state_file"),
+        "secrets_file": yaml.data.get("secrets_file"),
+    }
+
+    write_run_context(
+        {
+            "deploy_file": str(deploy_file_path),
+            "source_dir": yaml.data.get(settings.DEPLOY_KEY_SOURCE_DIR),
+            "target_dir": yaml.data.get(settings.DEPLOY_KEY_TARGET_DIR),
+            "target_url": yaml.data.get(settings.DEPLOY_KEY_TARGET_URL),
+            "source_url": yaml.data.get(settings.DEPLOY_KEY_SOURCE_URL),
+            "deploy_summary": deploy_summary,
+        }
+    )
 
     if not check_required_keys(yaml.data):
         return
