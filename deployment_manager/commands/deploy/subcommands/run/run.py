@@ -50,6 +50,12 @@ async def deploy_release_file(
                     "id": item.get("id"),
                     "name": item.get("name"),
                     "targets": [target.get("id") for target in targets if isinstance(target, dict)],
+                    "attribute_override": item.get("attribute_override") or {},
+                    "target_overrides": [
+                        target.get("attribute_override")
+                        for target in targets
+                        if isinstance(target, dict) and target.get("attribute_override")
+                    ],
                 }
             )
         return summarized
@@ -61,6 +67,12 @@ async def deploy_release_file(
                 "id": item.get("id"),
                 "name": item.get("name"),
                 "targets": [target.get("id") for target in (item.get("targets") or []) if isinstance(target, dict)],
+                "attribute_override": item.get("attribute_override") or {},
+                "target_overrides": [
+                    target.get("attribute_override")
+                    for target in (item.get("targets") or [])
+                    if isinstance(target, dict) and target.get("attribute_override")
+                ],
             }
             schema = item.get("schema") or {}
             inbox = item.get("inbox") or {}
@@ -68,11 +80,21 @@ async def deploy_release_file(
                 queue_entry["schema"] = {
                     "id": schema.get("id"),
                     "targets": [target.get("id") for target in (schema.get("targets") or []) if isinstance(target, dict)],
+                    "target_overrides": [
+                        target.get("attribute_override")
+                        for target in (schema.get("targets") or [])
+                        if isinstance(target, dict) and target.get("attribute_override")
+                    ],
                 }
             if isinstance(inbox, dict):
                 queue_entry["inbox"] = {
                     "id": inbox.get("id"),
                     "targets": [target.get("id") for target in (inbox.get("targets") or []) if isinstance(target, dict)],
+                    "target_overrides": [
+                        target.get("attribute_override")
+                        for target in (inbox.get("targets") or [])
+                        if isinstance(target, dict) and target.get("attribute_override")
+                    ],
                 }
             summarized.append(queue_entry)
         return summarized
@@ -85,6 +107,9 @@ async def deploy_release_file(
         "engines": summarize_targets(yaml.data.get("engines") or []),
         "labels": summarize_targets(yaml.data.get("labels") or []),
         "email_templates": summarize_targets(yaml.data.get("email_templates") or []),
+        "unselected_hooks": yaml.data.get("unselected_hooks") or [],
+        "deploy_state_file": yaml.data.get("deploy_state_file"),
+        "secrets_file": yaml.data.get("secrets_file"),
     }
 
     write_run_context(

@@ -1,6 +1,6 @@
 provider: gemini
 command: gemini
-model_id: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+model_id: us.anthropic.claude-haiku-4-5-20251001-v1:0
 prompt_prefix: "You are assisting with a PRD2 deployment. Summarize important events and prompt the user with next steps."
 log_path: logs
 asset_root: deployment_manager/ai_agent/assets

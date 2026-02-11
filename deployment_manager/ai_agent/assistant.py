@@ -104,12 +104,12 @@ def _extract_ids_from_path(path: Path) -> list[int]:
         return []
     return [int(match.group(1))]
 
-def _scan_object_dir(base_dir: Path, object_dir: str) -> dict[str, object]:
-    dir_path = base_dir / object_dir
-    if not dir_path.exists():
-        return {"count": 0, "ids": []}
+def _scan_object_dir(base_dir: Path, patterns: list[str]) -> dict[str, object]:
     ids: list[int] = []
-    for path in dir_path.rglob("*.json"):
+    paths: list[Path] = []
+    for pattern in patterns:
+        paths.extend(base_dir.glob(pattern))
+    for path in {p for p in paths if p.is_file()}:
         ids.extend(_extract_ids_from_path(path))
     return {"count": len(ids), "ids": sorted(set(ids))}
 
@@ -142,28 +142,55 @@ def _collect_project_context(deploy_file: Path, deploy_data: dict) -> dict[str, 
     source_base = project_root / source_dir if source_dir else None
     target_base = project_root / target_dir if target_dir else None
     object_dirs = {
-        "workspaces": "workspaces",
-        "queues": "queues",
-        "schemas": "schemas",
-        "inboxes": "inboxes",
-        "hooks": "hooks",
-        "rules": "rules",
-        "engines": "engines",
-        "labels": "labels",
-        "email_templates": "email_templates",
+        "workspaces": {
+            "patterns": ["workspaces/*.json"],
+            "deploy_key": "workspaces",
+        },
+        "queues": {
+            "patterns": ["**/queues/*.json"],
+            "deploy_key": "queues",
+        },
+        "schemas": {
+            "patterns": ["**/schemas/*.json"],
+            "deploy_key": "schemas",
+        },
+        "inboxes": {
+            "patterns": ["**/inboxes/*.json"],
+            "deploy_key": "inboxes",
+        },
+        "hooks": {
+            "patterns": ["hooks/*.json", "**/hooks/*.json"],
+            "deploy_key": "hooks",
+        },
+        "rules": {
+            "patterns": ["rules/*.json", "**/rules/*.json"],
+            "deploy_key": "rules",
+        },
+        "engines": {
+            "patterns": ["engines/*.json", "**/engines/*.json"],
+            "deploy_key": "engines",
+        },
+        "labels": {
+            "patterns": ["labels/*.json", "**/labels/*.json"],
+            "deploy_key": "labels",
+        },
+        "email_templates": {
+            "patterns": ["email_templates/*.json", "**/email_templates/*.json"],
+            "deploy_key": "email_templates",
+        },
     }
     source_counts = {}
     target_counts = {}
     if source_base:
-        for key, folder in object_dirs.items():
-            source_counts[key] = _scan_object_dir(source_base, folder)
+        for key, spec in object_dirs.items():
+            source_counts[key] = _scan_object_dir(source_base, spec["patterns"])
     if target_base:
-        for key, folder in object_dirs.items():
-            target_counts[key] = _scan_object_dir(target_base, folder)
+        for key, spec in object_dirs.items():
+            target_counts[key] = _scan_object_dir(target_base, spec["patterns"])
 
     deploy_counts: dict[str, list[int]] = {}
-    for key, folder in object_dirs.items():
-        items = deploy_data.get(folder) or []
+    for key, spec in object_dirs.items():
+        items = deploy_data.get(spec["deploy_key"]) or []
         ids: list[int] = []
         for item in items:
             if isinstance(item, dict) and item.get("id") is not None:
@@ -181,6 +208,49 @@ def _collect_project_context(deploy_file: Path, deploy_data: dict) -> dict[str, 
                 "sample_ids": missing[:10],
             }
 
+    deploy_summary = deploy_data.get("deploy_summary") or {}
+    multi_target_sources = []
+    override_targets_missing_ids = []
+    for section, items in deploy_summary.items():
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            targets = item.get("targets") or []
+            if len(targets) > 1:
+                multi_target_sources.append(
+                    {
+                        "section": section,
+                        "source_id": item.get("id"),
+                        "name": item.get("name"),
+                        "targets": targets,
+                    }
+                )
+            target_overrides = item.get("target_overrides") or []
+            if target_overrides and any(target_id in (None, "") for target_id in targets):
+                override_targets_missing_ids.append(
+                    {
+                        "section": section,
+                        "source_id": item.get("id"),
+                        "name": item.get("name"),
+                        "override_count": len(target_overrides),
+                        "targets": targets,
+                    }
+                )
+            for key in ("schema", "inbox"):
+                nested = item.get(key)
+                if not isinstance(nested, dict):
+                    continue
+                nested_targets = nested.get("targets") or []
+                if len(nested_targets) > 1:
+                    multi_target_sources.append(
+                        {
+                            "section": f"{section}.{key}",
+                            "source_id": nested.get("id"),
+                            "name": item.get("name"),
+                            "targets": nested_targets,
+                        }
+                    )
+
     return {
         "deploy_file": str(deploy_file),
         "source_dir": source_dir,
@@ -190,6 +260,8 @@ def _collect_project_context(deploy_file: Path, deploy_data: dict) -> dict[str, 
         "target_counts": target_counts,
         "deploy_ids": {key: len(ids) for key, ids in deploy_counts.items()},
         "missing_in_deploy": missing_in_deploy,
+        "multi_target_sources": multi_target_sources,
+        "override_targets_missing_ids": override_targets_missing_ids,
     }
 
 def _strip_log_artifacts(line: str) -> str:

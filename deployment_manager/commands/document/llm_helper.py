@@ -13,9 +13,9 @@ from deployment_manager.utils.consts import display_error, display_info
 
 logging.getLogger("botocore.credentials").setLevel(logging.CRITICAL)
 
-MODEL_ID = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+MODEL_ID = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 
-MODEL_PRICING_MAP = {"us.anthropic.claude-3-7-sonnet-20250219-v1:0": {"input": 0.003, "output": 0.015}}
+MODEL_PRICING_MAP = {"us.anthropic.claude-haiku-4-5-20251001-v1:0": {"input": 0.003, "output": 0.015}}
 
 
 def display_tokens_and_cost(message: str, input_tokens_total: int, output_tokens_total: int, price_total: float):
@@ -47,9 +47,8 @@ class LLMHelper:
 
         self.payload_basis = {
             "anthropic_version": "bedrock-2023-05-31",
-            "temperature": 0.5,
+            "temperature": 0.2,
             "max_tokens": 5000,
-            "top_p": 0.9,
         }
 
     @classmethod
