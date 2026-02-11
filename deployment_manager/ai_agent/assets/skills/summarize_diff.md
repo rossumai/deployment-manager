@@ -5,6 +5,7 @@ Trigger:
 
 Inputs:
 - Recent log excerpt that includes the diff.
+- Structured summary JSON from the agent (plan counts, mappings, diff counts, repeated changes).
 
 Output:
 - 3-6 bullet summary of the diff.
@@ -13,4 +14,5 @@ Output:
 
 Notes:
 - Keep it short and action-oriented.
+- If repeated changes appear, mention how many times they repeat.
 - If no diff is present, say "No diff detected".

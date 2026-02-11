@@ -88,9 +88,11 @@ def ensure_tmux_split(agent_config: AgentConfig, log_path: Path, config_path: Pa
         display_warning("Failed to split tmux window for AI agent.")
         return None
 
+    run_dir = log_path.parent
     agent_command = " ".join(
         [
             "PRD2_LOG_PREFIX=prd2_assistant",
+            f"PRD2_LOG_PATH={shlex.quote(str(run_dir / 'assistant.log'))}",
             "prd2",
             "deploy",
             "ai",

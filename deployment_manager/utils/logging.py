@@ -11,9 +11,11 @@ from rich.logging import RichHandler
 
 _LOG_HANDLE = None
 _LOG_PATH: Path | None = None
+_RUN_LOG_DIR: Path | None = None
 _LAST_SECTION = None
 _PROMPT_ACTIVE = 0
 _ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+_RUN_DIR_RE = re.compile(r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}")
 _SECTION_OUTPUT = "PRD OUTPUT"
 _SECTION_INPUT = "USER INPUT"
 
@@ -146,6 +148,36 @@ def _resolve_log_path(log_path: str | Path | None, default_path: Path) -> Path:
         return log_path
     return Path(log_path)
 
+def _resolve_run_log_dir(log_file: Path, timestamp: str) -> Path:
+    """Create or reuse a run-specific log directory."""
+    global _RUN_LOG_DIR
+    if _RUN_LOG_DIR is not None:
+        return _RUN_LOG_DIR
+
+    if log_file.is_dir():
+        run_dir = log_file / timestamp
+        run_dir.mkdir(parents=True, exist_ok=True)
+        _RUN_LOG_DIR = run_dir
+        return _RUN_LOG_DIR
+
+    if _RUN_DIR_RE.fullmatch(log_file.parent.name):
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        _RUN_LOG_DIR = log_file.parent
+        return _RUN_LOG_DIR
+
+    run_dir = log_file.parent / timestamp
+    run_dir.mkdir(parents=True, exist_ok=True)
+    _RUN_LOG_DIR = run_dir
+    return run_dir
+
+def _resolve_log_basename(prefix: str) -> str:
+    mapping = {
+        "prd2_user": "user",
+        "prd2_assistant": "assistant",
+        "prd2_ai_comm": "ai_communication",
+    }
+    return mapping.get(prefix, prefix)
+
 
 
 class TeeIO:
@@ -204,20 +236,26 @@ class TeeIO:
 
 
 def configure_logging(log_path: str | Path | None = None) -> None:
-    global _LOG_HANDLE, _LOG_PATH
+    global _LOG_HANDLE, _LOG_PATH, _RUN_LOG_DIR
 
     env_log_path = os.environ.get("PRD2_LOG_PATH")
     env_log_prefix = os.environ.get("PRD2_LOG_PREFIX")
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     log_prefix = env_log_prefix or "prd2_user"
-    default_log_path = Path("logs") / f"{log_prefix}_{timestamp}.log"
+    log_basename = _resolve_log_basename(log_prefix)
+    default_log_path = Path("logs") / f"{log_basename}.log"
     if env_log_path:
         log_file = _resolve_log_path(env_log_path, default_log_path)
     else:
         log_file = _resolve_log_path(log_path, default_log_path)
+    run_dir = _resolve_run_log_dir(log_file, timestamp)
+    if log_file.is_dir():
+        log_file = run_dir / f"{log_basename}.log"
+    elif run_dir != log_file.parent:
+        log_file = run_dir / log_file.name
     _LOG_PATH = log_file
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-    _LOG_HANDLE = open(log_file, "w", encoding="utf-8", buffering=1)
+    _RUN_LOG_DIR = run_dir
+    _LOG_HANDLE = open(_LOG_PATH, "w", encoding="utf-8", buffering=1)
     _LOG_HANDLE.write(f"--- Run started {datetime.now().isoformat(timespec='seconds')} ---\n")
     _write_log_section(_SECTION_OUTPUT)
 
@@ -239,3 +277,6 @@ def configure_logging(log_path: str | Path | None = None) -> None:
 
 def get_log_path() -> Path | None:
     return _LOG_PATH
+
+def get_run_log_dir() -> Path | None:
+    return _RUN_LOG_DIR

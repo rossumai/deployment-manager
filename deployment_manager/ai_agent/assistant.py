@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+import re
 from pathlib import Path
 import subprocess
 import time
@@ -63,7 +65,159 @@ def _read_skills(config: AgentConfig) -> str:
             content.append(f"\n# Skill: {skill_file.name}\n{skill_text}")
     return "\n".join(content).strip()
 
-def _build_prompt(config: AgentConfig, log_excerpt: str) -> str:
+def _find_latest_log_file(log_dir: Path) -> Path | None:
+    if not log_dir.exists():
+        return None
+
+    log_files = list(log_dir.glob("*.log"))
+    if log_files:
+        return max(log_files, key=lambda path: path.stat().st_mtime)
+
+    run_dirs = [path for path in log_dir.iterdir() if path.is_dir()]
+    if not run_dirs:
+        return None
+    run_dirs.sort(key=lambda path: path.name)
+    latest_run = run_dirs[-1]
+    preferred = latest_run / "user.log"
+    if preferred.exists():
+        return preferred
+    log_files = list(latest_run.glob("*.log"))
+    if log_files:
+        return max(log_files, key=lambda path: path.stat().st_mtime)
+    return None
+
+_PLAN_LINE_RE = re.compile(
+    r"PLAN:\s+(?P<action>UPDATE|CREATE|DELETE)\s+(?P<type>[a-zA-Z_]+)\s+\"(?P<source_name>.+)\s+\((?P<source_id>\d+)\)\"\s+->\s+\"(?P<target_name>.+)\s+\((?P<target_id>[^\)]+)\)\""
+)
+_NEW_COPY_TYPE_RE = re.compile(r"/api/v1/(?P<type>[a-z_]+)/<NEW COPY>", re.IGNORECASE)
+
+def _strip_log_artifacts(line: str) -> str:
+    if "│" in line:
+        parts = line.split("│")
+        if len(parts) >= 2:
+            line = "│".join(parts[1:-1])
+    line = line.replace("\x1b", "")
+    return line.strip()
+
+def _build_summary_json(log_excerpt: str) -> str:
+    plan_counts: dict[str, dict[str, int]] = {}
+    new_copy_counts: dict[str, int] = {}
+    new_copy_total = 0
+    mappings: list[dict[str, object]] = []
+    object_changes: dict[str, dict[str, object]] = {}
+    diff_counts: dict[str, int] = {"additions": 0, "deletions": 0}
+    diff_occurrences: dict[str, int] = {}
+    current_key: str | None = None
+
+    for raw_line in log_excerpt.splitlines():
+        line = _strip_log_artifacts(raw_line)
+        if not line:
+            continue
+
+        if "<NEW COPY>" in line:
+            new_copy_total += 1
+            type_match = _NEW_COPY_TYPE_RE.search(line)
+            if type_match:
+                copy_type = type_match.group("type").lower()
+            else:
+                copy_type = "unknown"
+            new_copy_counts[copy_type] = new_copy_counts.get(copy_type, 0) + 1
+
+        plan_match = _PLAN_LINE_RE.search(line)
+        if plan_match:
+            action = plan_match.group("action").lower()
+            obj_type = plan_match.group("type").lower()
+            target_id_raw = plan_match.group("target_id")
+            new_copy = "<NEW COPY>" in target_id_raw
+            target_id_match = re.search(r"\d+", target_id_raw)
+            target_id = int(target_id_match.group(0)) if target_id_match else None
+            plan_counts.setdefault(obj_type, {})
+            plan_counts[obj_type][action] = plan_counts[obj_type].get(action, 0) + 1
+            if new_copy:
+                new_copy_counts[obj_type] = new_copy_counts.get(obj_type, 0) + 1
+                new_copy_total += 1
+            source_id = int(plan_match.group("source_id"))
+            mappings.append(
+                {
+                    "action": action,
+                    "type": obj_type,
+                    "source_id": source_id,
+                    "target_id": target_id,
+                    "target_id_raw": target_id_raw,
+                    "new_copy": new_copy,
+                    "source_name": plan_match.group("source_name"),
+                    "target_name": plan_match.group("target_name"),
+                }
+            )
+            current_key = f"{obj_type}:{source_id}:{target_id_raw}"
+            object_changes.setdefault(
+                current_key,
+                {
+                    "action": action,
+                    "type": obj_type,
+                    "source_id": source_id,
+                    "target_id": target_id,
+                    "target_id_raw": target_id_raw,
+                    "new_copy": new_copy,
+                    "diff_lines": {},
+                },
+            )
+            continue
+
+        stripped = line.lstrip()
+        if stripped.startswith("+") and not stripped.startswith("+++"):
+            diff_counts["additions"] += 1
+            diff_occurrences[stripped] = diff_occurrences.get(stripped, 0) + 1
+            if current_key:
+                diff_map = object_changes[current_key]["diff_lines"]
+                diff_map[stripped] = diff_map.get(stripped, 0) + 1
+        elif stripped.startswith("-") and not stripped.startswith("---"):
+            diff_counts["deletions"] += 1
+            diff_occurrences[stripped] = diff_occurrences.get(stripped, 0) + 1
+            if current_key:
+                diff_map = object_changes[current_key]["diff_lines"]
+                diff_map[stripped] = diff_map.get(stripped, 0) + 1
+
+    repeated_changes = [
+        {"line": line, "count": count}
+        for line, count in sorted(diff_occurrences.items(), key=lambda item: item[1], reverse=True)
+    ]
+
+    total_objects = len(object_changes)
+    common_changes = []
+    if total_objects:
+        for line, count in diff_occurrences.items():
+            if count == total_objects:
+                common_changes.append({"line": line, "count": count})
+
+    object_change_list = []
+    for key, obj in object_changes.items():
+        diff_lines = obj["diff_lines"]
+        repeated = [
+            {"line": line, "count": count}
+            for line, count in sorted(diff_lines.items(), key=lambda item: item[1], reverse=True)
+        ]
+        obj_copy = {k: v for k, v in obj.items() if k != "diff_lines"}
+        obj_copy["repeated_changes"] = repeated
+        object_change_list.append(obj_copy)
+
+    summary = {
+        "plan": {
+            "counts": plan_counts,
+            "new_copy_counts": new_copy_counts,
+            "new_copy_total": new_copy_total,
+            "mappings": mappings,
+        },
+        "diff": {
+            "counts": diff_counts,
+            "repeated_changes": repeated_changes,
+            "common_changes": common_changes,
+            "object_changes": object_change_list,
+        },
+    }
+    return json.dumps(summary, ensure_ascii=True)
+
+def _build_prompt(config: AgentConfig, log_excerpt: str, summary_json: str | None = None) -> str:
     agent_instructions = _read_agent_instructions(config)
     skills_text = _read_skills(config)
     base_prompt = config.prompt_prefix
@@ -71,13 +225,19 @@ def _build_prompt(config: AgentConfig, log_excerpt: str) -> str:
         base_prompt = f"{base_prompt}\n\nAgent instructions:\n{agent_instructions}"
     if skills_text:
         base_prompt = f"{base_prompt}\n\nSkills:\n{skills_text}"
+    summary_block = ""
+    if summary_json:
+        summary_block = f"\n\nStructured summary JSON:\n{summary_json}"
     diff_instructions = (
         "You must count additions and deletions from diff-like lines. "
         "Count lines whose first non-border character is '+' as additions and '-' as deletions, "
         "ignoring '+++' and '---' headers. "
         "Reply only with: Additions: <n> Deletions: <n>."
     )
-    return f"{base_prompt}\n\n{diff_instructions}\n\nLog excerpt:\n{log_excerpt}\n"
+    prompt = f"{base_prompt}\n\n{diff_instructions}{summary_block}"
+    if log_excerpt:
+        prompt = f"{prompt}\n\nLog excerpt:\n{log_excerpt}\n"
+    return prompt
 
 def _run_gemini(command: str, prompt: str, use_stdin: bool) -> str:
     if "\x00" in prompt:
@@ -124,20 +284,13 @@ def _resolve_log_path(config: AgentConfig, log_path: Path | None = None) -> Path
     if config.log_path.exists() and config.log_path.is_file():
         return config.log_path
     if config.log_path.exists() and config.log_path.is_dir():
-        log_files = sorted(config.log_path.glob("*.log"), key=lambda path: path.stat().st_mtime, reverse=True)
-        if log_files:
-            return log_files[0]
+        latest_log = _find_latest_log_file(config.log_path)
+        if latest_log:
+            return latest_log
     return None
 
 def _resolve_comm_log_path(log_path: Path) -> Path:
-    name = log_path.name
-    if name.startswith("prd2_user_"):
-        name = name.replace("prd2_user_", "prd2_ai_comm_", 1)
-    elif name.startswith("prd2_assistant_"):
-        name = name.replace("prd2_assistant_", "prd2_ai_comm_", 1)
-    else:
-        name = f"prd2_ai_comm_{name}"
-    return log_path.with_name(name)
+    return log_path.with_name("prd2_ai_communication.log")
 
 def _append_ai_comm(comm_path: Path, prompt: str, response: str, pending: bool = False) -> None:
     comm_path.parent.mkdir(parents=True, exist_ok=True)
@@ -161,7 +314,8 @@ def run_agent_once(options: AgentOptions, log_path: Path | None = None) -> str:
     if not log_excerpt:
         return "No log data available yet."
 
-    prompt = _build_prompt(config, log_excerpt)
+    summary_json = _build_summary_json(log_excerpt)
+    prompt = _build_prompt(config, "", summary_json=summary_json)
     return _run_gemini(config.command, prompt)
 
 def run_agent_follow(options: AgentOptions, log_path: Path | None = None) -> None:
@@ -210,8 +364,9 @@ def run_agent_follow(options: AgentOptions, log_path: Path | None = None) -> Non
         if prompt_present and not last_prompt_present:
             display_info("User input detected. Summarizing context with AI agent.")
 
+        summary_json = _build_summary_json(log_excerpt)
         if prompt_present and not prompt_consumed and config.fast_diff_summary:
-            prompt = _build_prompt(config, log_excerpt)
+            prompt = _build_prompt(config, "", summary_json=summary_json)
             _append_ai_comm(comm_log_path, prompt, "", pending=True)
             output = _run_llm(prompt, config.model_id)
             _append_ai_comm(comm_log_path, prompt, output)
@@ -222,7 +377,7 @@ def run_agent_follow(options: AgentOptions, log_path: Path | None = None) -> Non
                 time.sleep(config.interval_seconds)
                 continue
 
-        prompt = _build_prompt(config, log_excerpt)
+        prompt = _build_prompt(config, "", summary_json=summary_json)
         _append_ai_comm(comm_log_path, prompt, "", pending=True)
         output = _run_llm(prompt, config.model_id)
         _append_ai_comm(comm_log_path, prompt, output)
