@@ -55,6 +55,11 @@ def load_agent_config(config_path: Path) -> AgentConfig:
             resolved = _find_upwards(Path.cwd(), config_path.name)
             if resolved:
                 config_path = resolved
+            if not config_path.exists():
+                package_root = Path(__file__).resolve().parents[2]
+                resolved = _find_upwards(package_root, config_path.name)
+                if resolved:
+                    config_path = resolved
         if not config_path.exists():
             raise FileNotFoundError(f"AI agent config not found: {config_path}")
 
