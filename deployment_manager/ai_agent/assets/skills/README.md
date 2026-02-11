@@ -6,4 +6,4 @@ Add skill definitions here. Each skill should be a short markdown file describin
 - Expected output format.
 - Safety notes or things to avoid.
 
-Example file: `summarize_plan.md`.
+Example file: `summarize_deploy_risk.md`.
