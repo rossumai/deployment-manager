@@ -7,11 +7,11 @@ Inputs:
 - Structured summary JSON from the agent (context, project, plan mappings, diff summary).
 
 Output:
-- 3-5 bullet summary of attribute overrides and their risk.
+- 2-3 bullet summary of attribute overrides and their risk.
 - Flag overrides on targets with missing IDs (new objects).
 - Mention overrides that appear to be unused in diffs.
 - If overrides are absent, state "No attribute overrides detected."
 
 Notes:
 - Prefer structured summary JSON; do not rely on raw logs.
-- Keep it short and action-oriented.
+- Keep it short and action-oriented; avoid repeating any risk already called out.

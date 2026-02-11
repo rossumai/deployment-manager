@@ -99,6 +99,11 @@ _NEW_COPY_TYPE_RE = re.compile(r"/api/v1/(?P<type>[a-z_]+)/<NEW COPY>", re.IGNOR
 _ID_SUFFIX_RE = re.compile(r"\[(\d+)\]")
 _CONFLICT_FILE_RE = re.compile(r"Conflict between source and remote target detected for:\s*(?P<path>.+)")
 _PROMPT_QUESTION_RE = re.compile(r"^(?:\?|PROMPT)\s+(?P<question>.+)")
+_REBASE_PROMPT_RE = re.compile(r"Rebase it into source\?", re.IGNORECASE)
+_REBASE_DECISION_RE = re.compile(
+    r"Rebase it into source\?\s*\([^)]+\)\s*(?P<answer>yy|nn|y|n)\b",
+    re.IGNORECASE,
+)
 _DIFF_HIGHLIGHT_TOKENS = (
     "trigger_condition",
     "engine",
@@ -113,6 +118,30 @@ _SUSPICIOUS_DIFF_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("empty_len", re.compile(r"\blen\(\)")),
     ("empty_sum", re.compile(r"\bsum\(\)")),
 )
+_OBJECT_TYPE_ALIASES = {
+    "workspace": "workspaces",
+    "workspaces": "workspaces",
+    "queue": "queues",
+    "queues": "queues",
+    "schema": "schemas",
+    "schemas": "schemas",
+    "inbox": "inboxes",
+    "inboxes": "inboxes",
+    "hook": "hooks",
+    "hooks": "hooks",
+    "rule": "rules",
+    "rules": "rules",
+    "engine": "engines",
+    "engines": "engines",
+    "label": "labels",
+    "labels": "labels",
+    "email_template": "email_templates",
+    "email_templates": "email_templates",
+}
+_MAX_REPEATED_CHANGES = 20
+_MAX_COMMON_CHANGES = 10
+_MAX_OBJECT_CHANGES = 25
+_MAX_LOG_ITEMS = 10
 
 def _extract_ids_from_path(path: Path) -> list[int]:
     match = _ID_SUFFIX_RE.search(path.stem)
@@ -128,6 +157,47 @@ def _scan_object_dir(base_dir: Path, patterns: list[str]) -> dict[str, object]:
     for path in {p for p in paths if p.is_file()}:
         ids.extend(_extract_ids_from_path(path))
     return {"count": len(ids), "ids": sorted(set(ids))}
+
+def _scan_object_names(base_dir: Path, patterns: list[str], filter_ids: set[int] | None = None) -> dict[int, str]:
+    paths: list[Path] = []
+    for pattern in patterns:
+        paths.extend(base_dir.glob(pattern))
+    names: dict[int, str] = {}
+    for path in {p for p in paths if p.is_file()}:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8", errors="ignore"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        obj_id = data.get("id")
+        if obj_id is None:
+            ids = _extract_ids_from_path(path)
+            obj_id = ids[0] if ids else None
+        if obj_id is None:
+            continue
+        try:
+            obj_id_int = int(obj_id)
+        except (TypeError, ValueError):
+            continue
+        if filter_ids is not None and obj_id_int not in filter_ids:
+            continue
+        name = data.get("name")
+        if not name:
+            continue
+        names[obj_id_int] = str(name)
+    return names
+
+def _dedupe_preserve_order(items: list[object]) -> list[object]:
+    seen = set()
+    deduped = []
+    for item in items:
+        key = json.dumps(item, sort_keys=True) if isinstance(item, dict) else item
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+    return deduped
 
 def _add_review_question(questions: list[str], seen: set[str], question: str) -> None:
     if question in seen:
@@ -242,6 +312,8 @@ def _collect_project_context(deploy_file: Path, deploy_data: dict) -> dict[str, 
     }
     source_counts = {}
     target_counts = {}
+    source_names: dict[str, dict[int, str]] = {}
+    target_names: dict[str, dict[int, str]] = {}
     if source_base:
         for key, spec in object_dirs.items():
             source_counts[key] = _scan_object_dir(source_base, spec["patterns"])
@@ -250,13 +322,46 @@ def _collect_project_context(deploy_file: Path, deploy_data: dict) -> dict[str, 
             target_counts[key] = _scan_object_dir(target_base, spec["patterns"])
 
     deploy_counts: dict[str, list[int]] = {}
+    deploy_target_ids: dict[str, set[int]] = {key: set() for key in object_dirs}
     for key, spec in object_dirs.items():
         items = deploy_data.get(spec["deploy_key"]) or []
         ids: list[int] = []
         for item in items:
             if isinstance(item, dict) and item.get("id") is not None:
                 ids.append(int(item["id"]))
+            if not isinstance(item, dict):
+                continue
+            for target in item.get("targets") or []:
+                if isinstance(target, dict) and target.get("id") is not None:
+                    deploy_target_ids[key].add(int(target["id"]))
         deploy_counts[key] = sorted(set(ids))
+
+    queue_items = deploy_data.get("queues") or []
+    for item in queue_items:
+        if not isinstance(item, dict):
+            continue
+        schema = item.get("schema")
+        if isinstance(schema, dict) and schema.get("id") is not None:
+            deploy_counts.setdefault("schemas", [])
+            deploy_counts["schemas"] = sorted(set(deploy_counts["schemas"] + [int(schema["id"]) ]))
+            for target in schema.get("targets") or []:
+                if isinstance(target, dict) and target.get("id") is not None:
+                    deploy_target_ids["schemas"].add(int(target["id"]))
+        inbox = item.get("inbox")
+        if isinstance(inbox, dict) and inbox.get("id") is not None:
+            deploy_counts.setdefault("inboxes", [])
+            deploy_counts["inboxes"] = sorted(set(deploy_counts["inboxes"] + [int(inbox["id"]) ]))
+            for target in inbox.get("targets") or []:
+                if isinstance(target, dict) and target.get("id") is not None:
+                    deploy_target_ids["inboxes"].add(int(target["id"]))
+
+    for key, spec in object_dirs.items():
+        source_filter_ids = set(deploy_counts.get(key, []))
+        target_filter_ids = deploy_target_ids.get(key, set())
+        if source_base:
+            source_names[key] = _scan_object_names(source_base, spec["patterns"], source_filter_ids or None)
+        if target_base:
+            target_names[key] = _scan_object_names(target_base, spec["patterns"], target_filter_ids or None)
 
     missing_in_deploy = {}
     for key, info in source_counts.items():
@@ -320,10 +425,75 @@ def _collect_project_context(deploy_file: Path, deploy_data: dict) -> dict[str, 
         "source_counts": source_counts,
         "target_counts": target_counts,
         "deploy_ids": {key: len(ids) for key, ids in deploy_counts.items()},
+        "source_name_index": source_names,
+        "target_name_index": target_names,
         "missing_in_deploy": missing_in_deploy,
         "multi_target_sources": multi_target_sources,
         "override_targets_missing_ids": override_targets_missing_ids,
     }
+
+def _normalize_object_type(obj_type: str) -> str | None:
+    return _OBJECT_TYPE_ALIASES.get(obj_type.lower())
+
+def _collect_id_discrepancies(
+    mappings: list[dict[str, object]],
+    project: dict[str, object],
+) -> list[dict[str, object]]:
+    source_index = project.get("source_name_index") or {}
+    target_index = project.get("target_name_index") or {}
+    source_name_lookup = {
+        obj_type: {name: obj_id for obj_id, name in names.items()}
+        for obj_type, names in source_index.items()
+    }
+    discrepancies: list[dict[str, object]] = []
+    for mapping in mappings:
+        obj_type = _normalize_object_type(str(mapping.get("type") or ""))
+        if not obj_type:
+            continue
+        source_id = mapping.get("source_id")
+        target_id = mapping.get("target_id")
+        if not isinstance(source_id, int) or not isinstance(target_id, int):
+            continue
+        source_name = (source_index.get(obj_type) or {}).get(source_id)
+        target_name = (target_index.get(obj_type) or {}).get(target_id)
+        if source_name and target_name and source_name != target_name:
+            collision_id = source_name_lookup.get(obj_type, {}).get(target_name)
+            if collision_id is None or collision_id == source_id:
+                continue
+            discrepancies.append(
+                {
+                    "type": obj_type,
+                    "source_id": source_id,
+                    "target_id": target_id,
+                    "source_name": source_name,
+                    "target_name": target_name,
+                    "reason": "name_collision",
+                    "collision_source_id": collision_id,
+                }
+            )
+        elif source_name and target_name is None:
+            discrepancies.append(
+                {
+                    "type": obj_type,
+                    "source_id": source_id,
+                    "target_id": target_id,
+                    "source_name": source_name,
+                    "target_name": None,
+                    "reason": "missing_target",
+                }
+            )
+        elif target_name and source_name is None:
+            discrepancies.append(
+                {
+                    "type": obj_type,
+                    "source_id": source_id,
+                    "target_id": target_id,
+                    "source_name": None,
+                    "target_name": target_name,
+                    "reason": "missing_source",
+                }
+            )
+    return discrepancies
 
 def _strip_log_artifacts(line: str) -> str:
     if "│" in line:
@@ -347,11 +517,13 @@ def _load_latest_jsonl_event(log_path: Path, event_name: str) -> dict[str, objec
             return payload.get("data", {})
     return None
 
-def _scan_jsonl_log(log_path: Path) -> dict[str, list[str]]:
+def _scan_jsonl_log(log_path: Path) -> dict[str, list[object]]:
     conflict_files: list[str] = []
     conflicts: list[str] = []
     warning_messages: list[str] = []
     prompt_questions: list[str] = []
+    rebase_prompts: list[str] = []
+    rebase_decisions: list[dict[str, str]] = []
     try:
         lines = log_path.read_text(encoding="utf-8", errors="ignore").splitlines()
     except OSError:
@@ -360,6 +532,8 @@ def _scan_jsonl_log(log_path: Path) -> dict[str, list[str]]:
             "conflicts": conflicts,
             "warning_messages": warning_messages,
             "prompt_questions": prompt_questions,
+            "rebase_prompts": rebase_prompts,
+            "rebase_decisions": rebase_decisions,
         }
     for raw_line in lines:
         try:
@@ -372,6 +546,16 @@ def _scan_jsonl_log(log_path: Path) -> dict[str, list[str]]:
         prompt_match = _PROMPT_QUESTION_RE.match(line)
         if prompt_match:
             prompt_questions.append(prompt_match.group("question"))
+        if _REBASE_PROMPT_RE.search(line):
+            rebase_prompts.append(line)
+        rebase_match = _REBASE_DECISION_RE.search(line)
+        if rebase_match:
+            rebase_decisions.append(
+                {
+                    "answer": rebase_match.group("answer").lower(),
+                    "raw": line,
+                }
+            )
         conflict_match = _CONFLICT_FILE_RE.search(line)
         if conflict_match:
             conflict_files.append(conflict_match.group("path"))
@@ -386,6 +570,8 @@ def _scan_jsonl_log(log_path: Path) -> dict[str, list[str]]:
         "conflicts": conflicts,
         "warning_messages": warning_messages,
         "prompt_questions": prompt_questions,
+        "rebase_prompts": rebase_prompts,
+        "rebase_decisions": rebase_decisions,
     }
 
 def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path | None = None) -> str:
@@ -403,6 +589,8 @@ def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path
     conflict_files: list[str] = []
     warning_messages: list[str] = []
     prompt_questions: list[str] = []
+    rebase_prompts: list[str] = []
+    rebase_decisions: list[dict[str, str]] = []
     review_questions: list[str] = []
     review_questions_seen: set[str] = set()
     current_key: str | None = None
@@ -494,6 +682,16 @@ def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path
         prompt_match = _PROMPT_QUESTION_RE.match(line)
         if prompt_match:
             prompt_questions.append(prompt_match.group("question"))
+        if _REBASE_PROMPT_RE.search(line):
+            rebase_prompts.append(line)
+        rebase_match = _REBASE_DECISION_RE.search(line)
+        if rebase_match:
+            rebase_decisions.append(
+                {
+                    "answer": rebase_match.group("answer").lower(),
+                    "raw": line,
+                }
+            )
 
         conflict_match = _CONFLICT_FILE_RE.search(line)
         if conflict_match:
@@ -599,6 +797,7 @@ def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path
         {"line": line, "count": count}
         for line, count in sorted(diff_occurrences.items(), key=lambda item: item[1], reverse=True)
     ]
+    repeated_changes = repeated_changes[:_MAX_REPEATED_CHANGES]
 
     total_objects = len(object_changes)
     common_changes = []
@@ -606,6 +805,7 @@ def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path
         for line, count in diff_occurrences.items():
             if count == total_objects:
                 common_changes.append({"line": line, "count": count})
+    common_changes = common_changes[:_MAX_COMMON_CHANGES]
 
     object_change_list = []
     for key, obj in object_changes.items():
@@ -614,9 +814,11 @@ def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path
             {"line": line, "count": count}
             for line, count in sorted(diff_lines.items(), key=lambda item: item[1], reverse=True)
         ]
+        repeated = repeated[:_MAX_REPEATED_CHANGES]
         obj_copy = {k: v for k, v in obj.items() if k != "diff_lines"}
         obj_copy["repeated_changes"] = repeated
         object_change_list.append(obj_copy)
+    object_change_list = object_change_list[:_MAX_OBJECT_CHANGES]
 
     summary = {
         "context": context,
@@ -639,6 +841,8 @@ def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path
             "conflict_files": conflict_files,
             "warning_messages": warning_messages,
             "prompt_questions": prompt_questions,
+            "rebase_prompts": rebase_prompts,
+            "rebase_decisions": rebase_decisions,
             "review_questions": review_questions,
         },
     }
@@ -674,25 +878,63 @@ def _build_summary_json(log_excerpt: str, is_jsonl: bool = False, log_path: Path
             for item in jsonl_summary["prompt_questions"]:
                 if item not in prompt_questions:
                     prompt_questions.append(item)
+            for item in jsonl_summary["rebase_prompts"]:
+                if item not in rebase_prompts:
+                    rebase_prompts.append(item)
+            for item in jsonl_summary["rebase_decisions"]:
+                if item not in rebase_decisions:
+                    rebase_decisions.append(item)
             if jsonl_summary["conflict_files"] or jsonl_summary["conflicts"]:
                 _add_review_question(
                     review_questions,
                     review_questions_seen,
                     "Resolve conflicts listed in the log before applying the plan.",
                 )
+            if jsonl_summary["rebase_decisions"]:
+                if any(decision.get("answer") in {"y", "yy"} for decision in jsonl_summary["rebase_decisions"]):
+                    _add_review_question(
+                        review_questions,
+                        review_questions_seen,
+                        "Rebase accepted for target-only changes; confirm they are intended.",
+                    )
+                if any(decision.get("answer") in {"n", "nn"} for decision in jsonl_summary["rebase_decisions"]):
+                    _add_review_question(
+                        review_questions,
+                        review_questions_seen,
+                        "Rebase rejected for target-only changes; validate target differences remain acceptable.",
+                    )
+            elif jsonl_summary["rebase_prompts"]:
+                _add_review_question(
+                    review_questions,
+                    review_questions_seen,
+                    "Confirm target-only changes before accepting rebase prompts.",
+                )
             summary["warnings"] = warnings
             summary["log"] = {
-                "conflict_files": conflict_files,
-                "warning_messages": warning_messages,
-                "prompt_questions": prompt_questions,
-                "review_questions": review_questions,
+                "conflict_files": conflict_files[:_MAX_LOG_ITEMS],
+                "warning_messages": warning_messages[:_MAX_LOG_ITEMS],
+                "prompt_questions": prompt_questions[:_MAX_LOG_ITEMS],
+                "rebase_prompts": rebase_prompts[:_MAX_LOG_ITEMS],
+                "rebase_decisions": rebase_decisions[:_MAX_LOG_ITEMS],
+                "review_questions": review_questions[:_MAX_LOG_ITEMS],
             }
 
     deploy_file = summary["context"].get("deploy_file")
     if deploy_file:
         deploy_path = Path(str(deploy_file))
         deploy_data = _load_deploy_yaml(deploy_path)
-        summary["project"] = _collect_project_context(deploy_path, deploy_data)
+        project = _collect_project_context(deploy_path, deploy_data)
+        summary["project"] = project
+        summary["mapping"] = {
+            "id_discrepancies": _collect_id_discrepancies(mappings, project)[:_MAX_LOG_ITEMS],
+        }
+    summary["plan"]["mappings"] = _dedupe_preserve_order(summary["plan"]["mappings"])[:_MAX_OBJECT_CHANGES]
+    summary["log"]["conflict_files"] = _dedupe_preserve_order(summary["log"]["conflict_files"])
+    summary["log"]["warning_messages"] = _dedupe_preserve_order(summary["log"]["warning_messages"])
+    summary["log"]["prompt_questions"] = _dedupe_preserve_order(summary["log"]["prompt_questions"])
+    summary["log"]["rebase_prompts"] = _dedupe_preserve_order(summary["log"]["rebase_prompts"])
+    summary["log"]["rebase_decisions"] = _dedupe_preserve_order(summary["log"]["rebase_decisions"])
+    summary["log"]["review_questions"] = _dedupe_preserve_order(summary["log"]["review_questions"])
     return json.dumps(summary, ensure_ascii=True)
 
 def _build_prompt(config: AgentConfig, log_excerpt: str, summary_json: str | None = None) -> str:
