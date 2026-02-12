@@ -219,3 +219,8 @@ class RuleDeployObject(DeployObject):
             object_type=Resource.Queue,
             use_dummy_references=use_dummy_references,
         )
+        await self.persist_target_only_references(
+            target=target,
+            data_attribute=data_attribute,
+            dependency_name="queues",
+        )

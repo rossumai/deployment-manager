@@ -339,6 +339,33 @@ class DeployObject(BaseModel):
                 continue
             overriden_references.append(remote_target_reference_url)
 
+    async def persist_target_only_reference(self, target: Target, data_attribute: str, dependency_name: str):
+        """For single references, restores the target-only value when mapping is missing."""
+        if not target.exists_on_remote:
+            return
+
+        remote_target = await self.get_remote_object(target.id)
+        remote_reference = remote_target.get(dependency_name)
+        if not remote_reference:
+            return
+
+        data_with_overriden_reference = getattr(target, data_attribute)
+        current_reference = data_with_overriden_reference.get(dependency_name)
+        if not current_reference:
+            data_with_overriden_reference[dependency_name] = remote_reference
+            return
+
+        source_reference = None
+        if target.pre_reference_replace_data:
+            source_reference = target.pre_reference_replace_data.get(dependency_name)
+
+        source_base_url = self.deploy_file.source_client._http_client.base_url
+        target_base_url = self.deploy_file.client._http_client.base_url
+        if source_reference and current_reference == source_reference:
+            data_with_overriden_reference[dependency_name] = remote_reference
+        elif source_base_url != target_base_url and str(current_reference).startswith(source_base_url):
+            data_with_overriden_reference[dependency_name] = remote_reference
+
     def remove_ignored_attributes(self, data):
         data.pop("created_by", None)
         data.pop("created_at", None)
