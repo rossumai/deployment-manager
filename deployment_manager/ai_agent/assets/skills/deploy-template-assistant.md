@@ -315,3 +315,23 @@ After printing the analysis, output the **complete updated deploy file** with al
 3. **Preserve existing target IDs** - only fill empty ones
 4. **Preserve user comments** - YAML comments must be kept
 5. **When uncertain, ask** - if match confidence is low, highlight it rather than assuming
+
+## LLM Response Contract
+
+When responding to the `template enhance` command, return JSON only in this structure:
+```
+{
+  "mappings": [{"type": "hooks", "source_id": 1, "target_id": 2}],
+  "overrides": [
+    {
+      "type": "hooks",
+      "source_id": 1,
+      "target_id": 2,
+      "attribute": "settings.api_url",
+      "value": "https://api-prod.example.com"
+    }
+  ]
+}
+```
+
+Use `attribute` + `value` instead of embedding nested objects in JSON so special characters can be escaped reliably.
