@@ -18,6 +18,26 @@ _MISSING_TARGET_KEYS = {
     settings.DEPLOY_KEY_LABELS,
     settings.DEPLOY_KEY_EMAIL_TEMPLATES,
 }
+_TYPE_ALIASES = {
+    "workspace": "workspaces",
+    "workspaces": "workspaces",
+    "queue": "queues",
+    "queues": "queues",
+    "schema": "schemas",
+    "schemas": "schemas",
+    "inbox": "inboxes",
+    "inboxes": "inboxes",
+    "hook": "hooks",
+    "hooks": "hooks",
+    "rule": "rules",
+    "rules": "rules",
+    "engine": "engines",
+    "engines": "engines",
+    "label": "labels",
+    "labels": "labels",
+    "email_template": "email_templates",
+    "email_templates": "email_templates",
+}
 
 def _read_json(path: Path) -> dict:
     try:
@@ -116,9 +136,35 @@ def _scan_target_inventory(target_base: Path) -> dict[str, list[dict[str, object
 
     return inventory
 
-def _collect_missing_targets(deploy_data: dict) -> tuple[list[dict[str, object]], dict[tuple[str, int], list[dict]]]:
+def _read_hook_objects(base_dir: Path, hook_ids: set[int]) -> dict[int, dict[str, object]]:
+    hooks_dir = base_dir / "hooks"
+    if not hooks_dir.exists():
+        return {}
+    objects: dict[int, dict[str, object]] = {}
+    for hook_path in hooks_dir.glob("*.json"):
+        data = _read_json(hook_path)
+        hook_id = data.get("id")
+        if hook_id is None:
+            continue
+        try:
+            hook_id_int = int(hook_id)
+        except (TypeError, ValueError):
+            continue
+        if hook_id_int not in hook_ids:
+            continue
+        objects[hook_id_int] = {
+            "id": hook_id_int,
+            "name": data.get("name"),
+            "settings": data.get("settings"),
+        }
+    return objects
+
+def _collect_missing_targets(
+    deploy_data: dict,
+) -> tuple[list[dict[str, object]], dict[tuple[str, int], list[dict]], dict[tuple[str, int, int | None], list[dict]]]:
     missing: list[dict[str, object]] = []
     target_index: dict[tuple[str, int], list[dict]] = {}
+    target_entries: dict[tuple[str, int, int | None], list[dict]] = {}
 
     def register_missing(obj_type: str, source_id: int, source_name: str | None, target: dict, extra: dict | None):
         entry = {
@@ -143,8 +189,10 @@ def _collect_missing_targets(deploy_data: dict) -> tuple[list[dict[str, object]]
                 if not isinstance(target, dict):
                     continue
                 if target.get("id"):
+                    target_entries.setdefault((key, int(source_id), int(target["id"])), []).append(target)
                     continue
                 register_missing(key, int(source_id), item.get("name"), target, None)
+                target_entries.setdefault((key, int(source_id), None), []).append(target)
 
     for queue in deploy_data.get(settings.DEPLOY_KEY_QUEUES, []) or []:
         if not isinstance(queue, dict):
@@ -161,6 +209,7 @@ def _collect_missing_targets(deploy_data: dict) -> tuple[list[dict[str, object]]
                 if not isinstance(target, dict):
                     continue
                 if target.get("id"):
+                    target_entries.setdefault((target_key, int(source_id), int(target["id"])), []).append(target)
                     continue
                 register_missing(
                     target_key,
@@ -169,8 +218,9 @@ def _collect_missing_targets(deploy_data: dict) -> tuple[list[dict[str, object]]
                     target,
                     {"queue_name": queue_name, "queue_id": queue.get("id")},
                 )
+                target_entries.setdefault((target_key, int(source_id), None), []).append(target)
 
-    return missing, target_index
+    return missing, target_index, target_entries
 
 def _read_skill_prompt(project_root: Path) -> str:
     config_path = project_root / "ai_agent.yaml"
@@ -209,16 +259,93 @@ def _extract_json_payload(text: str) -> dict:
     brace_end = cleaned.rfind("}")
     if brace_start != -1 and brace_end != -1 and brace_end > brace_start:
         candidate = cleaned[brace_start : brace_end + 1]
-        return json.loads(candidate)
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            try:
+                import yaml
+            except ImportError:
+                raise
+            parsed = yaml.safe_load(candidate)
+            if isinstance(parsed, dict):
+                return parsed
     raise ValueError("LLM response did not contain valid JSON")
+
+def _normalize_override_values(attributes: dict[str, object]) -> dict[str, object]:
+    normalized = {}
+    for key, value in attributes.items():
+        if isinstance(value, str):
+            normalized[key] = value.replace("\x08", "\\b")
+        else:
+            normalized[key] = value
+    return normalized
+
+def _aggregate_overrides(overrides: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:
+    by_attribute: dict[str, dict[str, object]] = {}
+    by_attribute_mixed: dict[str, dict[str, object]] = {}
+    for entry in overrides:
+        attribute = str(entry.get("attribute") or "")
+        value = entry.get("value")
+        if not attribute:
+            continue
+        key = f"{attribute}::{value!r}"
+        record = by_attribute.setdefault(
+            key,
+            {
+                "attribute": attribute,
+                "value": value,
+                "count": 0,
+                "targets": set(),
+            },
+        )
+        record["count"] = int(record["count"]) + 1
+        target_id = entry.get("target_id")
+        if target_id is not None:
+            record["targets"].add(target_id)
+        mixed = by_attribute_mixed.setdefault(
+            attribute,
+            {
+                "attribute": attribute,
+                "values": {},
+            },
+        )
+        value_key = repr(value)
+        mixed_values = mixed["values"].setdefault(value_key, {"value": value, "targets": set()})
+        if target_id is not None:
+            mixed_values["targets"].add(target_id)
+    aggregated = []
+    for record in by_attribute.values():
+        targets = sorted(record["targets"], key=lambda item: int(item) if isinstance(item, int) else str(item))
+        aggregated.append(
+            {
+                "attribute": record["attribute"],
+                "value": record["value"],
+                "count": record["count"],
+                "target_ids": targets,
+            }
+        )
+    aggregated.sort(key=lambda item: item["count"], reverse=True)
+    mixed_summary = []
+    for record in by_attribute_mixed.values():
+        values = []
+        for value_info in record["values"].values():
+            targets = sorted(value_info["targets"], key=lambda item: int(item) if isinstance(item, int) else str(item))
+            values.append({"value": value_info["value"], "target_ids": targets})
+        if len(values) > 1:
+            mixed_summary.append({"attribute": record["attribute"], "values": values})
+    return {"by_attribute": aggregated, "by_attribute_mixed": mixed_summary}
 
 def _build_prompt(skill_prompt: str, missing_targets: list[dict[str, object]], inventory: dict[str, list[dict]]):
     return (
         f"{skill_prompt}\n\n"
         "Task: Fill missing target IDs in the deploy template using only the local target inventory. "
         "Do not create new objects and do not change non-empty target IDs. "
-        "Return JSON only, with a single key 'mappings' containing entries with "
-        "type, source_id, and target_id. Omit items you cannot confidently match. "
+        "Return JSON only, with keys 'mappings' and 'overrides'. "
+        "'mappings' entries contain type, source_id, and target_id. "
+        "'overrides' entries contain type, source_id, target_id, attribute, and value. "
+        "(attribute is a single JMESPath string, value is the override value.) "
+        "Omit items you cannot confidently match. "
+        "Ensure all backslashes are escaped (\\) in JSON strings. "
         "Ignore any other formatting instructions above and respond with JSON only.\n\n"
         f"Missing targets:\n{json.dumps(missing_targets, ensure_ascii=True, indent=2)}\n\n"
         f"Target inventory:\n{json.dumps(inventory, ensure_ascii=True, indent=2)}\n"
@@ -245,17 +372,62 @@ async def enhance_deploy_template(
         display_error(f'Target dir "{target_base}" not found.')
         return
 
-    missing_targets, target_index = _collect_missing_targets(deploy_data)
-    if not missing_targets:
-        display_info("No missing target IDs found in deploy file.")
-        return
+    missing_targets, target_index, target_entries = _collect_missing_targets(deploy_data)
+
+    source_dir = deploy_data.get(settings.DEPLOY_KEY_SOURCE_DIR)
+    source_base = Path(str(project_path)) / str(source_dir) if source_dir else None
 
     inventory = _scan_target_inventory(target_base)
+    hook_pairs = []
+    source_hook_ids: set[int] = set()
+    target_hook_ids: set[int] = set()
+    for hook in deploy_data.get(settings.DEPLOY_KEY_HOOKS, []) or []:
+        if not isinstance(hook, dict):
+            continue
+        source_id = hook.get("id")
+        if source_id is None:
+            continue
+        source_hook_ids.add(int(source_id))
+        for target in hook.get("targets") or []:
+            if not isinstance(target, dict):
+                continue
+            target_id = target.get("id")
+            if target_id is None:
+                continue
+            target_hook_ids.add(int(target_id))
+            hook_pairs.append({"source_id": int(source_id), "target_id": int(target_id)})
+
+    hook_settings = []
+    if source_base:
+        source_hooks = _read_hook_objects(source_base, source_hook_ids)
+    else:
+        source_hooks = {}
+    target_hooks = _read_hook_objects(target_base, target_hook_ids)
+    for pair in hook_pairs:
+        source_hook = source_hooks.get(pair["source_id"], {})
+        target_hook = target_hooks.get(pair["target_id"], {})
+        hook_settings.append(
+            {
+                "source_id": pair["source_id"],
+                "source_name": source_hook.get("name"),
+                "source_settings": source_hook.get("settings"),
+                "target_id": pair["target_id"],
+                "target_name": target_hook.get("name"),
+                "target_settings": target_hook.get("settings"),
+            }
+        )
+
     skill_prompt = _read_skill_prompt(Path(str(project_path)))
     if not skill_prompt:
         display_error("No deploy template assistant skill found.")
         return
-    prompt = _build_prompt(skill_prompt, missing_targets, inventory)
+    if not missing_targets and not hook_pairs:
+        display_info("No missing target IDs or hook pairs available for overrides.")
+        return
+    prompt = (
+        _build_prompt(skill_prompt, missing_targets, inventory)
+        + f"\nHook settings pairs:\n{json.dumps(hook_settings, ensure_ascii=True, indent=2)}\n"
+    )
 
     helper = LLMHelper(model_id=model_id)
     if not helper.validate_credentials():
@@ -272,8 +444,12 @@ async def enhance_deploy_template(
         return
 
     mappings = payload.get("mappings") or []
+    overrides = payload.get("overrides") or []
     if not isinstance(mappings, list):
         display_error("LLM response must include a list under 'mappings'.")
+        return
+    if overrides and not isinstance(overrides, list):
+        display_error("LLM response must include a list under 'overrides'.")
         return
 
     applied = []
@@ -298,16 +474,73 @@ async def enhance_deploy_template(
         if targets:
             applied.append({"type": obj_type, "source_id": source_id, "target_id": target_id_int})
 
-    if not applied:
-        display_info("No target IDs were filled from the LLM response.")
+    if not applied and not overrides:
+        display_info("No target IDs or attribute overrides were returned from the LLM response.")
         return
 
-    display_info(f"Proposed {len(applied)} target ID updates.")
-    for entry in applied[:10]:
-        display_info(
-            f"{entry['type']} source {entry['source_id']} -> target {entry['target_id']}"
-        )
+    applied_overrides = []
+    override_preview = []
+    for override in overrides:
+        if not isinstance(override, dict):
+            continue
+        obj_type = _TYPE_ALIASES.get(str(override.get("type") or ""), str(override.get("type") or ""))
+        source_id = override.get("source_id")
+        target_id = override.get("target_id")
+        attributes = override.get("attribute_override")
+        attribute_key = override.get("attribute")
+        attribute_value = override.get("value")
+        if not obj_type or source_id is None or target_id is None:
+            continue
+        if isinstance(attributes, dict):
+            attributes = _normalize_override_values(attributes)
+        elif isinstance(attribute_key, str):
+            attributes = _normalize_override_values({attribute_key: attribute_value})
+        else:
+            continue
+        try:
+            key = (obj_type, int(source_id), int(target_id))
+        except (TypeError, ValueError):
+            continue
+        targets = target_entries.get(key) or []
+        for target in targets:
+            override_map = target.get("attribute_override") or {}
+            override_map.update(attributes)
+            target["attribute_override"] = override_map
+        if targets:
+            applied_overrides.append({"type": obj_type, "source_id": source_id, "target_id": target_id})
+            for attr_key, attr_value in attributes.items():
+                override_preview.append(
+                    {
+                        "type": obj_type,
+                        "source_id": source_id,
+                        "target_id": target_id,
+                        "attribute": attr_key,
+                        "value": attr_value,
+                    }
+                )
 
+    if applied:
+        display_info(f"Proposed {len(applied)} target ID updates.")
+        for entry in applied[:10]:
+            display_info(
+                f"{entry['type']} source {entry['source_id']} -> target {entry['target_id']}"
+            )
+    if applied_overrides:
+        display_info(f"Proposed {len(applied_overrides)} attribute override update(s).")
+        aggregated = _aggregate_overrides(override_preview)
+        display_info("Override summary (aggregated):")
+        for entry in aggregated["by_attribute"][:10]:
+            display_info(
+                f"{entry['attribute']} = {entry['value']} (count: {entry['count']}, targets: {entry['target_ids']})"
+            )
+        if aggregated["by_attribute_mixed"]:
+            display_info("Override fields with multiple values:")
+            for entry in aggregated["by_attribute_mixed"][:10]:
+                display_info(f"{entry['attribute']}")
+                for value_info in entry["values"]:
+                    display_info(
+                        f"  -> {value_info['value']} targets: {value_info['target_ids']}"
+                    )
     if not await questionary.confirm("Apply these changes to the deploy file?", default=False).ask_async():
         display_info("Aborted. No changes were saved.")
         return
