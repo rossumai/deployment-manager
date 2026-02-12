@@ -367,6 +367,72 @@ def _format_table(headers: list[str], rows: list[list[str]]) -> str:
         )
     return "\n".join([top, header_row, mid, *body_rows, bottom])
 
+def _build_hook_settings(
+    deploy_data: dict,
+    source_base: Path | None,
+    target_base: Path,
+) -> list[dict[str, object]]:
+    hook_pairs = []
+    source_hook_ids: set[int] = set()
+    target_hook_ids: set[int] = set()
+    for hook in deploy_data.get(settings.DEPLOY_KEY_HOOKS, []) or []:
+        if not isinstance(hook, dict):
+            continue
+        source_id = hook.get("id")
+        if source_id is None:
+            continue
+        source_hook_ids.add(int(source_id))
+        for target in hook.get("targets") or []:
+            if not isinstance(target, dict):
+                continue
+            target_id = target.get("id")
+            if target_id is None:
+                continue
+            target_hook_ids.add(int(target_id))
+            hook_pairs.append({"source_id": int(source_id), "target_id": int(target_id)})
+
+    if source_base:
+        source_hooks = _read_hook_objects(source_base, source_hook_ids)
+    else:
+        source_hooks = {}
+    target_hooks = _read_hook_objects(target_base, target_hook_ids)
+
+    hook_settings = []
+    for pair in hook_pairs:
+        source_hook = source_hooks.get(pair["source_id"], {})
+        target_hook = target_hooks.get(pair["target_id"], {})
+        hook_settings.append(
+            {
+                "source_id": pair["source_id"],
+                "source_name": source_hook.get("name"),
+                "source_settings": source_hook.get("settings"),
+                "target_id": pair["target_id"],
+                "target_name": target_hook.get("name"),
+                "target_settings": target_hook.get("settings"),
+            }
+        )
+    return hook_settings
+
+async def _request_llm_payload(helper: LLMHelper, prompt: str) -> tuple[list, list] | None:
+    response = await helper.run(prompt)
+    if not response or not response.text:
+        display_error("LLM did not return any response.")
+        return None
+    try:
+        payload = _extract_json_payload(response.text)
+    except Exception as exc:
+        display_error(f"Failed to parse LLM response as JSON: {exc}")
+        return None
+    mappings = payload.get("mappings") or []
+    overrides = payload.get("overrides") or []
+    if not isinstance(mappings, list):
+        display_error("LLM response must include a list under 'mappings'.")
+        return None
+    if overrides and not isinstance(overrides, list):
+        display_error("LLM response must include a list under 'overrides'.")
+        return None
+    return mappings, overrides
+
 def _build_prompt(skill_prompt: str, missing_targets: list[dict[str, object]], inventory: dict[str, list[dict]]):
     return (
         f"{skill_prompt}\n\n"
@@ -410,79 +476,27 @@ async def enhance_deploy_template(
     source_base = Path(str(project_path)) / str(source_dir) if source_dir else None
 
     inventory = _scan_target_inventory(target_base)
-    hook_pairs = []
-    source_hook_ids: set[int] = set()
-    target_hook_ids: set[int] = set()
-    for hook in deploy_data.get(settings.DEPLOY_KEY_HOOKS, []) or []:
-        if not isinstance(hook, dict):
-            continue
-        source_id = hook.get("id")
-        if source_id is None:
-            continue
-        source_hook_ids.add(int(source_id))
-        for target in hook.get("targets") or []:
-            if not isinstance(target, dict):
-                continue
-            target_id = target.get("id")
-            if target_id is None:
-                continue
-            target_hook_ids.add(int(target_id))
-            hook_pairs.append({"source_id": int(source_id), "target_id": int(target_id)})
-
-    hook_settings = []
-    if source_base:
-        source_hooks = _read_hook_objects(source_base, source_hook_ids)
-    else:
-        source_hooks = {}
-    target_hooks = _read_hook_objects(target_base, target_hook_ids)
-    for pair in hook_pairs:
-        source_hook = source_hooks.get(pair["source_id"], {})
-        target_hook = target_hooks.get(pair["target_id"], {})
-        hook_settings.append(
-            {
-                "source_id": pair["source_id"],
-                "source_name": source_hook.get("name"),
-                "source_settings": source_hook.get("settings"),
-                "target_id": pair["target_id"],
-                "target_name": target_hook.get("name"),
-                "target_settings": target_hook.get("settings"),
-            }
-        )
+    hook_settings = _build_hook_settings(deploy_data, source_base, target_base)
 
     skill_prompt = _read_skill_prompt(Path(str(project_path)))
     if not skill_prompt:
         display_error("No deploy template assistant skill found.")
         return
-    if not missing_targets and not hook_pairs:
-        display_info("No missing target IDs or hook pairs available for overrides.")
+    if not missing_targets and not hook_settings:
+        display_info("No missing target IDs or hook settings available for overrides.")
         return
+    helper = LLMHelper(model_id=model_id)
+    if not helper.validate_credentials():
+        return
+
     prompt = (
         _build_prompt(skill_prompt, missing_targets, inventory)
         + f"\nHook settings pairs:\n{json.dumps(hook_settings, ensure_ascii=True, indent=2)}\n"
     )
-
-    helper = LLMHelper(model_id=model_id)
-    if not helper.validate_credentials():
+    payload = await _request_llm_payload(helper, prompt)
+    if payload is None:
         return
-    response = await helper.run(prompt)
-    if not response or not response.text:
-        display_error("LLM did not return any response.")
-        return
-
-    try:
-        payload = _extract_json_payload(response.text)
-    except Exception as exc:
-        display_error(f"Failed to parse LLM response as JSON: {exc}")
-        return
-
-    mappings = payload.get("mappings") or []
-    overrides = payload.get("overrides") or []
-    if not isinstance(mappings, list):
-        display_error("LLM response must include a list under 'mappings'.")
-        return
-    if overrides and not isinstance(overrides, list):
-        display_error("LLM response must include a list under 'overrides'.")
-        return
+    mappings, overrides = payload
 
     applied = []
     for mapping in mappings:
@@ -505,6 +519,18 @@ async def enhance_deploy_template(
             target["id"] = target_id_int
         if targets:
             applied.append({"type": obj_type, "source_id": source_id, "target_id": target_id_int})
+
+    if applied:
+        missing_targets, target_index, target_entries = _collect_missing_targets(deploy_data)
+        hook_settings = _build_hook_settings(deploy_data, source_base, target_base)
+        prompt = (
+            _build_prompt(skill_prompt, missing_targets, inventory)
+            + f"\nHook settings pairs:\n{json.dumps(hook_settings, ensure_ascii=True, indent=2)}\n"
+        )
+        payload = await _request_llm_payload(helper, prompt)
+        if payload is None:
+            return
+        _, overrides = payload
 
     if not applied and not overrides:
         display_info("No target IDs or attribute overrides were returned from the LLM response.")
