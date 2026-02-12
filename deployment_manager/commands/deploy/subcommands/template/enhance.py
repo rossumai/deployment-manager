@@ -335,6 +335,38 @@ def _aggregate_overrides(overrides: list[dict[str, object]]) -> dict[str, list[d
             mixed_summary.append({"attribute": record["attribute"], "values": values})
     return {"by_attribute": aggregated, "by_attribute_mixed": mixed_summary}
 
+def _stringify_override_value(value: object) -> str:
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=True, sort_keys=True)
+    if isinstance(value, str):
+        return value.replace("\n", "\\n")
+    return str(value)
+
+def _format_table(headers: list[str], rows: list[list[str]]) -> str:
+    if not rows:
+        return ""
+    string_rows = [[str(cell) for cell in row] for row in rows]
+    widths = [len(header) for header in headers]
+    for row in string_rows:
+        for index, cell in enumerate(row):
+            widths[index] = max(widths[index], len(cell))
+    top = "┌" + "┬".join("─" * (width + 2) for width in widths) + "┐"
+    mid = "├" + "┼".join("─" * (width + 2) for width in widths) + "┤"
+    bottom = "└" + "┴".join("─" * (width + 2) for width in widths) + "┘"
+    header_row = "│" + "│".join(
+        f" {header}{' ' * (widths[index] - len(header))} " for index, header in enumerate(headers)
+    ) + "│"
+    body_rows = []
+    for row in string_rows:
+        body_rows.append(
+            "│"
+            + "│".join(
+                f" {cell}{' ' * (widths[index] - len(cell))} " for index, cell in enumerate(row)
+            )
+            + "│"
+        )
+    return "\n".join([top, header_row, mid, *body_rows, bottom])
+
 def _build_prompt(skill_prompt: str, missing_targets: list[dict[str, object]], inventory: dict[str, list[dict]]):
     return (
         f"{skill_prompt}\n\n"
@@ -520,27 +552,33 @@ async def enhance_deploy_template(
                 )
 
     if applied:
-        display_info(f"Proposed {len(applied)} target ID updates.")
-        for entry in applied[:10]:
-            display_info(
-                f"{entry['type']} source {entry['source_id']} -> target {entry['target_id']}"
+        display_info(
+            "PROPOSED TARGET ID UPDATES\n"
+            + _format_table(
+                ["Type", "Source ID", "Target ID"],
+                [
+                    [str(entry["type"]), str(entry["source_id"]), str(entry["target_id"])]
+                    for entry in applied
+                ],
             )
+        )
     if applied_overrides:
-        display_info(f"Proposed {len(applied_overrides)} attribute override update(s).")
-        aggregated = _aggregate_overrides(override_preview)
-        display_info("Override summary (aggregated):")
-        for entry in aggregated["by_attribute"][:10]:
-            display_info(
-                f"{entry['attribute']} = {entry['value']} (count: {entry['count']}, targets: {entry['target_ids']})"
+        display_info(
+            "PROPOSED ATTRIBUTE OVERRIDES\n"
+            + _format_table(
+                ["Type", "Source ID", "Target ID", "Attribute", "Value"],
+                [
+                    [
+                        str(entry["type"]),
+                        str(entry["source_id"]),
+                        str(entry["target_id"]),
+                        str(entry["attribute"]),
+                        _stringify_override_value(entry["value"]),
+                    ]
+                    for entry in override_preview
+                ],
             )
-        if aggregated["by_attribute_mixed"]:
-            display_info("Override fields with multiple values:")
-            for entry in aggregated["by_attribute_mixed"][:10]:
-                display_info(f"{entry['attribute']}")
-                for value_info in entry["values"]:
-                    display_info(
-                        f"  -> {value_info['value']} targets: {value_info['target_ids']}"
-                    )
+        )
     if not await questionary.confirm("Apply these changes to the deploy file?", default=False).ask_async():
         display_info("Aborted. No changes were saved.")
         return
