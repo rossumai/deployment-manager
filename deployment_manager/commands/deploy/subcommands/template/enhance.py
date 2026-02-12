@@ -280,6 +280,15 @@ def _normalize_override_values(attributes: dict[str, object]) -> dict[str, objec
             normalized[key] = value
     return normalized
 
+def _normalize_hook_override_attributes(attributes: dict[str, object]) -> dict[str, object]:
+    normalized = {}
+    for key, value in attributes.items():
+        key_str = str(key)
+        if not key_str.startswith("settings."):
+            key_str = f"settings.{key_str}"
+        normalized[key_str] = value
+    return normalized
+
 def _aggregate_overrides(overrides: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:
     by_attribute: dict[str, dict[str, object]] = {}
     by_attribute_mixed: dict[str, dict[str, object]] = {}
@@ -442,6 +451,7 @@ def _build_prompt(skill_prompt: str, missing_targets: list[dict[str, object]], i
         "'mappings' entries contain type, source_id, and target_id. "
         "'overrides' entries contain type, source_id, target_id, attribute, and value. "
         "(attribute is a single JMESPath string, value is the override value.) "
+        "For hook settings, use the 'settings.' prefix for all override paths (for example, settings.import_config.dataset_name). "
         "Omit items you cannot confidently match. "
         "Ensure all backslashes are escaped (\\) in JSON strings. "
         "Ignore any other formatting instructions above and respond with JSON only.\n\n"
@@ -555,6 +565,8 @@ async def enhance_deploy_template(
             attributes = _normalize_override_values({attribute_key: attribute_value})
         else:
             continue
+        if obj_type == settings.DEPLOY_KEY_HOOKS:
+            attributes = _normalize_hook_override_attributes(attributes)
         try:
             key = (obj_type, int(source_id), int(target_id))
         except (TypeError, ValueError):
