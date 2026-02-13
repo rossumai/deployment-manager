@@ -162,9 +162,11 @@ class ReferenceReplacer:
             return
 
         target_id_str = str(selected_target.id)
-        source_id_str = str(source_id)
-        new_url = source_dependency_url.replace(source_id_str, target_id_str)
-        return new_url
+        if selected_target.data_from_remote and selected_target.data_from_remote.get("url"):
+            return selected_target.data_from_remote["url"]
+
+        target_base_url = self.parent_object_reference.deploy_file.client._http_client.base_url
+        return f"{target_base_url}/{object_type.value}/{target_id_str}"
 
     def replace_reference_url(
         self,

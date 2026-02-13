@@ -43,7 +43,7 @@ from deployment_manager.commands.deploy.subcommands.run.models import (
 )
 from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
 from deployment_manager.utils.consts import display_error, display_warning, settings
-from deployment_manager.utils.functions import gather_with_concurrency, templatize_name_id
+from deployment_manager.utils.functions import gather_with_concurrency, templatize_name_id, extract_id_from_url
 from rossum_api import APIClientError
 from rossum_api.api_client import Resource
 
@@ -339,7 +339,13 @@ class DeployObject(BaseModel):
                 continue
             overriden_references.append(remote_target_reference_url)
 
-    async def persist_target_only_reference(self, target: Target, data_attribute: str, dependency_name: str):
+    async def persist_target_only_reference(
+        self,
+        target: Target,
+        data_attribute: str,
+        dependency_name: str,
+        object_type: Resource | None = None,
+    ):
         """For single references, restores the target-only value when mapping is missing."""
         if not target.exists_on_remote:
             return
@@ -358,6 +364,13 @@ class DeployObject(BaseModel):
         source_reference = None
         if target.pre_reference_replace_data:
             source_reference = target.pre_reference_replace_data.get(dependency_name)
+
+        if object_type and source_reference:
+            source_reference_id = extract_id_from_url(source_reference)
+            if source_reference_id is not None:
+                targets = self.deploy_file.lookup_table.get(source_reference_id, {}).get(object_type, [])
+                if targets:
+                    return
 
         source_base_url = self.deploy_file.source_client._http_client.base_url
         target_base_url = self.deploy_file.client._http_client.base_url

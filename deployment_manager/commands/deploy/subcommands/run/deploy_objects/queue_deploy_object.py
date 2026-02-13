@@ -200,6 +200,7 @@ class QueueDeployObject(DeployObject):
             target=target,
             data_attribute=data_attribute,
             dependency_name="engine",
+            object_type=Resource.Engine,
         )
 
     async def visualize_changes(self):
