@@ -222,8 +222,10 @@ async def create_deploy_template(
 
     await yaml.save_to_file(deploy_filepath)
 
-    display_info(f"Deploy file saved to [green]{deploy_filepath}[/green]. Use it by running:")
+    display_info(f"Deploy file saved to [green]{deploy_filepath}[/green]. Recommended next steps:")
 
     pprint(
+        f"\n  {settings.NEW_COMMAND_NAME} {settings.DEPLOY_COMMAND_NAME} {settings.DEPLOY_TEMPLATE_COMMAND_NAME} "
+        f"{settings.DEPLOY_TEMPLATE_ENHANCE_COMMAND_NAME} {deploy_filepath}"
         f"\n  {settings.NEW_COMMAND_NAME} {settings.DEPLOY_COMMAND_NAME} {settings.DEPLOY_RUN_COMMAND_NAME} {deploy_filepath}\n"
     )

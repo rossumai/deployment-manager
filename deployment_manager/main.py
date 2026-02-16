@@ -2,6 +2,8 @@ import importlib.metadata
 
 import click
 
+from deployment_manager.utils.logging import configure_logging
+
 from deployment_manager.commands.deploy.deploy import deploy
 from deployment_manager.commands.document.document import generate_documentation_wrapper
 from deployment_manager.commands.download.download import download_project_wrapper
@@ -15,7 +17,8 @@ from deployment_manager.commands.upload.upload import upload_project_wrapper
 
 @click.group(context_settings={"max_content_width": 120})
 @click.version_option(version=importlib.metadata.version("deployment-manager"))
-def main(): ...
+def main():
+    configure_logging()
 
 
 main.add_command(download_project_wrapper)

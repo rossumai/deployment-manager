@@ -1,0 +1,14 @@
+provider: gemini
+command: gemini
+model_id: us.anthropic.claude-haiku-4-5-20251001-v1:0
+prompt_prefix: "You are assisting with a PRD2 deployment. Summarize important events and prompt the user with next steps."
+log_path: logs
+asset_root: deployment_manager/ai_agent/assets
+tail_lines: 200
+interval_seconds: 1.0
+enable_tmux: true
+project_skills_path: llm_skills
+prompt_markers:
+  - "Do you wish to apply the plan?"
+fast_diff_summary: true
+use_stdin: true

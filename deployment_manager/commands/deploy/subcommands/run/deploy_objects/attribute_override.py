@@ -2,7 +2,7 @@ import re
 
 import jmespath
 
-from deployment_manager.utils.consts import settings
+from deployment_manager.utils.consts import display_warning, settings
 from deployment_manager.utils.functions import flatten
 from rossum_api.api_client import Resource
 
@@ -22,7 +22,15 @@ class AttributeOverrider:
     ):
         parent, key, create_if_not_exists = parse_parent_and_key(key_query)
 
-        search = perform_search(parent, object)
+        try:
+            search = perform_search(parent, object)
+        except AttributeOverrideException:
+            if self.type == Resource.Hook and key_query and not key_query.startswith("settings."):
+                fallback_query = f"settings.{key_query}"
+                parent, key, create_if_not_exists = parse_parent_and_key(fallback_query)
+                search = perform_search(parent, object)
+            else:
+                raise
 
         for override_parent in search:
             # The attribute (key) might not be on all parent objects (e.g., configurations[*].queue_ids)
@@ -56,11 +64,15 @@ class AttributeOverrider:
             )
 
         for key, value in attribute_overrides.items():
-            self.override_attribute_v2(
-                object=object,
-                key_query=key,
-                new_value=value,
-            )
+            try:
+                self.override_attribute_v2(
+                    object=object,
+                    key_query=key,
+                    new_value=value,
+                )
+            except AttributeOverrideException as exc:
+                display_warning(str(exc))
+                continue
 
     def reverse_attributes_v2(
         self,
