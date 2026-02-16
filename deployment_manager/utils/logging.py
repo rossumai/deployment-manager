@@ -19,6 +19,7 @@ _LAST_SECTION = None
 _PROMPT_ACTIVE = 0
 _ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 _RUN_DIR_RE = re.compile(r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}")
+_MAX_LOG_DIRS = 20
 _SECTION_OUTPUT = "PRD OUTPUT"
 _SECTION_INPUT = "USER INPUT"
 _BOX_DRAWING_CHARS = set("╭╮╰╯─│┌┐└┘├┤┬┴┼━┃┏┓┗┛┣┫┳┻╋")
@@ -194,6 +195,20 @@ def _resolve_log_path(log_path: str | Path | None, default_path: Path) -> Path:
         return log_path
     return Path(log_path)
 
+def _prune_old_log_dirs(parent: Path) -> None:
+    """Keep only the most recent _MAX_LOG_DIRS run directories."""
+    try:
+        run_dirs = sorted(
+            (d for d in parent.iterdir() if d.is_dir() and _RUN_DIR_RE.fullmatch(d.name)),
+            key=lambda d: d.name,
+        )
+    except OSError:
+        return
+    while len(run_dirs) > _MAX_LOG_DIRS:
+        oldest = run_dirs.pop(0)
+        import shutil
+        shutil.rmtree(oldest, ignore_errors=True)
+
 def _resolve_run_log_dir(log_file: Path, timestamp: str) -> Path:
     """Create or reuse a run-specific log directory."""
     global _RUN_LOG_DIR
@@ -203,6 +218,7 @@ def _resolve_run_log_dir(log_file: Path, timestamp: str) -> Path:
     if log_file.is_dir():
         run_dir = log_file / timestamp
         run_dir.mkdir(parents=True, exist_ok=True)
+        _prune_old_log_dirs(log_file)
         _RUN_LOG_DIR = run_dir
         return _RUN_LOG_DIR
 
@@ -213,6 +229,7 @@ def _resolve_run_log_dir(log_file: Path, timestamp: str) -> Path:
 
     run_dir = log_file.parent / timestamp
     run_dir.mkdir(parents=True, exist_ok=True)
+    _prune_old_log_dirs(log_file.parent)
     _RUN_LOG_DIR = run_dir
     return run_dir
 

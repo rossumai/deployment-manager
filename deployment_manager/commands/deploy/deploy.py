@@ -7,7 +7,8 @@ from deployment_manager.commands.deploy.subcommands.run.run import deploy_releas
 from deployment_manager.commands.deploy.subcommands.template.create import create_deploy_template
 from deployment_manager.commands.deploy.subcommands.template.enhance import enhance_deploy_template
 from deployment_manager.commands.deploy.subcommands.template.reverse import DeployFileReverser
-from deployment_manager.commands.deploy.ai_agent import ai_group, start_ai_agent, stop_ai_agent
+from deployment_manager.commands.deploy.ai_agent import ai_group
+from deployment_manager.ai_agent.runtime import start_ai_agent, stop_ai_agent
 from deployment_manager.utils.consts import settings
 from deployment_manager.utils.functions import apply_concurrency_override, coro
 from deployment_manager.utils.logging import get_log_path

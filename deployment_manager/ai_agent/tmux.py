@@ -71,7 +71,12 @@ def _find_right_pane() -> str | None:
             return pane["pane_id"]
     return None
 
-def ensure_tmux_split(agent_config: AgentConfig, log_path: Path, config_path: Path) -> tuple[str, bool] | None:
+def ensure_tmux_split(
+    agent_config: AgentConfig,
+    log_path: Path,
+    config_path: Path,
+    cli_path: list[str] | None = None,
+) -> tuple[str, bool] | None:
     if not agent_config.enable_tmux:
         return None
     if not _is_inside_tmux():
@@ -89,14 +94,13 @@ def ensure_tmux_split(agent_config: AgentConfig, log_path: Path, config_path: Pa
         return None
 
     run_dir = log_path.parent
+    command_parts = cli_path or ["deploy", "ai", "follow"]
     agent_command = " ".join(
         [
             "PRD2_LOG_PREFIX=prd2_assistant",
             f"PRD2_LOG_PATH={shlex.quote(str(run_dir / 'assistant.log'))}",
             "prd2",
-            "deploy",
-            "ai",
-            "follow",
+            *command_parts,
             "--config",
             shlex.quote(str(config_path)),
             "--log-path",

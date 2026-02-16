@@ -4,9 +4,12 @@ from pathlib import Path
 import questionary
 from anyio import Path as AsyncPath
 
-from deployment_manager.ai_agent.config import load_agent_config
+from deployment_manager.ai_agent.llm.bedrock import BedrockLLMClient
+from deployment_manager.ai_agent.skills.loader import SkillLoader
+from deployment_manager.ai_agent.utils.json_utils import read_json_safe
+from deployment_manager.ai_agent.utils.object_types import TYPE_ALIASES
+from deployment_manager.ai_agent.utils.tables import format_table
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
-from deployment_manager.commands.document.llm_helper import LLMHelper
 from deployment_manager.utils.consts import display_error, display_info, settings
 
 _MISSING_TARGET_KEYS = {
@@ -18,32 +21,6 @@ _MISSING_TARGET_KEYS = {
     settings.DEPLOY_KEY_LABELS,
     settings.DEPLOY_KEY_EMAIL_TEMPLATES,
 }
-_TYPE_ALIASES = {
-    "workspace": "workspaces",
-    "workspaces": "workspaces",
-    "queue": "queues",
-    "queues": "queues",
-    "schema": "schemas",
-    "schemas": "schemas",
-    "inbox": "inboxes",
-    "inboxes": "inboxes",
-    "hook": "hooks",
-    "hooks": "hooks",
-    "rule": "rules",
-    "rules": "rules",
-    "engine": "engines",
-    "engines": "engines",
-    "label": "labels",
-    "labels": "labels",
-    "email_template": "email_templates",
-    "email_templates": "email_templates",
-}
-
-def _read_json(path: Path) -> dict:
-    try:
-        return json.loads(path.read_text(encoding="utf-8", errors="ignore"))
-    except (OSError, json.JSONDecodeError):
-        return {}
 
 def _scan_target_inventory(target_base: Path) -> dict[str, list[dict[str, object]]]:
     inventory: dict[str, list[dict[str, object]]] = {
@@ -64,7 +41,7 @@ def _scan_target_inventory(target_base: Path) -> dict[str, list[dict[str, object
             if not ws_dir.is_dir():
                 continue
             ws_json = ws_dir / "workspace.json"
-            data = _read_json(ws_json) if ws_json.exists() else {}
+            data = read_json_safe(ws_json) if ws_json.exists() else {}
             if data.get("id"):
                 inventory["workspaces"].append({"id": data.get("id"), "name": data.get("name")})
             queues_dir = ws_dir / "queues"
@@ -74,7 +51,7 @@ def _scan_target_inventory(target_base: Path) -> dict[str, list[dict[str, object
                 if not queue_dir.is_dir():
                     continue
                 queue_json = queue_dir / "queue.json"
-                queue_data = _read_json(queue_json) if queue_json.exists() else {}
+                queue_data = read_json_safe(queue_json) if queue_json.exists() else {}
                 if queue_data.get("id"):
                     inventory["queues"].append(
                         {
@@ -85,7 +62,7 @@ def _scan_target_inventory(target_base: Path) -> dict[str, list[dict[str, object
                         }
                     )
                 schema_json = queue_dir / "schema.json"
-                schema_data = _read_json(schema_json) if schema_json.exists() else {}
+                schema_data = read_json_safe(schema_json) if schema_json.exists() else {}
                 if schema_data.get("id"):
                     inventory["schemas"].append(
                         {
@@ -95,7 +72,7 @@ def _scan_target_inventory(target_base: Path) -> dict[str, list[dict[str, object
                         }
                     )
                 inbox_json = queue_dir / "inbox.json"
-                inbox_data = _read_json(inbox_json) if inbox_json.exists() else {}
+                inbox_data = read_json_safe(inbox_json) if inbox_json.exists() else {}
                 if inbox_data.get("id"):
                     inventory["inboxes"].append(
                         {
@@ -106,7 +83,7 @@ def _scan_target_inventory(target_base: Path) -> dict[str, list[dict[str, object
                     )
 
                 for template_path in (queue_dir / "email_templates").glob("*.json"):
-                    template_data = _read_json(template_path)
+                    template_data = read_json_safe(template_path)
                     if template_data.get("id"):
                         inventory["email_templates"].append(
                             {"id": template_data.get("id"), "name": template_data.get("name")}
@@ -115,22 +92,22 @@ def _scan_target_inventory(target_base: Path) -> dict[str, list[dict[str, object
     hooks_dir = target_base / "hooks"
     if hooks_dir.exists():
         for hook_path in hooks_dir.glob("*.json"):
-            data = _read_json(hook_path)
+            data = read_json_safe(hook_path)
             if data.get("id"):
                 inventory["hooks"].append({"id": data.get("id"), "name": data.get("name")})
 
     for rule_path in target_base.rglob("rules/*.json"):
-        data = _read_json(rule_path)
+        data = read_json_safe(rule_path)
         if data.get("id"):
             inventory["rules"].append({"id": data.get("id"), "name": data.get("name")})
 
     for engine_path in target_base.rglob("engines/*.json"):
-        data = _read_json(engine_path)
+        data = read_json_safe(engine_path)
         if data.get("id"):
             inventory["engines"].append({"id": data.get("id"), "name": data.get("name")})
 
     for label_path in target_base.rglob("labels/*.json"):
-        data = _read_json(label_path)
+        data = read_json_safe(label_path)
         if data.get("id"):
             inventory["labels"].append({"id": data.get("id"), "name": data.get("name")})
 
@@ -142,7 +119,7 @@ def _read_hook_objects(base_dir: Path, hook_ids: set[int]) -> dict[int, dict[str
         return {}
     objects: dict[int, dict[str, object]] = {}
     for hook_path in hooks_dir.glob("*.json"):
-        data = _read_json(hook_path)
+        data = read_json_safe(hook_path)
         hook_id = data.get("id")
         if hook_id is None:
             continue
@@ -223,25 +200,15 @@ def _collect_missing_targets(
     return missing, target_index, target_entries
 
 def _read_skill_prompt(project_root: Path) -> str:
+    from deployment_manager.ai_agent.config import load_agent_config
+
     config_path = project_root / "ai_agent.yaml"
     try:
         config = load_agent_config(config_path)
     except Exception:
         return ""
-    skill_paths = [*config.extra_skills_paths, config.skills_path]
-    for skill_path in skill_paths:
-        if not skill_path.exists():
-            continue
-        skill_file = skill_path / "deploy-template-assistant.md"
-        if not skill_file.exists():
-            continue
-        try:
-            skill_text = skill_file.read_text(encoding="utf-8", errors="ignore").strip()
-        except OSError:
-            continue
-        if skill_text:
-            return f"\n# Skill: {skill_file.name}\n{skill_text}"
-    return ""
+    loader = SkillLoader(config)
+    return loader.load_skill_file("deploy-template-assistant.md")
 
 def _extract_json_payload(text: str) -> dict:
     if not text:
@@ -351,31 +318,6 @@ def _stringify_override_value(value: object) -> str:
         return value.replace("\n", "\\n")
     return str(value)
 
-def _format_table(headers: list[str], rows: list[list[str]]) -> str:
-    if not rows:
-        return ""
-    string_rows = [[str(cell) for cell in row] for row in rows]
-    widths = [len(header) for header in headers]
-    for row in string_rows:
-        for index, cell in enumerate(row):
-            widths[index] = max(widths[index], len(cell))
-    top = "┌" + "┬".join("─" * (width + 2) for width in widths) + "┐"
-    mid = "├" + "┼".join("─" * (width + 2) for width in widths) + "┤"
-    bottom = "└" + "┴".join("─" * (width + 2) for width in widths) + "┘"
-    header_row = "│" + "│".join(
-        f" {header}{' ' * (widths[index] - len(header))} " for index, header in enumerate(headers)
-    ) + "│"
-    body_rows = []
-    for row in string_rows:
-        body_rows.append(
-            "│"
-            + "│".join(
-                f" {cell}{' ' * (widths[index] - len(cell))} " for index, cell in enumerate(row)
-            )
-            + "│"
-        )
-    return "\n".join([top, header_row, mid, *body_rows, bottom])
-
 def _build_hook_settings(
     deploy_data: dict,
     source_base: Path | None,
@@ -422,13 +364,13 @@ def _build_hook_settings(
         )
     return hook_settings
 
-async def _request_llm_payload(helper: LLMHelper, prompt: str) -> tuple[list, list] | None:
-    response = await helper.run(prompt)
-    if not response or not response.text:
+async def _request_llm_payload(llm: BedrockLLMClient, prompt: str) -> tuple[list, list] | None:
+    response_text = await llm.run(prompt)
+    if not response_text:
         display_error("LLM did not return any response.")
         return None
     try:
-        payload = _extract_json_payload(response.text)
+        payload = _extract_json_payload(response_text)
     except Exception as exc:
         display_error(f"Failed to parse LLM response as JSON: {exc}")
         return None
@@ -495,15 +437,15 @@ async def enhance_deploy_template(
     if not missing_targets and not hook_settings:
         display_info("No missing target IDs or hook settings available for overrides.")
         return
-    helper = LLMHelper(model_id=model_id)
-    if not helper.validate_credentials():
+    llm = BedrockLLMClient(model_id=model_id)
+    if not llm.validate():
         return
 
     prompt = (
         _build_prompt(skill_prompt, missing_targets, inventory)
         + f"\nHook settings pairs:\n{json.dumps(hook_settings, ensure_ascii=True, indent=2)}\n"
     )
-    payload = await _request_llm_payload(helper, prompt)
+    payload = await _request_llm_payload(llm, prompt)
     if payload is None:
         return
     mappings, overrides = payload
@@ -537,7 +479,7 @@ async def enhance_deploy_template(
             _build_prompt(skill_prompt, missing_targets, inventory)
             + f"\nHook settings pairs:\n{json.dumps(hook_settings, ensure_ascii=True, indent=2)}\n"
         )
-        payload = await _request_llm_payload(helper, prompt)
+        payload = await _request_llm_payload(llm, prompt)
         if payload is None:
             return
         _, overrides = payload
@@ -551,7 +493,7 @@ async def enhance_deploy_template(
     for override in overrides:
         if not isinstance(override, dict):
             continue
-        obj_type = _TYPE_ALIASES.get(str(override.get("type") or ""), str(override.get("type") or ""))
+        obj_type = TYPE_ALIASES.get(str(override.get("type") or ""), str(override.get("type") or ""))
         source_id = override.get("source_id")
         target_id = override.get("target_id")
         attributes = override.get("attribute_override")
@@ -592,7 +534,7 @@ async def enhance_deploy_template(
     if applied:
         display_info(
             "PROPOSED TARGET ID UPDATES\n"
-            + _format_table(
+            + format_table(
                 ["Type", "Source ID", "Target ID"],
                 [
                     [str(entry["type"]), str(entry["source_id"]), str(entry["target_id"])]
@@ -603,7 +545,7 @@ async def enhance_deploy_template(
     if applied_overrides:
         display_info(
             "PROPOSED ATTRIBUTE OVERRIDES\n"
-            + _format_table(
+            + format_table(
                 ["Type", "Source ID", "Target ID", "Attribute", "Value"],
                 [
                     [
