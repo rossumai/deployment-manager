@@ -196,6 +196,12 @@ class QueueDeployObject(DeployObject):
             use_dummy_references=use_dummy_references,
             allow_empty_reference=True,
         )
+        await self.persist_target_only_reference(
+            target=target,
+            data_attribute=data_attribute,
+            dependency_name="engine",
+            object_type=Resource.Engine,
+        )
 
     async def visualize_changes(self):
         await super().visualize_changes()

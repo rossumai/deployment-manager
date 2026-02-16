@@ -43,7 +43,7 @@ from deployment_manager.commands.deploy.subcommands.run.models import (
 )
 from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
 from deployment_manager.utils.consts import display_error, display_warning, settings
-from deployment_manager.utils.functions import gather_with_concurrency, templatize_name_id
+from deployment_manager.utils.functions import gather_with_concurrency, templatize_name_id, extract_id_from_url
 from deployment_manager.utils.logging import append_raw_event
 from rossum_api import APIClientError
 from rossum_api.api_client import Resource
@@ -339,6 +339,46 @@ class DeployObject(BaseModel):
             if remote_target_reference_url in overriden_references:
                 continue
             overriden_references.append(remote_target_reference_url)
+
+    async def persist_target_only_reference(
+        self,
+        target: Target,
+        data_attribute: str,
+        dependency_name: str,
+        object_type: Resource | None = None,
+    ):
+        """For single references, restores the target-only value when mapping is missing."""
+        if not target.exists_on_remote:
+            return
+
+        remote_target = await self.get_remote_object(target.id)
+        remote_reference = remote_target.get(dependency_name)
+        if not remote_reference:
+            return
+
+        data_with_overriden_reference = getattr(target, data_attribute)
+        current_reference = data_with_overriden_reference.get(dependency_name)
+        if not current_reference:
+            data_with_overriden_reference[dependency_name] = remote_reference
+            return
+
+        source_reference = None
+        if target.pre_reference_replace_data:
+            source_reference = target.pre_reference_replace_data.get(dependency_name)
+
+        if object_type and source_reference:
+            source_reference_id = extract_id_from_url(source_reference)
+            if source_reference_id is not None:
+                targets = self.deploy_file.lookup_table.get(source_reference_id, {}).get(object_type, [])
+                if targets:
+                    return
+
+        source_base_url = self.deploy_file.source_client._http_client.base_url
+        target_base_url = self.deploy_file.client._http_client.base_url
+        if source_reference and current_reference == source_reference:
+            data_with_overriden_reference[dependency_name] = remote_reference
+        elif source_base_url != target_base_url and str(current_reference).startswith(source_base_url):
+            data_with_overriden_reference[dependency_name] = remote_reference
 
     def remove_ignored_attributes(self, data):
         data.pop("created_by", None)
