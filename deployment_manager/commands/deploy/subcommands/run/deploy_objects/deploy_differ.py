@@ -4,6 +4,8 @@ import subprocess
 import tempfile
 from copy import deepcopy
 
+from rich.markup import escape
+
 
 class DeployObjectDiffer:
     @classmethod
@@ -67,9 +69,9 @@ class DeployObjectDiffer:
 
         for index, line in enumerate(split_lines):
             if line.startswith("-"):
-                colorized_line = f"[red]{line}[/red]"
+                colorized_line = f"[red]{escape(line)}[/red]"
             elif line.startswith("+"):
-                colorized_line = f"[green]{line}[/green]"
+                colorized_line = f"[green]{escape(line)}[/green]"
             # The second is a CRLF issue related to diff
             elif line.startswith("@@") or "newline at end of file" in line:
                 del split_lines[index]
