@@ -75,7 +75,7 @@ class LLMHelper:
         try:
             return await asyncio.to_thread(blocking_call)
         except Exception as e:
-            print(f"An error occurred: {e}")
+            display_error(f"An error occurred: {e}", e)
 
     def validate_credentials(self):
         try:
