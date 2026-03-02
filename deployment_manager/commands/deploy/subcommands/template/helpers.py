@@ -189,7 +189,11 @@ async def find_rule_paths_for_dir(base_dir: Path):
     rules_dir = base_dir / settings.RULES_DIR_NAME
     if not await rules_dir.exists():
         return []
-    return [rule_path async for rule_path in rules_dir.iterdir() if await rule_path.is_file()]
+    return [
+        rule_path
+        async for rule_path in rules_dir.iterdir()
+        if await rule_path.is_file() and rule_path.name.endswith(".json")
+    ]
 
 
 async def find_engine_paths_for_dir(base_dir: Path):

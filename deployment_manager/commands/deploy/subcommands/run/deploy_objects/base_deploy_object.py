@@ -43,7 +43,7 @@ from deployment_manager.commands.deploy.subcommands.run.models import (
 )
 from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
 from deployment_manager.utils.consts import display_error, display_warning, settings
-from deployment_manager.utils.functions import gather_with_concurrency, templatize_name_id, extract_id_from_url
+from deployment_manager.utils.functions import extract_id_from_url, gather_with_concurrency, templatize_name_id
 from rossum_api import APIClientError
 from rossum_api.api_client import Resource
 
