@@ -94,7 +94,7 @@ class SchemaDeployObject(DeployObject):
             return
 
         async for field_file_path in formula_directory.iterdir():
-            if not await field_file_path.is_file():
+            if not await field_file_path.is_file() or field_file_path.suffix != ".py":
                 continue
 
             formula_code = await read_formula_file(field_file_path)
