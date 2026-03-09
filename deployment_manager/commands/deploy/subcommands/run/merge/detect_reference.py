@@ -2,7 +2,7 @@ import re
 from enum import Enum, auto
 from typing import Any, Optional, Tuple
 
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 
 class ReferenceDetectionStatus(Enum):

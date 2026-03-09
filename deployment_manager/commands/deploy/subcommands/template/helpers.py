@@ -5,6 +5,7 @@ from typing import Any
 import questionary
 from anyio import Path
 from pydantic import BaseModel
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.attribute_override import create_regex_override_syntax
 from deployment_manager.common.read_write import read_object_from_json, read_prd_project_config
@@ -15,7 +16,6 @@ from deployment_manager.utils.functions import (
     find_object_by_id,
     templatize_name_id,
 )
-from rossum_api.api_client import Resource
 
 
 def create_deploy_file_template():

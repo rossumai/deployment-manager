@@ -2,6 +2,8 @@ import os
 
 from anyio import Path
 from rich.prompt import Confirm
+from rossum_api import APIClientError, AsyncRossumAPIClient
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.common.determine_path import determine_object_type_from_url
 from deployment_manager.common.read_write import (
@@ -16,8 +18,6 @@ from deployment_manager.common.read_write import (
 )
 from deployment_manager.common.schema import find_schema_id
 from deployment_manager.utils.consts import GIT_CHARACTERS, display_warning, settings
-from rossum_api import ElisAPIClient
-from rossum_api.api_client import APIClientError, Resource
 
 
 def is_change_existing(change, changes):
@@ -138,7 +138,7 @@ async def merge_hook_changes(changes: list[tuple[str, Path]], org_path: Path):
     return merged_changes
 
 
-async def mark_unstaged_objects_as_updated(changes, org_path, client: ElisAPIClient):
+async def mark_unstaged_objects_as_updated(changes, org_path, client: AsyncRossumAPIClient):
     """
     Unstaged changes may be truly new objects or existing objects that were pulled and not yet committed. Change op-codes based on their existence on the remote.
     """

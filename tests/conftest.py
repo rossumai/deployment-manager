@@ -3,10 +3,11 @@ import os
 import pytest
 import pytest_asyncio
 from anyio import Path
+from rossum_api.dtos import UserCredentials
 
 from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
+from deployment_manager.common.rossum_client import CustomAsyncAPIClient
 from deployment_manager.utils.consts import settings
-from rossum_api import ElisAPIClient
 
 base_url = os.environ.get("SOURCE_API_BASE")
 username = os.environ.get("SOURCE_USERNAME")
@@ -21,10 +22,9 @@ def client():
     settings.TARGET_API_BASE = base_url
     settings.SOURCE_USERNAME = username
     settings.TARGET_PASSWORD = password
-    return ElisAPIClient(
+    return CustomAsyncAPIClient(
         base_url=base_url,
-        username=username,
-        password=password,
+        credentials=UserCredentials(username=username, password=password),
     )
 
 
@@ -42,10 +42,9 @@ def target_client():
     settings.TARGET_USERNAME = target_username
     settings.TARGET_PASSWORD = target_password
 
-    return ElisAPIClient(
+    return CustomAsyncAPIClient(
         base_url=target_base_url,
-        username=target_username,
-        password=target_password,
+        credentials=UserCredentials(username=target_username, password=target_password),
     )
 
 

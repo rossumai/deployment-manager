@@ -4,13 +4,13 @@ from typing import Optional
 from anyio import Path
 from pydantic import BaseModel, Field
 from rich import print as pprint
+from rossum_api import APIClientError, AsyncRossumAPIClient
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
 from deployment_manager.commands.deploy.subcommands.run.models import SubObjectException, Target, TargetWithDefault
 from deployment_manager.utils.consts import display_error, display_info, display_warning, settings
 from deployment_manager.utils.functions import gather_with_concurrency
-from rossum_api import APIClientError, ElisAPIClient
-from rossum_api.api_client import Resource
 
 
 class NonExistentObjectException(Exception): ...
@@ -27,7 +27,7 @@ class RevertObjectDeploy(BaseModel):
     yaml: DeployYaml = None
     yaml_reference: dict = None
 
-    client: ElisAPIClient = None
+    client: AsyncRossumAPIClient = None
 
     plan_only: bool = False
 

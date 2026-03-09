@@ -4,11 +4,12 @@ import copy
 import re
 from typing import TYPE_CHECKING, Any
 
+from rossum_api.domain_logic.resources import Resource
+
 from deployment_manager.commands.deploy.subcommands.run.helpers import create_object_label, traverse_object
 from deployment_manager.commands.deploy.subcommands.run.models import LookupTable, ReverseLookupTable
 from deployment_manager.utils.consts import display_warning
 from deployment_manager.utils.functions import extract_id_from_url
-from rossum_api.api_client import Resource
 
 if TYPE_CHECKING:
     from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject

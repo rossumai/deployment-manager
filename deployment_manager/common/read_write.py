@@ -7,11 +7,11 @@ import aiofiles
 import yaml
 from anyio import Path
 from rich import print
+from rossum_api.domain_logic.resources import Resource
 from ruamel.yaml import YAML
 
 from deployment_manager.common.determine_path import determine_object_type_from_path
 from deployment_manager.utils.consts import settings
-from rossum_api.api_client import Resource
 
 NON_VERSIONED_ATTRIBUTES_FILE_LOCK = asyncio.Lock()
 

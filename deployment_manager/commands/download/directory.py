@@ -5,6 +5,9 @@ from anyio import Path
 from pydantic import BaseModel
 from rich import print as pprint
 from rich.panel import Panel
+from rossum_api import APIClientError, AsyncRossumAPIClient
+from rossum_api.domain_logic.resources import Resource
+from rossum_api.dtos import Token
 
 from deployment_manager.commands.deploy.common.helpers import validate_credentials
 from deployment_manager.commands.deploy.subcommands.run.helpers import get_token
@@ -36,10 +39,9 @@ from deployment_manager.commands.download.types import ObjectSaver
 from deployment_manager.common.determine_path import determine_object_type_from_url
 from deployment_manager.common.git import get_changed_file_paths
 from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
+from deployment_manager.common.rossum_client import CustomAsyncAPIClient
 from deployment_manager.utils.consts import CustomResource, display_error, settings
 from deployment_manager.utils.functions import find_all_object_paths, gather_with_concurrency
-from rossum_api import APIClientError, ElisAPIClient
-from rossum_api.api_client import Resource
 
 
 class DownloadException(Exception): ...
@@ -59,7 +61,7 @@ class OrganizationDirectory(BaseModel):
     subdirectories: SubdirectoriesDict = {}
 
     # Added later
-    client: ElisAPIClient = None
+    client: AsyncRossumAPIClient = None
     project_path: Path = None
 
     @property
@@ -125,7 +127,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
             )
             credentials = Credentials(token=token, url=self.api_base)
             await validate_credentials(credentials)
-            self.client = ElisAPIClient(base_url=self.api_base, token=token)
+            self.client = CustomAsyncAPIClient(base_url=self.api_base, credentials=Token(token=token))
 
     # TODO: catch errors on org-dir or subdir level?
     async def download_organization(self):
@@ -159,9 +161,9 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                     downloader.download_remote_objects(type=Resource.Schema),
                     downloader.download_remote_objects(type=Resource.Engine, check_access=True),
                     downloader.download_remote_objects(type=Resource.EngineField, check_access=True),
-                    downloader.download_remote_objects(type=CustomResource.Rule, check_access=True),
+                    downloader.download_remote_objects(type=Resource.Rule, check_access=True),
                     downloader.download_remote_objects(type=Resource.Hook),
-                    downloader.download_remote_objects(type=Resource.Label, check_access=True),
+                    downloader.download_remote_objects(type=CustomResource.Label, check_access=True),
                     downloader.download_remote_objects(type=CustomResource.Workflow, check_access=True),
                     downloader.download_remote_objects(type=CustomResource.WorkflowStep, check_access=True),
                 ],
@@ -446,7 +448,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
         match object_type:
             case Resource.Hook:
                 remote_path = self.hook_saver.construct_object_path(subdir, remote_object)
-            case Resource.Label:
+            case CustomResource.Label:
                 remote_path = self.label_saver.construct_object_path(subdir, remote_object)
             case Resource.Schema:
                 remote_path = self.schema_saver.construct_object_path(subdir, remote_object)
@@ -454,7 +456,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
                 remote_path = self.engine_saver.construct_object_path(subdir, remote_object)
             case Resource.EngineField:
                 remote_path = self.engine_field_saver.construct_object_path(subdir, remote_object)
-            case CustomResource.Rule:
+            case Resource.Rule:
                 remote_path = self.rule_saver.construct_object_path(subdir, remote_object)
             case Resource.Inbox:
                 remote_path = self.inbox_saver.construct_object_path(subdir, remote_object)

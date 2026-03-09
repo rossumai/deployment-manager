@@ -9,12 +9,13 @@ from langchain_aws import AmazonKnowledgeBasesRetriever, ChatBedrockConverse
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.messages.utils import count_tokens_approximately
 from langchain_core.tools import tool
+from rossum_api.dtos import Token
 
 from deployment_manager.commands.deploy.subcommands.run.upload_helpers import Credentials
 from deployment_manager.commands.document.llm_helper import MODEL_ID
+from deployment_manager.common.rossum_client import CustomAsyncAPIClient
 from deployment_manager.utils.consts import display_error, settings
 from deployment_manager.utils.functions import extract_id_from_url, find_all_object_paths
-from rossum_api.elis_api_client import ElisAPIClient
 
 # No longer strictly needed for direct message passing but good for prompt templates
 # from langchain_core.prompts import MessagesPlaceholder
@@ -78,7 +79,7 @@ class ConversationSolver:
             print(message)
 
     def __init__(self, creds: Credentials, project_path: Path, dir_name: str, subdir_name: str):
-        self.client = ElisAPIClient(token=creds.token, base_url=creds.url)
+        self.client = CustomAsyncAPIClient(base_url=creds.url, credentials=Token(token=creds.token))
 
         self.project_path = project_path
         self.dir_name = dir_name

@@ -1,21 +1,21 @@
 from copy import deepcopy
 
 import jmespath
+from rossum_api import AsyncRossumAPIClient
+from rossum_api.domain_logic.resources import Resource
+from rossum_api.models.organization import Organization
 
 from deployment_manager.commands.deploy.common.helpers import get_token_owner_from_user
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
 from deployment_manager.utils.consts import display_warning, settings
 from deployment_manager.utils.functions import flatten, templatize_name_id
-from rossum_api import ElisAPIClient
-from rossum_api.api_client import Resource
-from rossum_api.models.organization import Organization
 
 
 class ObjectConfigReverser:
-    prev_source_client: ElisAPIClient
-    prev_target_client: ElisAPIClient
+    prev_source_client: AsyncRossumAPIClient
+    prev_target_client: AsyncRossumAPIClient
 
-    def __init__(self, prev_source_client: ElisAPIClient, prev_target_client: ElisAPIClient):
+    def __init__(self, prev_source_client: AsyncRossumAPIClient, prev_target_client: AsyncRossumAPIClient):
         self.prev_source_client = prev_source_client
         self.prev_target_client = prev_target_client
 
@@ -109,8 +109,8 @@ async def reverse_source_target_in_yaml(
     yaml: DeployYaml,
     source_org: Organization,
     target_org: Organization,
-    prev_source_client: ElisAPIClient,
-    prev_target_client: ElisAPIClient,
+    prev_source_client: AsyncRossumAPIClient,
+    prev_target_client: AsyncRossumAPIClient,
 ):
     yaml = deepcopy(yaml)
     # Reverse dirs and urls

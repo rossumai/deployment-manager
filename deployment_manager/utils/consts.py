@@ -12,8 +12,7 @@ import yaml
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
-
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.ERROR)
@@ -356,6 +355,6 @@ initialize_settings()
 
 
 class CustomResource(Enum):
-    Rule = "rules"
+    Label = "labels"
     Workflow = "workflows"
     WorkflowStep = "workflow_steps"

@@ -1,12 +1,12 @@
 from anyio import Path
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
 from deployment_manager.commands.deploy.subcommands.run.models import Target
 from deployment_manager.common.read_write import find_fields_in_schema, read_formula_file
 from deployment_manager.common.schema import find_schema_id
-from deployment_manager.utils.consts import CustomResource, settings
+from deployment_manager.utils.consts import settings
 from deployment_manager.utils.functions import templatize_name_id
-from rossum_api.api_client import Resource
 
 
 class SchemaDeployObject(DeployObject):
@@ -68,7 +68,7 @@ class SchemaDeployObject(DeployObject):
             dependency_name="rules",
             lookup_table=self.deploy_file.lookup_table,
             reverse_lookup_table=self.deploy_file.reverse_lookup_table,
-            object_type=CustomResource.Rule,
+            object_type=Resource.Rule,
             use_dummy_references=use_dummy_references,
         )
 

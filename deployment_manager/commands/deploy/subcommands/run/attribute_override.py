@@ -5,12 +5,12 @@ import subprocess
 import tempfile
 
 import jmespath
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.helpers import traverse_object
 from deployment_manager.commands.deploy.subcommands.run.models import LookupTable, Target
 from deployment_manager.utils.consts import display_warning, settings
 from deployment_manager.utils.functions import flatten
-from rossum_api.api_client import Resource
 
 
 class AttributeOverrideException(Exception): ...
