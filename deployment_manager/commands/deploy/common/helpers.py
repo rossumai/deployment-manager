@@ -1,14 +1,16 @@
 import questionary
 from anyio import Path
 from pydantic import HttpUrl, ValidationError
+from rossum_api import APIClientError, AsyncRossumAPIClient
+from rossum_api.dtos import Token
+from rossum_api.models.group import Group
+from rossum_api.models.user import User
 
 from deployment_manager.commands.deploy.subcommands.run.upload_helpers import Credentials
 from deployment_manager.common.questionary_functions import ask_async_with_interruption
 from deployment_manager.common.read_write import read_prd_cred_file, read_prd_project_config, write_prd_cred_file
+from deployment_manager.common.rossum_client import CustomAsyncAPIClient
 from deployment_manager.utils.consts import display_error, settings
-from rossum_api import APIClientError, ElisAPIClient
-from rossum_api.models.group import Group
-from rossum_api.models.user import User
 
 
 class InvalidCredentialsException(Exception): ...
@@ -113,9 +115,9 @@ def is_user_admin(user: User, user_roles: list[Group]):
     return False
 
 
-async def get_token_owner_from_user(client: ElisAPIClient):
-    users = [user async for user in client.list_all_users()]
-    user_roles = [role async for role in client.list_all_user_roles()]
+async def get_token_owner_from_user(client: AsyncRossumAPIClient):
+    users = [user async for user in client.list_users()]
+    user_roles = [role async for role in client.list_user_roles()]
     user_choices = [
         questionary.Choice(title=user.username, value=user.id)
         for user in users
@@ -135,7 +137,9 @@ async def validate_credentials(credentials: Credentials):
         raise Exception(f"No {settings.CONFIG_KEY_TOKEN} in credentials")
 
     try:
-        await ElisAPIClient(base_url=credentials.url, token=credentials.token).request("get", "auth/user")
+        await CustomAsyncAPIClient(base_url=credentials.url, credentials=Token(token=credentials.token)).request(
+            "get", "auth/user"
+        )
     except APIClientError as e:
         if e.status_code == 401:
             raise InvalidCredentialsException(f'Invalid API token "{credentials.token}" for URL "{credentials.url}"')

@@ -1,7 +1,8 @@
 import click
+from rossum_api.dtos import Token, UserCredentials
 
+from deployment_manager.common.rossum_client import CustomAsyncAPIClient
 from deployment_manager.utils.consts import settings, validate_token
-from rossum_api import ElisAPIClient
 
 
 async def create_and_validate_client(
@@ -17,12 +18,11 @@ async def create_and_validate_client(
             validate_token(settings.SOURCE_API_BASE, settings.SOURCE_TOKEN, "source")
 
         try:
-            client = ElisAPIClient(
-                base_url=settings.SOURCE_API_URL,
-                token=settings.SOURCE_TOKEN,
-                username=settings.SOURCE_USERNAME,
-                password=settings.SOURCE_PASSWORD,
-            )
+            if settings.SOURCE_PASSWORD:
+                creds = UserCredentials(username=settings.SOURCE_USERNAME, password=settings.SOURCE_PASSWORD)
+            else:
+                creds = Token(token=settings.SOURCE_TOKEN)
+            client = CustomAsyncAPIClient(base_url=settings.SOURCE_API_URL, credentials=creds)
             await client.request("get", "auth/user")
             return client
         except Exception:
@@ -36,12 +36,11 @@ async def create_and_validate_client(
             validate_token(settings.TARGET_API_BASE, settings.TARGET_TOKEN, "target")
 
         try:
-            client = ElisAPIClient(
-                base_url=settings.TARGET_API_URL,
-                token=settings.TARGET_TOKEN,
-                username=settings.TARGET_USERNAME,
-                password=settings.TARGET_PASSWORD,
-            )
+            if settings.TARGET_PASSWORD:
+                creds = UserCredentials(username=settings.TARGET_USERNAME, password=settings.TARGET_PASSWORD)
+            else:
+                creds = Token(token=settings.TARGET_TOKEN)
+            client = CustomAsyncAPIClient(base_url=settings.TARGET_API_URL, credentials=creds)
             await client.request("get", "auth/user")
             return client
         except Exception:

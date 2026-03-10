@@ -2,6 +2,7 @@ from copy import deepcopy
 
 import questionary
 from rich import print as pprint
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.hook_reference_replacer import (
@@ -12,7 +13,6 @@ from deployment_manager.commands.deploy.subcommands.run.models import Target
 from deployment_manager.common.read_write import write_str
 from deployment_manager.utils.consts import display_error, settings
 from deployment_manager.utils.functions import extract_id_from_url, templatize_name_id
-from rossum_api.api_client import Resource
 
 
 class HookDeployObject(DeployObject):

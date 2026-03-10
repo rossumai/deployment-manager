@@ -1,5 +1,6 @@
 from anyio import Path
 from pydantic import BaseModel
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.download.helpers import should_write_object
 from deployment_manager.commands.download.subdirectory import Subdirectory
@@ -14,7 +15,6 @@ from deployment_manager.common.read_write import (
 )
 from deployment_manager.utils.consts import CustomResource, Settings, display_warning
 from deployment_manager.utils.functions import templatize_name_id
-from rossum_api.api_client import Resource
 
 
 class WorkspaceSaver(ObjectSaver):
@@ -319,7 +319,7 @@ class FormulaSaver(BaseModel):
 
 
 class RuleSaver(ObjectSaver):
-    type: Resource = CustomResource.Rule
+    type: Resource = Resource.Rule
     queues: list[dict]
 
     def find_subdir_of_object(self, object: dict):
@@ -403,7 +403,7 @@ class HookSaver(ObjectSaver):
 
 
 class LabelSaver(ObjectSaver):
-    type: Resource = Resource.Label
+    type: CustomResource = CustomResource.Label
 
     def construct_object_path(self, subdir: Subdirectory, label: dict) -> Path:
         object_path = self.base_path / subdir.name / "labels" / f'{templatize_name_id(label["name"], label["id"])}.json'

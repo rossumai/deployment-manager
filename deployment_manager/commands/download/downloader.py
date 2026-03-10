@@ -1,16 +1,16 @@
 from pydantic import BaseModel
+from rossum_api import APIClientError, AsyncRossumAPIClient
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.utils.consts import CustomResource
 from deployment_manager.utils.functions import gather_with_concurrency
-from rossum_api import APIClientError, ElisAPIClient
-from rossum_api.api_client import Resource
 
 
 class Downloader(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    client: ElisAPIClient
+    client: AsyncRossumAPIClient
 
     async def download_remote_objects(self, type: Resource | CustomResource, check_access: bool = False):
         # Some API objects (e.g., rules) might not be allowed and Elis API would return 403...

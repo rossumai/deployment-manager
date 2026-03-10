@@ -3,6 +3,7 @@ import hashlib
 import questionary
 from anyio import Path
 from rich import print as pprint
+from rossum_api import AsyncRossumAPIClient
 
 from deployment_manager.commands.deploy.common.helpers import (
     get_api_url_from_config,
@@ -30,7 +31,6 @@ from deployment_manager.common.read_write import (
     write_object_to_json,
 )
 from deployment_manager.utils.consts import display_error, display_info, settings
-from rossum_api import ElisAPIClient
 
 
 async def create_deploy_template(
@@ -38,8 +38,8 @@ async def create_deploy_template(
     mapping_file_path: Path = None,
     org_path: Path = None,
     interactive: bool = False,
-    source_client: ElisAPIClient = None,
-    target_client: ElisAPIClient = None,
+    source_client: AsyncRossumAPIClient = None,
+    target_client: AsyncRossumAPIClient = None,
 ):
     if not input_file_path:
         input_file_content = create_deploy_file_template()

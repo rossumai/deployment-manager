@@ -2,6 +2,7 @@ import dataclasses
 import filecmp
 
 from anyio import Path
+from rossum_api.models import Hook, Inbox, Organization, Queue, Schema, Workspace
 
 from deployment_manager.common.mapping import (
     extract_source_target_pairs,
@@ -15,7 +16,6 @@ from deployment_manager.utils.functions import (
     extract_id_from_url,
     templatize_name_id,
 )
-from rossum_api.models import Hook, Inbox, Organization, Queue, Schema, Workspace
 
 
 def is_object_equal(object_one: dict, object_two: dict):

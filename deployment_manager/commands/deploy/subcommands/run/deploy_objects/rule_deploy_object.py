@@ -1,3 +1,5 @@
+from rossum_api.domain_logic.resources import Resource
+
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.email_template_deploy_object import (
     EmailTemplateDeployObject,
@@ -6,11 +8,10 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.label_dep
 from deployment_manager.commands.deploy.subcommands.run.models import TargetWithDefault
 from deployment_manager.utils.consts import CustomResource, display_warning
 from deployment_manager.utils.functions import extract_id_from_url
-from rossum_api.api_client import Resource
 
 
 class RuleDeployObject(DeployObject):
-    type: CustomResource = CustomResource.Rule
+    type: Resource = Resource.Rule
 
     skipped: bool = False
     # Track if second_deploy_data references have been overridden
@@ -117,14 +118,14 @@ class RuleDeployObject(DeployObject):
             if any(label.id == label_id for label in self.deploy_file.labels):
                 continue
             try:
-                label_data = await self.deploy_file.source_client._http_client.fetch_one(Resource.Label, label_id)
+                label_data = await self.deploy_file.source_client._http_client.fetch_one(CustomResource.Label, label_id)
 
                 # Re-check after async fetch to reduce duplicates from concurrent rules
                 if any(label.id == label_id for label in self.deploy_file.labels):
                     continue
 
                 # Check if this label was previously deployed
-                target_ids = self.get_target_ids_from_auto_mappings(Resource.Label, label_id)
+                target_ids = self.get_target_ids_from_auto_mappings(CustomResource.Label, label_id)
                 if target_ids:
                     # Use existing target IDs from previous deployments
                     targets = [TargetWithDefault(id=target_id) for target_id in target_ids]

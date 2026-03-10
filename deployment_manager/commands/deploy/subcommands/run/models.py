@@ -4,8 +4,7 @@ import uuid
 from typing import TYPE_CHECKING, Annotated, Union
 
 from pydantic import BaseModel, BeforeValidator, Field, field_validator
-
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 # { source_id: { Resource.Hooks: [Target1, Target2] } }
 type LookupTable = dict[int, dict[Resource, list[Target]]]

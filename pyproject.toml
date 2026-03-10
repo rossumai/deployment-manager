@@ -2,13 +2,8 @@
 name = "deployment-manager"
 version = "0.0.0"
 packages = [
-    { include = "deployment_manager" },    # Keeps main package
-    { include = "rossum_api" },
+    { include = "deployment_manager" },
 ]
-
-
-# Force Poetry to include rossum_api, even if it's in .gitignore
-include = ["rossum_api/**/*"]
 
 description = ""
 authors = [
@@ -35,6 +30,7 @@ rich = "^13.7.0"
 jmespath = "^1.0.1"
 ruamel-yaml = "^0.18.6"
 pydantic = "^2.9.2"
+rossum-api = "^3.11.0"
 questionary = "^2.0.1"
 boto3 = "^1.37.30"
 botocore = "^1.37.30"
@@ -65,7 +61,7 @@ requires = ["poetry-core", "poetry-dynamic-versioning"]
 build-backend = "poetry_dynamic_versioning.backend"
 
 [tool.ruff]
-exclude = ["dummy_project", "dist", "rossum_api"]
+exclude = ["dummy_project", "dist"]
 line-length = 120
 
 [tool.ruff.lint]
