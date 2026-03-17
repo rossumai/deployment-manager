@@ -50,10 +50,12 @@ class ReferenceReplacer:
 
             for parent, key_in_parent, value in traverse_object(target_object, key, target_object[key]):
                 for source_id, types_dict in lookup_table.items():
-                    # source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
-                    # if not re.search(source_id_regex, str(value)):
-                    # continue
-                    if str(source_id) not in str(value):
+                    # For action IDs, only match exact values (not substrings)
+                    # to avoid corrupting UUIDs that happen to contain the source ID
+                    if key == "actions" and key_in_parent == "id":
+                        if str(value) != str(source_id):
+                            continue
+                    elif str(source_id) not in str(value):
                         continue
 
                     if len(types_dict.keys()) > 1:
