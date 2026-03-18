@@ -1,12 +1,12 @@
 from pydantic import BaseModel
 from rich import print
 from rich.panel import Panel
+from rossum_api import AsyncRossumAPIClient
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.common.modified_at import check_modified_timestamp
 from deployment_manager.utils.consts import settings
 from deployment_manager.utils.functions import find_object_by_id
-from rossum_api import ElisAPIClient
-from rossum_api.api_client import Resource
 
 
 class TargetObjectNotFoundException(Exception):
@@ -16,7 +16,7 @@ class TargetObjectNotFoundException(Exception):
 
 
 async def upload_organization(
-    client: ElisAPIClient,
+    client: AsyncRossumAPIClient,
     organization: dict,
     local_target_organization: dict = None,
     errors={},
@@ -50,7 +50,7 @@ async def upload_organization(
 
 
 async def upload_inbox(
-    client: ElisAPIClient,
+    client: AsyncRossumAPIClient,
     inbox: dict,
     target_id: int,
     target_objects=[],

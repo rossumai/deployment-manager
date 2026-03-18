@@ -12,8 +12,7 @@ from rich.console import Console
 from rich.text import Text
 from rich.panel import Panel
 from rich.prompt import Prompt
-
-from rossum_api.api_client import Resource
+from rossum_api.domain_logic.resources import Resource
 
 API_SUFFIX_RE = re.compile(r"/api/v\d+$")
 
@@ -350,6 +349,6 @@ def initialize_settings():
 initialize_settings()
 
 class CustomResource(Enum):
-    Rule = "rules"
+    Label = "labels"
     Workflow = "workflows"
     WorkflowStep = "workflow_steps"

@@ -1,10 +1,10 @@
 import re
 
 import jmespath
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.utils.consts import display_warning, settings
 from deployment_manager.utils.functions import flatten
-from rossum_api.api_client import Resource
 
 
 class AttributeOverrideException(Exception): ...

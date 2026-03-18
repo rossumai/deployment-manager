@@ -1852,6 +1852,27 @@ pygments = ">=2.13.0,<3.0.0"
 jupyter = ["ipywidgets (>=7.5.1,<9)"]
 
 [[package]]
+name = "rossum-api"
+version = "3.11.0"
+description = "Python API client for the Rossum platform."
+optional = false
+python-versions = ">=3.10"
+files = [
+    {file = "rossum_api-3.11.0-py3-none-any.whl", hash = "sha256:b789c5bfca82074f0d574817792b9e8eeb7accfc8739b7e94be6ad768ed3fbb6"},
+    {file = "rossum_api-3.11.0.tar.gz", hash = "sha256:92c774f15e1a74df3c36a93107d92975ea80113fd735221db9c0aa835ad39eed"},
+]
+
+[package.dependencies]
+aiofiles = "*"
+dacite = ">=1.9.0"
+httpx = "*"
+tenacity = "*"
+
+[package.extras]
+docs = ["furo", "sphinx (>=8.2,<9.0)", "sphinx-autodoc-typehints"]
+tests = ["codecov", "pre-commit", "pytest", "pytest-asyncio", "pytest-cov", "pytest-httpx (>=0.34.0)", "ruff", "types-aiofiles"]
+
+[[package]]
 name = "ruamel-yaml"
 version = "0.18.11"
 description = "ruamel.yaml is a YAML parser/emitter that supports roundtrip preservation of comments, seq/map flow style, and map key order"
@@ -2334,4 +2355,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "72dfae0c7509c5b0ad37c8f5e51293281618ece841510856040a0548c52ecc66"
+content-hash = "013de6c1626ead71646b80bd5641b6f4d8cfcbb719b914ef894a799e2d3fd7c2"

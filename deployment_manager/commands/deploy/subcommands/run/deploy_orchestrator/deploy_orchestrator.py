@@ -5,6 +5,9 @@ from collections import defaultdict
 import questionary
 from anyio import Path
 from pydantic import BaseModel
+from rossum_api import APIClientError, AsyncRossumAPIClient
+from rossum_api.domain_logic.resources import Resource
+from rossum_api.models.organization import Organization
 from ruamel.yaml import YAML
 
 from deployment_manager.commands.deploy.common.helpers import get_token_owner_from_user
@@ -62,9 +65,6 @@ from deployment_manager.utils.consts import (
 )
 from deployment_manager.utils.functions import extract_id_from_url, gather_with_concurrency
 from deployment_manager.utils.logging import append_raw_event
-from rossum_api import APIClientError, ElisAPIClient
-from rossum_api.api_client import Resource
-from rossum_api.models.organization import Organization
 
 # TODO: dummy refs not in diff -> conflict if org.workspaces is 1 and we are creating another
 # TODO: purge should clean up state file as well
@@ -88,8 +88,8 @@ class DeployOrchestrator(BaseModel):
     secrets: dict | None = {}
     deploy_state: DeployState | None = {}
 
-    client: ElisAPIClient
-    source_client: ElisAPIClient
+    client: AsyncRossumAPIClient
+    source_client: AsyncRossumAPIClient
     source_dir_path: Path
     yaml: DeployYaml
     deploy_file_path: Path
@@ -223,13 +223,13 @@ class DeployOrchestrator(BaseModel):
         deploy_state_objects = [
             (Resource.Organization, [self.organization]),
             (Resource.Hook, self.hooks),
-            (Resource.Label, self.labels),
+            (CustomResource.Label, self.labels),
             (Resource.EmailTemplate, self.email_templates),
             (Resource.Engine, self.engines),
             (Resource.EngineField, engine_fields),
             (Resource.Queue, self.queues),
             (Resource.Schema, schemas),
-            (CustomResource.Rule, self.rules),
+            (Resource.Rule, self.rules),
             (Resource.Inbox, inboxes),
             (Resource.Workspace, self.workspaces),
         ]
@@ -515,7 +515,7 @@ class DeployOrchestrator(BaseModel):
             lookup_table[hook.id][Resource.Hook] = hook.targets
 
         for label in self.labels:
-            lookup_table[label.id][Resource.Label] = label.targets
+            lookup_table[label.id][CustomResource.Label] = label.targets
 
         for email_template in self.email_templates:
             lookup_table[email_template.id][Resource.EmailTemplate] = email_template.targets
@@ -527,7 +527,7 @@ class DeployOrchestrator(BaseModel):
                 lookup_table[engine_field.id][Resource.EngineField] = engine_field.targets
 
         for rule in self.rules:
-            lookup_table[rule.id][CustomResource.Rule] = rule.targets
+            lookup_table[rule.id][Resource.Rule] = rule.targets
 
         for workspace in self.workspaces:
             lookup_table[workspace.id][Resource.Workspace] = workspace.targets

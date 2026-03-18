@@ -33,6 +33,8 @@ def get_changed_file_paths(destination: str, indexed_only=False) -> list[tuple[s
         op, path = tuple(change.split(" ", maxsplit=1))
 
         path = Path(path.strip().strip('"'))
+        if path.suffix not in (".json", ".py", ".js"):
+            continue
 
         changes.append((op, path))
     return changes

@@ -32,6 +32,8 @@ from pydantic import BaseModel
 from rich import print as pprint
 from rich.console import Console
 from rich.panel import Panel
+from rossum_api import APIClientError
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.reference_replacer import ReferenceReplacer
 from deployment_manager.commands.deploy.subcommands.run.helpers import create_object_label

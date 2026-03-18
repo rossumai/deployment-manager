@@ -1,5 +1,7 @@
 import questionary
 from anyio import Path
+from rossum_api import AsyncRossumAPIClient
+from rossum_api.dtos import Token
 
 from deployment_manager.commands.deploy.subcommands.run.helpers import get_url_and_credentials
 from deployment_manager.commands.hook.helpers import (
@@ -10,13 +12,15 @@ from deployment_manager.commands.hook.helpers import (
 )
 from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
 from deployment_manager.common.read_write import write_object_to_json
+from deployment_manager.common.rossum_client import CustomAsyncAPIClient
 from deployment_manager.utils.consts import display_error, display_warning
-from rossum_api import ElisAPIClient
 
 STATUS_REQUIRING_EVENTS = ["annotation_status", "annotation_content"]
 
 
-async def generate_and_save_hook_payload(hook_path: Path, annotation_url: str = "", client: ElisAPIClient = None):
+async def generate_and_save_hook_payload(
+    hook_path: Path, annotation_url: str = "", client: AsyncRossumAPIClient = None
+):
     try:
         payload = await generate_hook_payload(hook_path=hook_path, annotation_url=annotation_url, client=client)
         if not payload:
@@ -34,7 +38,7 @@ async def generate_and_save_hook_payload(hook_path: Path, annotation_url: str = 
         display_error("Error while generating hook payload {} ^", e)
 
 
-async def generate_hook_payload(hook_path: Path, annotation_url: str = "", client: ElisAPIClient = None):
+async def generate_hook_payload(hook_path: Path, annotation_url: str = "", client: AsyncRossumAPIClient = None):
     hook = await load_hook_object(hook_path=hook_path)
     if not hook:
         return
@@ -48,7 +52,7 @@ async def generate_hook_payload(hook_path: Path, annotation_url: str = "", clien
         )
         if not credentials:
             return
-        client = ElisAPIClient(base_url=credentials.url, token=credentials.token)
+        client = CustomAsyncAPIClient(base_url=credentials.url, credentials=Token(token=credentials.token))
 
     if not annotation_url:
         annotation_url = await questionary.text("Annotation ID or URL for hook payload:").ask_async()

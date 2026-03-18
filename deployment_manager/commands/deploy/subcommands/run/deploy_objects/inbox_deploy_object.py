@@ -1,7 +1,7 @@
 from anyio import Path
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
-from rossum_api.api_client import Resource
 
 
 class InboxDeployObject(DeployObject):

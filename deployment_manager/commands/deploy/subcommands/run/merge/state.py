@@ -4,6 +4,7 @@ from typing import Dict, Literal, Optional
 
 import anyio
 from pydantic import BaseModel, Field
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
     DeployObject,
@@ -15,7 +16,6 @@ from deployment_manager.utils.consts import (
     display_info,
     settings,
 )
-from rossum_api.api_client import Resource
 
 
 class LastAppliedEntry(BaseModel):

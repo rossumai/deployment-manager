@@ -4,11 +4,12 @@ import copy
 import re
 from typing import TYPE_CHECKING, Any
 
+from rossum_api.domain_logic.resources import Resource
+
 from deployment_manager.commands.deploy.subcommands.run.helpers import create_object_label, traverse_object
 from deployment_manager.commands.deploy.subcommands.run.models import LookupTable, ReverseLookupTable
 from deployment_manager.utils.consts import display_warning
 from deployment_manager.utils.functions import extract_id_from_url
-from rossum_api.api_client import Resource
 
 if TYPE_CHECKING:
     from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
@@ -162,15 +163,18 @@ class ReferenceReplacer:
             return
 
         target_id_str = str(selected_target.id)
-        if selected_target.data_from_remote and selected_target.data_from_remote.get("url"):
-            return selected_target.data_from_remote["url"]
 
         source_base_url = self.parent_object_reference.deploy_file.source_client._http_client.base_url
         target_base_url = self.parent_object_reference.deploy_file.client._http_client.base_url
-        if source_base_url == target_base_url:
-            return source_dependency_url.replace(str(source_id), target_id_str)
 
-        return f"{target_base_url}/{object_type.value}/{target_id_str}"
+        if selected_target.data_from_remote and selected_target.data_from_remote.get("url"):
+            remote_url = selected_target.data_from_remote["url"]
+            target_id_str = str(extract_id_from_url(remote_url))
+
+        new_url = source_dependency_url.replace(str(source_id), target_id_str)
+        if source_base_url != target_base_url:
+            new_url = new_url.replace(source_base_url, target_base_url)
+        return new_url
 
     def replace_reference_url(
         self,

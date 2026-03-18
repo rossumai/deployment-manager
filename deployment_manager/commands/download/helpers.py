@@ -10,11 +10,11 @@ if TYPE_CHECKING:
     )
 
 from anyio import Path
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.common.determine_path import determine_object_type_from_url
 from deployment_manager.common.read_write import NON_VERSIONED_ATTRIBUTES_FILE_LOCK, read_object_from_json
 from deployment_manager.utils.consts import display_warning, settings
-from rossum_api.api_client import Resource
 
 
 def replace_code_paths(file_paths: list[Path]):

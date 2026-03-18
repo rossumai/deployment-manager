@@ -3,6 +3,8 @@ from copy import deepcopy
 import questionary
 from anyio import Path
 from pydantic import ValidationError
+from rossum_api import AsyncRossumAPIClient
+from rossum_api.dtos import Token
 
 from deployment_manager.commands.deploy.subcommands.revert.revert_deploy_file import RevertDeployFile
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
@@ -14,14 +16,14 @@ from deployment_manager.commands.deploy.subcommands.run.helpers import (
 )
 from deployment_manager.commands.deploy.subcommands.run.models import DeployException
 from deployment_manager.commands.download.download import download_destinations
+from deployment_manager.common.rossum_client import CustomAsyncAPIClient
 from deployment_manager.utils.consts import display_error, display_info, settings
-from rossum_api import ElisAPIClient
 
 
 async def revert_release_file(
     deploy_file_path: Path,
     project_path: Path = None,
-    target_client: ElisAPIClient = None,
+    target_client: AsyncRossumAPIClient = None,
     commit: bool = False,
     commit_message: str = "",
 ):
@@ -45,7 +47,9 @@ async def revert_release_file(
         )
         if not target_credentials:
             return
-        target_client = ElisAPIClient(base_url=target_credentials.url, token=target_credentials.token)
+        target_client = CustomAsyncAPIClient(
+            base_url=target_credentials.url, credentials=Token(token=target_credentials.token)
+        )
 
     try:
         release = RevertDeployFile(

@@ -2,6 +2,8 @@ from anyio import Path
 from pydantic import BaseModel
 from rich import print as pprint
 from rich.panel import Panel
+from rossum_api.domain_logic.resources import Resource
+from rossum_api.dtos import Token
 
 from deployment_manager.commands.deploy.common.helpers import validate_credentials
 from deployment_manager.commands.deploy.subcommands.run.helpers import get_token
@@ -17,10 +19,9 @@ from deployment_manager.common.determine_path import determine_object_type_from_
 from deployment_manager.common.git import get_changed_file_paths
 from deployment_manager.common.modified_at import check_modified_timestamp
 from deployment_manager.common.read_write import read_object_from_json, write_object_to_json
+from deployment_manager.common.rossum_client import CustomAsyncAPIClient
 from deployment_manager.utils.consts import GIT_CHARACTERS, CustomResource, display_error, display_warning, settings
 from deployment_manager.utils.functions import find_all_object_paths, gather_with_concurrency
-from rossum_api import ElisAPIClient
-from rossum_api.api_client import Resource
 
 
 class ChangedObject(BaseModel):
@@ -94,7 +95,7 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             )
             credentials = Credentials(token=token, url=self.api_base)
             await validate_credentials(credentials)
-            self.client = ElisAPIClient(base_url=self.api_base, token=token)
+            self.client = CustomAsyncAPIClient(base_url=self.api_base, credentials=Token(token=token))
 
     async def prepare_changed_objects(self):
         changes = get_changed_file_paths(self.project_path / self.name, indexed_only=self.indexed_only)

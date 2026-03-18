@@ -5,6 +5,7 @@ from typing import Any
 import questionary
 from anyio import Path
 from pydantic import BaseModel
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.attribute_override import create_regex_override_syntax
 from deployment_manager.common.read_write import read_object_from_json, read_prd_project_config
@@ -15,7 +16,6 @@ from deployment_manager.utils.functions import (
     find_object_by_id,
     templatize_name_id,
 )
-from rossum_api.api_client import Resource
 
 
 def create_deploy_file_template():
@@ -189,7 +189,11 @@ async def find_rule_paths_for_dir(base_dir: Path):
     rules_dir = base_dir / settings.RULES_DIR_NAME
     if not await rules_dir.exists():
         return []
-    return [rule_path async for rule_path in rules_dir.iterdir() if await rule_path.is_file()]
+    return [
+        rule_path
+        async for rule_path in rules_dir.iterdir()
+        if await rule_path.is_file() and rule_path.name.endswith(".json")
+    ]
 
 
 async def find_engine_paths_for_dir(base_dir: Path):
