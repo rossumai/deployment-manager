@@ -47,7 +47,7 @@ from deployment_manager.common.read_write import read_object_from_json, write_ob
 from deployment_manager.utils.consts import display_error, display_warning, settings
 from deployment_manager.utils.functions import extract_id_from_url, gather_with_concurrency, templatize_name_id
 
-console = Console()
+console = Console(stderr=True)
 
 
 # TODO: prebuilt exceptions that automatically reference the type/name/id of object
