@@ -20,8 +20,8 @@ class ReferenceReplacer:
     parent_object_reference: "DeployObject"
 
     IMPLICIT_OVERRIDE_KEYS = ["settings", "metadata", "actions"]
-    # Paths (as "key.subkey") where reference IDs must match exactly rather than as substrings,
-    # to avoid corrupting values (e.g., UUIDs) that happen to contain the source ID.
+    # Paths (as "key.subkey") where reference IDs must match exactly in unstructured attributes replacer rather than as
+    # substrings, to avoid corrupting values (e.g., UUIDs) that happen to contain the source ID.
     EXACT_MATCH_PATHS = ["actions.id"]
 
     def __init__(self, parent_object_reference: DeployObject, type: Resource):
@@ -56,10 +56,10 @@ class ReferenceReplacer:
                     # source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
                     # if not re.search(source_id_regex, str(value)):
                     # continue
-                    if f"{key}.{key_in_parent}" in self.EXACT_MATCH_PATHS:
-                        if str(value) != str(source_id):
-                            continue
-                    elif str(source_id) not in str(value):
+                    if str(source_id) not in str(value):
+                        continue
+                    elif f"{key}.{key_in_parent}" in self.EXACT_MATCH_PATHS and str(source_id) != str(value):
+                        # Skip substring-only matches for paths like "actions.id" where partial ID replacement would corrupt values (e.g., UUIDs)
                         continue
 
                     if len(types_dict.keys()) > 1:
