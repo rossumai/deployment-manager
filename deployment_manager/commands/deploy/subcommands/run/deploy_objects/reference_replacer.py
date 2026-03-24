@@ -20,6 +20,9 @@ class ReferenceReplacer:
     parent_object_reference: "DeployObject"
 
     IMPLICIT_OVERRIDE_KEYS = ["settings", "metadata", "actions"]
+    # Paths (as "key.subkey") where reference IDs must match exactly rather than as substrings,
+    # to avoid corrupting values (e.g., UUIDs) that happen to contain the source ID.
+    EXACT_MATCH_PATHS = ["actions.id"]
 
     def __init__(self, parent_object_reference: DeployObject, type: Resource):
         self.parent_object_reference = parent_object_reference
@@ -50,9 +53,7 @@ class ReferenceReplacer:
 
             for parent, key_in_parent, value in traverse_object(target_object, key, target_object[key]):
                 for source_id, types_dict in lookup_table.items():
-                    # For action IDs, only match exact values (not substrings)
-                    # to avoid corrupting UUIDs that happen to contain the source ID
-                    if key == "actions" and key_in_parent == "id":
+                    if f"{key}.{key_in_parent}" in self.EXACT_MATCH_PATHS:
                         if str(value) != str(source_id):
                             continue
                     elif str(source_id) not in str(value):
