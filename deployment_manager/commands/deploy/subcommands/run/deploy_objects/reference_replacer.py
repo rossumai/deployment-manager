@@ -53,6 +53,9 @@ class ReferenceReplacer:
 
             for parent, key_in_parent, value in traverse_object(target_object, key, target_object[key]):
                 for source_id, types_dict in lookup_table.items():
+                    # source_id_regex = re.compile(f"(?<!\\w)({source_id})(?!\\w)")
+                    # if not re.search(source_id_regex, str(value)):
+                    # continue
                     if f"{key}.{key_in_parent}" in self.EXACT_MATCH_PATHS:
                         if str(value) != str(source_id):
                             continue
