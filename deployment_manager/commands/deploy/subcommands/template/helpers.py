@@ -608,15 +608,18 @@ async def get_attribute_overrides_from_user():
 
 async def get_secrets_from_user(deploy_file_object: dict, previous_secrets_file: dict):
     hooks = deploy_file_object.get(settings.DEPLOY_KEY_HOOKS, [])
-    object_choices = [
-        questionary.Choice(
-            title=f"{hook.get('name', 'no-name')} ({hook.get('id', 'no-id')})",
-            value=hook,
-            checked=templatize_name_id(hook.get("name", "no-name"), hook.get("id", "no-id"))
-            in previous_secrets_file.keys(),
-        )
-        for hook in hooks
-    ]
+    object_choices = sorted(
+        [
+            questionary.Choice(
+                title=f"{hook.get('name', 'no-name')} ({hook.get('id', 'no-id')})",
+                value=hook,
+                checked=templatize_name_id(hook.get("name", "no-name"), hook.get("id", "no-id"))
+                in previous_secrets_file.keys(),
+            )
+            for hook in hooks
+        ],
+        key=lambda choice: choice.title.casefold(),
+    )
 
     if not object_choices:
         return {}
