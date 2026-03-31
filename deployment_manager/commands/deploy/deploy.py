@@ -1,12 +1,17 @@
 import click
+import os
 from anyio import Path
 
 from deployment_manager.commands.deploy.subcommands.revert.revert import revert_release_file
 from deployment_manager.commands.deploy.subcommands.run.run import deploy_release_file
 from deployment_manager.commands.deploy.subcommands.template.create import create_deploy_template
+from deployment_manager.commands.deploy.subcommands.template.enhance import enhance_deploy_template
 from deployment_manager.commands.deploy.subcommands.template.reverse import DeployFileReverser
+from deployment_manager.commands.deploy.ai_agent import ai_group
+from deployment_manager.ai_agent.runtime import start_ai_agent, stop_ai_agent
 from deployment_manager.utils.consts import settings
 from deployment_manager.utils.functions import apply_concurrency_override, coro
+from deployment_manager.utils.logging import get_log_path
 
 
 @click.group(
@@ -72,6 +77,31 @@ async def update_deploy_template_wrapper(
         input_file_path=deploy_file,
         mapping_file_path=mapping_file,
         interactive=interactive,
+    )
+
+@template.command(
+    name=settings.DEPLOY_TEMPLATE_ENHANCE_COMMAND_NAME,
+    help="""Use LLM guidance to fill missing target IDs in a deploy file using local target data.""",
+)
+@click.argument("deploy_file", type=click.Path(path_type=Path, exists=True))
+@click.option(
+    "--model",
+    "model_id",
+    default=None,
+    help="Override the LLM model id for the enhance step.",
+)
+@coro
+async def enhance_deploy_template_wrapper(
+    deploy_file: Path,
+    model_id: str | None = None,
+    project_path: Path = None,
+):
+    if not project_path:
+        project_path = Path("./")
+    await enhance_deploy_template(
+        deploy_file_path=deploy_file,
+        project_path=project_path,
+        model_id=model_id,
     )
 
 
@@ -148,6 +178,19 @@ If these objects don't exist, they get created.
     default=None,
     help="Maximum concurrent API requests (default: 5, or PRD2_CONCURRENCY env var).",
 )
+@click.option(
+    "--ai-agent",
+    "-A",
+    is_flag=True,
+    default=False,
+    help="Enable AI agent sidecar (Gemini) for deployment guidance.",
+)
+@click.option(
+    "--ai-config",
+    type=click.Path(path_type=Path),
+    default=Path("ai_agent.yaml"),
+    help="Path to AI agent configuration file.",
+)
 @coro
 async def deploy_project_wrapper(
     deploy_file: Path,
@@ -158,23 +201,37 @@ async def deploy_project_wrapper(
     prefer: str = None,
     no_rebase: bool = False,
     concurrency: int = None,
+    ai_agent: bool = False,
+    ai_config: Path = None,
 ):
     apply_concurrency_override(concurrency)
+
+    os.environ.setdefault("PRD2_LOG_PREFIX", "prd2_user")
+
+    tmux_info = None
+    if ai_agent:
+        log_path = get_log_path()
+        if log_path:
+            tmux_info = await start_ai_agent(config_path=Path(ai_config), log_path=log_path)
 
     if prefer:
         prefer = prefer.lower()  # Normalize input
     else:
         prefer = "neither"
 
-    await deploy_release_file(
-        deploy_file_path=deploy_file,
-        prefer=prefer,
-        no_rebase=no_rebase,
-        # auto_delete=auto_delete,
-        auto_apply_plan=auto_apply,
-        commit=commit,
-        commit_message=message,
-    )
+    try:
+        await deploy_release_file(
+            deploy_file_path=deploy_file,
+            prefer=prefer,
+            no_rebase=no_rebase,
+            # auto_delete=auto_delete,
+            auto_apply_plan=auto_apply,
+            commit=commit,
+            commit_message=message,
+        )
+    finally:
+        if ai_agent:
+            await stop_ai_agent(tmux_info)
 
 
 @deploy.command(
@@ -207,3 +264,5 @@ async def revert_project_wrapper(
         commit=commit,
         commit_message=message,
     )
+
+deploy.add_command(ai_group)

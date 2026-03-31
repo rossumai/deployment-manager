@@ -1,0 +1,567 @@
+import json
+from pathlib import Path
+
+import questionary
+from anyio import Path as AsyncPath
+
+from deployment_manager.ai_agent.llm.bedrock import BedrockLLMClient
+from deployment_manager.ai_agent.skills.loader import SkillLoader
+from deployment_manager.ai_agent.utils.json_utils import read_json_safe
+from deployment_manager.ai_agent.utils.object_types import TYPE_ALIASES
+from deployment_manager.ai_agent.utils.tables import format_table
+from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
+from deployment_manager.utils.consts import display_error, display_info, settings
+
+_MISSING_TARGET_KEYS = {
+    settings.DEPLOY_KEY_WORKSPACES,
+    settings.DEPLOY_KEY_QUEUES,
+    settings.DEPLOY_KEY_HOOKS,
+    settings.DEPLOY_KEY_RULES,
+    settings.DEPLOY_KEY_ENGINES,
+    settings.DEPLOY_KEY_LABELS,
+    settings.DEPLOY_KEY_EMAIL_TEMPLATES,
+}
+
+def _scan_target_inventory(target_base: Path) -> dict[str, list[dict[str, object]]]:
+    inventory: dict[str, list[dict[str, object]]] = {
+        "workspaces": [],
+        "queues": [],
+        "schemas": [],
+        "inboxes": [],
+        "hooks": [],
+        "rules": [],
+        "engines": [],
+        "labels": [],
+        "email_templates": [],
+    }
+
+    workspaces_dir = target_base / "workspaces"
+    if workspaces_dir.exists():
+        for ws_dir in workspaces_dir.iterdir():
+            if not ws_dir.is_dir():
+                continue
+            ws_json = ws_dir / "workspace.json"
+            data = read_json_safe(ws_json) if ws_json.exists() else {}
+            if data.get("id"):
+                inventory["workspaces"].append({"id": data.get("id"), "name": data.get("name")})
+            queues_dir = ws_dir / "queues"
+            if not queues_dir.exists():
+                continue
+            for queue_dir in queues_dir.iterdir():
+                if not queue_dir.is_dir():
+                    continue
+                queue_json = queue_dir / "queue.json"
+                queue_data = read_json_safe(queue_json) if queue_json.exists() else {}
+                if queue_data.get("id"):
+                    inventory["queues"].append(
+                        {
+                            "id": queue_data.get("id"),
+                            "name": queue_data.get("name"),
+                            "workspace_id": data.get("id"),
+                            "workspace_name": data.get("name"),
+                        }
+                    )
+                schema_json = queue_dir / "schema.json"
+                schema_data = read_json_safe(schema_json) if schema_json.exists() else {}
+                if schema_data.get("id"):
+                    inventory["schemas"].append(
+                        {
+                            "id": schema_data.get("id"),
+                            "name": schema_data.get("name"),
+                            "queue_id": queue_data.get("id"),
+                        }
+                    )
+                inbox_json = queue_dir / "inbox.json"
+                inbox_data = read_json_safe(inbox_json) if inbox_json.exists() else {}
+                if inbox_data.get("id"):
+                    inventory["inboxes"].append(
+                        {
+                            "id": inbox_data.get("id"),
+                            "name": inbox_data.get("name"),
+                            "queue_id": queue_data.get("id"),
+                        }
+                    )
+
+                for template_path in (queue_dir / "email_templates").glob("*.json"):
+                    template_data = read_json_safe(template_path)
+                    if template_data.get("id"):
+                        inventory["email_templates"].append(
+                            {"id": template_data.get("id"), "name": template_data.get("name")}
+                        )
+
+    hooks_dir = target_base / "hooks"
+    if hooks_dir.exists():
+        for hook_path in hooks_dir.glob("*.json"):
+            data = read_json_safe(hook_path)
+            if data.get("id"):
+                inventory["hooks"].append({"id": data.get("id"), "name": data.get("name")})
+
+    for rule_path in target_base.rglob("rules/*.json"):
+        data = read_json_safe(rule_path)
+        if data.get("id"):
+            inventory["rules"].append({"id": data.get("id"), "name": data.get("name")})
+
+    for engine_path in target_base.rglob("engines/*.json"):
+        data = read_json_safe(engine_path)
+        if data.get("id"):
+            inventory["engines"].append({"id": data.get("id"), "name": data.get("name")})
+
+    for label_path in target_base.rglob("labels/*.json"):
+        data = read_json_safe(label_path)
+        if data.get("id"):
+            inventory["labels"].append({"id": data.get("id"), "name": data.get("name")})
+
+    return inventory
+
+def _read_hook_objects(base_dir: Path, hook_ids: set[int]) -> dict[int, dict[str, object]]:
+    hooks_dir = base_dir / "hooks"
+    if not hooks_dir.exists():
+        return {}
+    objects: dict[int, dict[str, object]] = {}
+    for hook_path in hooks_dir.glob("*.json"):
+        data = read_json_safe(hook_path)
+        hook_id = data.get("id")
+        if hook_id is None:
+            continue
+        try:
+            hook_id_int = int(hook_id)
+        except (TypeError, ValueError):
+            continue
+        if hook_id_int not in hook_ids:
+            continue
+        objects[hook_id_int] = {
+            "id": hook_id_int,
+            "name": data.get("name"),
+            "settings": data.get("settings"),
+        }
+    return objects
+
+def _collect_missing_targets(
+    deploy_data: dict,
+) -> tuple[list[dict[str, object]], dict[tuple[str, int], list[dict]], dict[tuple[str, int, int | None], list[dict]]]:
+    missing: list[dict[str, object]] = []
+    target_index: dict[tuple[str, int], list[dict]] = {}
+    target_entries: dict[tuple[str, int, int | None], list[dict]] = {}
+
+    def register_missing(obj_type: str, source_id: int, source_name: str | None, target: dict, extra: dict | None):
+        entry = {
+            "type": obj_type,
+            "source_id": source_id,
+            "source_name": source_name,
+        }
+        if extra:
+            entry.update(extra)
+        missing.append(entry)
+        target_index.setdefault((obj_type, source_id), []).append(target)
+
+    for key in _MISSING_TARGET_KEYS:
+        for item in deploy_data.get(key, []) or []:
+            if not isinstance(item, dict):
+                continue
+            source_id = item.get("id")
+            if source_id is None:
+                continue
+            targets = item.get("targets") or []
+            for target in targets:
+                if not isinstance(target, dict):
+                    continue
+                if target.get("id"):
+                    target_entries.setdefault((key, int(source_id), int(target["id"])), []).append(target)
+                    continue
+                register_missing(key, int(source_id), item.get("name"), target, None)
+                target_entries.setdefault((key, int(source_id), None), []).append(target)
+
+    for queue in deploy_data.get(settings.DEPLOY_KEY_QUEUES, []) or []:
+        if not isinstance(queue, dict):
+            continue
+        queue_name = queue.get("name")
+        for nested_key, target_key in (("schema", "schemas"), ("inbox", "inboxes")):
+            nested = queue.get(nested_key)
+            if not isinstance(nested, dict):
+                continue
+            source_id = nested.get("id")
+            if source_id is None:
+                continue
+            for target in nested.get("targets") or []:
+                if not isinstance(target, dict):
+                    continue
+                if target.get("id"):
+                    target_entries.setdefault((target_key, int(source_id), int(target["id"])), []).append(target)
+                    continue
+                register_missing(
+                    target_key,
+                    int(source_id),
+                    queue_name,
+                    target,
+                    {"queue_name": queue_name, "queue_id": queue.get("id")},
+                )
+                target_entries.setdefault((target_key, int(source_id), None), []).append(target)
+
+    return missing, target_index, target_entries
+
+def _read_skill_prompt(project_root: Path) -> str:
+    from deployment_manager.ai_agent.config import load_agent_config
+
+    config_path = project_root / "ai_agent.yaml"
+    try:
+        config = load_agent_config(config_path)
+    except Exception:
+        return ""
+    loader = SkillLoader(config)
+    return loader.load_skill_file("deploy-template-assistant.md")
+
+def _extract_json_payload(text: str) -> dict:
+    if not text:
+        raise ValueError("Empty LLM response")
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`")
+        if cleaned.startswith("json"):
+            cleaned = cleaned[4:]
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+    brace_start = cleaned.find("{")
+    brace_end = cleaned.rfind("}")
+    if brace_start != -1 and brace_end != -1 and brace_end > brace_start:
+        candidate = cleaned[brace_start : brace_end + 1]
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            try:
+                import yaml
+            except ImportError:
+                raise
+            parsed = yaml.safe_load(candidate)
+            if isinstance(parsed, dict):
+                return parsed
+    raise ValueError("LLM response did not contain valid JSON")
+
+def _normalize_override_values(attributes: dict[str, object]) -> dict[str, object]:
+    normalized = {}
+    for key, value in attributes.items():
+        if isinstance(value, str):
+            normalized[key] = value.replace("\x08", "\\b")
+        else:
+            normalized[key] = value
+    return normalized
+
+def _normalize_hook_override_attributes(attributes: dict[str, object]) -> dict[str, object]:
+    normalized = {}
+    for key, value in attributes.items():
+        key_str = str(key)
+        if not key_str.startswith("settings."):
+            key_str = f"settings.{key_str}"
+        normalized[key_str] = value
+    return normalized
+
+def _aggregate_overrides(overrides: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:
+    by_attribute: dict[str, dict[str, object]] = {}
+    by_attribute_mixed: dict[str, dict[str, object]] = {}
+    for entry in overrides:
+        attribute = str(entry.get("attribute") or "")
+        value = entry.get("value")
+        if not attribute:
+            continue
+        key = f"{attribute}::{value!r}"
+        record = by_attribute.setdefault(
+            key,
+            {
+                "attribute": attribute,
+                "value": value,
+                "count": 0,
+                "targets": set(),
+            },
+        )
+        record["count"] = int(record["count"]) + 1
+        target_id = entry.get("target_id")
+        if target_id is not None:
+            record["targets"].add(target_id)
+        mixed = by_attribute_mixed.setdefault(
+            attribute,
+            {
+                "attribute": attribute,
+                "values": {},
+            },
+        )
+        value_key = repr(value)
+        mixed_values = mixed["values"].setdefault(value_key, {"value": value, "targets": set()})
+        if target_id is not None:
+            mixed_values["targets"].add(target_id)
+    aggregated = []
+    for record in by_attribute.values():
+        targets = sorted(record["targets"], key=lambda item: int(item) if isinstance(item, int) else str(item))
+        aggregated.append(
+            {
+                "attribute": record["attribute"],
+                "value": record["value"],
+                "count": record["count"],
+                "target_ids": targets,
+            }
+        )
+    aggregated.sort(key=lambda item: item["count"], reverse=True)
+    mixed_summary = []
+    for record in by_attribute_mixed.values():
+        values = []
+        for value_info in record["values"].values():
+            targets = sorted(value_info["targets"], key=lambda item: int(item) if isinstance(item, int) else str(item))
+            values.append({"value": value_info["value"], "target_ids": targets})
+        if len(values) > 1:
+            mixed_summary.append({"attribute": record["attribute"], "values": values})
+    return {"by_attribute": aggregated, "by_attribute_mixed": mixed_summary}
+
+def _stringify_override_value(value: object) -> str:
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=True, sort_keys=True)
+    if isinstance(value, str):
+        return value.replace("\n", "\\n")
+    return str(value)
+
+def _build_hook_settings(
+    deploy_data: dict,
+    source_base: Path | None,
+    target_base: Path,
+) -> list[dict[str, object]]:
+    hook_pairs = []
+    source_hook_ids: set[int] = set()
+    target_hook_ids: set[int] = set()
+    for hook in deploy_data.get(settings.DEPLOY_KEY_HOOKS, []) or []:
+        if not isinstance(hook, dict):
+            continue
+        source_id = hook.get("id")
+        if source_id is None:
+            continue
+        source_hook_ids.add(int(source_id))
+        for target in hook.get("targets") or []:
+            if not isinstance(target, dict):
+                continue
+            target_id = target.get("id")
+            if target_id is None:
+                continue
+            target_hook_ids.add(int(target_id))
+            hook_pairs.append({"source_id": int(source_id), "target_id": int(target_id)})
+
+    if source_base:
+        source_hooks = _read_hook_objects(source_base, source_hook_ids)
+    else:
+        source_hooks = {}
+    target_hooks = _read_hook_objects(target_base, target_hook_ids)
+
+    hook_settings = []
+    for pair in hook_pairs:
+        source_hook = source_hooks.get(pair["source_id"], {})
+        target_hook = target_hooks.get(pair["target_id"], {})
+        hook_settings.append(
+            {
+                "source_id": pair["source_id"],
+                "source_name": source_hook.get("name"),
+                "source_settings": source_hook.get("settings"),
+                "target_id": pair["target_id"],
+                "target_name": target_hook.get("name"),
+                "target_settings": target_hook.get("settings"),
+            }
+        )
+    return hook_settings
+
+async def _request_llm_payload(llm: BedrockLLMClient, prompt: str) -> tuple[list, list] | None:
+    response_text = await llm.run(prompt)
+    if not response_text:
+        display_error("LLM did not return any response.")
+        return None
+    try:
+        payload = _extract_json_payload(response_text)
+    except Exception as exc:
+        display_error(f"Failed to parse LLM response as JSON: {exc}")
+        return None
+    mappings = payload.get("mappings") or []
+    overrides = payload.get("overrides") or []
+    if not isinstance(mappings, list):
+        display_error("LLM response must include a list under 'mappings'.")
+        return None
+    if overrides and not isinstance(overrides, list):
+        display_error("LLM response must include a list under 'overrides'.")
+        return None
+    return mappings, overrides
+
+def _build_prompt(skill_prompt: str, missing_targets: list[dict[str, object]], inventory: dict[str, list[dict]]):
+    return (
+        f"{skill_prompt}\n\n"
+        "Task: Fill missing target IDs in the deploy template using only the local target inventory. "
+        "Do not create new objects and do not change non-empty target IDs. "
+        "Return JSON only, with keys 'mappings' and 'overrides'. "
+        "'mappings' entries contain type, source_id, and target_id. "
+        "'overrides' entries contain type, source_id, target_id, attribute, and value. "
+        "(attribute is a single JMESPath string, value is the override value.) "
+        "For hook settings, use the 'settings.' prefix for all override paths (for example, settings.import_config.dataset_name). "
+        "Omit items you cannot confidently match. "
+        "Ensure all backslashes are escaped (\\) in JSON strings. "
+        "Ignore any other formatting instructions above and respond with JSON only.\n\n"
+        f"Missing targets:\n{json.dumps(missing_targets, ensure_ascii=True, indent=2)}\n\n"
+        f"Target inventory:\n{json.dumps(inventory, ensure_ascii=True, indent=2)}\n"
+    )
+
+async def enhance_deploy_template(
+    deploy_file_path: AsyncPath,
+    project_path: AsyncPath | None = None,
+    model_id: str | None = None,
+):
+    if not project_path:
+        project_path = AsyncPath("./")
+    deploy_text = await deploy_file_path.read_text()
+    yaml = DeployYaml(file=deploy_text)
+    deploy_data = yaml.data or {}
+
+    target_dir = deploy_data.get(settings.DEPLOY_KEY_TARGET_DIR)
+    if not target_dir:
+        display_error("Target dir is missing in the deploy file.")
+        return
+
+    target_base = Path(str(project_path)) / str(target_dir)
+    if not target_base.exists():
+        display_error(f'Target dir "{target_base}" not found.')
+        return
+
+    missing_targets, target_index, target_entries = _collect_missing_targets(deploy_data)
+
+    source_dir = deploy_data.get(settings.DEPLOY_KEY_SOURCE_DIR)
+    source_base = Path(str(project_path)) / str(source_dir) if source_dir else None
+
+    inventory = _scan_target_inventory(target_base)
+    hook_settings = _build_hook_settings(deploy_data, source_base, target_base)
+
+    skill_prompt = _read_skill_prompt(Path(str(project_path)))
+    if not skill_prompt:
+        display_error("No deploy template assistant skill found.")
+        return
+    if not missing_targets and not hook_settings:
+        display_info("No missing target IDs or hook settings available for overrides.")
+        return
+    llm = BedrockLLMClient(model_id=model_id)
+    if not llm.validate():
+        return
+
+    prompt = (
+        _build_prompt(skill_prompt, missing_targets, inventory)
+        + f"\nHook settings pairs:\n{json.dumps(hook_settings, ensure_ascii=True, indent=2)}\n"
+    )
+    payload = await _request_llm_payload(llm, prompt)
+    if payload is None:
+        return
+    mappings, overrides = payload
+
+    applied = []
+    for mapping in mappings:
+        if not isinstance(mapping, dict):
+            continue
+        obj_type = mapping.get("type")
+        source_id = mapping.get("source_id")
+        target_id = mapping.get("target_id")
+        if obj_type is None or source_id is None or target_id in (None, ""):
+            continue
+        try:
+            key = (str(obj_type), int(source_id))
+            target_id_int = int(target_id)
+        except (TypeError, ValueError):
+            continue
+        targets = target_index.get(key) or []
+        for target in targets:
+            if target.get("id"):
+                continue
+            target["id"] = target_id_int
+        if targets:
+            applied.append({"type": obj_type, "source_id": source_id, "target_id": target_id_int})
+
+    if applied:
+        missing_targets, target_index, target_entries = _collect_missing_targets(deploy_data)
+        hook_settings = _build_hook_settings(deploy_data, source_base, target_base)
+        prompt = (
+            _build_prompt(skill_prompt, missing_targets, inventory)
+            + f"\nHook settings pairs:\n{json.dumps(hook_settings, ensure_ascii=True, indent=2)}\n"
+        )
+        payload = await _request_llm_payload(llm, prompt)
+        if payload is None:
+            return
+        _, overrides = payload
+
+    if not applied and not overrides:
+        display_info("No target IDs or attribute overrides were returned from the LLM response.")
+        return
+
+    applied_overrides = []
+    override_preview = []
+    for override in overrides:
+        if not isinstance(override, dict):
+            continue
+        obj_type = TYPE_ALIASES.get(str(override.get("type") or ""), str(override.get("type") or ""))
+        source_id = override.get("source_id")
+        target_id = override.get("target_id")
+        attributes = override.get("attribute_override")
+        attribute_key = override.get("attribute")
+        attribute_value = override.get("value")
+        if not obj_type or source_id is None or target_id is None:
+            continue
+        if isinstance(attributes, dict):
+            attributes = _normalize_override_values(attributes)
+        elif isinstance(attribute_key, str):
+            attributes = _normalize_override_values({attribute_key: attribute_value})
+        else:
+            continue
+        if obj_type == settings.DEPLOY_KEY_HOOKS:
+            attributes = _normalize_hook_override_attributes(attributes)
+        try:
+            key = (obj_type, int(source_id), int(target_id))
+        except (TypeError, ValueError):
+            continue
+        targets = target_entries.get(key) or []
+        for target in targets:
+            override_map = target.get("attribute_override") or {}
+            override_map.update(attributes)
+            target["attribute_override"] = override_map
+        if targets:
+            applied_overrides.append({"type": obj_type, "source_id": source_id, "target_id": target_id})
+            for attr_key, attr_value in attributes.items():
+                override_preview.append(
+                    {
+                        "type": obj_type,
+                        "source_id": source_id,
+                        "target_id": target_id,
+                        "attribute": attr_key,
+                        "value": attr_value,
+                    }
+                )
+
+    if applied:
+        display_info(
+            "PROPOSED TARGET ID UPDATES\n"
+            + format_table(
+                ["Type", "Source ID", "Target ID"],
+                [
+                    [str(entry["type"]), str(entry["source_id"]), str(entry["target_id"])]
+                    for entry in applied
+                ],
+            )
+        )
+    if applied_overrides:
+        display_info(
+            "PROPOSED ATTRIBUTE OVERRIDES\n"
+            + format_table(
+                ["Type", "Source ID", "Target ID", "Attribute", "Value"],
+                [
+                    [
+                        str(entry["type"]),
+                        str(entry["source_id"]),
+                        str(entry["target_id"]),
+                        str(entry["attribute"]),
+                        _stringify_override_value(entry["value"]),
+                    ]
+                    for entry in override_preview
+                ],
+            )
+        )
+    if not await questionary.confirm("Apply these changes to the deploy file?", default=False).ask_async():
+        display_info("Aborted. No changes were saved.")
+        return
+
+    await yaml.save_to_file(deploy_file_path)
+    display_info(f"Deploy template updated: {deploy_file_path}")
