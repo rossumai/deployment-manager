@@ -39,6 +39,7 @@ async def merge_formula_changes(changes: list[tuple[str, Path]]):
                 GIT_CHARACTERS.UPDATED,
                 GIT_CHARACTERS.CREATED,
                 GIT_CHARACTERS.CREATED_STAGED,
+                GIT_CHARACTERS.CREATED_STAGED_MODIFIED,
             ]
             and settings.FORMULA_DIR_NAME in path.parent.name
             and (path.suffix == ".py")
@@ -71,6 +72,7 @@ async def merge_formula_changes(changes: list[tuple[str, Path]]):
                 GIT_CHARACTERS.UPDATED,
                 GIT_CHARACTERS.CREATED,
                 GIT_CHARACTERS.CREATED_STAGED,
+                GIT_CHARACTERS.CREATED_STAGED_MODIFIED,
             ]
             and "schema.json" in path.name
         ):
@@ -95,6 +97,7 @@ async def merge_hook_changes(changes: list[tuple[str, Path]], org_path: Path):
                 GIT_CHARACTERS.UPDATED,
                 GIT_CHARACTERS.CREATED,
                 GIT_CHARACTERS.CREATED_STAGED,
+                GIT_CHARACTERS.CREATED_STAGED_MODIFIED,
             ]
             and path.parent.name == "hooks"
             and path.suffix in [".py", ".js"]
@@ -124,6 +127,7 @@ async def merge_hook_changes(changes: list[tuple[str, Path]], org_path: Path):
                 GIT_CHARACTERS.UPDATED,
                 GIT_CHARACTERS.CREATED,
                 GIT_CHARACTERS.CREATED_STAGED,
+                GIT_CHARACTERS.CREATED_STAGED_MODIFIED,
             ]
             and path.parent.name == "hooks"
         ) and path.suffix == ".json":
@@ -146,7 +150,7 @@ async def mark_unstaged_objects_as_updated(changes, org_path, client: AsyncRossu
     for change in changes:
         path: Path
         op, path = change
-        if (op == GIT_CHARACTERS.CREATED or op == GIT_CHARACTERS.CREATED_STAGED) and path.suffix == ".json":
+        if op in (GIT_CHARACTERS.CREATED, GIT_CHARACTERS.CREATED_STAGED, GIT_CHARACTERS.CREATED_STAGED_MODIFIED) and path.suffix == ".json":
             object_path = org_path / path
             object = await read_object_from_json(object_path)
 
