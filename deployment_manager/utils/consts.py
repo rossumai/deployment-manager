@@ -81,6 +81,7 @@ class GIT_CHARACTERS(StrEnum):
     PARTIALLY_UPADTED = "MM"
     CREATED = "??"
     CREATED_STAGED = "A"
+    CREATED_STAGED_MODIFIED = "AM"
 
 
 QUEUE_ENGINE_ATTRIBUTES = ["dedicated_engine", "generic_engine"]

@@ -58,7 +58,7 @@ class ChangedObject(BaseModel):
     def display_operation(self):
         display_operation = ""
         match self.operation:
-            case GIT_CHARACTERS.CREATED | GIT_CHARACTERS.CREATED_STAGED:
+            case GIT_CHARACTERS.CREATED | GIT_CHARACTERS.CREATED_STAGED | GIT_CHARACTERS.CREATED_STAGED_MODIFIED:
                 display_operation = settings.CREATE_PRINT_STR
             case GIT_CHARACTERS.DELETED:
                 display_operation = settings.CREATE_PRINT_STR
@@ -174,7 +174,7 @@ class UploadOrganizationDirectory(OrganizationDirectory):
         requests = []
         for changed_object in self.changed_objects:
             match changed_object.operation:
-                case GIT_CHARACTERS.CREATED | GIT_CHARACTERS.CREATED_STAGED:
+                case GIT_CHARACTERS.CREATED | GIT_CHARACTERS.CREATED_STAGED | GIT_CHARACTERS.CREATED_STAGED_MODIFIED:
                     requests.append(self.make_create_request(object=changed_object))
                 case GIT_CHARACTERS.UPDATED | GIT_CHARACTERS.PARTIALLY_UPADTED:
                     requests.append(self.make_update_request(object=changed_object))
