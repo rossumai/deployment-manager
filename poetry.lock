@@ -1853,13 +1853,13 @@ jupyter = ["ipywidgets (>=7.5.1,<9)"]
 
 [[package]]
 name = "rossum-api"
-version = "3.13.1"
+version = "3.13.2"
 description = "Python API client for the Rossum platform."
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "rossum_api-3.13.1-py3-none-any.whl", hash = "sha256:22bf0dabc961bb685d9037c1a0ae89c5fe16a34d488a8586114b07b57c2de2f8"},
-    {file = "rossum_api-3.13.1.tar.gz", hash = "sha256:5307e272592904a8170a4dd633ce8b1b1f726b63a1af30090353a4fbd43a2a6d"},
+    {file = "rossum_api-3.13.2-py3-none-any.whl", hash = "sha256:138c8864b6e1895eb3787efefe3a85b6de142c144d88fbff2321581550824c79"},
+    {file = "rossum_api-3.13.2.tar.gz", hash = "sha256:e02cbfb74cdd40c1de7fa6fc0476da7402377c561735c79655c56b0587c5d685"},
 ]
 
 [package.dependencies]
@@ -2355,4 +2355,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "90c6705c2749911c636d7c40e2bf99b6766f27152eff2e7aa3a8f644176db507"
+content-hash = "019580c85b2b489b12bf8f8fccbbe0a18303cfdea21460c48fb920c8a39ad60b"
