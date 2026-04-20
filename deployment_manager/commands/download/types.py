@@ -4,11 +4,11 @@ from typing import TYPE_CHECKING, Optional
 
 import questionary
 from anyio import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from rich import print as pprint
-from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.download.subdirectory import Subdirectory
+from rossum_api.domain_logic.resources import Resource
 
 if TYPE_CHECKING:
     from deployment_manager.commands.download.directory import DownloadOrganizationDirectory
@@ -16,8 +16,7 @@ if TYPE_CHECKING:
 
 # TODO: error handling? Level of objects vs level of object ?
 class ObjectSaver(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     parent_dir_reference: Optional["DownloadOrganizationDirectory"] = None
     type: Resource

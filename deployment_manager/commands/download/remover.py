@@ -3,8 +3,7 @@ import shutil
 from typing import Any
 
 from anyio import Path
-from pydantic import BaseModel
-from rossum_api.domain_logic.resources import Resource
+from pydantic import BaseModel, ConfigDict
 
 from deployment_manager.commands.download.helpers import delete_objects_non_versioned_attributes
 from deployment_manager.commands.download.subdirectory import Subdirectory
@@ -16,12 +15,12 @@ from deployment_manager.common.read_write import (
     read_object_from_json,
 )
 from deployment_manager.utils.consts import CustomResource, display_warning
+from rossum_api.domain_logic.resources import Resource
 
 
 # TODO: error handling? Level of objects vs level of object ?
 class ObjectRemover(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     type: Resource | CustomResource
     subdir: Subdirectory

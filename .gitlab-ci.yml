@@ -12,5 +12,18 @@ test:
     GIT_STRATEGY: none
   script:
     - cd /app
-    - pytest tests
+    - pytest tests --cov --cov-report=term --cov-report=xml:coverage.xml --junitxml=junit.xml
+  # Extract the total coverage percentage for the pipeline badge
+  coverage: '/(?i)TOTAL.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    when: always
+    reports:
+      # Powers the red/green annotations on MR diffs
+      coverage_report:
+        coverage_format: cobertura
+        path: /app/coverage.xml
+      junit: /app/junit.xml
+    paths:
+      - /app/coverage.xml
+      - /app/junit.xml
   needs: [build-docker-image]

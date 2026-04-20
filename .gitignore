@@ -17,3 +17,9 @@ temp_project
 
 **/**/non_versioned_object_attributes.json
 **/hook_sync_configs/
+
+# Coverage
+coverage.xml
+junit.xml
+.coverage
+htmlcov/

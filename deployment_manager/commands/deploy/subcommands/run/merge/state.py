@@ -82,7 +82,7 @@ class DeployState(BaseModel):
     ) -> Optional[dict]:
         try:
             entry = getattr(self, resource_type.value)[int(source_id)].deployments[int(target_id)].last_applied
-            result = entry.dict().get(direction)
+            result = entry.model_dump().get(direction)
             if result is not None:
                 result["derived_fields"] = entry.derived_fields or []
             return result
