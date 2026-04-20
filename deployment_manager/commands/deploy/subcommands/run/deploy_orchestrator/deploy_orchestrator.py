@@ -64,6 +64,7 @@ from deployment_manager.utils.consts import (
     settings,
 )
 from deployment_manager.utils.functions import extract_id_from_url, gather_with_concurrency
+from deployment_manager.utils.logging import append_raw_event
 
 # TODO: dummy refs not in diff -> conflict if org.workspaces is 1 and we are creating another
 # TODO: purge should clean up state file as well
@@ -383,6 +384,19 @@ class DeployOrchestrator(BaseModel):
 
     async def show_deploy_plan(self):
         try:
+            append_raw_event(
+                "deploy_context",
+                {
+                    "source_org_id": self.source_org.id,
+                    "source_org_name": self.source_org.name,
+                    "target_org_id": self.target_org.id,
+                    "target_org_name": self.target_org.name,
+                    "deploy_file": str(self.deploy_file_path),
+                    "same_org": self.is_same_org,
+                    "patch_target_org": self.patch_target_org,
+                    "reverse_mapping": bool(self.yaml.data.get(settings.DEPLOY_KEY_REVERSE_MAPPING, False)),
+                },
+            )
             for object in self.deploy_objects:
                 if isinstance(object, OrganizationDeployObject) and not self.patch_target_org:
                     continue
