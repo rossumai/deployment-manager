@@ -90,15 +90,16 @@ class TestNonVersionedAttributes:
         merged = await read_object_from_json(rel_ws_path, include_non_version_attribtues=True)
         assert merged["modified_at"] == "2024-01-01T00:00:00Z"
 
-    async def test_write_outside_subdir_does_not_split(self, tmp_path):
+    async def test_write_outside_subdir_does_not_split(self, tmp_path, monkeypatch):
         # Path too shallow -> no sidecar; modified_at stays in main file
-        path = tmp_path / "shallow.json"
+        monkeypatch.chdir(tmp_path)
+        path = Path("shallow.json")
         await write_object_to_json(
             path,
             {"id": 1, "modified_at": "2024-01-01T00:00:00Z"},
             type=Resource.Workspace,
         )
-        raw = json.loads((await path.read_text()))
+        raw = json.loads(open(tmp_path / "shallow.json").read())
         # modified_at still in the file because depth is less than 3
         assert "modified_at" in raw
 
