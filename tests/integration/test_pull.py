@@ -62,7 +62,6 @@ async def test_pull_creates_organization_file(tmp_path: Path, monkeypatch):
             destinations=(Path(SOURCE_DIR_NAME) / SUBDIR_NAME,),
             project_path=tmp_path,
         )
-    raise Exception()
     org_path = tmp_path / SOURCE_DIR_NAME / "organization.json"
     assert await org_path.exists()
     org_data = await read_object_from_json(org_path)
