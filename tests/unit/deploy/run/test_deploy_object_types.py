@@ -16,9 +16,7 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.label_dep
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.rule_deploy_object import (
     RuleDeployObject,
 )
-from deployment_manager.commands.deploy.subcommands.run.deploy_objects.workflow_deploy_object import (
-    WorkflowDeployObject,
-)
+
 
 # Trigger model rebuilds for forward refs
 from deployment_manager.commands.deploy.subcommands.run.deploy_orchestrator.deploy_orchestrator import (  # noqa: F401
@@ -58,17 +56,6 @@ class TestEngineDeployObject:
         assert engine.type == Resource.Engine
         assert engine.engine_field_deploy_objects == []
         assert engine.base_path == ""
-
-
-class TestWorkflowDeployObject:
-    def test_class_type_attribute(self):
-        """WorkflowDeployObject isn't wired into the orchestrator's model rebuild, so
-        instantiating fails. Check the class-level type annotation directly."""
-        import pydantic
-
-        assert issubclass(WorkflowDeployObject, pydantic.BaseModel)
-        # type is a class-level default via the class body
-        assert WorkflowDeployObject.model_fields["type"].default == CustomResource.Workflow
 
 
 class TestRuleDeployObject:
