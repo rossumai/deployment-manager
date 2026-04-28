@@ -1,17 +1,22 @@
-"""Tests for deploy/common/helpers.py - config lookup, admin check."""
+"""Tests for deploy/common/helpers.py - config lookup, admin check, credential validation."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import yaml
 from anyio import Path
+from rossum_api import APIClientError
 
 from deployment_manager.commands.deploy.common.helpers import (
+    InvalidCredentialsException,
     get_api_url_from_config,
     get_directory_from_config,
     get_org_id_from_config,
+    get_token_from_cred_file,
     is_user_admin,
+    validate_credentials,
 )
+from deployment_manager.commands.deploy.subcommands.run.upload_helpers import Credentials
 from deployment_manager.utils.consts import settings
 
 
@@ -110,3 +115,102 @@ class TestIsUserAdmin:
     def test_empty_roles(self):
         user = MagicMock(groups=["https://api/v1/groups/1"])
         assert is_user_admin(user, []) is False
+
+
+def _write_creds(tmp_path: Path, data: dict):
+    import pathlib
+
+    pathlib.Path(tmp_path / settings.CREDENTIALS_FILENAME).write_text(yaml.safe_dump(data))
+
+
+@pytest.mark.asyncio
+class TestGetTokenFromCredFile:
+    async def test_returns_empty_when_no_creds_file(self, tmp_path):
+        result = await get_token_from_cred_file(tmp_path, "https://api")
+        assert result == ""
+
+    async def test_returns_token_when_valid(self, tmp_path):
+        _write_creds(tmp_path, {settings.CONFIG_KEY_TOKEN: "tk_valid"})
+        with patch(
+            "deployment_manager.commands.deploy.common.helpers.validate_credentials",
+            new=AsyncMock(),
+        ):
+            result = await get_token_from_cred_file(tmp_path, "https://api")
+        assert result == "tk_valid"
+
+    async def test_prompts_for_new_token_when_invalid(self, tmp_path):
+        _write_creds(tmp_path, {settings.CONFIG_KEY_TOKEN: "tk_old"})
+        # First validate raises (old token bad); after user provides "tk_new", second validate succeeds
+        validate_calls = []
+
+        async def fake_validate(creds):
+            validate_calls.append(creds.token)
+            if creds.token == "tk_old":
+                raise InvalidCredentialsException("expired")
+
+        with patch(
+            "deployment_manager.commands.deploy.common.helpers.validate_credentials",
+            new=fake_validate,
+        ), patch(
+            "deployment_manager.commands.deploy.common.helpers.get_token_from_user",
+            new=AsyncMock(return_value="tk_new"),
+        ), patch(
+            "deployment_manager.commands.deploy.common.helpers.write_prd_cred_file",
+            new=AsyncMock(),
+        ) as write_mock:
+            result = await get_token_from_cred_file(tmp_path, "https://api")
+        assert result == "tk_new"
+        # Both old and new tokens were validated
+        assert validate_calls == ["tk_old", "tk_new"]
+        write_mock.assert_awaited_once()
+
+    async def test_returns_empty_on_unexpected_exception(self, tmp_path):
+        _write_creds(tmp_path, {settings.CONFIG_KEY_TOKEN: "tk"})
+        with patch(
+            "deployment_manager.commands.deploy.common.helpers.validate_credentials",
+            new=AsyncMock(side_effect=RuntimeError("boom")),
+        ):
+            result = await get_token_from_cred_file(tmp_path, "https://api")
+        assert result == ""
+
+
+@pytest.mark.asyncio
+class TestValidateCredentials:
+    async def test_raises_when_url_missing(self):
+        with pytest.raises(Exception, match=settings.CONFIG_KEY_API_BASE_URL):
+            await validate_credentials(Credentials(token="tk", url=""))
+
+    async def test_raises_when_token_missing(self):
+        with pytest.raises(Exception, match=settings.CONFIG_KEY_TOKEN):
+            await validate_credentials(Credentials(token="", url="https://api"))
+
+    async def test_raises_invalid_creds_on_401(self):
+        client = MagicMock()
+        client.request = AsyncMock(side_effect=APIClientError("get", "auth/user", 401, "Unauthorized"))
+        with patch(
+            "deployment_manager.commands.deploy.common.helpers.CustomAsyncAPIClient",
+            return_value=client,
+        ):
+            with pytest.raises(InvalidCredentialsException):
+                await validate_credentials(Credentials(token="bad", url="https://api"))
+
+    async def test_reraises_other_api_errors(self):
+        client = MagicMock()
+        client.request = AsyncMock(side_effect=APIClientError("get", "auth/user", 500, "Server Error"))
+        with patch(
+            "deployment_manager.commands.deploy.common.helpers.CustomAsyncAPIClient",
+            return_value=client,
+        ):
+            with pytest.raises(APIClientError):
+                await validate_credentials(Credentials(token="x", url="https://api"))
+
+    async def test_silent_when_request_succeeds(self):
+        client = MagicMock()
+        client.request = AsyncMock(return_value={"id": 1})
+        with patch(
+            "deployment_manager.commands.deploy.common.helpers.CustomAsyncAPIClient",
+            return_value=client,
+        ):
+            # Should return None and not raise
+            result = await validate_credentials(Credentials(token="ok", url="https://api"))
+        assert result is None
