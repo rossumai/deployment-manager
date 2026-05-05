@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.reverse_override import (
     ObjectConfigReverser,
@@ -11,7 +12,6 @@ from deployment_manager.commands.deploy.subcommands.run.reverse_override import 
     reverse_source_target_in_yaml,
 )
 from deployment_manager.utils.consts import settings
-from rossum_api.domain_logic.resources import Resource
 
 
 def _make_client(fetch_one_responses: dict | None = None, request_json_responses: dict | None = None):

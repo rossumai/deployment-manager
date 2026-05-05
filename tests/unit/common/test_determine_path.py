@@ -1,12 +1,12 @@
 import pytest
 from anyio import Path
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.common.determine_path import (
     determine_object_type_from_path,
     determine_object_type_from_url,
 )
 from deployment_manager.utils.consts import CustomResource
-from rossum_api.domain_logic.resources import Resource
 
 
 class TestDetermineObjectTypeFromPath:

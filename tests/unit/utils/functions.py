@@ -2,11 +2,11 @@ import asyncio
 import logging
 
 from anyio import Path
+from rossum_api import AsyncRossumAPIClient
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.common.mapping import read_mapping, write_mapping
 from deployment_manager.utils.consts import settings
-from rossum_api import AsyncRossumAPIClient
-from rossum_api.domain_logic.resources import Resource
 
 
 async def create_self_targetting_org(tmp_path: Path, undo=False):

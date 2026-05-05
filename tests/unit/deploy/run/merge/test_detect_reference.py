@@ -1,10 +1,11 @@
+from rossum_api.domain_logic.resources import Resource
+
 from deployment_manager.commands.deploy.subcommands.run.merge.detect_reference import (
     FIELD_TO_RESOURCE,
     ROSSUM_URL_RE,
     ReferenceDetectionStatus,
     detect_reference_with_type,
 )
-from rossum_api.domain_logic.resources import Resource
 
 
 class TestDetectReferenceByFieldName:

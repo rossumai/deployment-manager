@@ -2,6 +2,7 @@ import json
 import pathlib
 
 import pytest
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.merge.state import (
     DeploymentEntry,
@@ -9,7 +10,6 @@ from deployment_manager.commands.deploy.subcommands.run.merge.state import (
     LastAppliedEntry,
     ResourceDeployments,
 )
-from rossum_api.domain_logic.resources import Resource
 
 
 class TestLastAppliedEntry:

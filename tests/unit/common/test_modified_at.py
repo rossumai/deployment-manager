@@ -1,9 +1,9 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.common.modified_at import check_modified_timestamp
-from rossum_api.domain_logic.resources import Resource
 
 
 @pytest.mark.asyncio

@@ -2,6 +2,9 @@ import questionary
 from anyio import Path
 from pydantic import BaseModel, ConfigDict
 from rich import print as pprint
+from rossum_api import AsyncRossumAPIClient
+from rossum_api.domain_logic.resources import Resource
+from rossum_api.dtos import Token
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.attribute_override import AttributeOverrider
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml, get_url_and_credentials
@@ -10,9 +13,6 @@ from deployment_manager.common.get_filepath_from_user import get_filepath_from_u
 from deployment_manager.common.rossum_client import CustomAsyncAPIClient
 from deployment_manager.utils.consts import display_error, display_info, display_warning, settings
 from deployment_manager.utils.functions import extract_id_from_url, templatize_name_id
-from rossum_api import AsyncRossumAPIClient
-from rossum_api.domain_logic.resources import Resource
-from rossum_api.dtos import Token
 
 
 class DeployFileReverser(BaseModel):

@@ -5,6 +5,9 @@ from collections import defaultdict
 import questionary
 from anyio import Path
 from pydantic import BaseModel, ConfigDict
+from rossum_api import APIClientError, AsyncRossumAPIClient
+from rossum_api.domain_logic.resources import Resource
+from rossum_api.models.organization import Organization
 from ruamel.yaml import YAML
 
 from deployment_manager.commands.deploy.common.helpers import get_token_owner_from_user
@@ -61,9 +64,6 @@ from deployment_manager.utils.consts import (
     settings,
 )
 from deployment_manager.utils.functions import extract_id_from_url, gather_with_concurrency
-from rossum_api import APIClientError, AsyncRossumAPIClient
-from rossum_api.domain_logic.resources import Resource
-from rossum_api.models.organization import Organization
 
 # TODO: dummy refs not in diff -> conflict if org.workspaces is 1 and we are creating another
 # TODO: purge should clean up state file as well

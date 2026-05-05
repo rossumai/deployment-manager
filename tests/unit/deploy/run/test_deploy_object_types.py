@@ -2,6 +2,7 @@
 non-creatable email templates, etc."""
 
 import pytest
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.email_template_deploy_object import (
     NON_CREATABLE_EMAIL_TEMPLATE_TYPES,
@@ -17,13 +18,11 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.rule_depl
     RuleDeployObject,
 )
 
-
 # Trigger model rebuilds for forward refs
 from deployment_manager.commands.deploy.subcommands.run.deploy_orchestrator.deploy_orchestrator import (  # noqa: F401
     DeployOrchestrator,
 )
 from deployment_manager.utils.consts import CustomResource
-from rossum_api.domain_logic.resources import Resource
 
 
 class TestNonCreatableEmailTemplates:

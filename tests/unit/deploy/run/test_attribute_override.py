@@ -1,4 +1,5 @@
 import pytest
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.attribute_override import (
     AttributeOverrideException,
@@ -11,7 +12,6 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.attribute
     traverse_mapping,
 )
 from deployment_manager.utils.consts import settings
-from rossum_api.domain_logic.resources import Resource
 
 
 class TestParseParentAndKey:

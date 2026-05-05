@@ -1,5 +1,7 @@
 """Tests for utils/consts.py - pure module-level constants, enums, and small utilities."""
 
+from rossum_api.domain_logic.resources import Resource
+
 from deployment_manager.utils.consts import (
     API_SUFFIX_RE,
     ATTRIBUTE_OVERRIDE_SOURCE_REFERENCE_KEYWORD,
@@ -15,7 +17,6 @@ from deployment_manager.utils.consts import (
     display_warning,
     settings,
 )
-from rossum_api.domain_logic.resources import Resource
 
 
 class TestConstants:

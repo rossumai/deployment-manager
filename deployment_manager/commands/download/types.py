@@ -6,9 +6,9 @@ import questionary
 from anyio import Path
 from pydantic import BaseModel, ConfigDict
 from rich import print as pprint
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.download.subdirectory import Subdirectory
-from rossum_api.domain_logic.resources import Resource
 
 if TYPE_CHECKING:
     from deployment_manager.commands.download.directory import DownloadOrganizationDirectory

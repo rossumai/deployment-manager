@@ -2,6 +2,7 @@ from collections import defaultdict
 from unittest.mock import MagicMock
 
 import pytest
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.reference_replacer import (
     ReferenceReplacer,
@@ -12,7 +13,6 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_orchestrator.depl
     DeployOrchestrator,
 )
 from deployment_manager.commands.deploy.subcommands.run.models import Target
-from rossum_api.domain_logic.resources import Resource
 
 
 def _make_target(id_):

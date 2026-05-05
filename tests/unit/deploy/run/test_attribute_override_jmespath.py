@@ -3,6 +3,7 @@ array indices, $-quoted keys, deeply nested paths.
 """
 
 import pytest
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.attribute_override import (
     AttributeOverrideException,
@@ -10,7 +11,6 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.attribute
     parse_parent_and_key,
     perform_search,
 )
-from rossum_api.domain_logic.resources import Resource
 
 
 class TestArrayIndexOverrides:

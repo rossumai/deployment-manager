@@ -2,11 +2,12 @@
 
 from collections import defaultdict
 
+from rossum_api.domain_logic.resources import Resource
+
 from deployment_manager.commands.deploy.subcommands.run.deploy_orchestrator.deploy_orchestrator import (  # noqa: F401
     DeployOrchestrator,
 )
 from deployment_manager.commands.deploy.subcommands.run.models import Target
-from rossum_api.domain_logic.resources import Resource
 
 
 class TestLookupTableStructure:

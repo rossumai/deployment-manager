@@ -2,6 +2,7 @@ import json
 
 import pytest
 from anyio import Path
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.common.read_write import (
     create_custom_hook_code_path,
@@ -19,7 +20,6 @@ from deployment_manager.common.read_write import (
     write_yaml,
 )
 from deployment_manager.utils.consts import settings
-from rossum_api.domain_logic.resources import Resource
 
 
 @pytest.mark.asyncio
