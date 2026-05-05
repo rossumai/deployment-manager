@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 from copy import deepcopy
 
 from anyio import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from rich import print as pprint
 from rich.console import Console
 from rich.panel import Panel
@@ -52,8 +52,7 @@ console = Console()
 
 # TODO: prebuilt exceptions that automatically reference the type/name/id of object
 class DeployObject(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: int
     name: str
@@ -607,8 +606,7 @@ class DeployObject(BaseModel):
 
 
 class EmptyDeployObject(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: int = None
     name: str = ""

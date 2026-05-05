@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from rossum_api import APIClientError, AsyncRossumAPIClient
 from rossum_api.domain_logic.resources import Resource
 
@@ -7,8 +7,7 @@ from deployment_manager.utils.functions import gather_with_concurrency
 
 
 class Downloader(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     client: AsyncRossumAPIClient
 

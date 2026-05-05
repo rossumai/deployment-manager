@@ -1,5 +1,5 @@
 from anyio import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.download.helpers import should_write_object
@@ -297,8 +297,7 @@ class SchemaSaver(QueueSaver):
 
 
 class FormulaSaver(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     parent_schema_path: Path
     parent_schema: dict

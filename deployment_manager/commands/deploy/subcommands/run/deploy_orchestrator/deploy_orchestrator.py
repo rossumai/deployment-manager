@@ -4,7 +4,7 @@ from collections import defaultdict
 
 import questionary
 from anyio import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from rossum_api import APIClientError, AsyncRossumAPIClient
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.organization import Organization
@@ -70,8 +70,7 @@ from deployment_manager.utils.functions import extract_id_from_url, gather_with_
 
 
 class DeployOrchestrator(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     auto_delete: bool = False
     prefer: str = None

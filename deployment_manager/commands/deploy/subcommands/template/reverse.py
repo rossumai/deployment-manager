@@ -1,6 +1,6 @@
 import questionary
 from anyio import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from rich import print as pprint
 from rossum_api import AsyncRossumAPIClient
 from rossum_api.domain_logic.resources import Resource
@@ -16,8 +16,7 @@ from deployment_manager.utils.functions import extract_id_from_url, templatize_n
 
 
 class DeployFileReverser(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     input_file_path: Path
     project_path: Path

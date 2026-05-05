@@ -2,7 +2,7 @@ import asyncio
 from typing import Optional
 
 from anyio import Path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from rich import print as pprint
 from rossum_api import APIClientError, AsyncRossumAPIClient
 from rossum_api.domain_logic.resources import Resource
@@ -17,8 +17,7 @@ class NonExistentObjectException(Exception): ...
 
 
 class RevertObjectDeploy(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: int
     name: str
@@ -128,8 +127,7 @@ class RevertObjectDeploy(BaseModel):
 
 
 class EmptyRevertObjectDeploy(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: int = None
     name: str = ""

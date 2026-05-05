@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from rich import print as pprint
 from rich.panel import Panel
 from rossum_api import APIClientError, AsyncRossumAPIClient
@@ -17,8 +17,7 @@ from deployment_manager.utils.functions import gather_with_concurrency
 
 
 class RevertDeployFile(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     plan_only: bool = False
 

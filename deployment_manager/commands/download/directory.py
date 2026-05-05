@@ -2,7 +2,7 @@ from collections import defaultdict
 from typing import Optional
 
 from anyio import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from rich import print as pprint
 from rich.panel import Panel
 from rossum_api import APIClientError, AsyncRossumAPIClient
@@ -47,12 +47,8 @@ from deployment_manager.utils.functions import find_all_object_paths, gather_wit
 class DownloadException(Exception): ...
 
 
-# TODO: use ConfigDict instead of Config class (pydantic)
-
-
 class OrganizationDirectory(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # Present in the config YAML
     name: str

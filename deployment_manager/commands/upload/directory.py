@@ -1,5 +1,5 @@
 from anyio import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from rich import print as pprint
 from rich.panel import Panel
 from rossum_api.domain_logic.resources import Resource
@@ -25,8 +25,7 @@ from deployment_manager.utils.functions import find_all_object_paths, gather_wit
 
 
 class ChangedObject(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     operation: GIT_CHARACTERS
     path: Path
