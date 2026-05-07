@@ -120,7 +120,7 @@ async def test_push_all_uploads_every_file(tmp_path: Path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_push_creates_new_object_from_untracked_json(tmp_path: Path, monkeypatch):
-    """An untracked local JSON (id/url that returns 404) → API create() is called."""
+    """An untracked local JSON with the `_[]` placeholder → API create() is called."""
     monkeypatch.chdir(tmp_path)
     _patch_git_empty(monkeypatch)
 
@@ -129,12 +129,11 @@ async def test_push_creates_new_object_from_untracked_json(tmp_path: Path, monke
     client = VirtualRossumClient(org)
     await _pull_initial(client)
 
-    # User creates a NEW hook JSON pointing at a non-existent remote ID
-    new_hook_path = tmp_path / SOURCE / SUB / "hooks" / "BrandNewHook_[999999].json"
+    # User creates a NEW hook with the `_[]` placeholder convention. No
+    # id/url — push is expected to POST and fill them in.
+    new_hook_path = tmp_path / SOURCE / SUB / "hooks" / "BrandNewHook_[].json"
     new_hook_data = {
-        "id": 999999,
         "name": "BrandNewHook",
-        "url": f"{org.base_url}/hooks/999999",
         "type": "function",
         "events": ["annotation_content.user_update"],
         "active": True,
@@ -154,7 +153,7 @@ async def test_push_creates_new_object_from_untracked_json(tmp_path: Path, monke
     await write_object_to_json(new_hook_path, new_hook_data)
 
     # Git shows this as untracked
-    _patch_git_with_changes(monkeypatch, [f"?? {SOURCE}/{SUB}/hooks/BrandNewHook_[999999].json"])
+    _patch_git_with_changes(monkeypatch, [f"?? {SOURCE}/{SUB}/hooks/BrandNewHook_[].json"])
 
     hooks_before = set(org._stores["hooks"].keys())
 
@@ -167,6 +166,7 @@ async def test_push_creates_new_object_from_untracked_json(tmp_path: Path, monke
                 await upload_destinations(
                     destinations=(Path(SOURCE) / SUB,),
                     project_path=Path("."),
+                    assume_yes=True,
                 )
 
     hooks_after = set(org._stores["hooks"].keys())

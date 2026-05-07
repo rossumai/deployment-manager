@@ -297,6 +297,7 @@ class Settings:
     FORMULA_DIR_NAME: str = "formulas"
     RULES_DIR_NAME: str = "rules"
     EMAIL_TEMPLATES_DIR_NAME: str = "email_templates"
+    LABELS_DIR_NAME: str = "labels"
 
     GITHUB_DEFAULT_LATEST_RELEASE_URL = "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
     GITHUB_SPECIFIC_RELEASE_URL = "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/{version_tag}"

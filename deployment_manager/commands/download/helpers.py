@@ -1,5 +1,6 @@
 import json
 import shutil
+import sys
 from typing import TYPE_CHECKING, Any
 
 import questionary
@@ -54,6 +55,13 @@ async def should_write_object(
                 display_warning(
                     f"File [green]{path}[/green] has local unversioned changes [white](local: {local_timestamp} | remote: {remote_timestamp})[/white]."
                 )
+                # questionary crashes on non-TTY stdin; default to overwrite
+                # since auto-pull-after-push implies trust in the remote.
+                if not sys.stdin.isatty():
+                    display_warning(
+                        f"Non-interactive shell — defaulting to overwrite for [green]{path}[/green]."
+                    )
+                    return True
                 user_answer = await questionary.text(
                     message="Should the remote version overwrite the local one?",
                     instruction="(y/n/yy)",

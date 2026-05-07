@@ -131,7 +131,7 @@ def _client_with_obj(remote_obj=None, status_code=None):
 
 @pytest.mark.asyncio
 class TestMarkUnstagedObjectsAsUpdated:
-    async def test_skips_uncommitted_object_without_id(self, tmp_path):
+    async def test_passes_through_uncommitted_object_without_id(self, tmp_path):
         org_path = tmp_path
         path = Path("source/org/hooks/h.json")
         await (org_path / path).parent.mkdir(parents=True)
@@ -141,8 +141,9 @@ class TestMarkUnstagedObjectsAsUpdated:
         result = await mark_unstaged_objects_as_updated(
             [(GIT_CHARACTERS.CREATED, path)], org_path, client
         )
-        # Object with no id/url is silently skipped
-        assert result == []
+        # No id/url and no `_[]` placeholder: pass through unchanged so
+        # plan.classify can emit a clear validation error to the user.
+        assert result == [(GIT_CHARACTERS.CREATED, path)]
 
     async def test_remote_exists_changes_create_to_update(self, tmp_path):
         org_path = tmp_path
@@ -190,7 +191,10 @@ class TestMarkUnstagedObjectsAsUpdated:
         # Organizations cannot be created → returned as empty
         assert result == []
 
-    async def test_inbox_create_is_warned_and_skipped(self, tmp_path):
+    async def test_inbox_create_is_passed_through(self, tmp_path):
+        # Inbox creation is supported by the API — no longer treated as
+        # non-creatable. With the remote returning 404, the change stays a
+        # CREATE and is forwarded to the planner.
         org_path = tmp_path
         path = Path("source/org/inboxes/i.json")
         await (org_path / path).parent.mkdir(parents=True)
@@ -202,7 +206,7 @@ class TestMarkUnstagedObjectsAsUpdated:
         result = await mark_unstaged_objects_as_updated(
             [(GIT_CHARACTERS.CREATED, path)], org_path, client
         )
-        assert result == []
+        assert result == [(GIT_CHARACTERS.CREATED, path)]
 
     async def test_passes_through_non_create_changes(self, tmp_path):
         # DELETED, UPDATED ops are not touched
