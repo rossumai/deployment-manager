@@ -13,9 +13,9 @@ from deployment_manager.utils.consts import display_error, display_info
 
 logging.getLogger("botocore.credentials").setLevel(logging.CRITICAL)
 
-MODEL_ID = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+MODEL_ID = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 
-MODEL_PRICING_MAP = {"us.anthropic.claude-3-7-sonnet-20250219-v1:0": {"input": 0.003, "output": 0.015}}
+MODEL_PRICING_MAP = {"us.anthropic.claude-haiku-4-5-20251001-v1:0": {"input": 0.003, "output": 0.015}}
 
 
 def display_tokens_and_cost(message: str, input_tokens_total: int, output_tokens_total: int, price_total: float):
@@ -32,7 +32,7 @@ class ModelResponse:
 
 
 class LLMHelper:
-    def __init__(self):
+    def __init__(self, model_id: str | None = None):
         profile_name = os.environ.get("AWS_PROFILE") or "rossum-dev"
         self.session = boto3.Session(profile_name=profile_name)
         config = Config(
@@ -43,11 +43,12 @@ class LLMHelper:
 
         self.bedrock_runtime = self.session.client("bedrock-runtime", region_name="us-west-2", config=config)
 
+        self.model_id = model_id or MODEL_ID
+
         self.payload_basis = {
             "anthropic_version": "bedrock-2023-05-31",
-            "temperature": 0.5,
+            "temperature": 0.2,
             "max_tokens": 5000,
-            "top_p": 0.9,
         }
 
     @classmethod
@@ -62,7 +63,7 @@ class LLMHelper:
         payload["messages"] = [{"role": "user", "content": prompt}]
 
         def blocking_call():
-            response = self.bedrock_runtime.invoke_model(modelId=MODEL_ID, body=json.dumps(payload))
+            response = self.bedrock_runtime.invoke_model(modelId=self.model_id, body=json.dumps(payload))
             response_body = json.loads(response["body"].read())
             usage = response_body["usage"]
 
@@ -75,7 +76,7 @@ class LLMHelper:
         try:
             return await asyncio.to_thread(blocking_call)
         except Exception as e:
-            print(f"An error occurred: {e}")
+            display_error(f"An error occurred: {e}", e)
 
     def validate_credentials(self):
         try:

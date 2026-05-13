@@ -1,6 +1,7 @@
 import asyncio
 import re
 from functools import wraps
+from typing import Any
 
 from anyio import Path
 from click import progressbar
@@ -144,3 +145,15 @@ async def find_all_schema_paths_in_destination(destination_path: Path):
         return []
 
     return [schema_path async for schema_path in schemas_dir.iterdir() if await schema_path.is_file()]
+
+def parse_bool(value: Any, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "no", "n", "off"}:
+        return False
+    return default
