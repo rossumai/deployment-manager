@@ -52,6 +52,10 @@ async def merge_formula_changes(changes: list[tuple[str, Path]]):
                 continue
 
             schema = await read_object_from_json(schema_path)
+            if "content" not in schema:
+                # Malformed/new schema without `content`; let plan.validate
+                # surface the missing-required-field error.
+                continue
             schema_id = find_schema_id(schema["content"], formula_name)
             schema_id["formula"] = formula_code
 
@@ -78,6 +82,8 @@ async def merge_formula_changes(changes: list[tuple[str, Path]]):
         ):
             schema = await read_object_from_json(path)
 
+            if "content" not in schema:
+                continue
             formula_fields = find_formula_fields_in_schema(schema["content"])
             if formula_fields:
                 formula_directory_path = create_formula_directory_path(path)
@@ -107,8 +113,10 @@ async def merge_hook_changes(changes: list[tuple[str, Path]], org_path: Path):
             with open(path, "r") as file:
                 code_str = file.read()
                 object_path = org_path / (Path(str(path).removesuffix(".py").removesuffix(".js") + ".json"))
+                if not await object_path.exists():
+                    continue
                 hook = await read_object_from_json(object_path)
-                hook["config"]["code"] = code_str
+                hook.setdefault("config", {})["code"] = code_str
                 await write_object_to_json(object_path, hook)
                 new_change = (GIT_CHARACTERS.UPDATED, object_path)
                 exists = is_change_existing(new_change, merged_changes)
@@ -116,6 +124,26 @@ async def merge_hook_changes(changes: list[tuple[str, Path]], org_path: Path):
                     merged_changes.append(new_change)
         elif not is_change_existing(change, merged_changes):
             merged_changes.append(change)
+
+    # Dedup by path: a brand-new hook may emit both (CREATE, json) directly
+    # and (UPDATE, json) synthesized from its .py companion. Prefer CREATE.
+    create_ops = {
+        GIT_CHARACTERS.CREATED,
+        GIT_CHARACTERS.CREATED_STAGED,
+        GIT_CHARACTERS.CREATED_STAGED_MODIFIED,
+    }
+    deduped: list[tuple[str, Path]] = []
+    seen: dict[str, int] = {}
+    for op, path in merged_changes:
+        key = str(path)
+        if key not in seen:
+            seen[key] = len(deduped)
+            deduped.append((op, path))
+        else:
+            existing_op = deduped[seen[key]][0]
+            if op in create_ops and existing_op not in create_ops:
+                deduped[seen[key]] = (op, path)
+    merged_changes = deduped
 
     # If code file was not among the changes, the JSON hook file already has the new code thanks to the for loop above and no change is technically actually made.
     # In case code of a hook was changed directly in the JSON file, update the code file as well.
@@ -131,6 +159,12 @@ async def merge_hook_changes(changes: list[tuple[str, Path]], org_path: Path):
             ]
             and path.parent.name == "hooks"
         ) and path.suffix == ".json":
+            # The change list can contain a CREATE for a file that no longer
+            # exists on disk — e.g. a `RD` rename whose new path was deleted
+            # by the user. Skip silently; the planner will resolve it via the
+            # paired DELETE for the old path.
+            if not await path.exists():
+                continue
             hook = await read_object_from_json(path)
 
             code_path = create_custom_hook_code_path(Path(path), hook)
@@ -144,25 +178,45 @@ async def merge_hook_changes(changes: list[tuple[str, Path]], org_path: Path):
 
 async def mark_unstaged_objects_as_updated(changes, org_path, client: AsyncRossumAPIClient):
     """
-    Unstaged changes may be truly new objects or existing objects that were pulled and not yet committed. Change op-codes based on their existence on the remote.
+    Unstaged changes may be truly new objects or existing objects that were
+    pulled and not yet committed. Change op-codes based on their existence on
+    the remote.
+
+    `_[]` placeholder semantics: if the path has any `_[]` segment, it is an
+    explicit CREATE — no remote check needed. The plan module rejects any
+    no-`_[]` create that lacks id+url with a clearer error than this stage.
     """
+    from deployment_manager.commands.upload.placeholder import path_has_own_placeholder
+
     changes_updated = []
     for change in changes:
         path: Path
         op, path = change
         if op in (GIT_CHARACTERS.CREATED, GIT_CHARACTERS.CREATED_STAGED, GIT_CHARACTERS.CREATED_STAGED_MODIFIED) and path.suffix == ".json":
+            # Explicit `_[]` placeholder => CREATE, do not consult the remote.
+            if path_has_own_placeholder(path):
+                if not is_change_existing(change, changes_updated):
+                    changes_updated.append(change)
+                continue
+
             object_path = org_path / path
-            object = await read_object_from_json(object_path)
+            try:
+                object = await read_object_from_json(object_path)
+            except FileNotFoundError:
+                # File deleted between git status and our read — skip.
+                continue
 
             id, url = object.get("id", None), object.get("url", None)
             if not id or not url:
-                display_warning(f"Skipping uncommitted object without ID or URL: ({object_path})")
+                # No `_[]` and no id/url — let plan.classify surface a clear error.
+                if not is_change_existing(change, changes_updated):
+                    changes_updated.append(change)
                 continue
 
             obj = None
             is_non_creatable_object = False
             object_type = determine_object_type_from_url(url)
-            if object_type in [Resource.Organization, Resource.Inbox]:
+            if object_type in [Resource.Organization]:
                 is_non_creatable_object = True
 
             try:
@@ -177,7 +231,7 @@ async def mark_unstaged_objects_as_updated(changes, org_path, client: AsyncRossu
                 op = GIT_CHARACTERS.UPDATED
                 changes_updated.append((op, path))
             elif is_non_creatable_object:
-                display_warning(f"Creating organization or inbox is not supported: ({path})")
+                display_warning(f"Creating organization is not supported: ({path})")
                 continue
             # Object does not exist on remote -> keep it as create
             elif not is_change_existing(change, changes_updated):

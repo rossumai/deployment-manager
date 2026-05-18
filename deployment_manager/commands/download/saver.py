@@ -405,7 +405,7 @@ class LabelSaver(ObjectSaver):
     type: CustomResource = CustomResource.Label
 
     def construct_object_path(self, subdir: Subdirectory, label: dict) -> Path:
-        object_path = self.base_path / subdir.name / "labels" / f'{templatize_name_id(label["name"], label["id"])}.json'
+        object_path = self.base_path / subdir.name / Settings.LABELS_DIR_NAME / f'{templatize_name_id(label["name"], label["id"])}.json'
         return object_path
 
     async def save_downloaded_object(self, label: dict, subdir: Subdirectory):

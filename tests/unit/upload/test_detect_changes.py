@@ -1,8 +1,12 @@
+import json
 import os
+import pathlib
+import subprocess
 from unittest.mock import AsyncMock
 
 import pytest
 from anyio import Path
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.download.saver import WorkspaceSaver
 from deployment_manager.commands.download.subdirectory import (
@@ -129,3 +133,273 @@ async def test_detect_ignores_unincluded_subdir(
     os.chdir(prev_cwd)
 
     assert upload_dir.changed_objects == []
+
+
+@pytest.mark.asyncio
+async def test_placeholder_path_with_leftover_url_routes_to_create(
+    workspace_json: dict, tmp_path: Path, test_subdir: Subdirectory
+):
+    """Regression: a `_[]` path whose JSON still has a leftover url (but no
+    id) must reach plan.classify, not be silently skipped with "No subdir
+    found"."""
+    TEST_ORG_NAME = "test-org"
+
+    os.makedirs(str(tmp_path / TEST_ORG_NAME))
+    pathlib.Path(str(tmp_path / TEST_ORG_NAME / "seed")).write_text("")
+    initialize_git_repo(tmp_path)
+
+    ws_dir = tmp_path / TEST_ORG_NAME / test_subdir.name / "workspaces" / "Created_workspace_[]"
+    ws_path = ws_dir / "workspace.json"
+    os.makedirs(str(ws_dir))
+    leftover = {**workspace_json}
+    leftover.pop("id", None)
+    await write_object_to_json(ws_path, leftover)
+
+    upload_dir = UploadOrganizationDirectory(
+        name=TEST_ORG_NAME,
+        project_path=tmp_path,
+        upload_all=False,
+        force=False,
+        indexed_only=False,
+        subdirectories={test_subdir.name: {"include": True, "object_ids": []}},
+        org_id=-1,
+        api_base="https://example.com",
+    )
+
+    prev_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        await upload_dir.prepare_changed_objects()
+    finally:
+        os.chdir(prev_cwd)
+
+    assert len(upload_dir.changed_objects) == 1
+    obj = upload_dir.changed_objects[0]
+    assert obj.operation in (
+        GIT_CHARACTERS.CREATED,
+        GIT_CHARACTERS.CREATED_STAGED,
+        GIT_CHARACTERS.CREATED_STAGED_MODIFIED,
+    )
+    assert obj.resolved_type == Resource.Workspace
+    assert obj.data.get("url")
+
+
+def test_build_deleted_skips_non_versioned_attributes_file():
+    """non_versioned_object_attributes.json is silently skipped."""
+    upload_dir = UploadOrganizationDirectory.model_construct(
+        name="test-org",
+        project_path=Path("/tmp"),
+        subdirectories={},
+        org_id=-1,
+        api_base="https://example.com",
+    )
+    result = upload_dir._build_deleted_changed_object(
+        GIT_CHARACTERS.DELETED,
+        Path("test-org/non_versioned_object_attributes.json"),
+    )
+    assert result is None
+
+
+def test_build_deleted_skips_email_template_dir():
+    """email_templates/*.json is silently skipped via the dir allow-list."""
+    upload_dir = UploadOrganizationDirectory.model_construct(
+        name="test-org",
+        project_path=Path("/tmp"),
+        subdirectories={},
+        org_id=-1,
+        api_base="https://example.com",
+    )
+    result = upload_dir._build_deleted_changed_object(
+        GIT_CHARACTERS.DELETED,
+        Path("test-org/email_templates/welcome.json"),
+    )
+    assert result is None
+
+
+def test_build_deleted_skips_formula_file():
+    """Formula `.py` files under formulas/ are silently skipped."""
+    upload_dir = UploadOrganizationDirectory.model_construct(
+        name="test-org",
+        project_path=Path("/tmp"),
+        subdirectories={},
+        org_id=-1,
+        api_base="https://example.com",
+    )
+    result = upload_dir._build_deleted_changed_object(
+        GIT_CHARACTERS.DELETED,
+        Path("test-org/workspaces/W_[1]/queues/Q_[2]/formulas/some_field.py"),
+    )
+    assert result is None
+
+
+def test_build_deleted_skips_labels_dir():
+    """labels/*.json is silently skipped via the dir allow-list."""
+    upload_dir = UploadOrganizationDirectory.model_construct(
+        name="test-org",
+        project_path=Path("/tmp"),
+        subdirectories={},
+        org_id=-1,
+        api_base="https://example.com",
+    )
+    result = upload_dir._build_deleted_changed_object(
+        GIT_CHARACTERS.DELETED,
+        Path("test-org/labels/important.json"),
+    )
+    assert result is None
+
+
+def _git_init_and_commit(tmp_path):
+    subprocess.run(["git", "init"], cwd=str(tmp_path), check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "t@t"],
+        cwd=str(tmp_path),
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "t"],
+        cwd=str(tmp_path),
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(["git", "add", "."], cwd=str(tmp_path), check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "init"],
+        cwd=str(tmp_path),
+        check=True,
+        capture_output=True,
+    )
+
+
+def test_build_deleted_schema_recovers_id_from_git(tmp_path):
+    """A deleted schema.json's id is recovered from git history so the
+    DELETE op survives into the plan (previously dropped → orphaned schema)."""
+    sync_root = pathlib.Path(str(tmp_path))
+    org_name = "test-org"
+    queue_dir = sync_root / org_name / "workspaces" / "W_[1]" / "queues" / "Q_[2]"
+    queue_dir.mkdir(parents=True)
+    schema_path = queue_dir / "schema.json"
+    schema_path.write_text(
+        json.dumps(
+            {
+                "id": 555,
+                "url": "https://x/api/v1/schemas/555",
+                "name": "S",
+                "content": [],
+            }
+        )
+    )
+
+    _git_init_and_commit(sync_root)
+    schema_path.unlink()
+
+    upload_dir = UploadOrganizationDirectory.model_construct(
+        name=org_name,
+        project_path=Path(tmp_path),
+        subdirectories={},
+        org_id=-1,
+        api_base="https://example.com",
+    )
+
+    rel_path = (
+        Path(org_name) / "workspaces" / "W_[1]" / "queues" / "Q_[2]" / "schema.json"
+    )
+
+    prev_cwd = os.getcwd()
+    os.chdir(str(sync_root))
+    try:
+        result = upload_dir._build_deleted_changed_object(GIT_CHARACTERS.DELETED, rel_path)
+    finally:
+        os.chdir(prev_cwd)
+
+    assert result is not None
+    assert result.data["id"] == 555
+    assert result.data["url"] == "https://x/api/v1/schemas/555"
+    assert result.resolved_type == Resource.Schema
+
+
+def test_build_deleted_inbox_recovers_id_from_git(tmp_path):
+    """Same as above, for inbox.json."""
+    sync_root = pathlib.Path(str(tmp_path))
+    org_name = "test-org"
+    queue_dir = sync_root / org_name / "workspaces" / "W_[1]" / "queues" / "Q_[2]"
+    queue_dir.mkdir(parents=True)
+    inbox_path = queue_dir / "inbox.json"
+    inbox_path.write_text(
+        json.dumps(
+            {
+                "id": 777,
+                "url": "https://x/api/v1/inboxes/777",
+                "name": "I",
+            }
+        )
+    )
+
+    _git_init_and_commit(sync_root)
+    inbox_path.unlink()
+
+    upload_dir = UploadOrganizationDirectory.model_construct(
+        name=org_name,
+        project_path=Path(tmp_path),
+        subdirectories={},
+        org_id=-1,
+        api_base="https://example.com",
+    )
+
+    rel_path = (
+        Path(org_name) / "workspaces" / "W_[1]" / "queues" / "Q_[2]" / "inbox.json"
+    )
+
+    prev_cwd = os.getcwd()
+    os.chdir(str(sync_root))
+    try:
+        result = upload_dir._build_deleted_changed_object(GIT_CHARACTERS.DELETED, rel_path)
+    finally:
+        os.chdir(prev_cwd)
+
+    assert result is not None
+    assert result.data["id"] == 777
+    assert result.resolved_type == Resource.Inbox
+
+
+def test_build_deleted_schema_returns_none_when_git_recovery_fails(tmp_path):
+    """Schema deleted but never in git: silently skip (return None)."""
+    sync_root = pathlib.Path(str(tmp_path))
+    org_name = "test-org"
+    queue_dir = sync_root / org_name / "workspaces" / "W_[1]" / "queues" / "Q_[2]"
+    queue_dir.mkdir(parents=True)
+
+    subprocess.run(["git", "init"], cwd=str(sync_root), check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "t@t"],
+        cwd=str(sync_root),
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "t"],
+        cwd=str(sync_root),
+        check=True,
+        capture_output=True,
+    )
+
+    upload_dir = UploadOrganizationDirectory.model_construct(
+        name=org_name,
+        project_path=Path(tmp_path),
+        subdirectories={},
+        org_id=-1,
+        api_base="https://example.com",
+    )
+
+    rel_path = (
+        Path(org_name) / "workspaces" / "W_[1]" / "queues" / "Q_[2]" / "schema.json"
+    )
+
+    prev_cwd = os.getcwd()
+    os.chdir(str(sync_root))
+    try:
+        result = upload_dir._build_deleted_changed_object(GIT_CHARACTERS.DELETED, rel_path)
+    finally:
+        os.chdir(prev_cwd)
+
+    assert result is None

@@ -65,13 +65,21 @@ Only source files are taken into account by default.
     help="Commit message after push.",
 )
 @click.option(
+    "--yes",
+    "-y",
+    "assume_yes",
+    default=False,
+    is_flag=True,
+    help="Skip the confirmation prompt shown when the plan contains CREATE or DELETE operations.",
+)
+@click.option(
     "--concurrency",
     type=click.IntRange(min=1),
     default=None,
     help="Maximum concurrent API requests (default: 5, or PRD2_CONCURRENCY env var).",
 )
 @coro
-async def upload_project_wrapper(destinations, all, force, indexed_only, commit, message, concurrency):
+async def upload_project_wrapper(destinations, all, force, indexed_only, commit, message, assume_yes, concurrency):
     apply_concurrency_override(concurrency)
     # To be able to run the command progammatically without the CLI decorators
     await upload_destinations(
@@ -81,6 +89,7 @@ async def upload_project_wrapper(destinations, all, force, indexed_only, commit,
         indexed_only=indexed_only,
         commit=commit,
         commit_message=message,
+        assume_yes=assume_yes,
     )
 
 
@@ -92,6 +101,7 @@ async def upload_destinations(
     indexed_only: bool = False,
     commit: bool = False,
     commit_message: str = "",
+    assume_yes: bool = False,
 ):
     if not destinations:
         display_warning("No destinations specified to pull.")
@@ -109,6 +119,7 @@ async def upload_destinations(
             upload_all=upload_all,
             force=force,
             indexed_only=indexed_only,
+            assume_yes=assume_yes,
             **value,
         )
         for name, value in project_config.get("directories", {}).items()
@@ -140,14 +151,21 @@ async def upload_destinations(
                 display_error(
                     f"Error(s) while uploading {dir_config.display_label}:\n{'\n'.join(dir_config.request_errors)}"
                 )
+            if dir_config.has_blocking_errors:
+                errors_encountered = True
         except Exception as e:
+            errors_encountered = True
             display_error(
                 f"Error during the {settings.UPLOAD_COMMAND_NAME} of {dir_config.display_label}: {e}",
                 e,
             )
 
-    if not errors_encountered:
-        await download_destinations(destinations=destinations)
+    # On any per-directory failure, skip both the post-push pull and the
+    # auto-commit below — leave the working tree dirty for inspection.
+    if errors_encountered:
+        return
+
+    await download_destinations(destinations=destinations)
 
     if commit:
         subprocess.run(["git", "add", "."])

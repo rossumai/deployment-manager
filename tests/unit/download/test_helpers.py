@@ -1,3 +1,7 @@
+import json
+import pathlib
+from unittest.mock import MagicMock, patch
+
 import pytest
 from anyio import Path
 
@@ -5,6 +9,7 @@ from deployment_manager.commands.download.helpers import (
     delete_empty_folders,
     delete_empty_formula_dir,
     replace_code_paths,
+    should_write_object,
 )
 from deployment_manager.utils.consts import settings
 
@@ -84,3 +89,55 @@ class TestDeleteEmptyFormulaDir:
         await delete_empty_formula_dir(tmp_path)
         assert await queue_dir.exists()
         assert await (queue_dir / "queue.json").exists()
+
+
+@pytest.mark.asyncio
+class TestShouldWriteObject:
+    async def test_non_tty_defaults_to_overwrite(self, tmp_path):
+        """Non-TTY context: skip the questionary prompt, default to True (overwrite)."""
+        sync_root = pathlib.Path(str(tmp_path))
+        file_path_str = str(sync_root / "obj.json")
+        with open(file_path_str, "w") as f:
+            json.dump(
+                {"url": "https://x/api/v1/queues/1", "modified_at": "2026-01-01"},
+                f,
+            )
+
+        file_path = Path(file_path_str)
+        remote = {"url": "https://x/api/v1/queues/1", "modified_at": "2026-02-02"}
+        parent_dir = MagicMock()
+        parent_dir.ignore_changed_file_warnings = False
+
+        with patch("sys.stdin.isatty", return_value=False):
+            result = await should_write_object(
+                path=file_path,
+                remote_object=remote,
+                changed_files=[file_path],
+                parent_dir_reference=parent_dir,
+            )
+        assert result is True
+
+    async def test_non_tty_does_not_call_questionary(self, tmp_path):
+        """In non-TTY, questionary.text must NOT be invoked (it would crash)."""
+        sync_root = pathlib.Path(str(tmp_path))
+        file_path_str = str(sync_root / "obj.json")
+        with open(file_path_str, "w") as f:
+            json.dump(
+                {"url": "https://x/api/v1/queues/1", "modified_at": "2026-01-01"},
+                f,
+            )
+        file_path = Path(file_path_str)
+        remote = {"url": "https://x/api/v1/queues/1", "modified_at": "2026-02-02"}
+        parent_dir = MagicMock()
+        parent_dir.ignore_changed_file_warnings = False
+
+        with patch("sys.stdin.isatty", return_value=False), patch(
+            "deployment_manager.commands.download.helpers.questionary.text"
+        ) as mock_q:
+            await should_write_object(
+                path=file_path,
+                remote_object=remote,
+                changed_files=[file_path],
+                parent_dir_reference=parent_dir,
+            )
+        mock_q.assert_not_called()
