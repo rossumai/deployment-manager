@@ -135,6 +135,55 @@ async def test_detect_ignores_unincluded_subdir(
     assert upload_dir.changed_objects == []
 
 
+@pytest.mark.asyncio
+async def test_placeholder_path_with_leftover_url_routes_to_create(
+    workspace_json: dict, tmp_path: Path, test_subdir: Subdirectory
+):
+    """Regression: a `_[]` path whose JSON still has a leftover url (but no
+    id) must reach plan.classify, not be silently skipped with "No subdir
+    found"."""
+    TEST_ORG_NAME = "test-org"
+
+    os.makedirs(str(tmp_path / TEST_ORG_NAME))
+    pathlib.Path(str(tmp_path / TEST_ORG_NAME / "seed")).write_text("")
+    initialize_git_repo(tmp_path)
+
+    ws_dir = tmp_path / TEST_ORG_NAME / test_subdir.name / "workspaces" / "Created_workspace_[]"
+    ws_path = ws_dir / "workspace.json"
+    os.makedirs(str(ws_dir))
+    leftover = {**workspace_json}
+    leftover.pop("id", None)
+    await write_object_to_json(ws_path, leftover)
+
+    upload_dir = UploadOrganizationDirectory(
+        name=TEST_ORG_NAME,
+        project_path=tmp_path,
+        upload_all=False,
+        force=False,
+        indexed_only=False,
+        subdirectories={test_subdir.name: {"include": True, "object_ids": []}},
+        org_id=-1,
+        api_base="https://example.com",
+    )
+
+    prev_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        await upload_dir.prepare_changed_objects()
+    finally:
+        os.chdir(prev_cwd)
+
+    assert len(upload_dir.changed_objects) == 1
+    obj = upload_dir.changed_objects[0]
+    assert obj.operation in (
+        GIT_CHARACTERS.CREATED,
+        GIT_CHARACTERS.CREATED_STAGED,
+        GIT_CHARACTERS.CREATED_STAGED_MODIFIED,
+    )
+    assert obj.resolved_type == Resource.Workspace
+    assert obj.data.get("url")
+
+
 def test_build_deleted_skips_non_versioned_attributes_file():
     """non_versioned_object_attributes.json is silently skipped."""
     upload_dir = UploadOrganizationDirectory.model_construct(

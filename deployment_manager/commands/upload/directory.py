@@ -20,6 +20,7 @@ from deployment_manager.commands.upload.dependencies import (
     merge_hook_changes,
 )
 from deployment_manager.commands.upload.models import PushException
+from deployment_manager.commands.upload.placeholder import path_has_own_placeholder
 from deployment_manager.commands.upload.plan import (
     classify,
     determine_type_from_local_path,
@@ -152,6 +153,14 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             except FileNotFoundError:
                 continue
 
+            rel_path = strip_org_prefix(path, self.project_path / self.name)
+
+            # `_[]` in the path means explicit create — skip the
+            # existing-object lookup and let classify validate the JSON.
+            if path_has_own_placeholder(rel_path):
+                self._append_placeholder_object(op, path, rel_path, data)
+                continue
+
             object_url = data.get("url", "")
             if object_url:
                 object_type = determine_object_type_from_url(object_url)
@@ -168,26 +177,24 @@ class UploadOrganizationDirectory(OrganizationDirectory):
                 self.changed_objects.append(changed_object)
                 continue
 
-            # No url => possibly a brand-new object marked with `_[]`.
-            rel_path = strip_org_prefix(path, self.project_path / self.name)
-            resolved_type = determine_type_from_local_path(rel_path)
-            if resolved_type is None:
-                display_warning(f"Cannot determine resource type for {path}, skipping.")
-                continue
-            # Subdir filtering for new objects: include them if any subdir under
-            # which they live is included. We don't have an id to look up, so
-            # use the path: the first segment is the subdir name.
-            subdir = self._find_subdir_by_path(rel_path)
-            if subdir is not None and not subdir.include:
-                continue
+            self._append_placeholder_object(op, path, rel_path, data)
 
-            changed_object = ChangedObject(
+    def _append_placeholder_object(self, op, path: Path, rel_path: Path, data: dict) -> None:
+        resolved_type = determine_type_from_local_path(rel_path)
+        if resolved_type is None:
+            display_warning(f"Cannot determine resource type for {path}, skipping.")
+            return
+        subdir = self._find_subdir_by_path(rel_path)
+        if subdir is not None and not subdir.include:
+            return
+        self.changed_objects.append(
+            ChangedObject(
                 operation=op,
                 path=path,
                 data=data,
                 resolved_type=resolved_type,
             )
-            self.changed_objects.append(changed_object)
+        )
 
     def _find_subdir_by_path(self, rel_path: Path):
         if not rel_path.parts:
