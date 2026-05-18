@@ -36,7 +36,9 @@ async def resolve_references(
     # Use the placeholder_path (path inside the org dir) for parent walking.
     rel = op.placeholder_path or op.path
 
-    if rtype == Resource.Queue:
+    if rtype == Resource.Workspace:
+        await _fill_url(op, "organization", Path("organization.json"), lookup, org_path)
+    elif rtype == Resource.Queue:
         await _fill_url(op, "workspace", _parent_workspace_path(rel), lookup, org_path)
         await _fill_url(op, "schema", _sibling_schema_path(rel), lookup, org_path)
     elif rtype == Resource.Schema:
@@ -53,7 +55,7 @@ async def resolve_references(
             op.data["queues"] = [url]
     elif rtype == Resource.EngineField:
         await _fill_url(op, "engine", _parent_engine_path(rel), lookup, org_path)
-    # Hook / Rule / Workspace / Engine: no filesystem-derived refs.
+    # Hook / Rule / Engine: no filesystem-derived refs.
 
 
 def _parent_workspace_path(rel: Path) -> Optional[Path]:

@@ -85,6 +85,42 @@ class TestApplyCreate:
         assert body["id"] == 100
         assert body["url"].endswith("/workspaces/100")
 
+    async def test_create_workspace_autofills_organization_from_disk(self, tmp_path):
+        """`organization` URL is auto-resolved from organization.json — the user
+        does not have to write it in workspace.json."""
+        org_name = "source"
+        org_path = Path(tmp_path) / org_name
+        ws_path = org_path / "workspaces" / "AP_[]" / "workspace.json"
+        org_url = "https://example.com/api/v1/organizations/1"
+        _write_json(org_path / "organization.json", {"id": 1, "url": org_url, "name": "Org"})
+        _write_json(ws_path, {"name": "AP"})
+
+        client = MagicMock()
+        client.create = AsyncMock(
+            return_value={
+                "id": 100,
+                "url": "https://example.com/api/v1/workspaces/100",
+                "name": "AP",
+                "organization": org_url,
+            }
+        )
+        directory = _build_directory(Path(tmp_path), org_name, client)
+
+        obj = ChangedObject(
+            operation=GIT_CHARACTERS.CREATED,
+            path=Path(org_name) / "workspaces" / "AP_[]" / "workspace.json",
+            data={"name": "AP"},
+        )
+        plan = classify([obj], Path(org_name))
+        validate(plan)
+        assert plan.errors == []
+
+        await apply_plan(plan, directory)
+
+        args, _ = client.create.await_args
+        assert args[0] == Resource.Workspace
+        assert args[1].get("organization") == org_url
+
     async def test_create_queue_resolves_workspace_url_from_lookup(self, tmp_path):
         org_name = "source"
         org_path = Path(tmp_path) / org_name

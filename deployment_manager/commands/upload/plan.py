@@ -245,14 +245,13 @@ def strip_org_prefix(path: Path, org_path: Path) -> Path:
 
 
 # Required-on-create fields per type. Fields auto-resolved from the local
-# filesystem at apply time (queue.workspace, queue.schema, schema.queues,
-# inbox.queues, engine_field.engine) are intentionally NOT listed here — the
-# user doesn't write them by hand. `organization` for Workspace IS listed
-# because there's no filesystem analog.
+# filesystem at apply time (workspace.organization, queue.workspace,
+# queue.schema, schema.queues, inbox.queues, engine_field.engine) are
+# intentionally NOT listed here — the user doesn't write them by hand.
 # `type` for Hook is also omitted: the API defaults it to "webhook"; the
 # runtime/code consistency check below catches function hooks missing runtime.
 REQUIRED_FIELDS: dict[Resource, list[str]] = {
-    Resource.Workspace: ["name", "organization"],
+    Resource.Workspace: ["name"],
     Resource.Queue: ["name"],
     Resource.Schema: ["name", "content"],
     Resource.Inbox: ["name"],
