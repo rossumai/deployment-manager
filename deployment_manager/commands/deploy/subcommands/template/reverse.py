@@ -11,7 +11,13 @@ from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYam
 from deployment_manager.commands.download.downloader import Downloader
 from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
 from deployment_manager.common.rossum_client import CustomAsyncAPIClient
-from deployment_manager.utils.consts import display_error, display_info, display_warning, settings
+from deployment_manager.utils.consts import (
+    CustomResource,
+    display_error,
+    display_info,
+    display_warning,
+    settings,
+)
 from deployment_manager.utils.functions import extract_id_from_url, templatize_name_id
 
 
@@ -107,11 +113,25 @@ class DeployFileReverser(BaseModel):
         deploy_file_object[settings.DEPLOY_KEY_HOOKS] = await self.reverse_object_type(
             type=Resource.Hook,
             deploy_file_object=deploy_file_object,
+            check_access=True,
         )
 
         deploy_file_object[settings.DEPLOY_KEY_ENGINES] = await self.reverse_object_type(
             type=Resource.Engine,
             deploy_file_object=deploy_file_object,
+            check_access=True,
+        )
+
+        deploy_file_object[settings.DEPLOY_KEY_LABELS] = await self.reverse_object_type(
+            type=CustomResource.Label,
+            deploy_file_object=deploy_file_object,
+            check_access=True,
+        )
+
+        deploy_file_object[settings.DEPLOY_KEY_EMAIL_TEMPLATES] = await self.reverse_object_type(
+            type=Resource.EmailTemplate,
+            deploy_file_object=deploy_file_object,
+            check_access=True,
         )
 
         default_deploy_name = f"reverse_{self.input_file_path.stem}.yaml"
@@ -139,7 +159,7 @@ class DeployFileReverser(BaseModel):
             f"\n  {settings.NEW_COMMAND_NAME} {settings.DEPLOY_COMMAND_NAME} {settings.DEPLOY_RUN_COMMAND_NAME} {deploy_file_path}\n"
         )
 
-    async def reverse_object_type(self, type: Resource, deploy_file_object: dict):
+    async def reverse_object_type(self, type: Resource, deploy_file_object: dict, check_access: bool = False):
         target_downloader = Downloader(client=self.target_client)
         source_downloader = Downloader(client=self.source_client)
         overrider = AttributeOverrider(type=type)
@@ -147,8 +167,8 @@ class DeployFileReverser(BaseModel):
         source_objects = deploy_file_object.get(type.value, [])
         reversed_source_objects = []
 
-        remote_target_objects = await target_downloader.download_remote_objects(type=type)
-        remote_source_objects = await source_downloader.download_remote_objects(type=type)
+        remote_target_objects = await target_downloader.download_remote_objects(type=type, check_access=check_access)
+        remote_source_objects = await source_downloader.download_remote_objects(type=type, check_access=check_access)
 
         for source_object in source_objects:
             source_object_id, source_object_name = source_object.get("id", ""), source_object.get("name", "")
@@ -209,6 +229,25 @@ class DeployFileReverser(BaseModel):
                     )
                 except Exception:
                     display_warning(f"Could not fetch workspace {workspace_id} for queue {reversed_object}")
+
+            elif type == Resource.EmailTemplate:
+                # Email templates live under their queue's email_templates/ dir; build that path
+                # from the target queue (and its workspace) so the reversed deploy can read the file.
+                try:
+                    queue_id = extract_id_from_url(remote_target["queue"])
+                    queue = await self.target_client.retrieve_queue(queue_id)
+                    workspace_id = extract_id_from_url(queue.workspace)
+                    workspace = await self.target_client.retrieve_workspace(workspace_id)
+                    reversed_object[settings.DEPLOY_KEY_BASE_PATH] = str(
+                        self.target_path
+                        / "workspaces"
+                        / templatize_name_id(workspace.name, workspace.id)
+                        / "queues"
+                        / templatize_name_id(queue.name, queue.id)
+                        / settings.EMAIL_TEMPLATES_DIR_NAME
+                    )
+                except Exception:
+                    display_warning(f"Could not compute base_path for email template {reversed_object.get('id')}")
 
             source_schema, source_inbox = (
                 source_object.get(settings.DEPLOY_KEY_SCHEMA, {}),

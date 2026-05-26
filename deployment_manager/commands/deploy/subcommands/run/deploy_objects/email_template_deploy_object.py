@@ -1,6 +1,8 @@
+from anyio import Path
 from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
+from deployment_manager.utils.functions import templatize_name_id
 
 # These types are auto-created with every queue and cannot be manually created
 NON_CREATABLE_EMAIL_TEMPLATE_TYPES = ["rejection_default", "email_with_no_processable_attachments"]
@@ -9,8 +11,18 @@ NON_CREATABLE_EMAIL_TEMPLATE_TYPES = ["rejection_default", "email_with_no_proces
 class EmailTemplateDeployObject(DeployObject):
     type: Resource = Resource.EmailTemplate
 
+    # Points at the queue's email_templates/ dir for standalone templates. Auto-loaded
+    # (rule-dependency) templates leave it unset and read from the API.
+    base_path: str | None = None
+
     # See NON_CREATABLE_EMAIL_TEMPLATE_TYPES
     non_creatable: bool = False
+
+    @property
+    def path(self) -> Path:
+        if self.base_path:
+            return Path(self.base_path) / f"{templatize_name_id(self.name, self.id)}.json"
+        return super().path
 
     async def initialize_deploy_object(self, deploy_file):
         await super().initialize_deploy_object(deploy_file)

@@ -13,13 +13,17 @@ from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYam
 from deployment_manager.commands.deploy.subcommands.template.helpers import (
     add_override_to_deploy_file_objects,
     add_targets_from_mapping,
+    collect_rule_dependency_ids,
     create_deploy_file_template,
     get_attribute_overrides_from_user,
     get_dir_and_subdir_from_user,
+    get_email_templates_from_user,
     get_engines_from_user,
     get_hooks_from_user,
+    get_labels_from_user,
     get_multi_targets_from_user,
     get_queues_from_user,
+    get_rule_dependency_objects,
     get_rules_from_user,
     get_secrets_from_user,
     get_workspaces_from_user,
@@ -132,13 +136,13 @@ async def create_deploy_template(
 
     # Rules
     rules = deploy_file_object.get(settings.DEPLOY_KEY_RULES, [])
-    selected_rules = await get_rules_from_user(
+    deploy_file_rules, selected_rule_objects = await get_rules_from_user(
         previous_deploy_file_rules=rules,
         source_path=source_path,
         queues=selected_queues,
         interactive=interactive,
     )
-    deploy_file_object[settings.DEPLOY_KEY_RULES] = selected_rules
+    deploy_file_object[settings.DEPLOY_KEY_RULES] = deploy_file_rules
 
     # Engines
     engines = deploy_file_object.get(settings.DEPLOY_KEY_ENGINES, [])
@@ -148,6 +152,40 @@ async def create_deploy_template(
         interactive=interactive,
     )
     deploy_file_object[settings.DEPLOY_KEY_ENGINES] = selected_engines
+
+    # Labels/email templates referenced by the selected rules, surfaced as mandatory in the
+    # menus below. Re-derived each run, so dropping a rule drops its dependencies.
+    label_rule_ids, email_template_rule_ids = collect_rule_dependency_ids(selected_rule_objects)
+
+    # `or []`: a bare `labels:` in the template parses as None, not []
+    previous_labels = deploy_file_object.get(settings.DEPLOY_KEY_LABELS) or []
+    user_labels = await get_labels_from_user(
+        previous_deploy_file_labels=previous_labels,
+        source_path=source_path,
+        interactive=interactive,
+        rule_required_ids=label_rule_ids,
+    )
+
+    previous_email_templates = deploy_file_object.get(settings.DEPLOY_KEY_EMAIL_TEMPLATES) or []
+    user_email_templates = await get_email_templates_from_user(
+        previous_deploy_file_email_templates=previous_email_templates,
+        selected_queues=selected_queues,
+        interactive=interactive,
+        rule_required_ids=email_template_rule_ids,
+    )
+
+    # Rule dependencies the menus can't reach: labels with no local file, and email templates
+    # of queues not in this deploy file. Exclude what the menus already covered.
+    rule_labels, rule_email_templates = await get_rule_dependency_objects(
+        selected_rules=selected_rule_objects,
+        source_path=source_path,
+        exclude_label_ids={obj["id"] for obj in user_labels},
+        exclude_email_template_ids={obj["id"] for obj in user_email_templates},
+        previous_deploy_file_labels=previous_labels,
+        previous_deploy_file_email_templates=previous_email_templates,
+    )
+    deploy_file_object[settings.DEPLOY_KEY_LABELS] = user_labels + rule_labels
+    deploy_file_object[settings.DEPLOY_KEY_EMAIL_TEMPLATES] = user_email_templates + rule_email_templates
 
     # Multi-target specification
     if interactive:
