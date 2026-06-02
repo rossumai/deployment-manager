@@ -299,6 +299,11 @@ class Settings:
     EMAIL_TEMPLATES_DIR_NAME: str = "email_templates"
     LABELS_DIR_NAME: str = "labels"
 
+    # New-version notification: cache the GitHub lookup so we check at most once
+    # per interval and don't spam the user on every command invocation.
+    VERSION_CHECK_CACHE_PATH: Path = Path.home() / ".prd2" / "version_check.json"
+    VERSION_CHECK_INTERVAL_SECONDS: int = 1 * 60 * 60  # hours * minutes * seconds
+
     GITHUB_DEFAULT_LATEST_RELEASE_URL = "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
     GITHUB_SPECIFIC_RELEASE_URL = "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/{version_tag}"
     GITHUB_DEPLOYMENT_MANAGER_REPO_OWNER = "rossumai"
