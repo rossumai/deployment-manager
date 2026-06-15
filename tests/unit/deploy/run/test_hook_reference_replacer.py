@@ -21,6 +21,9 @@ def _make_parent():
     parent = MagicMock()
     parent.deploy_file.source_client._http_client.base_url = "https://src.rossum.app/api/v1"
     parent.deploy_file.client._http_client.base_url = "https://tgt.rossum.app/api/v1"
+    # Default to a normal (non-local) deploy; otherwise the truthy MagicMock attribute
+    # would make the run_after resolution short-circuit.
+    parent.deploy_file.local_deploy = False
     return parent
 
 
@@ -109,3 +112,20 @@ class TestFindMissingHookRunAfter:
             target_index=0,
         )
         assert result == []
+
+    async def test_local_deploy_returns_empty_without_source_call(self):
+        """With --ld (local_deploy) the predecessor chain is not resolved against the source org."""
+        parent = _make_parent()
+        parent.deploy_file.local_deploy = True
+        parent.deploy_file.source_client.retrieve_hook = AsyncMock(return_value=MagicMock())
+
+        rr = HookReferenceReplacer(parent_object_reference=parent)
+        result = await rr.find_missing_hook_run_after(
+            predecessor_url="https://src.rossum.app/api/v1/hooks/999",
+            lookup_table={},
+            reverse_lookup_table={},
+            target_objects_count=1,
+            target_index=0,
+        )
+        assert result == []
+        parent.deploy_file.source_client.retrieve_hook.assert_not_awaited()

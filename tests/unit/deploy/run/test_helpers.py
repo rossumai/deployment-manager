@@ -1,8 +1,10 @@
 import re
 from datetime import datetime
+from unittest.mock import AsyncMock
 
 import pytest
 
+import deployment_manager.commands.deploy.subcommands.run.helpers as run_helpers
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
     check_required_keys,
@@ -154,3 +156,46 @@ class TestCreateObjectLabel:
         # Color markup present
         assert "[green]" in label
         assert "[purple]" in label
+
+
+@pytest.mark.asyncio
+class TestGetUrlAndCredentialsSkipValidation:
+    """`skip_validation=True` (used by `deploy run --ld`) must not hit the source org API."""
+
+    _SOURCE_URL = "https://src.rossum.app/api/v1"
+
+    def _yaml_data(self):
+        return {settings.DEPLOY_KEY_SOURCE_URL: self._SOURCE_URL}
+
+    async def test_skip_validation_does_not_call_validate(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(run_helpers, "get_token", AsyncMock(return_value="tok"))
+        validate_mock = AsyncMock()
+        monkeypatch.setattr(run_helpers, "validate_credentials", validate_mock)
+
+        creds = await run_helpers.get_url_and_credentials(
+            project_path=tmp_path,
+            org_name="",
+            type=settings.SOURCE_DIRNAME,
+            yaml_data=self._yaml_data(),
+            skip_validation=True,
+        )
+
+        assert creds is not None
+        assert creds.token == "tok"
+        assert creds.url == self._SOURCE_URL
+        validate_mock.assert_not_awaited()
+
+    async def test_validation_called_by_default(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(run_helpers, "get_token", AsyncMock(return_value="tok"))
+        validate_mock = AsyncMock()
+        monkeypatch.setattr(run_helpers, "validate_credentials", validate_mock)
+
+        creds = await run_helpers.get_url_and_credentials(
+            project_path=tmp_path,
+            org_name="",
+            type=settings.SOURCE_DIRNAME,
+            yaml_data=self._yaml_data(),
+        )
+
+        assert creds is not None
+        validate_mock.assert_awaited_once()

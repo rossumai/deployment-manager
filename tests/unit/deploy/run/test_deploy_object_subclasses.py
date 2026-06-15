@@ -284,6 +284,7 @@ class TestRuleAutoLoadActionDependencies:
             source_client=MagicMock(),
             auto_mappings={},
             deploy_state=SimpleNamespace(labels={}, email_templates={}),
+            local_deploy=False,
         )
         rule.deploy_file.source_client._http_client = MagicMock()
         rule.deploy_file.source_client._http_client.fetch_one = AsyncMock(
@@ -325,6 +326,7 @@ class TestRuleAutoLoadActionDependencies:
             source_client=MagicMock(),
             auto_mappings={},
             deploy_state=SimpleNamespace(labels={}, email_templates={}),
+            local_deploy=False,
         )
         rule.deploy_file.source_client._http_client = MagicMock()
         rule.deploy_file.source_client._http_client.fetch_one = AsyncMock(
@@ -364,6 +366,7 @@ class TestRuleAutoLoadActionDependencies:
             source_client=MagicMock(),
             auto_mappings={},
             deploy_state=SimpleNamespace(labels={}, email_templates={}),
+            local_deploy=False,
         )
         rule.deploy_file.source_client._http_client = MagicMock()
         fetch_mock = AsyncMock(return_value={"id": 100, "name": "L"})
@@ -382,3 +385,35 @@ class TestRuleAutoLoadActionDependencies:
         await rule.auto_load_action_dependencies()
         assert len(rule.deploy_file.labels) == 1
         assert fetch_mock.await_count == 1
+
+    async def test_local_deploy_skips_all_source_loading(self):
+        """With --ld (local_deploy) no rule dependencies are fetched from the source org."""
+        rule = RuleDeployObject(
+            id=1,
+            name="r",
+            data={
+                "actions": [
+                    {"type": "add_label", "payload": {"labels": ["https://api/v1/labels/100"]}},
+                    {"type": "send_email", "payload": {"email_template": "https://api/v1/email_templates/77"}},
+                ],
+            },
+        )
+        fetch_mock = AsyncMock()
+        source_client = MagicMock()
+        source_client._http_client = MagicMock()
+        source_client._http_client.fetch_one = fetch_mock
+        rule.deploy_file = SimpleNamespace(
+            labels=[],
+            email_templates=[],
+            queues=[],
+            source_client=source_client,
+            auto_mappings={},
+            deploy_state=SimpleNamespace(labels={}, email_templates={}),
+            local_deploy=True,
+        )
+
+        await rule.auto_load_action_dependencies()
+
+        assert rule.deploy_file.labels == []
+        assert rule.deploy_file.email_templates == []
+        fetch_mock.assert_not_awaited()
