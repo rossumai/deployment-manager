@@ -8,7 +8,7 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.label_dep
 from deployment_manager.commands.deploy.subcommands.run.models import TargetWithDefault
 from deployment_manager.common.read_write import read_object_from_json
 from deployment_manager.utils.consts import CustomResource, display_warning, settings
-from deployment_manager.utils.functions import detemplatize_name_id, extract_id_from_url
+from deployment_manager.utils.functions import extract_id_from_url, find_local_object_path_by_id
 
 
 class RuleDeployObject(DeployObject):
@@ -237,25 +237,11 @@ class RuleDeployObject(DeployObject):
     async def _find_local_object_data_by_id(
         self, search_dir, object_id: int, glob_pattern: str = "*.json"
     ) -> dict | None:
-        """Find a locally pulled object by its id among files matching ``glob_pattern`` under ``search_dir``.
-
-        Files are named ``<name>_[<id>].json``; the id is taken from the file name so only the
-        matching file is read. Returns ``None`` when no local file with that id exists.
-        """
-        if not await search_dir.exists():
+        """Read a locally pulled object by its id (used by local deploy --ld). ``None`` if not found."""
+        path = await find_local_object_path_by_id(search_dir, object_id, glob_pattern)
+        if not path:
             return None
-
-        async for path in search_dir.glob(glob_pattern):
-            if not await path.is_file():
-                continue
-            try:
-                _, file_id = detemplatize_name_id(str(path.stem))
-            except (ValueError, IndexError):
-                continue
-            if file_id == object_id:
-                return await read_object_from_json(path, False)
-
-        return None
+        return await read_object_from_json(path, False)
 
     async def override_references_in_target_object_data(self, data_attribute, target, use_dummy_references):
         # Already overridden by orchestrator

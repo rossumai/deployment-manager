@@ -161,7 +161,7 @@ If the command detects a difference between a **local** source object and a **re
 > ℹ️ Note: Use `--ld` (local deploy) to run a deploy **without making any calls to the source organization**. With this flag PRD does not validate the source token, and instead of querying the source org it resolves dependencies locally:
 > - **Rule label/email-template references** are read from the locally pulled files (`labels/<name>_[id].json` and `workspaces/<workspace>/queues/<queue>/email_templates/<name>_[id].json`). If a referenced object was not pulled locally, PRD warns and the reference may not be remapped.
 > - **Hook templates** are resolved by matching the hook's `hook_template` id directly in the target organization (instead of fetching the source template and matching it by name); if that id is not present in the target, you are prompted to pick one.
-> - **Hook `run_after` predecessor chains** for ignored hooks are not resolved (this would require the source API), so such references may not be remapped (PRD will warn).
+> - **Hook `run_after` predecessor chains** for ignored hooks are resolved from the locally pulled hooks (`<source_dir>/hooks/<name>_[id].json`) instead of the source org. If a predecessor hook was not pulled locally, PRD warns and that reference may not be remapped.
 >
 > The reverse-mapping step (`reverse_mapping: true`) still uses the source API and is unaffected by `--ld`.
 

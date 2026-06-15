@@ -12,6 +12,7 @@ from deployment_manager.utils.functions import (
     find_all_hook_paths_in_destination,
     find_all_object_paths,
     find_all_schema_paths_in_destination,
+    find_local_object_path_by_id,
     find_object_by_id,
     find_object_by_key,
     find_object_in_project,
@@ -256,6 +257,39 @@ class TestFindHookAndSchemaPaths:
 
         result = await find_all_schema_paths_in_destination(tmp_path)
         assert len(result) == 2
+
+
+@pytest.mark.asyncio
+class TestFindLocalObjectPathById:
+    async def test_dir_missing(self, tmp_path):
+        assert await find_local_object_path_by_id(tmp_path / "labels", 100) is None
+
+    async def test_finds_by_id_in_filename(self, tmp_path):
+        labels = tmp_path / "labels"
+        await labels.mkdir()
+        await (labels / f"{templatize_name_id('MyLabel', 100)}.json").write_text("{}")
+        await (labels / f"{templatize_name_id('Other', 200)}.json").write_text("{}")
+
+        result = await find_local_object_path_by_id(labels, 100)
+        assert result is not None
+        assert result.name == "MyLabel_[100].json"
+
+    async def test_returns_none_when_id_absent(self, tmp_path):
+        labels = tmp_path / "labels"
+        await labels.mkdir()
+        await (labels / f"{templatize_name_id('Other', 200)}.json").write_text("{}")
+        assert await find_local_object_path_by_id(labels, 100) is None
+
+    async def test_nested_glob_pattern(self, tmp_path):
+        et_dir = tmp_path / "workspaces" / "WS_[1]" / "queues" / "Q_[2]" / "email_templates"
+        await et_dir.mkdir(parents=True)
+        await (et_dir / f"{templatize_name_id('Welcome', 77)}.json").write_text("{}")
+
+        result = await find_local_object_path_by_id(
+            tmp_path, 77, glob_pattern="workspaces/*/queues/*/email_templates/*.json"
+        )
+        assert result is not None
+        assert result.name == "Welcome_[77].json"
 
 
 @pytest.mark.asyncio
