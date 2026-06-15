@@ -35,13 +35,29 @@ def _make_deploy_file(target_templates, *, local_deploy, is_same_org=False):
 
 @pytest.mark.asyncio
 class TestFindTemplateForHook:
-    async def test_local_deploy_skips_source_template_lookup(self, monkeypatch):
-        """With --ld (local_deploy) the source org is not queried to match the hook template by name."""
+    async def test_local_deploy_matches_target_template_by_id(self):
+        """With --ld the hook_template id is matched against TARGET templates, with no source call."""
+        hook = HookDeployObject(
+            id=1, name="h", data={"hook_template": "https://src.rossum.app/api/v1/hook_templates/55"}
+        )
+        # Target template has the SAME id but a DIFFERENT name — proving the match is by id, not name.
+        hook.deploy_file = _make_deploy_file(
+            [{"id": 55, "name": "Target Side Name", "url": "https://tgt.rossum.app/api/v1/hook_templates/55"}],
+            local_deploy=True,
+        )
+
+        result = await hook.find_template_for_hook()
+
+        hook.deploy_file.source_client.request_json.assert_not_awaited()
+        assert result == "https://tgt.rossum.app/api/v1/hook_templates/55"
+
+    async def test_local_deploy_falls_back_to_prompt_when_id_absent(self, monkeypatch):
+        """With --ld, if the id is not present in the target org, fall back to the user prompt (still no source call)."""
         hook = HookDeployObject(
             id=1, name="h", data={"hook_template": "https://src.rossum.app/api/v1/hook_templates/55"}
         )
         hook.deploy_file = _make_deploy_file(
-            [{"name": "My Template", "url": "https://tgt.rossum.app/api/v1/hook_templates/900"}],
+            [{"id": 900, "name": "Other", "url": "https://tgt.rossum.app/api/v1/hook_templates/900"}],
             local_deploy=True,
         )
 
@@ -52,7 +68,6 @@ class TestFindTemplateForHook:
 
         result = await hook.find_template_for_hook()
 
-        # Source org never queried; falls back to the (target-only) user prompt
         hook.deploy_file.source_client.request_json.assert_not_awaited()
         assert result == "PROMPTED_TEMPLATE_URL"
 

@@ -171,22 +171,29 @@ class HookDeployObject(DeployObject):
             item async for item in self.deploy_file.client._http_client.fetch_all_by_url("hook_templates")
         ]
 
-        # Local deploy: skip the source-organization lookup used to match the template by name.
-        # Without a source match the hook is processed as if the hook_template was not there
-        # (the user is asked to pick a target template below).
-        if self.data.get("hook_template", None) and not self.deploy_file.local_deploy:
-            # Hook template ids might differ inbetween orgs
-            # We try to find the corresponding template by comparing names
-            # If no match is found, this hook will be processed as if the hook_template was not there at all
+        if self.data.get("hook_template", None):
             template_id = extract_id_from_url(self.data["hook_template"])
-            source_hook_template = await self.deploy_file.source_client.request_json(
-                "GET", f"hook_templates/{template_id}"
-            )
 
-            for target_template in target_hook_templates:
-                if target_template["name"] == source_hook_template["name"]:
-                    target_hook_template_match_url = target_template["url"]
-                    break
+            if self.deploy_file.local_deploy:
+                # Local deploy: do not query the source org. Assume the hook_template id is the
+                # same in the target org and look the template up there by id (not by name).
+                # If no match is found, this hook is processed as if the hook_template was not there.
+                for target_template in target_hook_templates:
+                    if target_template.get("id") == template_id:
+                        target_hook_template_match_url = target_template["url"]
+                        break
+            else:
+                # Hook template ids might differ inbetween orgs
+                # We try to find the corresponding template by comparing names
+                # If no match is found, this hook will be processed as if the hook_template was not there at all
+                source_hook_template = await self.deploy_file.source_client.request_json(
+                    "GET", f"hook_templates/{template_id}"
+                )
+
+                for target_template in target_hook_templates:
+                    if target_template["name"] == source_hook_template["name"]:
+                        target_hook_template_match_url = target_template["url"]
+                        break
 
         # TODO: artifical test of hook template names not matching (letting user choose)
         if not target_hook_template_match_url:
