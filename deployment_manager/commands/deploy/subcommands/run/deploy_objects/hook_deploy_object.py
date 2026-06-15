@@ -171,7 +171,10 @@ class HookDeployObject(DeployObject):
             item async for item in self.deploy_file.client._http_client.fetch_all_by_url("hook_templates")
         ]
 
-        if self.data.get("hook_template", None):
+        # Local deploy: skip the source-organization lookup used to match the template by name.
+        # Without a source match the hook is processed as if the hook_template was not there
+        # (the user is asked to pick a target template below).
+        if self.data.get("hook_template", None) and not self.deploy_file.local_deploy:
             # Hook template ids might differ inbetween orgs
             # We try to find the corresponding template by comparing names
             # If no match is found, this hook will be processed as if the hook_template was not there at all

@@ -89,6 +89,11 @@ class RuleDeployObject(DeployObject):
 
     async def auto_load_action_dependencies(self):
         """Automatically detect and load labels and email templates referenced in rule actions."""
+        # Local deploy: skip loading rule dependencies from the source organization API.
+        # References to labels/email templates will be left as-is (may not be replaced correctly).
+        if self.deploy_file.local_deploy:
+            return
+
         label_ids = set()
         email_template_ids = set()
 

@@ -67,6 +67,11 @@ class HookReferenceReplacer(ReferenceReplacer):
         # Take the predecessor's source and find its predecessor (if none, stop)
         # Find the predecessors' target and put that into run_after for this hook
         # If there is no target, repeat from line one
+
+        # Local deploy: do not reach out to the source organization to resolve the predecessor chain.
+        if self.parent_object_reference.deploy_file.local_deploy:
+            return []
+
         try:
             predecessor_id = extract_id_from_url(predecessor_url)
             predecessor = await self.parent_object_reference.deploy_file.source_client.retrieve_hook(predecessor_id)

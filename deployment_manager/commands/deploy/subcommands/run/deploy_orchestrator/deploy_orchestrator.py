@@ -75,6 +75,9 @@ class DeployOrchestrator(BaseModel):
     auto_delete: bool = False
     prefer: str = None
     no_rebase: bool = False
+    # Local deploy: bypass all source-organization API calls/checks (credential validation,
+    # rule label/email-template auto-loading, hook template & run_after lookups)
+    local_deploy: bool = False
 
     patch_target_org: bool = True
     token_owner_id: int | None = None

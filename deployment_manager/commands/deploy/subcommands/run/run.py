@@ -38,6 +38,7 @@ async def deploy_release_file(
     # auto_delete: bool = False,
     commit: bool = False,
     commit_message: str = "",
+    local_deploy: bool = False,
 ):
     deploy_file = await deploy_file_path.read_text()
     yaml = DeployYaml(deploy_file)
@@ -66,6 +67,8 @@ async def deploy_release_file(
             org_name=source_org_name,
             type=settings.SOURCE_DIRNAME,
             yaml_data=yaml.data,
+            # Local deploy must not hit the source organization API, not even to validate the token
+            skip_validation=local_deploy,
         )
         if not source_credentials:
             return
@@ -127,6 +130,7 @@ async def deploy_release_file(
             prefer=prefer,
             no_rebase=no_rebase,
             deploy_file_path=deploy_file_path,
+            local_deploy=local_deploy,
             # auto_delete=auto_delete,
         )
     except ValidationError as e:

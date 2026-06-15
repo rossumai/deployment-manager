@@ -54,7 +54,9 @@ def check_required_keys(release: dict):
 # TODO: more robust (all scenarios)
 # TODO: prompt user for new token and store it
 # TODO: username + password support
-async def get_url_and_credentials(project_path: Path, org_name: str = "", type: str = "", yaml_data: dict = None):
+async def get_url_and_credentials(
+    project_path: Path, org_name: str = "", type: str = "", yaml_data: dict = None, skip_validation: bool = False
+):
     api_url = ""
     if type == settings.TARGET_DIRNAME and yaml_data:
         api_url = yaml_data.get(settings.DEPLOY_KEY_TARGET_URL, None)
@@ -68,8 +70,13 @@ async def get_url_and_credentials(project_path: Path, org_name: str = "", type: 
 
     token = await get_token(project_path=project_path, org_name=org_name, api_url=api_url, type=type)
 
+    credentials = Credentials(token=token, url=api_url)
+
+    # Local deploy: do not validate against the (source) organization API, just use the local credentials
+    if skip_validation:
+        return credentials
+
     try:
-        credentials = Credentials(token=token, url=api_url)
         await validate_credentials(credentials)
         return credentials
     except Exception as e:
