@@ -1,6 +1,7 @@
 """Tests for the simpler logic in deploy_object subclasses (paths, yaml lookup,
 auto-detect dependencies, etc.). Complements test_deploy_object_types.py."""
 
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -386,8 +387,28 @@ class TestRuleAutoLoadActionDependencies:
         assert len(rule.deploy_file.labels) == 1
         assert fetch_mock.await_count == 1
 
-    async def test_local_deploy_skips_all_source_loading(self):
-        """With --ld (local_deploy) no rule dependencies are fetched from the source org."""
+    async def test_local_deploy_loads_dependencies_from_local_files(self, monkeypatch, tmp_path):
+        """With --ld dependencies are read from the locally pulled files, never from the source org."""
+        from deployment_manager.commands.deploy.subcommands.run.deploy_objects.email_template_deploy_object import (
+            EmailTemplateDeployObject,
+        )
+        from deployment_manager.commands.deploy.subcommands.run.deploy_objects.label_deploy_object import (
+            LabelDeployObject,
+        )
+
+        # Recreate the pull layout: labels/<name>_[id].json and
+        # workspaces/<ws>/queues/<queue>/email_templates/<name>_[id].json
+        # (the conftest tmp_path fixture is an anyio.Path, so file ops are awaited)
+        labels_dir = tmp_path / "labels"
+        await labels_dir.mkdir(parents=True)
+        await (labels_dir / "MyLabel_[100].json").write_text(json.dumps({"id": 100, "name": "MyLabel"}))
+
+        et_dir = tmp_path / "workspaces" / "WS_[1]" / "queues" / "Q_[2]" / "email_templates"
+        await et_dir.mkdir(parents=True)
+        await (et_dir / "Welcome_[77].json").write_text(
+            json.dumps({"id": 77, "name": "Welcome", "queue": "https://api/v1/queues/2"})
+        )
+
         rule = RuleDeployObject(
             id=1,
             name="r",
@@ -407,13 +428,22 @@ class TestRuleAutoLoadActionDependencies:
             email_templates=[],
             queues=[],
             source_client=source_client,
+            source_dir_path=tmp_path,
             auto_mappings={},
             deploy_state=SimpleNamespace(labels={}, email_templates={}),
             local_deploy=True,
         )
 
+        async def fake_init(self, deploy_file):
+            self.deploy_file = deploy_file
+            self.ignored_attributes = []
+
+        monkeypatch.setattr(LabelDeployObject, "initialize_deploy_object", fake_init)
+        monkeypatch.setattr(EmailTemplateDeployObject, "initialize_deploy_object", fake_init)
+
         await rule.auto_load_action_dependencies()
 
-        assert rule.deploy_file.labels == []
-        assert rule.deploy_file.email_templates == []
+        # Loaded from local files; the source org was never queried
         fetch_mock.assert_not_awaited()
+        assert {label.id for label in rule.deploy_file.labels} == {100}
+        assert {et.id for et in rule.deploy_file.email_templates} == {77}

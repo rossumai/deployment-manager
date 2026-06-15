@@ -158,7 +158,12 @@ If the command detects a difference between a **local** source object and a **re
 
 > ℹ️ Note: If you are using deploy with an existing deploy file after updating PRD to v2.11+, include `--prefer=source` into your first deploy after the update. Otherwise, you will get source-target conflicts (there is no deploy state file yet to resolve them for you).
 
-> ℹ️ Note: Use `--ld` (local deploy) to run a deploy **without making any calls to the source organization**. With this flag PRD does not validate the source token, does not auto-load rule labels/email templates from source, and does not resolve `run_after` predecessor chains against source — all source object data is taken solely from the local files. Hook templates are resolved by **matching the hook's `hook_template` id directly in the target organization** (instead of fetching the source template and matching it by name); if that id is not present in the target, you are prompted to pick a template. Because the other source lookups are skipped, references that rely on them may not be remapped to their target equivalents (PRD will warn where a reference could not be replaced). The reverse-mapping step (`reverse_mapping: true`) still uses the source API and is unaffected by `--ld`.
+> ℹ️ Note: Use `--ld` (local deploy) to run a deploy **without making any calls to the source organization**. With this flag PRD does not validate the source token, and instead of querying the source org it resolves dependencies locally:
+> - **Rule label/email-template references** are read from the locally pulled files (`labels/<name>_[id].json` and `workspaces/<workspace>/queues/<queue>/email_templates/<name>_[id].json`). If a referenced object was not pulled locally, PRD warns and the reference may not be remapped.
+> - **Hook templates** are resolved by matching the hook's `hook_template` id directly in the target organization (instead of fetching the source template and matching it by name); if that id is not present in the target, you are prompted to pick one.
+> - **Hook `run_after` predecessor chains** for ignored hooks are not resolved (this would require the source API), so such references may not be remapped (PRD will warn).
+>
+> The reverse-mapping step (`reverse_mapping: true`) still uses the source API and is unaffected by `--ld`.
 
 If there is any error during the planning phase, you will see an error and the deploy will automatically abort. If there was an error during the execution phase, PRD will log the error and stop deploying. Any intermediate results (newly created targets) are stored in the deploy file.
 
