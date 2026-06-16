@@ -127,6 +127,29 @@ def find_object_by_id(id: int, objects: list):
     return find_object_by_key(key="id", value=id, objects=objects)
 
 
+async def find_local_object_path_by_id(search_dir: Path, object_id: int, glob_pattern: str = "*.json") -> Path | None:
+    """Find a locally pulled object file by its id among files matching ``glob_pattern`` under ``search_dir``.
+
+    Pulled files are named ``<name>_[<id>].json``; the id is parsed from the file name so the
+    object can be located without reading every file. Returns ``None`` when no match exists.
+    Used by local deploy (--ld) to resolve references without calling the source organization.
+    """
+    if not await search_dir.exists():
+        return None
+
+    async for path in search_dir.glob(glob_pattern):
+        if not await path.is_file():
+            continue
+        try:
+            _, file_id = detemplatize_name_id(str(path.stem))
+        except (ValueError, IndexError):
+            continue
+        if file_id == object_id:
+            return path
+
+    return None
+
+
 async def find_all_hook_paths_in_destination(destination_path: Path):
     hooks_dir = destination_path / "hooks"
     if not (await hooks_dir.exists()):

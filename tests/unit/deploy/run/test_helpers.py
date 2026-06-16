@@ -1,8 +1,10 @@
 import re
 from datetime import datetime
+from unittest.mock import AsyncMock
 
 import pytest
 
+import deployment_manager.commands.deploy.subcommands.run.helpers as run_helpers
 from deployment_manager.commands.deploy.subcommands.run.helpers import (
     DeployYaml,
     check_required_keys,
@@ -154,3 +156,70 @@ class TestCreateObjectLabel:
         # Color markup present
         assert "[green]" in label
         assert "[purple]" in label
+
+
+@pytest.mark.asyncio
+class TestGetUrlAndCredentialsSkipValidation:
+    """`skip_validation=True` (used by `deploy run --ld`) must not hit the source org API
+    and must never reach the interactive token prompt inside `get_token`."""
+
+    _SOURCE_URL = "https://src.rossum.app/api/v1"
+
+    def _yaml_data(self):
+        return {settings.DEPLOY_KEY_SOURCE_URL: self._SOURCE_URL}
+
+    async def test_skip_validation_reads_token_locally_without_validate_or_prompt(self, monkeypatch, tmp_path):
+        # get_token is the path that validates against the API and falls back to an interactive
+        # prompt; under skip_validation it must NOT be called at all.
+        get_token_mock = AsyncMock(return_value="should-not-be-used")
+        monkeypatch.setattr(run_helpers, "get_token", get_token_mock)
+        monkeypatch.setattr(
+            run_helpers, "get_token_without_validation", AsyncMock(return_value="local-tok")
+        )
+        validate_mock = AsyncMock()
+        monkeypatch.setattr(run_helpers, "validate_credentials", validate_mock)
+
+        creds = await run_helpers.get_url_and_credentials(
+            project_path=tmp_path,
+            org_name="",
+            type=settings.SOURCE_DIRNAME,
+            yaml_data=self._yaml_data(),
+            skip_validation=True,
+        )
+
+        assert creds is not None
+        assert creds.token == "local-tok"
+        assert creds.url == self._SOURCE_URL
+        get_token_mock.assert_not_awaited()
+        validate_mock.assert_not_awaited()
+
+    async def test_skip_validation_tolerates_missing_cred_file(self, monkeypatch, tmp_path):
+        # No credentials.yaml present: token resolves to "" with no prompt and no API call.
+        monkeypatch.setattr(run_helpers, "validate_credentials", AsyncMock())
+
+        creds = await run_helpers.get_url_and_credentials(
+            project_path=tmp_path,
+            org_name="nonexistent-org",
+            type=settings.SOURCE_DIRNAME,
+            yaml_data=self._yaml_data(),
+            skip_validation=True,
+        )
+
+        assert creds is not None
+        assert creds.token == ""
+        assert creds.url == self._SOURCE_URL
+
+    async def test_validation_called_by_default(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(run_helpers, "get_token", AsyncMock(return_value="tok"))
+        validate_mock = AsyncMock()
+        monkeypatch.setattr(run_helpers, "validate_credentials", validate_mock)
+
+        creds = await run_helpers.get_url_and_credentials(
+            project_path=tmp_path,
+            org_name="",
+            type=settings.SOURCE_DIRNAME,
+            yaml_data=self._yaml_data(),
+        )
+
+        assert creds is not None
+        validate_mock.assert_awaited_once()

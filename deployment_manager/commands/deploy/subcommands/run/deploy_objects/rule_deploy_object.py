@@ -6,8 +6,9 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.email_tem
 )
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.label_deploy_object import LabelDeployObject
 from deployment_manager.commands.deploy.subcommands.run.models import TargetWithDefault
-from deployment_manager.utils.consts import CustomResource, display_warning
-from deployment_manager.utils.functions import extract_id_from_url
+from deployment_manager.common.read_write import read_object_from_json
+from deployment_manager.utils.consts import CustomResource, display_warning, settings
+from deployment_manager.utils.functions import extract_id_from_url, find_local_object_path_by_id
 
 
 class RuleDeployObject(DeployObject):
@@ -88,7 +89,12 @@ class RuleDeployObject(DeployObject):
         return []
 
     async def auto_load_action_dependencies(self):
-        """Automatically detect and load labels and email templates referenced in rule actions."""
+        """Automatically detect and load labels and email templates referenced in rule actions.
+
+        Normally the referenced objects are fetched from the source organization. Under local
+        deploy (--ld) they are instead read from the locally pulled files (see _get_label_data /
+        _get_email_template_data), so no source-organization API call is made.
+        """
         label_ids = set()
         email_template_ids = set()
 
@@ -118,7 +124,13 @@ class RuleDeployObject(DeployObject):
             if any(label.id == label_id for label in self.deploy_file.labels):
                 continue
             try:
-                label_data = await self.deploy_file.source_client._http_client.fetch_one(CustomResource.Label, label_id)
+                label_data = await self._get_label_data(label_id)
+                if not label_data:
+                    display_warning(
+                        f"Could not load label {label_id} referenced in rule {self.display_label}. "
+                        "The reference may not be replaced correctly."
+                    )
+                    continue
 
                 # Re-check after async fetch to reduce duplicates from concurrent rules
                 if any(label.id == label_id for label in self.deploy_file.labels):
@@ -153,9 +165,13 @@ class RuleDeployObject(DeployObject):
             if any(et.id == email_template_id for et in self.deploy_file.email_templates):
                 continue
             try:
-                email_template_data = await self.deploy_file.source_client._http_client.fetch_one(
-                    Resource.EmailTemplate, email_template_id
-                )
+                email_template_data = await self._get_email_template_data(email_template_id)
+                if not email_template_data:
+                    display_warning(
+                        f"Could not load email template {email_template_id} referenced in rule {self.display_label}. "
+                        "The reference may not be replaced correctly."
+                    )
+                    continue
 
                 # Re-check after async fetch to reduce duplicates from concurrent rules
                 if any(et.id == email_template_id for et in self.deploy_file.email_templates):
@@ -191,6 +207,41 @@ class RuleDeployObject(DeployObject):
                     f"Could not load email template {email_template_id} referenced in rule {self.display_label}: {e}. "
                     "The reference may not be replaced correctly."
                 )
+
+    async def _get_label_data(self, label_id: int) -> dict | None:
+        """Resolve a label referenced by a rule action.
+
+        Local deploy (--ld) reads it from the locally pulled `labels/` folder; otherwise it is
+        fetched from the source organization.
+        """
+        if self.deploy_file.local_deploy:
+            labels_dir = self.deploy_file.source_dir_path / settings.LABELS_DIR_NAME
+            return await self._find_local_object_data_by_id(labels_dir, label_id)
+        return await self.deploy_file.source_client._http_client.fetch_one(CustomResource.Label, label_id)
+
+    async def _get_email_template_data(self, email_template_id: int) -> dict | None:
+        """Resolve an email template referenced by a rule action.
+
+        Local deploy (--ld) reads it from the locally pulled
+        `workspaces/<workspace>/queues/<queue>/email_templates/` folders; otherwise it is fetched
+        from the source organization.
+        """
+        if self.deploy_file.local_deploy:
+            return await self._find_local_object_data_by_id(
+                self.deploy_file.source_dir_path,
+                email_template_id,
+                glob_pattern=f"workspaces/*/queues/*/{settings.EMAIL_TEMPLATES_DIR_NAME}/*.json",
+            )
+        return await self.deploy_file.source_client._http_client.fetch_one(Resource.EmailTemplate, email_template_id)
+
+    async def _find_local_object_data_by_id(
+        self, search_dir, object_id: int, glob_pattern: str = "*.json"
+    ) -> dict | None:
+        """Read a locally pulled object by its id (used by local deploy --ld). ``None`` if not found."""
+        path = await find_local_object_path_by_id(search_dir, object_id, glob_pattern)
+        if not path:
+            return None
+        return await read_object_from_json(path, False)
 
     async def override_references_in_target_object_data(self, data_attribute, target, use_dummy_references):
         # Already overridden by orchestrator

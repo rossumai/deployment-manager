@@ -4,8 +4,9 @@ from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.reference_replacer import ReferenceReplacer
 from deployment_manager.commands.deploy.subcommands.run.models import LookupTable, ReverseLookupTable
-from deployment_manager.utils.consts import display_error
-from deployment_manager.utils.functions import extract_id_from_url
+from deployment_manager.common.read_write import read_object_from_json
+from deployment_manager.utils.consts import display_error, display_warning
+from deployment_manager.utils.functions import extract_id_from_url, find_local_object_path_by_id
 
 
 class HookReferenceReplacer(ReferenceReplacer):
@@ -67,11 +68,25 @@ class HookReferenceReplacer(ReferenceReplacer):
         # Take the predecessor's source and find its predecessor (if none, stop)
         # Find the predecessors' target and put that into run_after for this hook
         # If there is no target, repeat from line one
+        deploy_file = self.parent_object_reference.deploy_file
+        predecessor_id = extract_id_from_url(predecessor_url)
+
         try:
-            predecessor_id = extract_id_from_url(predecessor_url)
-            predecessor = await self.parent_object_reference.deploy_file.source_client.retrieve_hook(predecessor_id)
+            if deploy_file.local_deploy:
+                # Local deploy: resolve the predecessor from the locally pulled hooks, not the source org.
+                predecessor_data = await self._load_local_hook(predecessor_id)
+                if not predecessor_data:
+                    display_warning(
+                        f'Could not find predecessor hook with ID "{predecessor_id}" locally. '
+                        "The run_after reference may not be replaced correctly."
+                    )
+                    return []
+            else:
+                predecessor = await deploy_file.source_client.retrieve_hook(predecessor_id)
+                predecessor_data = dataclasses.asdict(predecessor)
+
             return await self.replace_hook_run_after_list(
-                object=dataclasses.asdict(predecessor),
+                object=predecessor_data,
                 reverse_lookup_table=reverse_lookup_table,
                 lookup_table=lookup_table,
                 target_objects_count=target_objects_count,
@@ -85,3 +100,11 @@ class HookReferenceReplacer(ReferenceReplacer):
                 e,
             )
             return []
+
+    async def _load_local_hook(self, hook_id: int) -> dict | None:
+        """Read a locally pulled hook by id from ``<source_dir>/hooks/`` (used by local deploy --ld)."""
+        hooks_dir = self.parent_object_reference.deploy_file.source_dir_path / Resource.Hook.value
+        path = await find_local_object_path_by_id(hooks_dir, hook_id)
+        if not path:
+            return None
+        return await read_object_from_json(path, False)

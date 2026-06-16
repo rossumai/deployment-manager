@@ -1,5 +1,6 @@
 """Tests for HookReferenceReplacer — run_after chain handling."""
 
+import json
 from collections import defaultdict
 from unittest.mock import AsyncMock, MagicMock
 
@@ -21,6 +22,9 @@ def _make_parent():
     parent = MagicMock()
     parent.deploy_file.source_client._http_client.base_url = "https://src.rossum.app/api/v1"
     parent.deploy_file.client._http_client.base_url = "https://tgt.rossum.app/api/v1"
+    # Default to a normal (non-local) deploy; otherwise the truthy MagicMock attribute
+    # would make the run_after resolution short-circuit.
+    parent.deploy_file.local_deploy = False
     return parent
 
 
@@ -109,3 +113,53 @@ class TestFindMissingHookRunAfter:
             target_index=0,
         )
         assert result == []
+
+    async def test_local_deploy_reads_predecessor_from_local_hooks(self, tmp_path):
+        """With --ld the predecessor chain is resolved from local hook files, not the source org."""
+        parent = _make_parent()
+        parent.deploy_file.local_deploy = True
+        parent.deploy_file.source_dir_path = tmp_path
+        parent.deploy_file.source_client.retrieve_hook = AsyncMock()  # must NOT be used
+
+        # Missing predecessor B (500020); its own predecessor A (500010) is deployed.
+        hooks_dir = tmp_path / "hooks"
+        await hooks_dir.mkdir(parents=True)
+        await (hooks_dir / "B_[500020].json").write_text(
+            json.dumps({"id": 500020, "name": "B", "run_after": ["https://src.rossum.app/api/v1/hooks/500010"]})
+        )
+
+        rr = HookReferenceReplacer(parent_object_reference=parent)
+        lookup = defaultdict(dict)
+        lookup[500010][Resource.Hook] = [Target(id=600010)]  # A → target
+        reverse = defaultdict(dict)
+
+        # This hook references B (500020), which is not deployed → walk up to A → target 600010
+        obj = {"run_after": ["https://src.rossum.app/api/v1/hooks/500020"]}
+        result = await rr.replace_hook_run_after_list(
+            object=obj,
+            target_index=0,
+            target_objects_count=1,
+            lookup_table=lookup,
+            reverse_lookup_table=reverse,
+            use_dummy_references=True,
+        )
+        assert result == ["https://tgt.rossum.app/api/v1/hooks/600010"]
+        parent.deploy_file.source_client.retrieve_hook.assert_not_awaited()
+
+    async def test_local_deploy_returns_empty_when_local_hook_absent(self, tmp_path):
+        """With --ld, a predecessor missing from local files yields [] without a source call."""
+        parent = _make_parent()
+        parent.deploy_file.local_deploy = True
+        parent.deploy_file.source_dir_path = tmp_path  # no hooks/ dir created
+        parent.deploy_file.source_client.retrieve_hook = AsyncMock()
+
+        rr = HookReferenceReplacer(parent_object_reference=parent)
+        result = await rr.find_missing_hook_run_after(
+            predecessor_url="https://src.rossum.app/api/v1/hooks/999",
+            lookup_table={},
+            reverse_lookup_table={},
+            target_objects_count=1,
+            target_index=0,
+        )
+        assert result == []
+        parent.deploy_file.source_client.retrieve_hook.assert_not_awaited()

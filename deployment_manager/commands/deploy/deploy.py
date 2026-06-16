@@ -123,6 +123,17 @@ If these objects don't exist, they get created.
     help="Does not ask user about any rebase from target.",
 )
 @click.option(
+    "--ld",
+    "ld",
+    default=False,
+    is_flag=True,
+    help=(
+        "Local deploy: do not make any source-organization API calls or checks. "
+        "Skips source credential validation, rule label/email-template auto-loading, "
+        "and hook template / run_after lookups. Source object data is taken solely from local files."
+    ),
+)
+@click.option(
     "--auto-apply",
     "-y",
     default=False,
@@ -157,6 +168,7 @@ async def deploy_project_wrapper(
     message: str,
     prefer: str = None,
     no_rebase: bool = False,
+    ld: bool = False,
     concurrency: int = None,
 ):
     apply_concurrency_override(concurrency)
@@ -174,6 +186,7 @@ async def deploy_project_wrapper(
         auto_apply_plan=auto_apply,
         commit=commit,
         commit_message=message,
+        local_deploy=ld,
     )
 
 
