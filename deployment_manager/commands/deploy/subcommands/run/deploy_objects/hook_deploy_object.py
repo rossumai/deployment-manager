@@ -177,9 +177,14 @@ class HookDeployObject(DeployObject):
             if self.deploy_file.local_deploy:
                 # Local deploy: do not query the source org. Assume the hook_template id is the
                 # same in the target org and look the template up there by id (not by name).
+                # The template list has no "id" field, so match on the id from the
+                # "url" instead (and use "id" if it happens to be there).
                 # If no match is found, this hook is processed as if the hook_template was not there.
                 for target_template in target_hook_templates:
-                    if target_template.get("id") == template_id:
+                    target_template_id = target_template.get("id") or extract_id_from_url(
+                        target_template.get("url", "")
+                    )
+                    if target_template_id == template_id:
                         target_hook_template_match_url = target_template["url"]
                         break
             else:

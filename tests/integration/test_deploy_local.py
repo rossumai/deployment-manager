@@ -185,8 +185,9 @@ async def test_local_deploy_creates_hooks_without_any_source_call(tmp_path: Path
     target_org = build_empty_target_org(org_id=222, name="target-org", base_url="https://tgt.rossum.app/api/v1")
     target_user = next(iter(target_org._stores["users"].values()))
     # The target org has the SAME template id 55 (store templates are global across orgs).
+    # Mirror the real list endpoint, which returns name + url but NOT a top-level "id" —
+    # the id must be derived from the url for the --ld match to succeed.
     target_org._stores["hook_templates"][55] = {
-        "id": 55,
         "name": "Master Data Hub",
         "url": f"{target_org.base_url}/hook_templates/55",
     }

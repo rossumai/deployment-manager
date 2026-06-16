@@ -51,6 +51,26 @@ class TestFindTemplateForHook:
         hook.deploy_file.source_client.request_json.assert_not_awaited()
         assert result == "https://tgt.rossum.app/api/v1/hook_templates/55"
 
+    async def test_local_deploy_matches_by_url_when_list_omits_id_field(self):
+        """The hook_templates LIST endpoint may not return a top-level "id" field.
+
+        The match must still succeed by deriving the id from the template "url",
+        otherwise a private webhook would wrongly fall through to the user prompt.
+        """
+        hook = HookDeployObject(
+            id=1, name="h", data={"hook_template": "https://src.rossum.app/api/v1/hook_templates/39"}
+        )
+        # No "id" key — mirrors the real list-endpoint payload (only name + url).
+        hook.deploy_file = _make_deploy_file(
+            [{"name": "Master Data Hub", "url": "https://tgt.rossum.app/api/v1/hook_templates/39"}],
+            local_deploy=True,
+        )
+
+        result = await hook.find_template_for_hook()
+
+        hook.deploy_file.source_client.request_json.assert_not_awaited()
+        assert result == "https://tgt.rossum.app/api/v1/hook_templates/39"
+
     async def test_local_deploy_falls_back_to_prompt_when_id_absent(self, monkeypatch):
         """With --ld, if the id is not present in the target org, fall back to the user prompt (still no source call)."""
         hook = HookDeployObject(
