@@ -15,7 +15,7 @@ from deployment_manager.commands.deploy.common.helpers import (
 )
 from deployment_manager.commands.deploy.subcommands.run.upload_helpers import Credentials
 from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
-from deployment_manager.common.read_write import write_prd_cred_file
+from deployment_manager.common.read_write import read_prd_cred_file, write_prd_cred_file
 from deployment_manager.utils.consts import QUEUE_ENGINE_ATTRIBUTES, display_error, settings
 
 
@@ -68,13 +68,17 @@ async def get_url_and_credentials(
     if not api_url:
         api_url = await get_api_url_from_user(type=type)
 
+    # Local deploy: never call the (source) organization API and never prompt for a token.
+    # get_token() would validate the cred file against the API and, if no token resolves,
+    # fall through to an interactive terminal prompt (which crashes in non-TTY contexts).
+    # The source token is not used during a local deploy, so an empty token is acceptable.
+    if skip_validation:
+        token = await get_token_without_validation(project_path=project_path, org_name=org_name)
+        return Credentials(token=token, url=api_url)
+
     token = await get_token(project_path=project_path, org_name=org_name, api_url=api_url, type=type)
 
     credentials = Credentials(token=token, url=api_url)
-
-    # Local deploy: do not validate against the (source) organization API, just use the local credentials
-    if skip_validation:
-        return credentials
 
     try:
         await validate_credentials(credentials)
@@ -83,6 +87,18 @@ async def get_url_and_credentials(
         display_error(f"Error while getting credentials for {type}: {str(e)}")
 
     return None
+
+
+async def get_token_without_validation(project_path: Path, org_name: str) -> str:
+    """Read the locally stored token without any API validation or interactive prompt.
+
+    Used by local deploy (--ld): the source token is never used to call the source org,
+    so a missing/empty token is fine and must not trigger validation or a terminal prompt.
+    """
+    cred_data = await read_prd_cred_file(project_path / org_name)
+    if cred_data:
+        return cred_data.get(settings.CONFIG_KEY_TOKEN, "")
+    return ""
 
 
 # TODO: move to a more common file
