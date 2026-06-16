@@ -78,9 +78,8 @@ async def get_url_and_credentials(
 
     token = await get_token(project_path=project_path, org_name=org_name, api_url=api_url, type=type)
 
-    credentials = Credentials(token=token, url=api_url)
-
     try:
+        credentials = Credentials(token=token, url=api_url)
         await validate_credentials(credentials)
         return credentials
     except Exception as e:
@@ -97,7 +96,7 @@ async def get_token_without_validation(project_path: Path, org_name: str) -> str
     """
     cred_data = await read_prd_cred_file(project_path / org_name)
     if cred_data:
-        return cred_data.get(settings.CONFIG_KEY_TOKEN, "")
+        return cred_data.get(settings.CONFIG_KEY_TOKEN) or ""
     return ""
 
 
