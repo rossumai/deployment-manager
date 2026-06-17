@@ -50,7 +50,7 @@ jobs:
             new_major=$((major + 1))
             new_minor=0
             new_patch=0
-          elif echo "$commits" | grep -q "feat:"; then
+          elif echo "$commits" | grep -Eq "feat(\([^)]*\))?:"; then
             new_minor=$((minor + 1))
             new_patch=0
           fi

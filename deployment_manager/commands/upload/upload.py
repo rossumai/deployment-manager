@@ -1,7 +1,7 @@
 import subprocess
-from anyio import Path
 
 import click
+from anyio import Path
 from rich import print as pprint
 from rich.panel import Panel
 
@@ -14,14 +14,8 @@ from deployment_manager.common.upload_download_setup import (
     expand_destinations,
     mark_subdirectories_to_include,
 )
-from deployment_manager.utils.consts import (
-    display_error,
-    display_warning,
-    settings,
-)
-from deployment_manager.utils.functions import (
-    coro,
-)
+from deployment_manager.utils.consts import display_error, display_warning, settings
+from deployment_manager.utils.functions import apply_concurrency_override, coro
 
 
 @click.command(
@@ -70,10 +64,23 @@ Only source files are taken into account by default.
     default="Pushed changes to remote",
     help="Commit message after push.",
 )
+@click.option(
+    "--yes",
+    "-y",
+    "assume_yes",
+    default=False,
+    is_flag=True,
+    help="Skip the confirmation prompt shown when the plan contains CREATE or DELETE operations.",
+)
+@click.option(
+    "--concurrency",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Maximum concurrent API requests (default: 5, or PRD2_CONCURRENCY env var).",
+)
 @coro
-async def upload_project_wrapper(
-    destinations, all, force, indexed_only, commit, message
-):
+async def upload_project_wrapper(destinations, all, force, indexed_only, commit, message, assume_yes, concurrency):
+    apply_concurrency_override(concurrency)
     # To be able to run the command progammatically without the CLI decorators
     await upload_destinations(
         destinations=destinations,
@@ -82,6 +89,7 @@ async def upload_project_wrapper(
         indexed_only=indexed_only,
         commit=commit,
         commit_message=message,
+        assume_yes=assume_yes,
     )
 
 
@@ -93,6 +101,7 @@ async def upload_destinations(
     indexed_only: bool = False,
     commit: bool = False,
     commit_message: str = "",
+    assume_yes: bool = False,
 ):
     if not destinations:
         display_warning(f"No destinations specified to {settings.UPLOAD_COMMAND_NAME}.")
@@ -110,6 +119,7 @@ async def upload_destinations(
             upload_all=upload_all,
             force=force,
             indexed_only=indexed_only,
+            assume_yes=assume_yes,
             **value,
         )
         for name, value in project_config.get("directories", {}).items()
@@ -139,16 +149,23 @@ async def upload_destinations(
             if dir_config.request_errors:
                 errors_encountered = True
                 display_error(
-                    f'Error(s) while uploading {dir_config.display_label}:\n{'\n'.join(dir_config.request_errors)}'
+                    f"Error(s) while uploading {dir_config.display_label}:\n{'\n'.join(dir_config.request_errors)}"
                 )
+            if dir_config.has_blocking_errors:
+                errors_encountered = True
         except Exception as e:
+            errors_encountered = True
             display_error(
                 f"Error during the {settings.UPLOAD_COMMAND_NAME} of {dir_config.display_label}: {e}",
                 e,
             )
 
-    if not errors_encountered:
-        await download_destinations(destinations=destinations)
+    # On any per-directory failure, skip both the post-push pull and the
+    # auto-commit below — leave the working tree dirty for inspection.
+    if errors_encountered:
+        return
+
+    await download_destinations(destinations=destinations)
 
     if commit:
         subprocess.run(["git", "add", "."])
@@ -156,6 +173,6 @@ async def upload_destinations(
 
     pprint(
         Panel(
-            f"Finished {settings.UPLOAD_COMMAND_NAME}.{ ' Please commit the changes before running this command again.' if not commit else ''}"
+            f"Finished {settings.UPLOAD_COMMAND_NAME}.{' Please commit the changes before running this command again.' if not commit else ''}"
         )
     )

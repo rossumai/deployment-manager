@@ -1,0 +1,85 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main, "**"]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Poetry
+        run: pip install poetry poetry-dynamic-versioning
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run tests with coverage
+        run: |
+          poetry run pytest tests/ \
+            --cov \
+            --cov-report=term \
+            --cov-report=xml:coverage.xml \
+            --junitxml=junit.xml
+
+      - name: Annotate uncovered lines in PR diff
+        if: github.event_name == 'pull_request'
+        run: |
+          poetry run python - <<'PY'
+          """Emit GitHub Actions ::warning annotations for each uncovered line
+          in files changed by this PR. Those appear as red markers inline on the
+          PR's "Files changed" tab — the closest equivalent to GitLab's MR diff coverage."""
+          import os, subprocess, xml.etree.ElementTree as ET
+
+          base_sha = os.environ.get("GITHUB_BASE_REF", "main")
+          subprocess.run(["git", "fetch", "origin", base_sha, "--depth=50"], check=False)
+          diff = subprocess.run(
+              ["git", "diff", "--name-only", f"origin/{base_sha}...HEAD"],
+              capture_output=True, text=True, check=False,
+          )
+          changed = set(diff.stdout.splitlines())
+
+          tree = ET.parse("coverage.xml")
+          for cls in tree.getroot().iter("class"):
+              filename = cls.get("filename")
+              full = f"deployment_manager/{filename}" if not filename.startswith("deployment_manager/") else filename
+              if full not in changed:
+                  continue
+              for line in cls.iter("line"):
+                  if line.get("hits") == "0":
+                      ln = line.get("number")
+                      print(f"::warning file={full},line={ln}::Line not covered by tests")
+          PY
+
+      - name: Coverage summary comment
+        if: github.event_name == 'pull_request'
+        uses: py-cov-action/python-coverage-comment-action@v3
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+          MINIMUM_GREEN: 80
+          MINIMUM_ORANGE: 60
+
+      - name: Upload coverage.xml artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            junit.xml

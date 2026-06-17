@@ -1,26 +1,22 @@
-from datetime import datetime, timezone
 import re
+from datetime import datetime, timezone
 from typing import Any
-from anyio import Path
+
 import questionary
+from anyio import Path
 from ruamel.yaml import YAML
 
-from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
 from deployment_manager.commands.deploy.common.helpers import (
     get_api_url_from_config,
+    get_api_url_from_user,
     get_token_from_cred_file,
+    get_token_from_user,
     validate_credentials,
 )
-from deployment_manager.commands.deploy.common.helpers import get_api_url_from_user
-from deployment_manager.commands.deploy.common.helpers import get_token_from_user
-from deployment_manager.commands.deploy.subcommands.run.upload_helpers import (
-    Credentials,
-)
-from deployment_manager.utils.consts import (
-    QUEUE_ENGINE_ATTRIBUTES,
-    display_error,
-    settings,
-)
+from deployment_manager.commands.deploy.subcommands.run.upload_helpers import Credentials
+from deployment_manager.common.get_filepath_from_user import get_filepath_from_user
+from deployment_manager.common.read_write import read_prd_cred_file, write_prd_cred_file
+from deployment_manager.utils.consts import QUEUE_ENGINE_ATTRIBUTES, display_error, settings
 
 
 class DeployYaml:
@@ -59,7 +55,7 @@ def check_required_keys(release: dict):
 # TODO: prompt user for new token and store it
 # TODO: username + password support
 async def get_url_and_credentials(
-    project_path: Path, org_name: str = "", type: str = "", yaml_data: dict = None
+    project_path: Path, org_name: str = "", type: str = "", yaml_data: dict = None, skip_validation: bool = False
 ):
     api_url = ""
     if type == settings.TARGET_DIRNAME and yaml_data:
@@ -68,15 +64,19 @@ async def get_url_and_credentials(
         api_url = yaml_data.get(settings.DEPLOY_KEY_SOURCE_URL, None)
 
     if not api_url and org_name:
-        api_url = await get_api_url_from_config(
-            base_path=project_path, org_name=org_name
-        )
+        api_url = await get_api_url_from_config(base_path=project_path, org_name=org_name)
     if not api_url:
         api_url = await get_api_url_from_user(type=type)
 
-    token = await get_token(
-        project_path=project_path, org_name=org_name, api_url=api_url, type=type
-    )
+    # Local deploy: never call the (source) organization API and never prompt for a token.
+    # get_token() would validate the cred file against the API and, if no token resolves,
+    # fall through to an interactive terminal prompt (which crashes in non-TTY contexts).
+    # The source token is not used during a local deploy, so an empty token is acceptable.
+    if skip_validation:
+        token = await get_token_without_validation(project_path=project_path, org_name=org_name)
+        return Credentials(token=token, url=api_url)
+
+    token = await get_token(project_path=project_path, org_name=org_name, api_url=api_url, type=type)
 
     try:
         credentials = Credentials(token=token, url=api_url)
@@ -88,11 +88,26 @@ async def get_url_and_credentials(
     return None
 
 
+async def get_token_without_validation(project_path: Path, org_name: str) -> str:
+    """Read the locally stored token without any API validation or interactive prompt.
+
+    Used by local deploy (--ld): the source token is never used to call the source org,
+    so a missing/empty token is fine and must not trigger validation or a terminal prompt.
+    """
+    cred_data = await read_prd_cred_file(project_path / org_name)
+    if cred_data:
+        return cred_data.get(settings.CONFIG_KEY_TOKEN) or ""
+    return ""
+
+
 # TODO: move to a more common file
 async def get_token(project_path: Path, org_name: str, api_url: str, type: str = ""):
     token = await get_token_from_cred_file(project_path / org_name, api_url=api_url)
     if not token:
         token = await get_token_from_user(name=type if type else org_name)
+        if token:
+            org_path = project_path / org_name
+            await write_prd_cred_file(org_path, {settings.CONFIG_KEY_TOKEN: token})
     return token
 
 
@@ -113,42 +128,30 @@ async def get_new_deploy_file_path(
     suffix: str = "",
 ):
     if create_with_suffix:
-        after_deploy_file_path = deploy_file_path.with_stem(
-            f"{deploy_file_path.stem}{suffix}"
-        )
+        after_deploy_file_path = deploy_file_path.with_stem(f"{deploy_file_path.stem}{suffix}")
         if await after_deploy_file_path.exists():
             overwrite = await questionary.confirm(
                 f'File "{after_deploy_file_path}" already exists. Overwrite?',
                 default=False,
             ).ask_async()
             if not overwrite:
-                after_deploy_file_path = await get_filepath_from_user(
-                    deploy_file_path.parent
-                )
+                after_deploy_file_path = await get_filepath_from_user(deploy_file_path.parent)
     else:
         after_deploy_file_path = deploy_file_path
 
     return after_deploy_file_path
 
 
-def update_ignore_flags_in_yaml(yaml_data: dict, ignore_warning_flags: dict):
-    for queue in yaml_data[settings.DEPLOY_KEY_QUEUES]:
-        if (queue_id := queue.get("id", None)) not in ignore_warning_flags:
-            continue
-        queue[settings.DEPLOY_KEY_IGNORE_DEPLOY_WARNINGS] = ignore_warning_flags.get(
-            queue_id, False
-        )
-
-
 def generate_deploy_timestamp():
-    return (
-        datetime.now(timezone.utc)
-        .isoformat(timespec="microseconds")
-        .replace("+00:00", "") + "Z"
-    )
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "") + "Z"
 
 
 def remove_queue_attributes_for_cross_org(queue_copy: dict):
+    # These attributes cannot be created through the API and so if used cross-org, they can only be ignored
     queue_copy.pop("workflows", None)
     for attr in QUEUE_ENGINE_ATTRIBUTES:
         queue_copy.pop(attr, None)
+
+
+def create_object_label(name: str, id: str | int):
+    return f'"[green]{name}[/green] ([purple]{id}[/purple])"'

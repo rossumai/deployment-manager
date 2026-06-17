@@ -1,8 +1,8 @@
 import asyncio
-from functools import wraps
 import re
-from anyio import Path
+from functools import wraps
 
+from anyio import Path
 from click import progressbar
 
 
@@ -53,6 +53,7 @@ def extract_id_from_url(url: str) -> int:
         return None
     return int(url.split("/")[-1])
 
+
 async def make_request_with_progress(coro, progress, task):
     result = await coro
     progress.update(task, advance=1)
@@ -79,7 +80,26 @@ class PauseProgress:
         self._progress.start()
 
 
-async def gather_with_concurrency(n, *coros):
+def apply_concurrency_override(concurrency: int | None):
+    """Override the global concurrency setting if a value is provided.
+
+    Args:
+        concurrency: The concurrency limit to apply, or None to use existing setting
+    """
+    if concurrency is not None:
+        from deployment_manager.utils.consts import settings
+
+        if settings:
+            settings.CONCURRENCY = concurrency
+
+
+async def gather_with_concurrency(*coros, n=None):
+    # Determine concurrency limit: CLI flag > env var > default 5
+    if n is None:
+        from deployment_manager.utils.consts import settings
+
+        n = settings.CONCURRENCY if settings else 5
+
     semaphore = asyncio.Semaphore(n)
 
     async def sem_coro(coro):
@@ -91,10 +111,7 @@ async def gather_with_concurrency(n, *coros):
 
 async def find_object_in_project(object: dict, base_path: Path):
     file_name = templatize_name_id(object["name"], object["id"])
-    return (
-        await (base_path / file_name).exists()
-        or await (base_path / (file_name + ".json")).exists()
-    )
+    return await (base_path / file_name).exists() or await (base_path / (file_name + ".json")).exists()
 
 
 def find_object_by_key(key: str, value: str, objects: list):
@@ -108,6 +125,29 @@ def find_object_by_key(key: str, value: str, objects: list):
 
 def find_object_by_id(id: int, objects: list):
     return find_object_by_key(key="id", value=id, objects=objects)
+
+
+async def find_local_object_path_by_id(search_dir: Path, object_id: int, glob_pattern: str = "*.json") -> Path | None:
+    """Find a locally pulled object file by its id among files matching ``glob_pattern`` under ``search_dir``.
+
+    Pulled files are named ``<name>_[<id>].json``; the id is parsed from the file name so the
+    object can be located without reading every file. Returns ``None`` when no match exists.
+    Used by local deploy (--ld) to resolve references without calling the source organization.
+    """
+    if not await search_dir.exists():
+        return None
+
+    async for path in search_dir.glob(glob_pattern):
+        if not await path.is_file():
+            continue
+        try:
+            _, file_id = detemplatize_name_id(str(path.stem))
+        except (ValueError, IndexError):
+            continue
+        if file_id == object_id:
+            return path
+
+    return None
 
 
 async def find_all_hook_paths_in_destination(destination_path: Path):
@@ -126,8 +166,4 @@ async def find_all_schema_paths_in_destination(destination_path: Path):
     if not (await schemas_dir.exists()):
         return []
 
-    return [
-        schema_path
-        async for schema_path in schemas_dir.iterdir()
-        if await schema_path.is_file()
-    ]
+    return [schema_path async for schema_path in schemas_dir.iterdir() if await schema_path.is_file()]

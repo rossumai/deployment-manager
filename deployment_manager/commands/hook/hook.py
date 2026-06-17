@@ -2,13 +2,11 @@ import click
 from anyio import Path
 
 from deployment_manager.commands.hook.payload import generate_and_save_hook_payload
+from deployment_manager.commands.hook.sync.sync import sync_hook
+from deployment_manager.commands.hook.sync.template import create_or_append_sync_template
 from deployment_manager.commands.hook.test import test_hook
-from deployment_manager.utils.consts import (
-    settings,
-)
-from deployment_manager.utils.functions import (
-    coro,
-)
+from deployment_manager.utils.consts import settings
+from deployment_manager.utils.functions import coro
 
 
 @click.group(
@@ -34,9 +32,7 @@ def hook(): ...
 )
 @coro
 async def generate_hook_payload_wrapper(hook_path: Path, annotation_url: str = ""):
-    await generate_and_save_hook_payload(
-        hook_path=hook_path, annotation_url=annotation_url
-    )
+    await generate_and_save_hook_payload(hook_path=hook_path, annotation_url=annotation_url)
 
 
 @hook.command(
@@ -60,9 +56,49 @@ async def generate_hook_payload_wrapper(hook_path: Path, annotation_url: str = "
     help="URL of the annotation to create the payload with",
 )
 @coro
-async def test_hook_wrapper(
-    hook_path: Path, payload_path: Path, annotation_url: str = ""
+async def test_hook_wrapper(hook_path: Path, payload_path: Path, annotation_url: str = ""):
+    await test_hook(hook_path=hook_path, payload_path=payload_path, annotation_url=annotation_url)
+
+
+@hook.group(
+    name=settings.HOOK_SYNC_COMMAND_NAME,
+    help="Group of commands related to working with hook syncs",
+)
+def sync(): ...
+
+
+@sync.command(
+    name=settings.DEPLOY_TEMPLATE_COMMAND_NAME,
+    help="""Create new template for hook sync""",
+)
+@coro
+async def create_deploy_template_wrapper():
+    await create_or_append_sync_template()
+
+
+@sync.command(
+    name=settings.DEPLOY_RUN_COMMAND_NAME,
+    help="""Sync the local scripts with remote from ps-serverless-functions""",
+)
+@click.argument("sync_file", type=click.Path(path_type=Path, exists=True))
+@coro
+async def pull_hook_wrapper(
+    sync_file: Path,
 ):
-    await test_hook(
-        hook_path=hook_path, payload_path=payload_path, annotation_url=annotation_url
+    await sync_hook(
+        sync_file=sync_file,
+    )
+
+
+@sync.command(
+    name=settings.HOOK_SYNC_ADD_TO_TEMPLATE_COMMAND_NAME,
+    help="""Add new hook to existing sync template""",
+)
+@click.argument("sync_file", type=click.Path(path_type=Path, exists=True))
+@coro
+async def add_hook_to_template_wrapper(
+    sync_file: Path,
+):
+    await create_or_append_sync_template(
+        old_hooks_file=sync_file,
     )

@@ -1,11 +1,11 @@
 import json
-from anyio import Path
-from rossum_api import ElisAPIClient
-from rich import print as pprint
 
-from deployment_manager.commands.deploy.subcommands.run.helpers import (
-    get_url_and_credentials,
-)
+from anyio import Path
+from rich import print as pprint
+from rossum_api import AsyncRossumAPIClient
+from rossum_api.dtos import Token
+
+from deployment_manager.commands.deploy.subcommands.run.helpers import get_url_and_credentials
 from deployment_manager.commands.hook.helpers import (
     get_org_name_from_hook_path,
     get_project_path_from_hook_path,
@@ -13,6 +13,7 @@ from deployment_manager.commands.hook.helpers import (
 )
 from deployment_manager.commands.hook.payload import generate_hook_payload
 from deployment_manager.common.read_write import read_object_from_json
+from deployment_manager.common.rossum_client import CustomAsyncAPIClient
 from deployment_manager.utils.consts import display_error
 from deployment_manager.utils.functions import detemplatize_name_id
 
@@ -21,7 +22,7 @@ async def test_hook(
     hook_path: Path,
     payload_path: Path = None,
     annotation_url: str = "",
-    client: ElisAPIClient = None,
+    client: AsyncRossumAPIClient = None,
 ):
     try:
         if not client:
@@ -33,12 +34,10 @@ async def test_hook(
             )
             if not credentials:
                 return
-            client = ElisAPIClient(base_url=credentials.url, token=credentials.token)
+            client = CustomAsyncAPIClient(base_url=credentials.url, credentials=Token(token=credentials.token))
 
         if not payload_path:
-            payload = await generate_hook_payload(
-                hook_path=hook_path, annotation_url=annotation_url
-            )
+            payload = await generate_hook_payload(hook_path=hook_path, annotation_url=annotation_url)
             if not payload:
                 return
         else:
@@ -62,9 +61,7 @@ async def test_hook(
         if latest_code_str:
             request_body["config"] = {"runtime": runtime, "code": latest_code_str}
 
-        result = await client._http_client.request_json(
-            method="POST", url=f"hooks/{hook_id}/test", json=request_body
-        )
+        result = await client._http_client.request_json(method="POST", url=f"hooks/{hook_id}/test", json=request_body)
 
         pprint("[bold]### RETURN: ###[/bold]")
         pprint(json.dumps(result.get("response", {}), indent=4))

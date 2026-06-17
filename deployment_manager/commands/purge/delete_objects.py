@@ -1,15 +1,12 @@
-import asyncio
-
 from rich.progress import Progress
-from rossum_api import ElisAPIClient
-from rossum_api.api_client import Resource
-
+from rossum_api import AsyncRossumAPIClient
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.utils.consts import display_error
-from deployment_manager.utils.functions import make_request_with_progress
+from deployment_manager.utils.functions import gather_with_concurrency, make_request_with_progress
 
 
-async def delete_all_objects_with_ids(ids_to_delete: list[dict], client: ElisAPIClient):
+async def delete_all_objects_with_ids(ids_to_delete: list[dict], client: AsyncRossumAPIClient):
     to_delete = {
         "workspaces": [],
         "queues": [],
@@ -19,22 +16,22 @@ async def delete_all_objects_with_ids(ids_to_delete: list[dict], client: ElisAPI
     }
     total_to_delete_count = 0
 
-    async for schema in client.list_all_schemas():
+    async for schema in client.list_schemas():
         if schema.id in ids_to_delete["schemas"]:
             to_delete["schemas"].append(schema.id)
             total_to_delete_count += 1
 
-    async for hook in client.list_all_hooks():
+    async for hook in client.list_hooks():
         if hook.id in ids_to_delete["hooks"]:
             to_delete["hooks"].append(hook.id)
             total_to_delete_count += 1
 
-    async for workspace in client.list_all_workspaces():
+    async for workspace in client.list_workspaces():
         if workspace.id in ids_to_delete["workspaces"]:
             to_delete["workspaces"].append(workspace.id)
             total_to_delete_count += 1
 
-    async for queue in client.list_all_queues():
+    async for queue in client.list_queues():
         if queue.id in ids_to_delete["queues"]:
             to_delete["queues"].append(queue.id)
             total_to_delete_count += 1
@@ -47,12 +44,10 @@ async def delete_all_objects_with_ids(ids_to_delete: list[dict], client: ElisAPI
             total_to_delete_count += 1
 
     with Progress() as progress:
-        task = progress.add_task(
-            "Deleting objects in Rossum.", total=total_to_delete_count
-        )
+        task = progress.add_task("Deleting objects in Rossum.", total=total_to_delete_count)
 
         try:
-            await asyncio.gather(
+            await gather_with_concurrency(
                 *[
                     make_request_with_progress(
                         client._http_client.delete(Resource.Hook, hook_id),
@@ -66,7 +61,7 @@ async def delete_all_objects_with_ids(ids_to_delete: list[dict], client: ElisAPI
             display_error(f"Error while deleting hooks: {e}", e)
 
         try:
-            await asyncio.gather(
+            await gather_with_concurrency(
                 *[
                     make_request_with_progress(
                         client._http_client.delete(Resource.Inbox, inbox_id),
@@ -80,12 +75,10 @@ async def delete_all_objects_with_ids(ids_to_delete: list[dict], client: ElisAPI
             display_error(f"Error while deleting inboxes: {e}", e)
 
         try:
-            await asyncio.gather(
+            await gather_with_concurrency(
                 *[
                     make_request_with_progress(
-                        client._http_client._request(
-                            "DELETE", f"queues/{queue_id}", params={"delete_after": "0"}
-                        ),
+                        client._http_client._request("DELETE", f"queues/{queue_id}", params={"delete_after": "0"}),
                         progress,
                         task,
                     )
@@ -96,11 +89,9 @@ async def delete_all_objects_with_ids(ids_to_delete: list[dict], client: ElisAPI
             display_error(f"Error while deleting queues: {e}", e)
 
         try:
-            await asyncio.gather(
+            await gather_with_concurrency(
                 *[
-                    make_request_with_progress(
-                        client.delete_workspace(workspace_id), progress, task
-                    )
+                    make_request_with_progress(client.delete_workspace(workspace_id), progress, task)
                     for workspace_id in to_delete["workspaces"]
                 ]
             )
@@ -108,11 +99,9 @@ async def delete_all_objects_with_ids(ids_to_delete: list[dict], client: ElisAPI
             display_error(f"Error while deleting workspaces: {e}", e)
 
         try:
-            await asyncio.gather(
+            await gather_with_concurrency(
                 *[
-                    make_request_with_progress(
-                        client.delete_schema(schema_id), progress, task
-                    )
+                    make_request_with_progress(client.delete_schema(schema_id), progress, task)
                     for schema_id in to_delete["schemas"]
                 ]
             )

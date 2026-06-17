@@ -1,8 +1,9 @@
 from anyio import Path
-from pydantic import BaseModel
-from rossum_api.api_client import Resource
+from pydantic import BaseModel, ConfigDict
+from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.download.helpers import should_write_object
+from deployment_manager.commands.download.subdirectory import Subdirectory
 from deployment_manager.commands.download.types import ObjectSaver
 from deployment_manager.common.read_write import (
     create_custom_hook_code_path,
@@ -12,17 +13,8 @@ from deployment_manager.common.read_write import (
     write_object_to_json,
     write_str,
 )
-from deployment_manager.utils.consts import (
-    CustomResource,
-    Settings,
-    display_warning,
-)
-from deployment_manager.utils.functions import (
-    templatize_name_id,
-)
-from deployment_manager.commands.download.subdirectory import (
-    Subdirectory,
-)
+from deployment_manager.utils.consts import CustomResource, Settings, display_warning
+from deployment_manager.utils.functions import templatize_name_id
 
 
 class WorkspaceSaver(ObjectSaver):
@@ -74,7 +66,6 @@ class QueueSaver(ObjectSaver):
     def construct_object_path(self, subdir: Subdirectory, queue: dict) -> Path:
         workspace_for_queue = self.find_workspace_for_queue(queue)
         if not workspace_for_queue:
-
             return
 
         object_path = (
@@ -160,9 +151,7 @@ class EmailTemplateSaver(QueueSaver):
         if not email_template.get("queue", None):
             return
 
-        object_path = self.construct_object_path(
-            subdir=subdir, email_template=email_template
-        )
+        object_path = self.construct_object_path(subdir=subdir, email_template=email_template)
         if not object_path:
             return
         if self.download_all or await should_write_object(
@@ -249,7 +238,6 @@ class SchemaSaver(QueueSaver):
 
     def find_queue(self, schema: dict):
         schema_queues = schema.get("queues", [None])
-        warning_message = f"Could not find queue for {self.display_type} {self.display_label(schema.get('name', 'no-name'), schema.get('id', 'no-id'))}. The object will not be saved locally."
         # The schema might not have any queues assigned ([])
         if not schema_queues:
             # display_warning(warning_message)
@@ -304,15 +292,12 @@ class SchemaSaver(QueueSaver):
                 log_message=f"Pulled {self.display_type} {object_path}",
             )
 
-            formula_saver = FormulaSaver(
-                parent_schema_path=object_path, parent_schema=schema
-            )
+            formula_saver = FormulaSaver(parent_schema_path=object_path, parent_schema=schema)
             await formula_saver.save_downloaded_objects()
 
 
 class FormulaSaver(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     parent_schema_path: Path
     parent_schema: dict
@@ -326,66 +311,50 @@ class FormulaSaver(BaseModel):
     async def save_downloaded_objects(self):
         formula_fields = find_formula_fields_in_schema(self.parent_schema["content"])
         for field_id, code in formula_fields:
-            await create_formula_file(
-                self.construct_object_path(field_id=field_id), code
-            )
+            await create_formula_file(self.construct_object_path(field_id=field_id), code)
 
     def construct_object_path(self, field_id):
         return self.formula_directory_path / f"{field_id}.py"
 
 
-class RuleSaver(SchemaSaver):
-    type: Resource = CustomResource.Rule
-    schemas: list[dict]
+class RuleSaver(ObjectSaver):
+    type: Resource = Resource.Rule
+    queues: list[dict]
 
-    async def save_downloaded_objects(self):
-        for object in self.objects:
-            subdir = self.find_subdir_of_object(object)
-            if not subdir:
-                self.objects_without_subdir.append(object)
-                continue
-            # The subdir should not be pulled, disregard the current object
-            elif not subdir.include:
-                continue
-            await self.save_downloaded_object(object, subdir)
+    def find_subdir_of_object(self, object: dict):
+        parent = self.find_parent_object(object)
+        if parent:
+            # If you know the parent's subdir, you can use its subdir
+            subdir = self.subdirs_by_object_id.get(parent["id"])
+            return subdir if subdir else super().find_subdir_of_object(parent)
 
-    def find_parent_object(self, child):
-        return self.find_schema(child)
-
-    def find_schema(self, rule: dict):
-        rule_schema = rule.get("schema", [None])
-        # The rule might not have any schema assigned
-        if not rule_schema:
-            return None
-
-        for schema in self.schemas:
-            if schema["url"] == rule_schema:
-                return schema
+        subdir = super().find_subdir_of_object(object)
+        if subdir:
+            return subdir
 
         return None
 
-    def construct_object_path(
-        self,
-        subdir: Subdirectory,
-        rule: dict,
-    ) -> Path:
-        schema_for_rule = self.find_schema(rule)
-        if not schema_for_rule:
-            return
-        queue_for_schema = self.find_queue(schema_for_rule)
-        if not queue_for_schema:
-            return
-        workspace_for_queue = self.find_workspace_for_queue(queue_for_schema)
-        if not workspace_for_queue:
-            return
+    def find_parent_object(self, child):
+        return self.find_queue_for_rule(child)
 
+    def find_queue_for_rule(self, rule: dict):
+        rule_queues = rule.get("queues", [])
+        # The rule might not have any queues assigned
+        if not rule_queues:
+            return None
+
+        # Use the first queue to determine the subdir
+        # If a rule spans multiple subdirs, this will use the first one
+        for queue in self.queues:
+            if queue["url"] in rule_queues:
+                return queue
+
+        return None
+
+    def construct_object_path(self, subdir: Subdirectory, rule: dict) -> Path:
         object_path = (
             self.base_path
             / subdir.name
-            / "workspaces"
-            / templatize_name_id(workspace_for_queue["name"], workspace_for_queue["id"])
-            / "queues"
-            / templatize_name_id(queue_for_schema["name"], queue_for_schema["id"])
             / Settings.RULES_DIR_NAME
             / f'{templatize_name_id(rule["name"], rule["id"])}.json'
         )
@@ -410,12 +379,7 @@ class HookSaver(ObjectSaver):
     type: Resource = Resource.Hook
 
     def construct_object_path(self, subdir: Subdirectory, hook: dict) -> Path:
-        object_path = (
-            self.base_path
-            / subdir.name
-            / "hooks"
-            / f'{templatize_name_id(hook["name"], hook["id"])}.json'
-        )
+        object_path = self.base_path / subdir.name / "hooks" / f'{templatize_name_id(hook["name"], hook["id"])}.json'
         return object_path
 
     async def save_downloaded_object(self, hook: dict, subdir: Subdirectory):
@@ -434,6 +398,190 @@ class HookSaver(ObjectSaver):
 
             custom_hook_code_path = create_custom_hook_code_path(object_path, hook)
             if custom_hook_code_path:
-                await write_str(
-                    custom_hook_code_path, hook.get("config", {}).get("code", None)
-                )
+                await write_str(custom_hook_code_path, hook.get("config", {}).get("code", None))
+
+
+class LabelSaver(ObjectSaver):
+    type: CustomResource = CustomResource.Label
+
+    def construct_object_path(self, subdir: Subdirectory, label: dict) -> Path:
+        object_path = self.base_path / subdir.name / Settings.LABELS_DIR_NAME / f'{templatize_name_id(label["name"], label["id"])}.json'
+        return object_path
+
+    async def save_downloaded_object(self, label: dict, subdir: Subdirectory):
+        object_path = self.construct_object_path(subdir=subdir, label=label)
+        if not object_path:
+            return
+        if self.download_all or await should_write_object(
+            object_path, label, self.changed_files, self.parent_dir_reference
+        ):
+            await write_object_to_json(
+                object_path,
+                label,
+                self.type,
+                log_message=f"Pulled {self.display_type} {object_path}",
+            )
+
+
+class WorkflowSaver(ObjectSaver):
+    type: Resource = CustomResource.Workflow
+
+    def construct_object_path(self, subdir: Subdirectory, object: dict) -> Path:
+        object_path = (
+            self.base_path
+            / subdir.name
+            / "workflows"
+            / templatize_name_id(object["name"], object["id"])
+            / "workflow.json"
+        )
+        return object_path
+
+    async def save_downloaded_object(self, workflow: dict, subdir: Subdirectory):
+        object_path = self.construct_object_path(subdir=subdir, object=workflow)
+        if self.download_all or await should_write_object(
+            object_path, workflow, self.changed_files, self.parent_dir_reference
+        ):
+            await write_object_to_json(
+                object_path,
+                workflow,
+                self.type,
+                log_message=f"Pulled {self.display_type} {object_path}",
+            )
+
+
+class EngineSaver(ObjectSaver):
+    type: Resource = Resource.Engine
+
+    def construct_object_path(self, subdir: Subdirectory, engine: dict) -> Path:
+        object_path = (
+            self.base_path / subdir.name / "engines" / templatize_name_id(engine["name"], engine["id"]) / "engine.json"
+        )
+        return object_path
+
+    async def save_downloaded_object(self, engine: dict, subdir: Subdirectory):
+        object_path = self.construct_object_path(subdir=subdir, engine=engine)
+        if not object_path:
+            return
+        if self.download_all or await should_write_object(
+            object_path, engine, self.changed_files, self.parent_dir_reference
+        ):
+            await write_object_to_json(
+                object_path,
+                engine,
+                self.type,
+                log_message=f"Pulled {self.display_type} {object_path}",
+            )
+
+
+class EngineFieldSaver(ObjectSaver):
+    type: Resource = Resource.EngineField
+    engines: list[dict]
+
+    def find_subdir_of_object(self, object: dict):
+        parent = self.find_parent_object(object)
+        if parent:
+            subdir = self.subdirs_by_object_id.get(parent["id"])
+            return subdir if subdir else super().find_subdir_of_object(parent)
+
+        subdir = super().find_subdir_of_object(object)
+        if subdir:
+            return subdir
+
+        return None
+
+    def find_parent_object(self, child):
+        return self.find_engine_for_engine_field(child)
+
+    def find_engine_for_engine_field(self, engine_field: dict):
+        for engine in self.engines:
+            if engine["url"] == engine_field.get("engine", None):
+                return engine
+        return None
+
+    def construct_object_path(self, subdir: Subdirectory, engine_field: dict) -> Path:
+        engine = self.find_engine_for_engine_field(engine_field)
+        if not engine:
+            return
+
+        object_path = (
+            self.base_path
+            / subdir.name
+            / "engines"
+            / templatize_name_id(engine["name"], engine["id"])
+            / "engine_fields"
+            / f'{templatize_name_id(engine_field["name"], engine_field["id"])}.json'
+        )
+        return object_path
+
+    async def save_downloaded_object(self, engine_field: dict, subdir: Subdirectory):
+        object_path = self.construct_object_path(subdir=subdir, engine_field=engine_field)
+        if not object_path:
+            return
+        if self.download_all or await should_write_object(
+            object_path, engine_field, self.changed_files, self.parent_dir_reference
+        ):
+            await write_object_to_json(
+                object_path,
+                engine_field,
+                self.type,
+                log_message=f"Pulled {self.display_type} {object_path}",
+            )
+
+
+class WorkflowStepSaver(ObjectSaver):
+    type: Resource = CustomResource.WorkflowStep
+    workflows: list[dict]
+
+    def find_subdir_of_object(self, object: dict):
+        parent = self.find_parent_object(object)
+        if parent:
+            # If you know the parent's subdir, you can use its subdir
+            subdir = self.subdirs_by_object_id.get(parent["id"])
+            return subdir if subdir else super().find_subdir_of_object(parent)
+
+        subdir = super().find_subdir_of_object(object)
+        if subdir:
+            return subdir
+
+        return None
+
+    def find_parent_object(self, child):
+        return self.find_workflow_for_workflow_step(child)
+
+    def construct_object_path(self, subdir: Subdirectory, workflow_step: dict) -> Path:
+        workflow_for_workflow_step = self.find_workflow_for_workflow_step(workflow_step)
+        if not workflow_for_workflow_step:
+            return
+
+        object_path = (
+            self.base_path
+            / subdir.name
+            / "workflows"
+            / templatize_name_id(workflow_for_workflow_step["name"], workflow_for_workflow_step["id"])
+            / "workflow_steps"
+            / f'{templatize_name_id(workflow_step["name"], workflow_step["id"])}.json'
+        )
+        return object_path
+
+    async def save_downloaded_object(self, workflow_step: dict, subdir: Subdirectory):
+        object_path = self.construct_object_path(subdir=subdir, workflow_step=workflow_step)
+        if not object_path:
+            return
+        if self.download_all or await should_write_object(
+            object_path, workflow_step, self.changed_files, self.parent_dir_reference
+        ):
+            await write_object_to_json(
+                object_path,
+                workflow_step,
+                self.type,
+                log_message=f"Pulled {self.display_type} {object_path}",
+            )
+
+    def find_workflow_for_workflow_step(self, workflow_step: dict):
+        for ws in self.workflows:
+            if ws["url"] == workflow_step.get("workflow", None):
+                return ws
+        # display_error(
+        #     f"Could not find workflow for {self.display_type} {self.display_label(queue.get('name', "no-name"), queue.get('id', 'no-id'))}. Skipping."
+        # )
+        return None

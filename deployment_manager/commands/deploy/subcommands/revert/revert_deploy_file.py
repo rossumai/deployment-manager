@@ -1,43 +1,39 @@
-import asyncio
+from pydantic import BaseModel, ConfigDict
 from rich import print as pprint
 from rich.panel import Panel
+from rossum_api import APIClientError, AsyncRossumAPIClient
+
 from deployment_manager.commands.deploy.subcommands.revert.revert_object_deploy import (
+    RevertEngineDeploy,
     RevertHookDeploy,
     RevertObjectDeploy,
     RevertQueueDeploy,
     RevertWorkspaceDeploy,
 )
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
-from deployment_manager.commands.deploy.subcommands.run.object_release import (
-    DeployException,
-)
+from deployment_manager.commands.deploy.subcommands.run.models import DeployException
 from deployment_manager.utils.consts import display_error, settings
-
-
-from pydantic import BaseModel
-from rossum_api import APIClientError, ElisAPIClient
+from deployment_manager.utils.functions import gather_with_concurrency
 
 
 class RevertDeployFile(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     plan_only: bool = False
 
     deployed_org_id: int | None = ""
 
-    client: ElisAPIClient
+    client: AsyncRossumAPIClient
     yaml: DeployYaml
 
     workspaces: list[RevertWorkspaceDeploy] = []
     queues: list[RevertQueueDeploy] = []
     hooks: list[RevertHookDeploy] = []
+    engines: list[RevertEngineDeploy] = []
 
     async def display_reverted_organization(self):
         if not self.deployed_org_id:
-            raise DeployException(
-                f"No {settings.DEPLOY_KEY_DEPLOYED_ORG_ID} found in the deploy file."
-            )
+            raise DeployException(f"No {settings.DEPLOY_KEY_DEPLOYED_ORG_ID} found in the deploy file.")
 
         try:
             target_org = await self.client.retrieve_organization(self.deployed_org_id)
@@ -50,7 +46,7 @@ class RevertDeployFile(BaseModel):
                 return
 
     async def revert_hooks(self):
-        await asyncio.gather(
+        await gather_with_concurrency(
             *[
                 hook_release.initialize(
                     yaml=self.yaml,
@@ -61,11 +57,26 @@ class RevertDeployFile(BaseModel):
             ]
         )
 
-        await asyncio.gather(*[hook_release.revert() for hook_release in self.hooks])
+        await gather_with_concurrency(*[hook_release.revert() for hook_release in self.hooks])
         self.detect_revert_phase_exceptions(self.hooks)
 
+    async def revert_engines(self):
+        await gather_with_concurrency(
+            *[
+                engine_release.initialize(
+                    yaml=self.yaml,
+                    client=self.client,
+                    plan_only=self.plan_only,
+                )
+                for engine_release in self.engines
+            ]
+        )
+
+        await gather_with_concurrency(*[engine_release.revert() for engine_release in self.engines])
+        self.detect_revert_phase_exceptions(self.engines)
+
     async def revert_workspaces(self):
-        await asyncio.gather(
+        await gather_with_concurrency(
             *[
                 workspace_release.initialize(
                     yaml=self.yaml,
@@ -76,13 +87,11 @@ class RevertDeployFile(BaseModel):
             ]
         )
 
-        await asyncio.gather(
-            *[workspace_release.revert() for workspace_release in self.workspaces]
-        )
+        await gather_with_concurrency(*[workspace_release.revert() for workspace_release in self.workspaces])
         self.detect_revert_phase_exceptions(self.workspaces)
 
     async def revert_queues(self):
-        await asyncio.gather(
+        await gather_with_concurrency(
             *[
                 queue_release.initialize(
                     yaml=self.yaml,
@@ -93,7 +102,7 @@ class RevertDeployFile(BaseModel):
             ]
         )
 
-        await asyncio.gather(*[queue_release.revert() for queue_release in self.queues])
+        await gather_with_concurrency(*[queue_release.revert() for queue_release in self.queues])
         self.detect_revert_phase_exceptions(self.queues)
 
     def detect_revert_phase_exceptions(self, releases: list[RevertObjectDeploy]):

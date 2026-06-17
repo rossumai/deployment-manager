@@ -1,13 +1,10 @@
 import os
 import subprocess
-from anyio import Path
 
 import click
-from deployment_manager.commands.download.directory import (
-    DownloadOrganizationDirectory,
-)
+from anyio import Path
 
-
+from deployment_manager.commands.download.directory import DownloadOrganizationDirectory
 from deployment_manager.common.read_write import read_prd_project_config
 from deployment_manager.common.upload_download_setup import (
     check_unique_org_ids,
@@ -15,9 +12,7 @@ from deployment_manager.common.upload_download_setup import (
     mark_subdirectories_to_include,
 )
 from deployment_manager.utils.consts import display_error, display_warning, settings
-from deployment_manager.utils.functions import (
-    coro,
-)
+from deployment_manager.utils.functions import apply_concurrency_override, coro
 
 # TODO: fix foreign JSONs in the subdir (mongo.json...)
 
@@ -62,6 +57,12 @@ In case the directory already exists, it first deletes its contents and then dow
     default="Sync changes to local",
     help="Commit message for pulling.",
 )
+@click.option(
+    "--concurrency",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Maximum concurrent API requests (default: 5, or PRD2_CONCURRENCY env var).",
+)
 @coro
 # To be able to run the command progammatically without the CLI decorators
 async def download_project_wrapper(
@@ -70,7 +71,9 @@ async def download_project_wrapper(
     message: str = "",
     all: bool = False,
     skip_objects_without_subdir: bool = False,
+    concurrency: int = None,
 ):
+    apply_concurrency_override(concurrency)
     await download_destinations(
         destinations=destinations,
         commit_message=message,
@@ -89,9 +92,7 @@ async def download_destinations(
     skip_objects_without_subdir: bool = False,
 ):
     if not destinations:
-        display_warning(
-            f"No destinations specified to {settings.DOWNLOAD_COMMAND_NAME}."
-        )
+        display_warning(f"No destinations specified to {settings.DOWNLOAD_COMMAND_NAME}.")
         return
 
     if not project_path:

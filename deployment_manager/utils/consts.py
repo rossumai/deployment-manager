@@ -1,18 +1,18 @@
-from enum import Enum, StrEnum
 import json
 import logging
-from pathlib import Path
+import os
 import re
 import sys
+from enum import Enum, StrEnum
+from pathlib import Path
+
 import click
 import httpx
-
-from rich.prompt import Prompt
+import yaml
 from rich.console import Console
 from rich.panel import Panel
-from rossum_api.api_client import Resource
-import yaml
-
+from rich.prompt import Prompt
+from rossum_api.domain_logic.resources import Resource
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.ERROR)
@@ -55,9 +55,7 @@ def validate_token(base_url: str, token: str, destination: str):
     is_token_valid = req.status_code == 200
 
     if not is_token_valid:
-        new_token = Prompt.ask(
-            f"Token for {base_url} is invalid or expired. Provide a new one"
-        )
+        new_token = Prompt.ask(f"Token for {base_url} is invalid or expired. Provide a new one")
         req = httpx.get(
             url=base_url + "/auth/user",
             headers={"Authorization": f"Bearer {new_token}"},
@@ -83,24 +81,33 @@ class GIT_CHARACTERS(StrEnum):
     PARTIALLY_UPADTED = "MM"
     CREATED = "??"
     CREATED_STAGED = "A"
+    CREATED_STAGED_MODIFIED = "AM"
 
 
-QUEUE_ENGINE_ATTRIBUTES = ["dedicated_engine", "engine", "generic_engine"]
+QUEUE_ENGINE_ATTRIBUTES = ["dedicated_engine", "generic_engine"]
 
 settings = None
 
 
 class Settings:
     def __init__(self):
+        # Read concurrency from environment variable, default to 5
+        self.CONCURRENCY = int(os.environ.get("PRD2_CONCURRENCY", 5))
+
+        # Validate concurrency value
+        if self.CONCURRENCY < 1:
+            raise ValueError(
+                f"PRD2_CONCURRENCY must be at least 1, got {self.CONCURRENCY}. "
+                f"Please set a valid value: export PRD2_CONCURRENCY=5"
+            )
+
         cred_path = Path("./") / self.CREDENTIALS_FILENAME
         if not cred_path.exists():
             return
         credentials = json.loads(cred_path.read_text())
 
         if not isinstance(credentials, dict):
-            raise click.ClickException(
-                f"{self.CREDENTIALS_FILENAME} is not a valid dictionary."
-            )
+            raise click.ClickException(f"{self.CREDENTIALS_FILENAME} is not a valid dictionary.")
 
         config_path = Path("./") / self.CONFIG_FILENAME
         if not config_path.exists():
@@ -108,18 +115,12 @@ class Settings:
         config = yaml.safe_load(config_path.open("r"))
 
         if not isinstance(config, dict):
-            raise click.ClickException(
-                f"{self.CONFIG_FILENAME} is not a valid dictionary."
-            )
+            raise click.ClickException(f"{self.CONFIG_FILENAME} is not a valid dictionary.")
 
         self.SOURCE_API_BASE = config.get("source_api_base")
 
-        self.SOURCE_USERNAME = credentials.get(self.SOURCE_DIRNAME, {}).get(
-            "username", None
-        )
-        self.SOURCE_PASSWORD = credentials.get(self.SOURCE_DIRNAME, {}).get(
-            "password", None
-        )
+        self.SOURCE_USERNAME = credentials.get(self.SOURCE_DIRNAME, {}).get("username", None)
+        self.SOURCE_PASSWORD = credentials.get(self.SOURCE_DIRNAME, {}).get("password", None)
         self.SOURCE_TOKEN = credentials.get(self.SOURCE_DIRNAME, {}).get("token", None)
 
         if not config.get("use_same_org_as_target", False):
@@ -130,19 +131,16 @@ class Settings:
                 )
             self.TARGET_API_BASE = config.get("target_api_base")
 
-            self.TARGET_USERNAME = credentials.get(self.TARGET_DIRNAME, {}).get(
-                "username", None
-            )
-            self.TARGET_PASSWORD = credentials.get(self.TARGET_DIRNAME, {}).get(
-                "password", None
-            )
-            self.TARGET_TOKEN = credentials.get(self.TARGET_DIRNAME, {}).get(
-                "token", None
-            )
+            self.TARGET_USERNAME = credentials.get(self.TARGET_DIRNAME, {}).get("username", None)
+            self.TARGET_PASSWORD = credentials.get(self.TARGET_DIRNAME, {}).get("password", None)
+            self.TARGET_TOKEN = credentials.get(self.TARGET_DIRNAME, {}).get("token", None)
         else:
             self.IS_PROJECT_IN_SAME_ORG = True
 
     IS_PROJECT_IN_SAME_ORG: bool = False
+
+    # Concurrency limit for gather_with_concurrency
+    CONCURRENCY: int = 5
 
     SOURCE_API_BASE: str = ""
     # Empty string gives an API error even if there is username and password
@@ -193,9 +191,15 @@ class Settings:
     DEPLOY_TEMPLATE_INIT_COMMAND_NAME: str = "init"
     DOCUMENT_COMMAND_NAME: str = "docommando"
     LLM_CHAT_COMMAND_NAME: str = "llm-chat"
+    DEPLOY_TEMPLATE_CREATE_COMMAND_NAME: str = "create"
+    DEPLOY_TEMPLATE_UPDATE_COMMAND_NAME: str = "update"
+    DEPLOY_TEMPLATE_REVERSE_COMMAND_NAME: str = "reverse"
     HOOK_COMMAND_NAME: str = "hook"
     HOOK_PAYLOAD_COMMAND_NAME: str = "payload"
     HOOK_TEST_COMMAND_NAME: str = "test"
+    HOOK_SYNC_COMMAND_NAME: str = "sync"
+    DEFAULT_HOOK_SYNC_PARENT = "hook_sync_configs"
+    HOOK_SYNC_ADD_TO_TEMPLATE_COMMAND_NAME: str = "add"
 
     CONFIG_KEY_API_BASE_URL = "api_base"
     CONFIG_KEY_TOKEN = "token"
@@ -211,12 +215,20 @@ class Settings:
     DOWNLOAD_KEY_REGEX = "regex"
 
     # Deploy consts
-    DEPLOY_IGNORED_DIRS = [".git", "payloads", "deploy_files", "deploy_secrets"]
+    DEPLOY_IGNORED_DIRS = [
+        ".git",
+        "payloads",
+        "deploy_files",
+        "deploy_secrets",
+        "hook_sync_configs",
+    ]
     DEPLOY_OVERRIDE_REGEX_SEPARATOR = "/#/"
     DEPLOY_DEFAULT_TARGET_URL = "https://my-org.rossum.app/api/v1"
     DEFAULT_DEPLOY_PARENT = "deploy_files"
     DEFAULT_DEPLOY_SECRETS_PARENT = "deploy_secrets"
+    DEFAULT_DEPLOY_STATE_PARENT = "deploy_states"
     DEPLOY_KEY_SECRETS_PATH = "secrets_file"
+    DEPLOY_KEY_STATE_PATH = "deploy_state_file"
     DEPLOY_KEY_TARGETS = "targets"
     DEPLOY_KEY_OVERRIDES = "attribute_override"
     DEPLOY_KEY_DEPLOYED_ORG_ID = "deployed_org_id"
@@ -238,13 +250,17 @@ class Settings:
     DEPLOY_KEY_RULES = "rules"
     DEPLOY_KEY_INBOX = "inbox"
     DEPLOY_KEY_HOOKS = "hooks"
+    DEPLOY_KEY_LABELS = "labels"
+    DEPLOY_KEY_EMAIL_TEMPLATES = "email_templates"
+    DEPLOY_KEY_ENGINES = "engines"
 
     UPDATE_PRINT_STR: str = "[blue]UPDATE[/blue]"
     CREATE_PRINT_STR: str = "[green]CREATE[/green]"
     DELETE_PRINT_STR: str = "[red]DELETE[/red]"
     PLAN_PRINT_STR: str = "[bold]PLAN:[/bold]"
 
-    IGNORED_KEYS: dict = {
+    # These are not even saved locally when pulling
+    NON_PULLED_KEYS_PER_OBJECT: dict = {
         Resource.Queue: ["counts", "users"],
         Resource.Hook: ["status"],
     }
@@ -252,13 +268,45 @@ class Settings:
     NON_VERSIONED_ATTRIBUTES_FILE_NAME: str = "non_versioned_object_attributes.json"
     NON_VERSIONED_ATTRIBUTES: tuple = ("modified_at",)
 
+    # These are versioned locally, but should not be deployed, and so they are not displayed in diffs either
+    DEPLOY_NON_DIFFED_KEYS: dict = {
+        Resource.Inbox: ["email"],
+        Resource.Queue: ["training_enabled"],
+        Resource.Hook: ["guide", "status"],
+        Resource.Organization: [
+            "organization_group",
+            "users",
+            "creator",
+            "trial_expires_at",
+        ],
+    }
+    # Non-diffed only if cross-org
+    DEPLOY_CROSS_ORG_NON_DIFFED_KEYS: dict = {Resource.Queue: ["workflows", *QUEUE_ENGINE_ATTRIBUTES]}
+
+    # List attributes that should be sorted before diff so not get false positive diffs (e.g., hook.queues)
+    DEPLOY_SORT_LIST_KEYS: dict = {
+        Resource.Hook: ["queues", "run_after"],
+        Resource.Queue: [
+            "hooks",
+            "webhooks",
+        ],
+        Resource.Workspace: ["queues"],
+        Resource.Organization: ["workspaces"],
+    }
+
     FORMULA_DIR_NAME: str = "formulas"
     RULES_DIR_NAME: str = "rules"
     EMAIL_TEMPLATES_DIR_NAME: str = "email_templates"
+    LABELS_DIR_NAME: str = "labels"
 
     GITHUB_DEFAULT_LATEST_RELEASE_URL = "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
+    GITHUB_SPECIFIC_RELEASE_URL = "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/{version_tag}"
     GITHUB_DEPLOYMENT_MANAGER_REPO_OWNER = "rossumai"
     GITHUB_DEPLOYMENT_MANAGER_REPO_NAME = "deployment-manager"
+
+    GITLAB_SERVERLESS_FUNCTIONS_URL = (
+        "https://gitlab.rossum.cloud/elis-connectors/elis-serverless-functions/-/blob/master"
+    )
 
     @property
     def SOURCE_API_URL(self):
@@ -309,4 +357,6 @@ initialize_settings()
 
 
 class CustomResource(Enum):
-    Rule = "rules"
+    Label = "labels"
+    Workflow = "workflows"
+    WorkflowStep = "workflow_steps"
