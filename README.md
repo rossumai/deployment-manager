@@ -657,6 +657,24 @@ workspaces:
           name: \(US\)/#/(EU)
 ```
 
+##### How the regex replacement is applied
+
+The regex on the left of `/#/` is **not** matched against the targeted value as a whole. Instead, the replacement descends recursively into the value found by the JMESPath query:
+
+- For a **string**, the regex substitution is applied directly.
+- For a **dict**, the substitution is applied to every (nested) value.
+- For a **list**, the substitution is applied to every (nested) element.
+- **Non-string leaves** (numbers, booleans, `null`) are left untouched.
+
+This means a regex override can target a key whose value is a whole object or list, and every string anywhere inside it that matches the pattern is replaced. For example, this rewrites `DEV` to `PROD` in *every* string inside `settings`, no matter how deeply nested:
+```YAML
+attribute_override:
+  settings: \bDEV\b/#/PROD
+```
+Earlier versions applied the regex with a single flat `re.sub` on the value, which only worked when the value was itself a string (and failed for `settings`/`metadata`-style objects or lists). The recursive behavior above replaces that.
+
+Note this recursive descent applies **only to regex overrides** (values containing `/#/`). The other override forms behave differently — see [Overriding objects](#overriding-objects) below: a plain string replaces the value outright, a dict is shallow-merged into the existing value, and any other value (e.g. a list) replaces the value wholesale.
+
 #### Overriding objects
 
 The JMESPath query for override can be used to replace non-primitive values (e.g., you can replace the whole `settings` object). However, careful if you want to override only a part of the object:
