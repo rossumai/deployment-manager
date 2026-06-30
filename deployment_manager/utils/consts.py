@@ -293,6 +293,7 @@ class Settings:
         ],
         Resource.Workspace: ["queues"],
         Resource.Organization: ["workspaces"],
+        Resource.Schema: ["rules"],
     }
 
     FORMULA_DIR_NAME: str = "formulas"

@@ -141,3 +141,71 @@ class TestShouldWriteObject:
                 parent_dir_reference=parent_dir,
             )
         mock_q.assert_not_called()
+
+    async def test_queue_hooks_reordered_only_is_not_treated_as_change(self, tmp_path):
+        sync_root = pathlib.Path(str(tmp_path))
+        file_path_str = str(sync_root / "queue.json")
+        local_queue = {
+            "url": "https://x/api/v1/queues/1",
+            "modified_at": "2026-01-01",
+            "hooks": [
+                "https://x/api/v1/hooks/9",
+                "https://x/api/v1/hooks/2",
+            ],
+        }
+        with open(file_path_str, "w") as f:
+            json.dump(local_queue, f)
+
+        file_path = Path(file_path_str)
+        remote = {
+            "url": "https://x/api/v1/queues/1",
+            "modified_at": "2026-01-01",
+            "hooks": [
+                "https://x/api/v1/hooks/2",
+                "https://x/api/v1/hooks/9",
+            ],
+        }
+        parent_dir = MagicMock()
+        parent_dir.ignore_changed_file_warnings = False
+
+        result = await should_write_object(
+            path=file_path,
+            remote_object=remote,
+            changed_files=[],
+            parent_dir_reference=parent_dir,
+        )
+        assert not result
+
+    async def test_schema_rules_reordered_only_is_not_treated_as_change(self, tmp_path):
+        sync_root = pathlib.Path(str(tmp_path))
+        file_path_str = str(sync_root / "schema.json")
+        local_schema = {
+            "url": "https://x/api/v1/schemas/1",
+            "modified_at": "2026-01-01",
+            "rules": [
+                "https://x/api/v1/rules/9",
+                "https://x/api/v1/rules/2",
+            ],
+        }
+        with open(file_path_str, "w") as f:
+            json.dump(local_schema, f)
+
+        file_path = Path(file_path_str)
+        remote = {
+            "url": "https://x/api/v1/schemas/1",
+            "modified_at": "2026-01-01",
+            "rules": [
+                "https://x/api/v1/rules/2",
+                "https://x/api/v1/rules/9",
+            ],
+        }
+        parent_dir = MagicMock()
+        parent_dir.ignore_changed_file_warnings = False
+
+        result = await should_write_object(
+            path=file_path,
+            remote_object=remote,
+            changed_files=[],
+            parent_dir_reference=parent_dir,
+        )
+        assert not result

@@ -9,9 +9,11 @@ from deployment_manager.common.read_write import (
     create_formula_directory_path,
     find_fields_in_schema,
     find_formula_fields_in_schema,
+    normalize_object_for_comparison,
     read_object_from_json,
     read_prd_cred_file,
     read_prd_project_config,
+    sort_object_list_attributes,
     read_yaml,
     write_object_to_json,
     write_prd_cred_file,
@@ -56,6 +58,69 @@ class TestWriteReadJson:
         )
         loaded = await read_object_from_json(path, False)
         assert "status" not in loaded
+
+    async def test_hook_run_after_sorted_on_write(self, tmp_path):
+        path = tmp_path / "hook.json"
+        hook = {
+            "id": 1,
+            "name": "h",
+            "run_after": [
+                "https://x/api/v1/hooks/9",
+                "https://x/api/v1/hooks/2",
+                "https://x/api/v1/hooks/4",
+            ],
+        }
+        await write_object_to_json(path, hook, type=Resource.Hook)
+        loaded = await read_object_from_json(path, False)
+        assert loaded["run_after"] == [
+            "https://x/api/v1/hooks/2",
+            "https://x/api/v1/hooks/4",
+            "https://x/api/v1/hooks/9",
+        ]
+
+    async def test_sort_object_list_attributes_keeps_complex_list_order(self):
+        hook = {
+            "id": 1,
+            "name": "h",
+            "run_after": [{"url": "https://x/api/v1/hooks/9"}, {"url": "https://x/api/v1/hooks/2"}],
+        }
+        sorted_hook = sort_object_list_attributes(hook, Resource.Hook)
+        assert sorted_hook["run_after"] == [{"url": "https://x/api/v1/hooks/9"}, {"url": "https://x/api/v1/hooks/2"}]
+
+    async def test_schema_rules_sorted(self):
+        schema = {
+            "id": 1,
+            "rules": [
+                "https://x/api/v1/rules/9",
+                "https://x/api/v1/rules/2",
+                "https://x/api/v1/rules/4",
+            ],
+        }
+        sorted_schema = sort_object_list_attributes(schema, Resource.Schema)
+        assert sorted_schema["rules"] == [
+            "https://x/api/v1/rules/2",
+            "https://x/api/v1/rules/4",
+            "https://x/api/v1/rules/9",
+        ]
+
+    async def test_normalize_object_for_comparison_does_not_mutate_original(self):
+        schema = {
+            "id": 1,
+            "rules": [
+                "https://x/api/v1/rules/9",
+                "https://x/api/v1/rules/2",
+            ],
+        }
+        normalized = normalize_object_for_comparison(schema, Resource.Schema)
+        # Original keeps its order; only the normalized copy is sorted.
+        assert schema["rules"] == ["https://x/api/v1/rules/9", "https://x/api/v1/rules/2"]
+        assert normalized["rules"] == ["https://x/api/v1/rules/2", "https://x/api/v1/rules/9"]
+
+    async def test_sort_object_list_attributes_noop_for_unconfigured_type(self):
+        org = {"id": 1, "workspaces": ["https://x/api/v1/workspaces/9", "https://x/api/v1/workspaces/2"]}
+        # Resource.Connector has no configured sort keys -> untouched.
+        result = sort_object_list_attributes(dict(org), Resource.Connector)
+        assert result["workspaces"] == ["https://x/api/v1/workspaces/9", "https://x/api/v1/workspaces/2"]
 
 
 @pytest.mark.asyncio
