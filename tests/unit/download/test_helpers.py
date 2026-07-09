@@ -176,15 +176,15 @@ class TestShouldWriteObject:
         )
         assert not result
 
-    async def test_schema_rules_reordered_only_is_not_treated_as_change(self, tmp_path):
+    async def test_schema_queues_reordered_only_is_not_treated_as_change(self, tmp_path):
         sync_root = pathlib.Path(str(tmp_path))
         file_path_str = str(sync_root / "schema.json")
         local_schema = {
             "url": "https://x/api/v1/schemas/1",
             "modified_at": "2026-01-01",
-            "rules": [
-                "https://x/api/v1/rules/9",
-                "https://x/api/v1/rules/2",
+            "queues": [
+                "https://x/api/v1/queues/9",
+                "https://x/api/v1/queues/2",
             ],
         }
         with open(file_path_str, "w") as f:
@@ -194,9 +194,9 @@ class TestShouldWriteObject:
         remote = {
             "url": "https://x/api/v1/schemas/1",
             "modified_at": "2026-01-01",
-            "rules": [
-                "https://x/api/v1/rules/2",
-                "https://x/api/v1/rules/9",
+            "queues": [
+                "https://x/api/v1/queues/2",
+                "https://x/api/v1/queues/9",
             ],
         }
         parent_dir = MagicMock()
