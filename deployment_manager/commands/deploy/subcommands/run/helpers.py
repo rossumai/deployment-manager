@@ -116,7 +116,7 @@ def traverse_object(parent_object: dict | None, parent_key: str, value: Any):
         for i in value:
             yield from traverse_object(parent_object, parent_key, i)
     elif isinstance(value, dict):
-        for k, v in value.items():
+        for k, v in list(value.items()):
             yield from traverse_object(value, k, v)
     elif isinstance(value, str) or isinstance(value, int):
         yield parent_object, parent_key, value

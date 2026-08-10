@@ -43,9 +43,10 @@ class TestReplaceBaseUrl:
     def test_same_base(self):
         rr = ReferenceReplacer(parent_object_reference=_make_parent(), type=Resource.Hook)
         url = "https://src.rossum.app/api/v1/hooks/500001"
-        assert rr.replace_base_url(
-            url, "https://src.rossum.app/api/v1", "https://tgt.rossum.app/api/v1"
-        ) == "https://tgt.rossum.app/api/v1/hooks/500001"
+        assert (
+            rr.replace_base_url(url, "https://src.rossum.app/api/v1", "https://tgt.rossum.app/api/v1")
+            == "https://tgt.rossum.app/api/v1/hooks/500001"
+        )
 
     def test_no_replacement(self):
         rr = ReferenceReplacer(parent_object_reference=_make_parent(), type=Resource.Hook)
@@ -467,3 +468,186 @@ class TestReplaceUnstructuredAttributes:
             num_targets=1,
         )
         assert target_object["actions"][0]["id"] == "99"
+
+
+class TestAmbiguousSourceIds:
+    """Source objects of different types can share the same numeric ID (e.g. hook 1 and rule 1)."""
+
+    @staticmethod
+    def _ambiguous_lookup(source_id=1, hook_target=90, rule_target=91):
+        lut = defaultdict(dict)
+        lut[source_id][Resource.Hook] = [_make_target(hook_target)]
+        lut[source_id][Resource.Rule] = [_make_target(rule_target)]
+        return lut
+
+    def _replace(self, target_object, lookup_table):
+        rr = ReferenceReplacer(parent_object_reference=_make_parent(), type=Resource.Hook)
+        rr.replace_references_in_unstructured_attributes(
+            target_object_label="hook label",
+            target_object=target_object,
+            lookup_table=lookup_table,
+            target_object_index=0,
+            num_targets=1,
+        )
+        return target_object
+
+    def test_ids_embedded_in_other_numbers_are_ignored(self):
+        target_object = {
+            "settings": {
+                "sorting_queues": {"ACV": 8917, "EU1": 8917},
+                "max_size_kb": 51200,
+                "gsc_endpoint": "https://dhl.rossum.app/svc/shipment-dev/api/v1/uwc/next_stage",
+            }
+        }
+        result = self._replace(target_object, self._ambiguous_lookup())
+        assert result["settings"] == {
+            "sorting_queues": {"ACV": 8917, "EU1": 8917},
+            "max_size_kb": 51200,
+            "gsc_endpoint": "https://dhl.rossum.app/svc/shipment-dev/api/v1/uwc/next_stage",
+        }
+
+    def test_type_resolved_from_key(self):
+        target_object = {"settings": {"next_phase_hook_id": "1"}}
+        result = self._replace(target_object, self._ambiguous_lookup())
+        assert result["settings"]["next_phase_hook_id"] == "90"
+
+    def test_type_resolved_from_url(self):
+        target_object = {"settings": {"target": "https://src.rossum.app/api/v1/rules/1"}}
+        result = self._replace(target_object, self._ambiguous_lookup())
+        assert result["settings"]["target"] == "https://src.rossum.app/api/v1/rules/91"
+
+    def test_reference_to_type_not_deployed_under_the_id_is_left_alone(self):
+        target_object = {"settings": {"queue_id": "1"}}
+        result = self._replace(target_object, self._ambiguous_lookup())
+        assert result["settings"]["queue_id"] == "1"
+
+    def test_warns_and_removes_only_when_truly_ambiguous(self, capsys):
+        target_object = {"settings": {"some_ref": "1"}}
+        result = self._replace(target_object, self._ambiguous_lookup())
+        assert "some_ref" not in result["settings"]
+        assert "There are different types of objects with the same ID" in capsys.readouterr().out
+
+    def test_ambiguous_id_inside_a_larger_value_is_left_alone(self, capsys):
+        target_object = {"settings": {"template": ['  "sequenceNumber": 1,', "  }"]}}
+        result = self._replace(target_object, self._ambiguous_lookup())
+        assert result["settings"]["template"] == ['  "sequenceNumber": 1,', "  }"]
+        assert "Could not override" not in capsys.readouterr().out
+
+    def test_unambiguous_id_still_replaced(self):
+        target_object = {"settings": {"whatever": 1}}
+        result = self._replace(target_object, _make_lookup(1, Resource.Hook, [_make_target(90)]))
+        assert result["settings"]["whatever"] == 90
+
+
+class TestReferenceTypeInference:
+    @pytest.mark.parametrize(
+        "key,expected",
+        [
+            ("next_phase_hook_id", Resource.Hook),
+            ("exporter_hook_id", Resource.Hook),
+            ("hooks", Resource.Hook),
+            ("sorting_queues", Resource.Queue),
+            ("queue", Resource.Queue),
+            ("email_template_id", Resource.EmailTemplate),
+            ("schema_id", Resource.Schema),
+            ("engine_field_ids", Resource.EngineField),
+            ("inbox", Resource.Inbox),
+            ("some_ref", None),
+            ("id", None),
+            ("case_id", None),
+        ],
+    )
+    def test_from_key(self, key, expected):
+        assert ReferenceReplacer._reference_type_from_key(key) == expected
+
+    @pytest.mark.parametrize(
+        "value,expected",
+        [
+            ("https://src.rossum.app/api/v1/hooks/1", Resource.Hook),
+            ("https://src.rossum.app/api/v1/rules/1", Resource.Rule),
+            ("queues/1", Resource.Queue),
+            ("https://src.rossum.app/api/v1/hooks/11", None),
+            ("api/v1/uwc/next_stage", None),
+        ],
+    )
+    def test_from_value(self, value, expected):
+        assert ReferenceReplacer._reference_type_from_value(value, 1) == expected
+
+
+class TestMultipleReferencesInOneValue:
+    """A single value can match several source IDs - each step must work on the up-to-date value."""
+
+    def _replace(self, target_object, lookup_table, type=Resource.Organization):
+        rr = ReferenceReplacer(parent_object_reference=_make_parent(), type=type)
+        rr.replace_references_in_unstructured_attributes(
+            target_object_label="org label",
+            target_object=target_object,
+            lookup_table=lookup_table,
+            target_object_index=0,
+            num_targets=1,
+        )
+        return target_object
+
+    def test_removed_key_is_not_replaced_afterwards(self):
+        """Regression: KeyError when a later source ID matched a value whose key was already removed."""
+        lut = defaultdict(dict)
+        # Source object with no target equivalent -> the key is removed
+        lut[1] = {}
+        # ...and a second, resolvable ID present in the very same value
+        lut[8914][Resource.Queue] = [_make_target(9914)]
+        target_object = {"metadata": {"some_ref": "1 https://src.rossum.app/api/v1/queues/8914"}}
+        result = self._replace(target_object, lut)
+        assert "some_ref" not in result["metadata"]
+
+    def test_removed_list_item_is_not_replaced_afterwards(self):
+        lut = defaultdict(dict)
+        lut[1] = {}
+        lut[8914][Resource.Queue] = [_make_target(9914)]
+        target_object = {"metadata": {"refs": ["1 https://src.rossum.app/api/v1/queues/8914", "keep"]}}
+        result = self._replace(target_object, lut)
+        assert result["metadata"]["refs"] == ["keep"]
+
+    def test_second_reference_in_the_same_value_is_replaced(self):
+        lut = defaultdict(dict)
+        lut[7][Resource.Organization] = [_make_target(77)]
+        lut[8914][Resource.Queue] = [_make_target(9914)]
+        target_object = {"metadata": {"path": "organizations/7/queues/8914"}}
+        result = self._replace(target_object, lut)
+        assert result["metadata"]["path"] == "organizations/77/queues/9914"
+
+    def test_url_reference_in_metadata_is_replaced(self):
+        """The uwc_inbox_queue_id shape from organization.json."""
+        lut = defaultdict(dict)
+        lut[1][Resource.Hook] = [_make_target(90)]
+        lut[1][Resource.Rule] = [_make_target(91)]
+        lut[8914][Resource.Queue] = [_make_target(9914)]
+        target_object = {"metadata": {"uwc_inbox_queue_id": "https://dhl.rossum.app/api/v1/queues/8914"}}
+        result = self._replace(target_object, lut)
+        assert result["metadata"]["uwc_inbox_queue_id"] == "https://dhl.rossum.app/api/v1/queues/9914"
+
+
+class TestReplaceIdInUrl:
+    def test_only_last_segment_is_replaced(self):
+        """Regression: source ID 1 must not turn "api/v1" into "api/v<target id>"."""
+        assert (
+            ReferenceReplacer._replace_id_in_url("https://dhl.rossum.app/api/v1/hooks/1", "15253")
+            == "https://dhl.rossum.app/api/v1/hooks/15253"
+        )
+
+    def test_webhooks_alias(self):
+        assert (
+            ReferenceReplacer._replace_id_in_url("https://dhl.rossum.app/api/v1/webhooks/1", "15253")
+            == "https://dhl.rossum.app/api/v1/webhooks/15253"
+        )
+
+    def test_id_repeated_in_path(self):
+        assert (
+            ReferenceReplacer._replace_id_in_url("https://x/api/v1/queues/19/queues/19", "2634")
+            == "https://x/api/v1/queues/19/queues/2634"
+        )
+
+    def test_dummy_target_id(self):
+        assert (
+            ReferenceReplacer._replace_id_in_url("https://x/api/v1/hooks/1", "<NEW COPY>[0](Hook - 1)")
+            == "https://x/api/v1/hooks/<NEW COPY>[0](Hook - 1)"
+        )
