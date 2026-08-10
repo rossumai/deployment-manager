@@ -273,6 +273,7 @@ class Settings:
         Resource.Inbox: ["email"],
         Resource.Queue: ["training_enabled"],
         Resource.Hook: ["guide", "status"],
+        Resource.Engine: ["agenda_id"],
         Resource.Organization: [
             "organization_group",
             "users",
