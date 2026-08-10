@@ -651,3 +651,41 @@ class TestReplaceIdInUrl:
             ReferenceReplacer._replace_id_in_url("https://x/api/v1/hooks/1", "<NEW COPY>[0](Hook - 1)")
             == "https://x/api/v1/hooks/<NEW COPY>[0](Hook - 1)"
         )
+
+
+class TestNoCascadeAcrossLookupEntries:
+    """A target written for one lookup entry must not be re-matched as a later entry's source ID."""
+
+    @staticmethod
+    def _lut_100_200_300():
+        # 100 -> 200, and a separate source object 200 -> 300 (200 is both a target and a later source)
+        lut = defaultdict(dict)
+        lut[100][Resource.Hook] = [_make_target(200)]
+        lut[200][Resource.Hook] = [_make_target(300)]
+        return lut
+
+    def test_scalar_written_target_not_rematched(self):
+        rr = ReferenceReplacer(parent_object_reference=_make_parent(), type=Resource.Hook)
+        obj = {"settings": {"some_hook_ref": 100}}
+        rr.replace_references_in_unstructured_attributes(
+            target_object_label="h",
+            target_object=obj,
+            lookup_table=self._lut_100_200_300(),
+            target_object_index=0,
+            num_targets=1,
+        )
+        # 100 maps to 200 and stays 200 (must NOT cascade to 300)
+        assert obj["settings"]["some_hook_ref"] == 200
+
+    def test_two_refs_in_one_string_replaced_simultaneously(self):
+        rr = ReferenceReplacer(parent_object_reference=_make_parent(), type=Resource.Hook)
+        obj = {"settings": {"some_hook_ref": "100 and 200"}}
+        rr.replace_references_in_unstructured_attributes(
+            target_object_label="h",
+            target_object=obj,
+            lookup_table=self._lut_100_200_300(),
+            target_object_index=0,
+            num_targets=1,
+        )
+        # original 100 -> 200, original 200 -> 300; the 200 written for 100 is not touched again
+        assert obj["settings"]["some_hook_ref"] == "200 and 300"

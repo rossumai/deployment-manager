@@ -135,11 +135,13 @@ class ReferenceReplacer:
                 continue
 
             for parent, key_in_parent, value in traverse_object(target_object, key, target_object[key]):
-                current_value = value
+                # Resolve every reference against the ORIGINAL value, then apply them in a single pass,
+                # so an ID written by one lookup entry cannot be re-matched by a later one.
+                replacements: dict[str, str] | None = {}
                 for source_id, types_dict in lookup_table.items():
-                    if not id_regexes[source_id].search(str(current_value)):
+                    if not id_regexes[source_id].search(str(value)):
                         continue
-                    elif f"{key}.{key_in_parent}" in self.EXACT_MATCH_PATHS and str(source_id) != str(current_value):
+                    elif f"{key}.{key_in_parent}" in self.EXACT_MATCH_PATHS and str(source_id) != str(value):
                         # Skip substring-only matches for paths like "actions.id" where partial ID replacement would corrupt values (e.g., UUIDs)
                         continue
 
@@ -147,11 +149,12 @@ class ReferenceReplacer:
                         display_warning(
                             f'Could not override source_id "{source_id}" to its target equivalent in {self.type.value} "{target_object_label}". No target IDs found.',
                         )
-                        self.remove_id_from_list(object=parent, key=key_in_parent, value=current_value)
+                        self.remove_id_from_list(object=parent, key=key_in_parent, value=value)
+                        replacements = None
                         break
 
                     reference_type = self._resolve_reference_type(
-                        key=key_in_parent, value=str(current_value), source_id=source_id, types_dict=types_dict
+                        key=key_in_parent, value=str(value), source_id=source_id, types_dict=types_dict
                     )
                     if reference_type is self.NOT_A_REFERENCE:
                         continue
@@ -159,7 +162,8 @@ class ReferenceReplacer:
                         display_warning(
                             f'Could not override source_id "{source_id}" to its target equivalent in {self.type.value} "{target_object_label}". There are different types of objects with the same ID ({list(types_dict.keys())}).',
                         )
-                        self.remove_id_from_list(object=parent, key=key_in_parent, value=current_value)
+                        self.remove_id_from_list(object=parent, key=key_in_parent, value=value)
+                        replacements = None
                         break
 
                     targets = types_dict[reference_type]
@@ -175,20 +179,22 @@ class ReferenceReplacer:
                                 f"For overriding source_id '{source_id}' in {self.type.value} '{target_object_label}', There are multiple target IDs that could be assigned. The first one was used.",
                             )
 
-                    current_value = self.replace_id_in_object(
-                        object=parent,
-                        key=key_in_parent,
-                        value=current_value,
-                        source_id=source_id,
-                        target_id=target_id,
+                    replacements[str(source_id)] = str(target_id)
+
+                if replacements:
+                    self.replace_ids_in_object(
+                        object=parent, key=key_in_parent, value=value, replacements=replacements
                     )
 
-    def replace_id_in_object(self, object: dict, key: str, value: str | int, source_id: int, target_id: int):
-        """Replace the source ID inside the value and return the new value (unchanged if the key is gone)."""
+    def replace_ids_in_object(self, object: dict, key: str, value: str | int, replacements: dict[str, str]):
+        """Replace all source IDs in the value in one pass; matching the original value means a written
+        target is never re-matched as another ID's source. Handles a scalar, a multi-reference string, or a list element."""
         if key not in object:
             return value
 
-        new_value = self._id_regex(source_id).sub(lambda _: str(target_id), str(value))
+        alternation = "|".join(re.escape(s) for s in sorted(replacements, key=len, reverse=True))
+        pattern = re.compile(rf"(?<![0-9A-Za-z])({alternation})(?![0-9A-Za-z])")
+        new_value = pattern.sub(lambda m: replacements[m.group(0)], str(value))
         # Convert value back to int if applicable
         # Only do it if the new ID can be converted - dummy references cannot for instance
         if isinstance(value, int) and new_value.isdigit():
@@ -202,6 +208,9 @@ class ReferenceReplacer:
             object[key] = new_value
 
         return new_value
+
+    def replace_id_in_object(self, object: dict, key: str, value: str | int, source_id: int, target_id: int):
+        return self.replace_ids_in_object(object, key, value, {str(source_id): str(target_id)})
 
     def remove_id_from_list(self, object: dict, key: str, value: str | int):
         if key not in object:
