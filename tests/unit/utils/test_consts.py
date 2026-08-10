@@ -49,6 +49,10 @@ class TestConstants:
     def test_queue_engine_attrs(self):
         assert set(QUEUE_ENGINE_ATTRIBUTES) == {"dedicated_engine", "generic_engine"}
 
+    def test_engine_agenda_id_is_non_diffed(self):
+        """agenda_id is environment-specific and must be ignored in diffs and not deployed."""
+        assert "agenda_id" in settings.DEPLOY_NON_DIFFED_KEYS.get(Resource.Engine, [])
+
 
 class TestApiSuffixRegex:
     def test_matches_standard_suffix(self):
