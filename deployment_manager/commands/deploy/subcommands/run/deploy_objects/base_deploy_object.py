@@ -237,6 +237,15 @@ class DeployObject(BaseModel):
         # asyncio.gather returns results in the same order as they were put in
         self.update_targets()
 
+    def _log_applied_secrets(self, sent_data: dict):
+        """Log (keys only, never values) that secrets from the secrets file were applied."""
+        secret_keys = sorted((sent_data.get("secrets") or {}).keys())
+        if secret_keys:
+            pprint(
+                f"  ↳ Applied {len(secret_keys)} secret(s) from the secrets file to {self.display_type} "
+                f"{self.display_label}: [purple]{', '.join(secret_keys)}[/purple]."
+            )
+
     async def create_remote(self, data_attribute: dict, target: Target = None):
         try:
             data = getattr(target, data_attribute)
@@ -252,6 +261,7 @@ class DeployObject(BaseModel):
             target.update_after_first_create()
 
             pprint(f"{settings.CREATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}.")
+            self._log_applied_secrets(create_copy)
         except Exception as e:
             display_error(
                 f"Error while creating {self.display_type} {self.display_label} ^",
@@ -276,6 +286,7 @@ class DeployObject(BaseModel):
             target.data_from_remote = result
 
             pprint(f"{settings.UPDATE_PRINT_STR} {self.display_type}: {self.create_source_to_target_string(result)}.")
+            self._log_applied_secrets(update_copy)
         except Exception as e:
             display_error(
                 f'Error while updating {self.display_type} {self.display_label} -> "{target.id}: {e}',
