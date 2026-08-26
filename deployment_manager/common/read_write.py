@@ -34,7 +34,7 @@ async def write_object_to_json(path: Path, object: dict, type: Resource = None, 
                     non_versioned_key_written = await write_non_versioned_attribute(path, object, key)
                     if non_versioned_key_written:
                         del object[key]
-    with open(path, "w") as wf:
+    with open(path, "w", encoding="utf-8") as wf:
         json.dump(object, wf, indent=2)
 
     if log_message:
@@ -86,7 +86,7 @@ async def write_non_versioned_attribute(path, object_, key):
 async def write_str(path: Path, code: str):
     if path.parent:
         await path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as wf:
+    with open(path, "w", encoding="utf-8") as wf:
         wf.write(code)
 
 
@@ -182,7 +182,7 @@ async def read_non_versioned_attribute_data(path, object_):
         non_versioned_data = {}
         # locking the file while reading to be sure other process won't write in the meantime
         async with NON_VERSIONED_ATTRIBUTES_FILE_LOCK:
-            with open(non_versioned_attributes_file, "r") as f:
+            with open(non_versioned_attributes_file, "r", encoding="utf-8") as f:
                 non_versioned_data = json.load(f)
 
         # fore more clarity of how this works, read the comment before the writing loop in the `write_non_versioned_attribute` function
@@ -199,7 +199,7 @@ async def read_non_versioned_attribute_data(path, object_):
 
 
 async def read_txt(path: Path) -> str:
-    return open(path, "r").read()
+    return open(path, "r", encoding="utf-8").read()
 
 
 async def write_txt(path: Path, text: str):
@@ -212,12 +212,12 @@ async def write_yaml(path: Path, object: dict):
     if dataclasses.is_dataclass(object):
         object = dataclasses.asdict(object)
     await path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as wf:
+    with open(path, "w", encoding="utf-8") as wf:
         yaml.dump(object, wf, sort_keys=False)
 
 
 def read_yaml(path: Path):
-    with open(path, "r") as rf:
+    with open(path, "r", encoding="utf-8") as rf:
         return yaml.safe_load(rf)
 
 
