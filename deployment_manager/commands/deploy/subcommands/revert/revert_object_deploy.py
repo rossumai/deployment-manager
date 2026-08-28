@@ -9,7 +9,7 @@ from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
 from deployment_manager.commands.deploy.subcommands.run.models import SubObjectException, Target, TargetWithDefault
-from deployment_manager.utils.consts import display_error, display_info, display_warning, settings
+from deployment_manager.utils.consts import CustomResource, display_error, display_info, display_warning, settings
 from deployment_manager.utils.functions import gather_with_concurrency
 
 
@@ -149,6 +149,15 @@ class RevertHookDeploy(RevertObjectDeploy):
 
 class RevertEngineDeploy(RevertObjectDeploy):
     type: Resource = Resource.Engine
+
+
+class RevertRuleDeploy(RevertObjectDeploy):
+    type: Resource = Resource.Rule
+
+
+class RevertLabelDeploy(RevertObjectDeploy):
+    # Labels use CustomResource (URL part "labels"); the client builds URLs from `.value`.
+    type: CustomResource = CustomResource.Label
 
 
 class RevertWorkspaceDeploy(RevertObjectDeploy):

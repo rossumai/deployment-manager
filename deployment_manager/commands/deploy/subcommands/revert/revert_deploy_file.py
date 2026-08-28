@@ -6,8 +6,10 @@ from rossum_api import APIClientError, AsyncRossumAPIClient
 from deployment_manager.commands.deploy.subcommands.revert.revert_object_deploy import (
     RevertEngineDeploy,
     RevertHookDeploy,
+    RevertLabelDeploy,
     RevertObjectDeploy,
     RevertQueueDeploy,
+    RevertRuleDeploy,
     RevertWorkspaceDeploy,
 )
 from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYaml
@@ -30,6 +32,8 @@ class RevertDeployFile(BaseModel):
     queues: list[RevertQueueDeploy] = []
     hooks: list[RevertHookDeploy] = []
     engines: list[RevertEngineDeploy] = []
+    rules: list[RevertRuleDeploy] = []
+    labels: list[RevertLabelDeploy] = []
 
     async def display_reverted_organization(self):
         if not self.deployed_org_id:
@@ -74,6 +78,36 @@ class RevertDeployFile(BaseModel):
 
         await gather_with_concurrency(*[engine_release.revert() for engine_release in self.engines])
         self.detect_revert_phase_exceptions(self.engines)
+
+    async def revert_rules(self):
+        await gather_with_concurrency(
+            *[
+                rule_release.initialize(
+                    yaml=self.yaml,
+                    client=self.client,
+                    plan_only=self.plan_only,
+                )
+                for rule_release in self.rules
+            ]
+        )
+
+        await gather_with_concurrency(*[rule_release.revert() for rule_release in self.rules])
+        self.detect_revert_phase_exceptions(self.rules)
+
+    async def revert_labels(self):
+        await gather_with_concurrency(
+            *[
+                label_release.initialize(
+                    yaml=self.yaml,
+                    client=self.client,
+                    plan_only=self.plan_only,
+                )
+                for label_release in self.labels
+            ]
+        )
+
+        await gather_with_concurrency(*[label_release.revert() for label_release in self.labels])
+        self.detect_revert_phase_exceptions(self.labels)
 
     async def revert_workspaces(self):
         await gather_with_concurrency(
