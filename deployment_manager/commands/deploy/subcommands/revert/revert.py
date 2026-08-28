@@ -73,8 +73,6 @@ async def revert_release_file(
 
         await planned_release.revert_hooks()
 
-        # Queues must be deleted before engines: the API refuses to delete an engine that
-        # still has active queues attached ("engine_attached_to_active_queues").
         await planned_release.revert_queues()
 
         await planned_release.revert_engines()
@@ -95,8 +93,6 @@ async def revert_release_file(
     try:
         await release.revert_hooks()
 
-        # Queues must be deleted before engines: the API refuses to delete an engine that
-        # still has active queues attached ("engine_attached_to_active_queues").
         await release.revert_queues()
 
         await release.revert_engines()
