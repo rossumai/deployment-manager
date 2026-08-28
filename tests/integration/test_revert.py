@@ -137,3 +137,47 @@ async def test_revert_declined_by_user_keeps_objects(tmp_path: Path, monkeypatch
 
     # Both workspaces still exist
     assert target_ws["id"] in org._stores["workspaces"]
+
+
+@pytest.mark.asyncio
+async def test_revert_deletes_queues_before_engines(tmp_path: Path, monkeypatch):
+    """The API refuses to delete an engine with active queues, so queues must be reverted first."""
+    monkeypatch.chdir(tmp_path)
+    _mock_confirm(monkeypatch, True)
+
+    from deployment_manager.commands.deploy.subcommands.revert import revert_deploy_file as rdf
+
+    calls: list[str] = []
+
+    def _recorder(name):
+        async def _method(self, *args, **kwargs):
+            calls.append(name)
+
+        return _method
+
+    for name in ("display_reverted_organization", "revert_hooks", "revert_engines", "revert_queues", "revert_workspaces"):
+        monkeypatch.setattr(rdf.RevertDeployFile, name, _recorder("org" if name == "display_reverted_organization" else name.removeprefix("revert_")))
+
+    deploy_file_data = {
+        settings.DEPLOY_KEY_SOURCE_DIR: "source/primary",
+        settings.DEPLOY_KEY_TARGET_URL: "https://x.rossum.app/api/v1",
+        settings.DEPLOY_KEY_TARGET_DIR: "",
+        settings.DEPLOY_KEY_DEPLOYED_ORG_ID: 42,
+        settings.DEPLOY_KEY_WORKSPACES: [],
+        settings.DEPLOY_KEY_QUEUES: [],
+        settings.DEPLOY_KEY_HOOKS: [],
+        "engines": [],
+        "unselected_hooks": [],
+    }
+    deploy_file_path = tmp_path / "deploy_files" / "order.yaml"
+    pathlib.Path(deploy_file_path.parent).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(deploy_file_path).write_text(yaml.safe_dump(deploy_file_data, sort_keys=False))
+
+    await revert_release_file(
+        deploy_file_path=deploy_file_path,
+        project_path=Path("."),
+        target_client=VirtualRossumClient(build_simple_org()),
+    )
+
+    # plan phase, then apply phase; queues before engines in both
+    assert calls == ["org", "hooks", "queues", "engines", "workspaces", "hooks", "queues", "engines", "workspaces"]
