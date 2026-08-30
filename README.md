@@ -561,6 +561,26 @@ You can leave comments in the deploy file and they will be preserved (in almost 
 
 > ℹ️ Note: Unlike in PRD v1, there is no `ignore` option for objects. If you do not want to deploy something, just remove it from the deploy file. However, this does not work for objects like schemas since a queue always needs one.
 
+### Releasable objects
+
+`deploy` can release the following Rossum object types:
+
+| Object | Deploy file key | Notes |
+| --- | --- | --- |
+| Organization | (implicit) | The release always happens within the context of a single target organization; it is not listed explicitly. |
+| Workspace | `workspaces` | Top-level. |
+| Queue | `queues` | Top-level (also reachable under a workspace's queues). |
+| Schema | `schema` | Nested under its queue. A queue always needs exactly one. |
+| Inbox | `inbox` | Nested under its queue. |
+| Hook | `hooks` | Top-level. |
+| Rule | `rules` | Nested under its schema. |
+| Engine | `engines` | Top-level. |
+| Engine field | (under engine) | Released together with its engine. |
+| Label | `labels` | |
+| Email template | `email_templates` | |
+
+Any other Rossum object types (e.g. `workflows`, users, organization groups) are **not** released by PRD and must be created/assigned manually in the target — `deploy` warns you when it detects such an attribute (see `queue.ignore_deploy_warnings`).
+
 For some objects, there are optional flags:
 
 #### `queue.keep_hook_dependencies_without_equivalent`
@@ -573,13 +593,40 @@ If `true`, `deploy` does not display the warning that the queue has a workflow o
 
 #### `queue.overwrite_ignored_fields`
 
-If `true`, `deploy` will overwrite target fields like `settings.columns` or `default_threshold`.
+If `true`, `deploy` will overwrite the queue's ignored AI/runtime fields on the target (see [Attributes ignored by default](#attributes-ignored-by-default) below). By default these are preserved from the target.
 
 #### `schema.overwrite_ignored_fields`
 
-If `true`, `deploy` will overwrite `score_threshold` fields.
+If `true`, `deploy` will overwrite the per-field `score_threshold` values on the target schema. By default these are preserved from the target.
 
-- Difference between:
+### Attributes ignored by default
+
+When releasing, PRD deliberately does **not** overwrite certain attributes. There are two distinct reasons an attribute is ignored:
+
+#### 1. AI / runtime tuning fields (preserved from the target)
+
+These fields are typically tuned per environment (e.g. you do not want a release to reset production automation or thresholds back to the source values). They are only preserved when the target object **already exists** — on the very first release to a new target there is nothing to preserve, so the source values are used. The preservation happens *before* attribute overrides, so an explicit `attribute_override` still wins.
+
+You can force these to be overwritten with the per-object `overwrite_ignored_fields` flag described above.
+
+| Object | Preserved-from-target fields |
+| --- | --- |
+| Queue | `automation_enabled`, `automation_level`, `default_score_threshold`, `settings.columns`, `settings.annotation_list_table` |
+| Schema | each datapoint's `score_threshold` (defaults to `1` if the field does not exist on the target; `button`-type fields are skipped) |
+
+#### 2. Attributes that are never deployed
+
+These are never sent to the target and are also hidden from the deploy diff. Unlike the fields above, there is **no flag** to deploy them — they are considered non-portable or environment-specific.
+
+| Object | Never-deployed attributes | Scope |
+| --- | --- | --- |
+| Queue | `counts`, `users` | not even pulled locally |
+| Hook | `status` | not even pulled locally |
+| Inbox | `email` | always |
+| Queue | `training_enabled` | always |
+| Hook | `guide`, `status` | always |
+| Organization | `organization_group`, `users`, `creator`, `trial_expires_at` | always |
+| Queue | `workflows`, `dedicated_engine`, `generic_engine` | cross-org releases only (kept for same-org) |
 
 ### Attribute override
 
@@ -609,6 +656,24 @@ workspaces:
         attribute_override:
           name: \(US\)/#/(EU)
 ```
+
+##### How the regex replacement is applied
+
+The regex on the left of `/#/` is **not** matched against the targeted value as a whole. Instead, the replacement descends recursively into the value found by the JMESPath query:
+
+- For a **string**, the regex substitution is applied directly.
+- For a **dict**, the substitution is applied to every (nested) value.
+- For a **list**, the substitution is applied to every (nested) element.
+- **Non-string leaves** (numbers, booleans, `null`) are left untouched.
+
+This means a regex override can target a key whose value is a whole object or list, and every string anywhere inside it that matches the pattern is replaced. For example, this rewrites `DEV` to `PROD` in *every* string inside `settings`, no matter how deeply nested:
+```YAML
+attribute_override:
+  settings: \bDEV\b/#/PROD
+```
+Earlier versions applied the regex with a single flat `re.sub` on the value, which only worked when the value was itself a string (and failed for `settings`/`metadata`-style objects or lists). The recursive behavior above replaces that.
+
+Note this recursive descent applies **only to regex overrides** (values containing `/#/`). The other override forms behave differently — see [Overriding objects](#overriding-objects) below: a plain string replaces the value outright, a dict is shallow-merged into the existing value, and any other value (e.g. a list) replaces the value wholesale.
 
 #### Overriding objects
 
