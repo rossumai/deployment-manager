@@ -285,6 +285,10 @@ class Settings:
     DEPLOY_CROSS_ORG_NON_DIFFED_KEYS: dict = {Resource.Queue: ["workflows", *QUEUE_ENGINE_ATTRIBUTES]}
 
     # List attributes that should be sorted before diff so not get false positive diffs (e.g., hook.queues)
+    # Only server-maintained reference/backref lists are sorted here: their order is never
+    # semantically meaningful, so sorting kills false diffs without changing behavior on push.
+    # Deliberately NOT sorted: queue.rules (rule evaluation may honor position),
+    # hook.events / hook.sideload (behavior config the user authors).
     DEPLOY_SORT_LIST_KEYS: dict = {
         Resource.Hook: ["queues", "run_after"],
         Resource.Queue: [
@@ -292,7 +296,12 @@ class Settings:
             "webhooks",
         ],
         Resource.Workspace: ["queues"],
-        Resource.Organization: ["workspaces"],
+        Resource.Organization: ["workspaces", "users"],
+        Resource.Schema: ["queues"],
+        Resource.Rule: ["queues"],
+        Resource.Inbox: ["queues"],
+        Resource.Engine: ["training_queues"],
+        Resource.EmailTemplate: ["triggers"],
     }
 
     FORMULA_DIR_NAME: str = "formulas"
