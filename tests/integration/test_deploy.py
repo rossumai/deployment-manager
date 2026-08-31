@@ -120,7 +120,7 @@ def _write_deploy_file(deploy_file_path: Path, data: dict) -> None:
     # Use sync write since called outside async ctx
     import pathlib
 
-    deploy_file_path.parent.mkdir(parents=True, exist_ok=True)
+    pathlib.Path(str(deploy_file_path.parent)).mkdir(parents=True, exist_ok=True)
     pathlib.Path(str(deploy_file_path)).write_text(yaml.safe_dump(data, sort_keys=False))
 
 
@@ -503,6 +503,407 @@ async def test_deploy_hook_queue_references_remapped_to_target(tmp_path: Path, m
 
     assert new_queue_url in new_hook["queues"]
     assert source_queue_url not in new_hook["queues"]
+
+
+@pytest.mark.asyncio
+async def test_deploy_standalone_label_creates_label(tmp_path: Path, monkeypatch):
+    """A label selected standalone (no rule) is read from disk and created on the target."""
+    monkeypatch.chdir(tmp_path)
+    _patch_prompts(monkeypatch, auto_apply=True)
+
+    org = build_simple_org()
+    await _write_project_config(tmp_path, org)
+    await _write_source_tree(tmp_path, org)
+
+    org_url = org._stores["organizations"][org.org_id]["url"]
+    label = {
+        "id": 4402,
+        "url": f"{org.base_url}/labels/4402",
+        "name": "Export Completed",
+        "organization": org_url,
+        "color": "#112233",
+    }
+    await write_object_to_json(
+        tmp_path / "source" / "primary" / "labels" / "Export Completed_[4402].json", label
+    )
+
+    deploy_file_data = {
+        settings.DEPLOY_KEY_SOURCE_DIR: "source/primary",
+        settings.DEPLOY_KEY_TARGET_DIR: "target/primary",
+        settings.DEPLOY_KEY_SOURCE_URL: org.base_url,
+        settings.DEPLOY_KEY_TARGET_URL: org.base_url,
+        settings.DEPLOY_KEY_TOKEN_OWNER: None,
+        settings.DEPLOY_KEY_DEPLOYED_ORG_ID: None,
+        "patch_target_org": False,
+        settings.DEPLOY_KEY_WORKSPACES: [],
+        settings.DEPLOY_KEY_QUEUES: [],
+        settings.DEPLOY_KEY_HOOKS: [],
+        settings.DEPLOY_KEY_LABELS: [
+            {"id": 4402, "name": "Export Completed", "targets": [{"id": None}]}
+        ],
+        settings.DEPLOY_KEY_EMAIL_TEMPLATES: [],
+        settings.DEPLOY_KEY_STATE_PATH: "deploy_states/label.json",
+        "unselected_hooks": [],
+    }
+    _write_deploy_file(tmp_path / "deploy_files" / "label.yaml", deploy_file_data)
+    deploy_file_path = tmp_path / "deploy_files" / "label.yaml"
+
+    async def _noop_download(*args, **kwargs):
+        return
+
+    monkeypatch.setattr(
+        "deployment_manager.commands.deploy.subcommands.run.run.download_destinations",
+        _noop_download,
+    )
+
+    labels_before = set(org._stores["labels"].keys())
+
+    client = VirtualRossumClient(org)
+    await deploy_release_file(
+        deploy_file_path=deploy_file_path,
+        project_path=Path("."),
+        source_client=client,
+        target_client=client,
+        auto_apply_plan=True,
+        prefer="",
+    )
+
+    new_label_ids = set(org._stores["labels"].keys()) - labels_before
+    assert len(new_label_ids) == 1
+    new_label = org._stores["labels"][new_label_ids.pop()]
+    assert new_label["name"] == "Export Completed"
+    assert new_label["color"] == "#112233"
+
+    # State must track the new label deployment
+    state = json.loads(await (tmp_path / "deploy_states" / "label.json").read_text())
+    assert "labels" in state
+    assert "4402" in state["labels"]
+
+
+@pytest.mark.asyncio
+async def test_deploy_standalone_email_template_remaps_queue(tmp_path: Path, monkeypatch):
+    """An email template selected standalone is created on the target with its `queue`
+    reference remapped to the newly-created target queue."""
+    monkeypatch.chdir(tmp_path)
+    _patch_prompts(monkeypatch, auto_apply=True)
+
+    org = build_simple_org()
+    target_ws = org.add_workspace(name="Target WS", id_=700001)
+
+    await _write_project_config(tmp_path, org)
+    await _write_source_tree(tmp_path, org)
+
+    org_url = org._stores["organizations"][org.org_id]["url"]
+    et_dir = (
+        tmp_path / "source" / "primary" / "workspaces" / "WS1_[500001]" / "queues" / "Q1_[500004]" / "email_templates"
+    )
+    email_template = {
+        "id": 6494193,
+        "url": f"{org.base_url}/email_templates/6494193",
+        "name": "Welcome",
+        "queue": f"{org.base_url}/queues/500004",
+        "organization": org_url,
+        "subject": "Hi",
+        "message": "Body",
+        "type": "custom",
+        "enabled": True,
+        "automate": False,
+        "triggers": [],
+        "to": [],
+        "cc": [],
+        "bcc": [],
+    }
+    await write_object_to_json(et_dir / "Welcome_[6494193].json", email_template)
+
+    et_base_path = "source/primary/workspaces/WS1_[500001]/queues/Q1_[500004]/email_templates"
+    deploy_file_data = {
+        settings.DEPLOY_KEY_SOURCE_DIR: "source/primary",
+        settings.DEPLOY_KEY_TARGET_DIR: "target/primary",
+        settings.DEPLOY_KEY_SOURCE_URL: org.base_url,
+        settings.DEPLOY_KEY_TARGET_URL: org.base_url,
+        settings.DEPLOY_KEY_TOKEN_OWNER: None,
+        settings.DEPLOY_KEY_DEPLOYED_ORG_ID: None,
+        "patch_target_org": False,
+        settings.DEPLOY_KEY_WORKSPACES: [
+            {"id": 500001, "name": "WS1", "targets": [{"id": target_ws["id"]}]}
+        ],
+        settings.DEPLOY_KEY_QUEUES: [
+            {
+                "id": 500004,
+                "name": "Q1",
+                "ignore_deploy_warnings": True,
+                "base_path": "source/primary/workspaces/WS1_[500001]",
+                "targets": [{"id": None}],
+                "schema": {"id": 500002, "targets": [{"id": None}]},
+            }
+        ],
+        settings.DEPLOY_KEY_HOOKS: [],
+        settings.DEPLOY_KEY_LABELS: [],
+        settings.DEPLOY_KEY_EMAIL_TEMPLATES: [
+            {
+                "id": 6494193,
+                "name": "Welcome",
+                "base_path": et_base_path,
+                "targets": [{"id": None}],
+            }
+        ],
+        settings.DEPLOY_KEY_STATE_PATH: "deploy_states/et.json",
+        "unselected_hooks": [],
+    }
+    _write_deploy_file(tmp_path / "deploy_files" / "et.yaml", deploy_file_data)
+    deploy_file_path = tmp_path / "deploy_files" / "et.yaml"
+
+    async def _noop_download(*args, **kwargs):
+        return
+
+    monkeypatch.setattr(
+        "deployment_manager.commands.deploy.subcommands.run.run.download_destinations",
+        _noop_download,
+    )
+
+    queues_before = set(org._stores["queues"].keys())
+    ets_before = set(org._stores["email_templates"].keys())
+
+    client = VirtualRossumClient(org)
+    await deploy_release_file(
+        deploy_file_path=deploy_file_path,
+        project_path=Path("."),
+        source_client=client,
+        target_client=client,
+        auto_apply_plan=True,
+        prefer="",
+    )
+
+    new_queue_ids = set(org._stores["queues"].keys()) - queues_before
+    new_et_ids = set(org._stores["email_templates"].keys()) - ets_before
+    assert len(new_queue_ids) == 1
+    assert len(new_et_ids) == 1
+
+    new_queue = org._stores["queues"][new_queue_ids.pop()]
+    new_et = org._stores["email_templates"][new_et_ids.pop()]
+
+    assert new_et["name"] == "Welcome"
+    # queue reference must point at the new target queue, not the source queue
+    assert new_et["queue"] == new_queue["url"]
+    assert new_et["queue"] != f"{org.base_url}/queues/500004"
+
+
+@pytest.mark.asyncio
+async def test_redeploy_rule_label_dependency_is_not_duplicated(tmp_path: Path, monkeypatch):
+    """A label auto-loaded as a rule dependency must reuse its existing target on a second
+    deploy (UPDATE, not a duplicate CREATE) — proving the mapping survives via the deploy
+    state alone, now that the .auto mappings file is gone."""
+    monkeypatch.chdir(tmp_path)
+    _patch_prompts(monkeypatch, auto_apply=True)
+
+    org = build_simple_org()
+    target_ws = org.add_workspace(name="Target WS", id_=700001)
+    org_url = org._stores["organizations"][org.org_id]["url"]
+
+    # Label exists in the source org (auto-load fetches it from the source API by id)
+    org._stores["labels"][3242] = {
+        "id": 3242,
+        "url": f"{org.base_url}/labels/3242",
+        "name": "Hello world",
+        "organization": org_url,
+        "color": "#abcdef",
+    }
+
+    await _write_project_config(tmp_path, org)
+    await _write_source_tree(tmp_path, org)
+
+    # A queue-based rule whose add_label action references the label above
+    rule = {
+        "id": 7000,
+        "url": f"{org.base_url}/rules/7000",
+        "name": "MyRule",
+        "organization": org_url,
+        "queues": [f"{org.base_url}/queues/500004"],
+        "enabled": True,
+        "actions": [
+            {"type": "add_label", "payload": {"labels": [f"{org.base_url}/labels/3242"]}}
+        ],
+    }
+    await write_object_to_json(
+        tmp_path / "source" / "primary" / "rules" / "MyRule_[7000].json", rule
+    )
+
+    deploy_file_data = {
+        settings.DEPLOY_KEY_SOURCE_DIR: "source/primary",
+        settings.DEPLOY_KEY_TARGET_DIR: "target/primary",
+        settings.DEPLOY_KEY_SOURCE_URL: org.base_url,
+        settings.DEPLOY_KEY_TARGET_URL: org.base_url,
+        settings.DEPLOY_KEY_TOKEN_OWNER: None,
+        settings.DEPLOY_KEY_DEPLOYED_ORG_ID: None,
+        "patch_target_org": False,
+        settings.DEPLOY_KEY_WORKSPACES: [
+            {"id": 500001, "name": "WS1", "targets": [{"id": target_ws["id"]}]}
+        ],
+        settings.DEPLOY_KEY_QUEUES: [
+            {
+                "id": 500004,
+                "name": "Q1",
+                "ignore_deploy_warnings": True,
+                "base_path": "source/primary/workspaces/WS1_[500001]",
+                "targets": [{"id": None}],
+                "schema": {"id": 500002, "targets": [{"id": None}]},
+            }
+        ],
+        settings.DEPLOY_KEY_HOOKS: [],
+        # Note: NO labels section — the label is pulled in only via the rule dependency
+        settings.DEPLOY_KEY_LABELS: [],
+        settings.DEPLOY_KEY_EMAIL_TEMPLATES: [],
+        settings.DEPLOY_KEY_RULES: [{"id": 7000, "name": "MyRule", "targets": [{"id": None}]}],
+        settings.DEPLOY_KEY_STATE_PATH: "deploy_states/rule_label.json",
+        "unselected_hooks": [],
+    }
+    deploy_file_path = tmp_path / "deploy_files" / "rule_label.yaml"
+    _write_deploy_file(deploy_file_path, deploy_file_data)
+
+    async def _noop_download(*args, **kwargs):
+        return
+
+    monkeypatch.setattr(
+        "deployment_manager.commands.deploy.subcommands.run.run.download_destinations",
+        _noop_download,
+    )
+
+    labels_before = set(org._stores["labels"].keys())
+
+    client = VirtualRossumClient(org)
+    await deploy_release_file(
+        deploy_file_path=deploy_file_path,
+        project_path=Path("."),
+        source_client=client,
+        target_client=client,
+        auto_apply_plan=True,
+        prefer="",
+    )
+
+    labels_after_first = set(org._stores["labels"].keys())
+    created_label_ids = labels_after_first - labels_before
+    assert len(created_label_ids) == 1, "first deploy should create exactly one label"
+
+    # No .auto file is written any more
+    assert not await (tmp_path / "deploy_files" / ".auto").exists()
+    # The deploy state must hold the label's source->target mapping
+    state = json.loads(await (tmp_path / "deploy_states" / "rule_label.json").read_text())
+    assert "3242" in state["labels"]
+
+    # Second deploy on the same (now rewritten) deploy file + state
+    await deploy_release_file(
+        deploy_file_path=deploy_file_path,
+        project_path=Path("."),
+        source_client=client,
+        target_client=client,
+        auto_apply_plan=True,
+        prefer="",
+    )
+
+    labels_after_second = set(org._stores["labels"].keys())
+    # The auto-loaded label must have been UPDATED in place, not duplicated
+    assert labels_after_second == labels_after_first
+
+
+@pytest.mark.asyncio
+async def test_deploy_rule_derived_label_entry_deploys_once_and_persists_target(tmp_path: Path, monkeypatch):
+    """A label surfaced in the deploy file as a rule dependency (tagged included_by_rules)
+    deploys exactly once (the rule dedups against it) and its target id is written back into
+    the deploy file entry — i.e. it's human-visible and tracked in the deploy file."""
+    monkeypatch.chdir(tmp_path)
+    _patch_prompts(monkeypatch, auto_apply=True)
+
+    org = build_simple_org()
+    target_ws = org.add_workspace(name="Target WS", id_=700001)
+    org_url = org._stores["organizations"][org.org_id]["url"]
+
+    await _write_project_config(tmp_path, org)
+    await _write_source_tree(tmp_path, org)
+
+    # Label on disk (read as a standalone-style entry) + rule that references it
+    await write_object_to_json(
+        tmp_path / "source" / "primary" / "labels" / "Hello world_[3242].json",
+        {"id": 3242, "url": f"{org.base_url}/labels/3242", "name": "Hello world", "organization": org_url, "color": "#abc"},
+    )
+    await write_object_to_json(
+        tmp_path / "source" / "primary" / "rules" / "MyRule_[7000].json",
+        {
+            "id": 7000,
+            "url": f"{org.base_url}/rules/7000",
+            "name": "MyRule",
+            "organization": org_url,
+            "queues": [f"{org.base_url}/queues/500004"],
+            "enabled": True,
+            "actions": [{"type": "add_label", "payload": {"labels": [f"{org.base_url}/labels/3242"]}}],
+        },
+    )
+
+    deploy_file_data = {
+        settings.DEPLOY_KEY_SOURCE_DIR: "source/primary",
+        settings.DEPLOY_KEY_TARGET_DIR: "target/primary",
+        settings.DEPLOY_KEY_SOURCE_URL: org.base_url,
+        settings.DEPLOY_KEY_TARGET_URL: org.base_url,
+        settings.DEPLOY_KEY_TOKEN_OWNER: None,
+        settings.DEPLOY_KEY_DEPLOYED_ORG_ID: None,
+        "patch_target_org": False,
+        settings.DEPLOY_KEY_WORKSPACES: [
+            {"id": 500001, "name": "WS1", "targets": [{"id": target_ws["id"]}]}
+        ],
+        settings.DEPLOY_KEY_QUEUES: [
+            {
+                "id": 500004,
+                "name": "Q1",
+                "ignore_deploy_warnings": True,
+                "base_path": "source/primary/workspaces/WS1_[500001]",
+                "targets": [{"id": None}],
+                "schema": {"id": 500002, "targets": [{"id": None}]},
+            }
+        ],
+        settings.DEPLOY_KEY_HOOKS: [],
+        # The label is in the file as a rule dependency (as `template create` would write it)
+        settings.DEPLOY_KEY_LABELS: [
+            {"id": 3242, "name": "Hello world", "included_by_rules": [7000], "targets": [{"id": None}]}
+        ],
+        settings.DEPLOY_KEY_EMAIL_TEMPLATES: [],
+        settings.DEPLOY_KEY_RULES: [{"id": 7000, "name": "MyRule", "targets": [{"id": None}]}],
+        settings.DEPLOY_KEY_STATE_PATH: "deploy_states/rule_derived.json",
+        "unselected_hooks": [],
+    }
+    deploy_file_path = tmp_path / "deploy_files" / "rule_derived.yaml"
+    _write_deploy_file(deploy_file_path, deploy_file_data)
+
+    async def _noop_download(*args, **kwargs):
+        return
+
+    monkeypatch.setattr(
+        "deployment_manager.commands.deploy.subcommands.run.run.download_destinations",
+        _noop_download,
+    )
+
+    labels_before = set(org._stores["labels"].keys())
+
+    client = VirtualRossumClient(org)
+    await deploy_release_file(
+        deploy_file_path=deploy_file_path,
+        project_path=Path("."),
+        source_client=client,
+        target_client=client,
+        auto_apply_plan=True,
+        prefer="",
+    )
+
+    # Deployed exactly once (rule auto-load dedups against the file entry)
+    new_label_ids = set(org._stores["labels"].keys()) - labels_before
+    assert len(new_label_ids) == 1
+    new_label_id = new_label_ids.pop()
+
+    # Target id written back into the deploy file's label entry (not just the state)
+    import pathlib
+
+    rewritten = yaml.safe_load(pathlib.Path(str(deploy_file_path)).read_text())
+    label_entry = next(e for e in rewritten[settings.DEPLOY_KEY_LABELS] if e["id"] == 3242)
+    assert label_entry["included_by_rules"] == [7000]
+    assert label_entry["targets"][0]["id"] == new_label_id
 
 
 @pytest.mark.asyncio

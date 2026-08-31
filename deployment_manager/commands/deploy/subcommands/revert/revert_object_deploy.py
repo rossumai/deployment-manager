@@ -160,6 +160,10 @@ class RevertLabelDeploy(RevertObjectDeploy):
     type: CustomResource = CustomResource.Label
 
 
+class RevertEmailTemplateDeploy(RevertObjectDeploy):
+    type: Resource = Resource.EmailTemplate
+
+
 class RevertWorkspaceDeploy(RevertObjectDeploy):
     type: Resource = Resource.Workspace
 

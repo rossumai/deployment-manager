@@ -8,6 +8,9 @@ from pydantic import BaseModel
 from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.deploy.subcommands.run.attribute_override import create_regex_override_syntax
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.email_template_deploy_object import (
+    NON_CREATABLE_EMAIL_TEMPLATE_TYPES,
+)
 from deployment_manager.common.read_write import read_object_from_json, read_prd_project_config
 from deployment_manager.utils.consts import display_error, display_warning, settings
 from deployment_manager.utils.functions import (
@@ -57,13 +60,29 @@ engines:
 
 rules:
 
+labels:
+
+email_templates:
+
 unselected_hooks: # List hook IDs that should not be deployed, even if they belong to selected queues
 """
 
 
-async def prepare_choices(paths: list[Path], preselected_ids: list = None, preselect_all: bool = False):
+async def prepare_choices(
+    paths: list[Path],
+    preselected_ids: list = None,
+    preselect_all: bool = False,
+    disabled_reasons: dict = None,
+):
+    """Build checkbox choices from object JSON files.
+
+    ids in `disabled_reasons` (id -> reason) are checked and disabled: visible but
+    not unselectable.
+    """
     if not preselected_ids:
         preselected_ids = []
+    if not disabled_reasons:
+        disabled_reasons = {}
     choices = []
 
     for path in paths:
@@ -71,10 +90,12 @@ async def prepare_choices(paths: list[Path], preselected_ids: list = None, prese
         name, id = object.get("name", ""), object.get("id", "")
         if not id:
             continue
+        disabled = disabled_reasons.get(id)
         choice = questionary.Choice(
             title=f"{name} ({id})" if name else id,
             value={**object, "path": path},
-            checked=preselect_all or id in preselected_ids,
+            checked=disabled is not None or preselect_all or id in preselected_ids,
+            disabled=disabled,
         )
         choices.append(choice)
 
@@ -196,6 +217,42 @@ async def find_rule_paths_for_dir(base_dir: Path):
     ]
 
 
+async def find_label_paths_for_dir(base_dir: Path):
+    """Find all label JSON files in the top-level labels/ directory."""
+    labels_dir = base_dir / settings.LABELS_DIR_NAME
+    if not await labels_dir.exists():
+        return []
+    return [
+        label_path
+        async for label_path in labels_dir.iterdir()
+        if await label_path.is_file() and label_path.name.endswith(".json")
+    ]
+
+
+async def find_email_template_paths_for_queue(queue_path: Path):
+    """Find all email template JSON files for a given queue (the queue's queue.json path)."""
+    email_templates_dir = queue_path.parent / settings.EMAIL_TEMPLATES_DIR_NAME
+    if not await email_templates_dir.exists():
+        return []
+    return [
+        et_path
+        async for et_path in email_templates_dir.iterdir()
+        if await et_path.is_file() and et_path.name.endswith(".json")
+    ]
+
+
+async def find_all_email_template_paths_for_dir(base_dir: Path):
+    """Find every email template JSON under base_dir (across all workspaces/queues)."""
+    if not await (base_dir / Resource.Workspace.value).exists():
+        return []
+    ws_paths = await find_ws_paths_for_dir(base_dir)
+    queue_paths = await find_queue_paths_for_workspaces(ws_paths)
+    et_paths = []
+    for queue_path in queue_paths:
+        et_paths.extend(await find_email_template_paths_for_queue(queue_path))
+    return et_paths
+
+
 async def find_engine_paths_for_dir(base_dir: Path):
     engine_dir = base_dir / Resource.Engine.value
     if not (await engine_dir.exists()):
@@ -249,6 +306,28 @@ def prepare_deploy_file_objects(
         }
         if not include_path:
             deploy_representation.pop(settings.DEPLOY_KEY_BASE_PATH)
+        deploy_objects.append(deploy_representation)
+    return deploy_objects
+
+
+def prepare_email_template_deploy_file_objects(
+    objects: list[dict],
+    objects_in_previous_file: list[dict] = [],
+):
+    """Email templates live under each queue's email_templates/ dir, so the base_path
+    points directly at that dir (unlike top-level objects)."""
+    previous_objects_by_id = {object["id"]: object for object in objects_in_previous_file}
+
+    deploy_objects = []
+    for object in objects:
+        previous_object = previous_objects_by_id.get(object["id"], {})
+        deploy_representation = {
+            **previous_object,
+            "id": object["id"],
+            "name": object["name"],
+            settings.DEPLOY_KEY_BASE_PATH: str(object["path"].parent),
+            settings.DEPLOY_KEY_TARGETS: previous_object.get(settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)),
+        }
         deploy_objects.append(deploy_representation)
     return deploy_objects
 
@@ -391,13 +470,18 @@ async def get_rules_from_user(
     interactive: bool,
     previous_deploy_file_rules: list[dict] = None,
 ):
-    """Get rules from the top-level rules/ directory."""
+    """Get rules from the top-level rules/ directory.
+
+    Returns (deploy_file_rules, selected_rules) where selected_rules are the raw rule
+    objects (including their `actions` and `path`) so callers can derive the rules'
+    label/email-template dependencies.
+    """
     if not previous_deploy_file_rules:
         previous_deploy_file_rules = []
     selected_rule_ids = [rule["id"] for rule in previous_deploy_file_rules]
     rule_paths = await find_rule_paths_for_dir(source_path)
     if not rule_paths:
-        return []
+        return [], []
 
     # Find rules that reference the selected queues
     rule_ids_for_selected_queues = await find_rules_for_queues(source_path, queues)
@@ -416,7 +500,7 @@ async def get_rules_from_user(
         valid_rule_paths.append(rule_path)
 
     if not valid_rule_paths:
-        return []
+        return [], []
 
     # Pre-select rules that belong to selected queues (similar to hooks behavior)
     # Also include any previously selected rules
@@ -426,13 +510,242 @@ async def get_rules_from_user(
         paths=valid_rule_paths,
         preselected_ids=list(preselected_rule_ids),
     )
-    deploy_file_rules = [rule.value for rule in rule_choices if rule.checked]
+    selected_rules = [rule.value for rule in rule_choices if rule.checked]
     if interactive or not selected_rule_ids:
-        deploy_file_rules = await questionary.checkbox(
-            "Modify selection of the rules:", choices=rule_choices
-        ).ask_async()
+        selected_rules = await questionary.checkbox("Modify selection of the rules:", choices=rule_choices).ask_async()
 
-    return prepare_deploy_file_objects(objects=deploy_file_rules, objects_in_previous_file=previous_deploy_file_rules)
+    deploy_file_rules = prepare_deploy_file_objects(
+        objects=selected_rules, objects_in_previous_file=previous_deploy_file_rules
+    )
+    return deploy_file_rules, selected_rules
+
+
+def _rule_required_reasons(rule_required_ids: dict) -> dict:
+    """id -> menu reason, e.g. `required by rule(s) 55, 60`."""
+    return {
+        obj_id: f"required by rule(s) {', '.join(str(rule_id) for rule_id in sorted(rule_ids))}"
+        for obj_id, rule_ids in rule_required_ids.items()
+    }
+
+
+def _tag_included_by_rules(entries: list[dict], rule_required_ids: dict):
+    """Add `included_by_rules` (before `targets`) to rule-referenced entries; drop stale tags."""
+    for entry in entries:
+        entry.pop("included_by_rules", None)
+        rule_ids = rule_required_ids.get(entry["id"])
+        if rule_ids:
+            targets = entry.pop(settings.DEPLOY_KEY_TARGETS, None)
+            entry["included_by_rules"] = sorted(rule_ids)
+            if targets is not None:
+                entry[settings.DEPLOY_KEY_TARGETS] = targets
+
+
+async def select_objects_with_rule_dependencies(
+    paths: list[Path],
+    prompt_message: str,
+    interactive: bool,
+    prepare_fn,
+    previous_deploy_file_objects: list[dict] = None,
+    rule_required_ids: dict = None,
+):
+    """Shared label/email-template selection.
+
+    Rule-required objects (`rule_required_ids`: id -> {rule_ids}) are forced into the
+    selection and tagged `included_by_rules`; previous manual picks stay preselected.
+    `prepare_fn` builds the entries (layout differs per type).
+    """
+    if not previous_deploy_file_objects:
+        previous_deploy_file_objects = []
+    if not rule_required_ids:
+        rule_required_ids = {}
+    previous_ids = [obj["id"] for obj in previous_deploy_file_objects]
+    # Only preselect manual picks; rule-required ones are forced in via disabled_reasons.
+    manual_ids = [obj["id"] for obj in previous_deploy_file_objects if not obj.get("included_by_rules")]
+    if not paths:
+        return []
+
+    choices = await prepare_choices(
+        paths=paths,
+        preselected_ids=manual_ids,
+        disabled_reasons=_rule_required_reasons(rule_required_ids),
+    )
+    selected = [choice.value for choice in choices if choice.checked]
+    if interactive or not previous_ids:
+        selected = await questionary.checkbox(prompt_message, choices=choices).ask_async()
+
+    entries = prepare_fn(objects=selected, objects_in_previous_file=previous_deploy_file_objects)
+    _tag_included_by_rules(entries, rule_required_ids)
+    return entries
+
+
+async def get_labels_from_user(
+    source_path: Path,
+    interactive: bool,
+    previous_deploy_file_labels: list[dict] = None,
+    rule_required_ids: dict = None,
+):
+    """Labels from the top-level labels/ directory (org-level, opt-in)."""
+    return await select_objects_with_rule_dependencies(
+        paths=await find_label_paths_for_dir(source_path),
+        prompt_message="Select labels:",
+        interactive=interactive,
+        prepare_fn=prepare_deploy_file_objects,
+        previous_deploy_file_objects=previous_deploy_file_labels,
+        rule_required_ids=rule_required_ids,
+    )
+
+
+async def find_creatable_email_template_paths(selected_queues: list[dict]):
+    """Collect email template paths for the selected queues, excluding non-creatable
+    types (rejection_default, email_with_no_processable_attachments) which are
+    auto-created with the queue and cannot be deployed standalone."""
+    et_paths = []
+    for queue in selected_queues:
+        queue_path = queue.get("path")
+        if not queue_path:
+            continue
+        for et_path in await find_email_template_paths_for_queue(queue_path):
+            email_template = await read_object_from_json(et_path)
+            if email_template.get("type") in NON_CREATABLE_EMAIL_TEMPLATE_TYPES:
+                continue
+            et_paths.append(et_path)
+    return et_paths
+
+
+async def get_email_templates_from_user(
+    selected_queues: list[dict],
+    interactive: bool,
+    previous_deploy_file_email_templates: list[dict] = None,
+    rule_required_ids: dict = None,
+):
+    """Email templates of the selected queues (they need a parent queue to deploy).
+
+    Rule-required templates in non-selected queues aren't offered here; they're handled
+    by get_rule_dependency_objects.
+    """
+    return await select_objects_with_rule_dependencies(
+        paths=await find_creatable_email_template_paths(selected_queues),
+        prompt_message="Select email templates:",
+        interactive=interactive,
+        prepare_fn=prepare_email_template_deploy_file_objects,
+        previous_deploy_file_objects=previous_deploy_file_email_templates,
+        rule_required_ids=rule_required_ids,
+    )
+
+
+def collect_rule_dependency_ids(selected_rules: list[dict]):
+    """Map each label/email-template id referenced by the rules' actions to the set of rule
+    ids that reference it."""
+    label_rule_ids: dict[int, set] = {}
+    email_template_rule_ids: dict[int, set] = {}
+    for rule in selected_rules:
+        # Schema-based rules are excluded from deploy entirely
+        if rule.get("schema"):
+            continue
+        rule_id = rule.get("id")
+        for action in rule.get("actions", []):
+            action_type = action.get("type", "")
+            payload = action.get("payload", {})
+            if action_type in ("add_label", "add_remove_label"):
+                for label_url in payload.get("labels", []):
+                    label_id = extract_id_from_url(label_url)
+                    if label_id:
+                        label_rule_ids.setdefault(label_id, set()).add(rule_id)
+            elif action_type == "send_email":
+                email_template_url = payload.get("email_template")
+                email_template_id = extract_id_from_url(email_template_url) if email_template_url else None
+                if email_template_id:
+                    email_template_rule_ids.setdefault(email_template_id, set()).add(rule_id)
+    return label_rule_ids, email_template_rule_ids
+
+
+async def get_rule_dependency_objects(
+    selected_rules: list[dict],
+    source_path: Path,
+    exclude_label_ids: set = None,
+    exclude_email_template_ids: set = None,
+    previous_deploy_file_labels: list[dict] = None,
+    previous_deploy_file_email_templates: list[dict] = None,
+):
+    """Entries for the rules' label/email-template dependencies, tagged `included_by_rules`.
+
+    Skips ids in exclude_* (already in the menus) and preserves previous targets so repeat
+    deploys don't duplicate. Returns (label_entries, email_template_entries).
+    """
+    exclude_label_ids = exclude_label_ids or set()
+    exclude_email_template_ids = exclude_email_template_ids or set()
+    previous_labels_by_id = {obj["id"]: obj for obj in (previous_deploy_file_labels or [])}
+    previous_ets_by_id = {obj["id"]: obj for obj in (previous_deploy_file_email_templates or [])}
+
+    label_rule_ids, email_template_rule_ids = collect_rule_dependency_ids(selected_rules)
+
+    # Resolve referenced ids to their local files (id -> object)
+    label_objects_by_id = {}
+    for path in await find_label_paths_for_dir(source_path):
+        obj = await read_object_from_json(path)
+        if obj.get("id"):
+            label_objects_by_id[obj["id"]] = obj
+
+    et_paths_by_id = {}
+    for path in await find_all_email_template_paths_for_dir(source_path):
+        obj = await read_object_from_json(path)
+        if obj.get("id"):
+            et_paths_by_id[obj["id"]] = (path, obj)
+
+    missing = []
+
+    label_entries = []
+    for label_id in sorted(label_rule_ids):
+        if label_id in exclude_label_ids:
+            continue
+        obj = label_objects_by_id.get(label_id)
+        if not obj:
+            missing.append(("label", label_id, label_rule_ids[label_id]))
+            continue
+        previous = previous_labels_by_id.get(label_id, {})
+        label_entries.append(
+            {
+                "id": label_id,
+                "name": obj.get("name", f"label-{label_id}"),
+                "included_by_rules": sorted(label_rule_ids[label_id]),
+                settings.DEPLOY_KEY_TARGETS: previous.get(settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)),
+            }
+        )
+
+    email_template_entries = []
+    for et_id in sorted(email_template_rule_ids):
+        if et_id in exclude_email_template_ids:
+            continue
+        found = et_paths_by_id.get(et_id)
+        if not found:
+            missing.append(("email template", et_id, email_template_rule_ids[et_id]))
+            continue
+        path, obj = found
+        # Non-creatable auto types are resolved at deploy time, not deployed as standalone
+        if obj.get("type") in NON_CREATABLE_EMAIL_TEMPLATE_TYPES:
+            continue
+        previous = previous_ets_by_id.get(et_id, {})
+        email_template_entries.append(
+            {
+                "id": et_id,
+                "name": obj.get("name", f"email-template-{et_id}"),
+                "included_by_rules": sorted(email_template_rule_ids[et_id]),
+                settings.DEPLOY_KEY_BASE_PATH: str(path.parent),
+                settings.DEPLOY_KEY_TARGETS: previous.get(settings.DEPLOY_KEY_TARGETS, deepcopy(DEFAULT_TARGETS)),
+            }
+        )
+
+    if missing:
+        lines = "\n".join(
+            f"  - {kind} {dep_id} (referenced by rules {sorted(rule_ids)})" for kind, dep_id, rule_ids in missing
+        )
+        display_warning(
+            "Some labels/email templates referenced by the selected rules have no local file, so "
+            "they won't be listed in the deploy file. They will still be deployed (auto-loaded from "
+            f"the source) when the rule is deployed:\n{lines}"
+        )
+
+    return label_entries, email_template_entries
 
 
 async def get_inbox_for_queue(queue: dict, previous_queues_by_id: dict):
@@ -516,6 +829,8 @@ async def get_multi_targets_from_user(deploy_file_object: dict):
         settings.DEPLOY_KEY_QUEUES,
         settings.DEPLOY_KEY_HOOKS,
         settings.DEPLOY_KEY_RULES,
+        settings.DEPLOY_KEY_LABELS,
+        settings.DEPLOY_KEY_EMAIL_TEMPLATES,
     ]
 
     for object_type in multi_target_options:
@@ -578,6 +893,8 @@ async def get_attribute_overrides_from_user():
         settings.DEPLOY_KEY_HOOKS,
         settings.DEPLOY_KEY_RULES,
         settings.DEPLOY_KEY_ENGINES,
+        settings.DEPLOY_KEY_LABELS,
+        settings.DEPLOY_KEY_EMAIL_TEMPLATES,
     ]
     overrides = []
     while await questionary.confirm("Do you want to add a regex attribute override?", default=True).ask_async():

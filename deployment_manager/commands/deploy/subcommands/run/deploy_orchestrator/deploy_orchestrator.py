@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict
 from rossum_api import APIClientError, AsyncRossumAPIClient
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.organization import Organization
-from ruamel.yaml import YAML
 
 from deployment_manager.commands.deploy.common.helpers import get_token_owner_from_user
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import (
@@ -117,9 +116,6 @@ class DeployOrchestrator(BaseModel):
 
     ignore_all_deploy_warnings: bool = False
 
-    # Auto-loaded dependency mappings (source_id -> target_id)
-    auto_mappings: dict = {}
-
     @property
     def is_same_org(self):
         return self.source_org.id == self.target_org.id
@@ -146,71 +142,10 @@ class DeployOrchestrator(BaseModel):
 
         self.deploy_state = DeployState.load_deploy_state(path=pathlib.Path(self.deploy_state_file))
 
-        # Load auto-mappings for auto-loaded dependencies
-        self.auto_mappings = self.load_auto_mappings()
-
         self.organization = OrganizationDeployObject(
             id=self.source_org.id,
             name=self.source_org.name,
         )
-
-    def get_auto_mappings_path(self) -> pathlib.Path:
-        """Get path to the .auto/{deploy_file_name}.yaml file."""
-        # Convert anyio.Path to pathlib.Path for sync operations
-        deploy_path = pathlib.Path(str(self.deploy_file_path))
-        auto_dir = deploy_path.parent / ".auto"
-        auto_file = auto_dir / deploy_path.name
-        return auto_file
-
-    def load_auto_mappings(self) -> dict:
-        """Load auto-dependency mappings from .auto/{deploy_file_name}.yaml."""
-        auto_file = self.get_auto_mappings_path()
-        try:
-            if not auto_file.exists():
-                return {}
-
-            yaml = YAML()
-            with open(auto_file, "r") as f:
-                mappings = yaml.load(f) or {}
-            return mappings
-        except FileNotFoundError:
-            return {}
-        except Exception as e:
-            display_warning(f"Could not load auto-mappings from {auto_file}: {e}")
-            return {}
-
-    async def save_auto_mappings(self):
-        """Save auto-loaded dependency mappings to .auto/{deploy_file_name}.yaml."""
-        # Build global mappings from auto-loaded labels and email_templates
-        # Using global mappings (not per-rule) so that if rules are added/removed,
-        # the target IDs are still found for shared dependencies
-        mappings = {"labels": {}, "email_templates": {}}
-
-        # Collect all label mappings
-        for label in self.labels:
-            if label.targets and label.targets[0].id:
-                mappings["labels"][label.id] = label.targets[0].id
-
-        # Collect all email_template mappings
-        for email_template in self.email_templates:
-            if email_template.targets and email_template.targets[0].id:
-                mappings["email_templates"][email_template.id] = email_template.targets[0].id
-
-        # Save to file if there are any mappings
-        if mappings["labels"] or mappings["email_templates"]:
-            auto_file = self.get_auto_mappings_path()
-            auto_dir = auto_file.parent
-
-            # Create .auto directory if it doesn't exist
-            auto_dir.mkdir(exist_ok=True)
-
-            try:
-                yaml = YAML()
-                yaml.indent(mapping=2, sequence=4, offset=2)
-                with open(auto_file, "w") as f:
-                    yaml.dump(mappings, f)
-            except Exception as e:
-                display_warning(f"Could not save auto-mappings to {auto_file}: {e}")
 
     async def save_deploy_state(self):
         """Save the last applied config for all deployed resources."""

@@ -283,7 +283,6 @@ class TestRuleAutoLoadActionDependencies:
             email_templates=[],
             queues=[],
             source_client=MagicMock(),
-            auto_mappings={},
             deploy_state=SimpleNamespace(labels={}, email_templates={}),
             local_deploy=False,
         )
@@ -325,7 +324,6 @@ class TestRuleAutoLoadActionDependencies:
             email_templates=[],
             queues=[],
             source_client=MagicMock(),
-            auto_mappings={},
             deploy_state=SimpleNamespace(labels={}, email_templates={}),
             local_deploy=False,
         )
@@ -365,7 +363,6 @@ class TestRuleAutoLoadActionDependencies:
             email_templates=[],
             queues=[],
             source_client=MagicMock(),
-            auto_mappings={},
             deploy_state=SimpleNamespace(labels={}, email_templates={}),
             local_deploy=False,
         )

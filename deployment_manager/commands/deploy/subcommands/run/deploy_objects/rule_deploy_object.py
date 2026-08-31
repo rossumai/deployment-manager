@@ -70,17 +70,9 @@ class RuleDeployObject(DeployObject):
             return
         await super().visualize_changes()
 
-    def get_target_ids_from_auto_mappings(self, resource_type: Resource, source_id: int) -> list[int]:
-        """Get target IDs for a source ID from auto-mappings or deploy state."""
-        # Check auto-mappings first (stored in .auto/{deploy_file}.yaml)
-        # Mappings are stored globally (not per-rule) so shared dependencies work
-        # even when rules are added/removed
-        resource_mappings = self.deploy_file.auto_mappings.get(resource_type.value, {})
-        target_id = resource_mappings.get(source_id)
-        if target_id:
-            return [target_id]
-
-        # Fallback to deploy state for backwards compatibility
+    def get_existing_target_ids(self, resource_type: Resource, source_id: int) -> list[int]:
+        """Target IDs a source label/email template was previously deployed to, from the
+        deploy state. Lets repeat deploys update the existing target instead of duplicating."""
         state_map = getattr(self.deploy_file.deploy_state, resource_type.value, {})
         resource_deployments = state_map.get(source_id)
         if resource_deployments:
@@ -137,7 +129,7 @@ class RuleDeployObject(DeployObject):
                     continue
 
                 # Check if this label was previously deployed
-                target_ids = self.get_target_ids_from_auto_mappings(CustomResource.Label, label_id)
+                target_ids = self.get_existing_target_ids(CustomResource.Label, label_id)
                 if target_ids:
                     # Use existing target IDs from previous deployments
                     targets = [TargetWithDefault(id=target_id) for target_id in target_ids]
@@ -178,7 +170,7 @@ class RuleDeployObject(DeployObject):
                     continue
 
                 # Check if this email template was previously deployed
-                target_ids = self.get_target_ids_from_auto_mappings(Resource.EmailTemplate, email_template_id)
+                target_ids = self.get_existing_target_ids(Resource.EmailTemplate, email_template_id)
                 if target_ids:
                     # Use existing target IDs from previous deployments
                     targets = [TargetWithDefault(id=target_id) for target_id in target_ids]
