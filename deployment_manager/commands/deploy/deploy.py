@@ -123,6 +123,12 @@ If these objects don't exist, they get created.
     help="Does not ask user about any rebase from target.",
 )
 @click.option(
+    "--changes-only",
+    default=False,
+    is_flag=True,
+    help="Plan shows only objects that will be created or changed.",
+)
+@click.option(
     "--ld",
     "ld",
     default=False,
@@ -168,6 +174,7 @@ async def deploy_project_wrapper(
     message: str,
     prefer: str = None,
     no_rebase: bool = False,
+    changes_only: bool = False,
     ld: bool = False,
     concurrency: int = None,
 ):
@@ -182,6 +189,7 @@ async def deploy_project_wrapper(
         deploy_file_path=deploy_file,
         prefer=prefer,
         no_rebase=no_rebase,
+        changes_only=changes_only,
         # auto_delete=auto_delete,
         auto_apply_plan=auto_apply,
         commit=commit,

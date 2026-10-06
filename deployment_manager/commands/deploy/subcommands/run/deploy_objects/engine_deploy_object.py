@@ -81,6 +81,18 @@ class EngineDeployObject(DeployObject):
             target=target, data_attribute=data_attribute, dependency_name="training_queues"
         )
 
+    async def compare_target_objects(self):
+        await super().compare_target_objects()
+
+        for engine_field_object in self.engine_field_deploy_objects:
+            await engine_field_object.compare_target_objects()
+            self.absorb_subobject_compare_result(engine_field_object)
+
+    async def reload_local_data(self):
+        await super().reload_local_data()
+        for engine_field_object in self.engine_field_deploy_objects:
+            await engine_field_object.reload_local_data()
+
     async def visualize_changes(self):
         await super().visualize_changes()
 
