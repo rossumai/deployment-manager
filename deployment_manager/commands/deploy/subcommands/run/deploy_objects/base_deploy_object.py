@@ -610,13 +610,10 @@ class DeployObject(BaseModel):
             pprint(Panel(message))
 
     async def reload_local_data(self):
-        """Drops cached data so the next initialize re-reads the file, picking up conflict resolutions made on disk.
-        Objects without a local file (e.g., auto-loaded from the API) keep their data."""
         if await self.path.exists():
             self.data = {}
 
     def absorb_subobject_compare_result(self, subobject: "DeployObject"):
-        """Sub-objects are not in the orchestrator's list, so the parent carries their flags for pause/reload."""
         self.conflict_detected = self.conflict_detected or subobject.conflict_detected
         self.rebase_detected = self.rebase_detected or subobject.rebase_detected
 
