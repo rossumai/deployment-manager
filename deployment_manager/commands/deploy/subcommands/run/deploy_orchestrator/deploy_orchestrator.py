@@ -316,6 +316,10 @@ class DeployOrchestrator(BaseModel):
 
                 await object.reload_local_data()
                 await object.initialize_deploy_object(deploy_file=self)
+                if object.initialize_failed:
+                    raise DeployException(
+                        f"Could not reload {object.display_type} {object.display_label} from source. Are conflict markers still in the file?"
+                    )
                 await object.initialize_target_objects()
                 await object.override_references(data_attribute="visualized_plan_data", use_dummy_references=True)
         except Exception as e:

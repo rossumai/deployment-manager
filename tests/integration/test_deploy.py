@@ -250,7 +250,7 @@ async def test_deploy_updates_existing_workspace(tmp_path: Path, monkeypatch):
         source_client=client,
         target_client=client,
         auto_apply_plan=True,
-        prefer="",
+        prefer="source",
     )
 
     # Target workspace must be renamed (attribute_override applied)
@@ -483,7 +483,7 @@ async def test_deploy_hook_queue_references_remapped_to_target(tmp_path: Path, m
         source_client=client,
         target_client=client,
         auto_apply_plan=True,
-        prefer="",
+        prefer="source",
     )
 
     new_queue_ids = set(org._stores["queues"].keys()) - queues_before
@@ -671,7 +671,7 @@ async def test_deploy_standalone_email_template_remaps_queue(tmp_path: Path, mon
         source_client=client,
         target_client=client,
         auto_apply_plan=True,
-        prefer="",
+        prefer="source",
     )
 
     new_queue_ids = set(org._stores["queues"].keys()) - queues_before
@@ -777,7 +777,7 @@ async def test_redeploy_rule_label_dependency_is_not_duplicated(tmp_path: Path, 
         source_client=client,
         target_client=client,
         auto_apply_plan=True,
-        prefer="",
+        prefer="source",
     )
 
     labels_after_first = set(org._stores["labels"].keys())
@@ -797,7 +797,7 @@ async def test_redeploy_rule_label_dependency_is_not_duplicated(tmp_path: Path, 
         source_client=client,
         target_client=client,
         auto_apply_plan=True,
-        prefer="",
+        prefer="source",
     )
 
     labels_after_second = set(org._stores["labels"].keys())
@@ -889,7 +889,7 @@ async def test_deploy_rule_derived_label_entry_deploys_once_and_persists_target(
         source_client=client,
         target_client=client,
         auto_apply_plan=True,
-        prefer="",
+        prefer="source",
     )
 
     # Deployed exactly once (rule auto-load dedups against the file entry)
@@ -1052,7 +1052,7 @@ async def test_deploy_queue_with_schema_creates_both(tmp_path: Path, monkeypatch
         source_client=client,
         target_client=client,
         auto_apply_plan=True,
-        prefer="",
+        prefer="source",
     )
 
     queues_after = set(org._stores["queues"].keys())
@@ -1071,3 +1071,79 @@ async def test_deploy_queue_with_schema_creates_both(tmp_path: Path, monkeypatch
     assert new_queue["schema"] == new_schema["url"]
     # And should reference the TARGET workspace
     assert new_queue["workspace"] == target_ws["url"]
+
+
+def _existing_workspace_deploy_file(target_ws_id: int, state_path: str) -> dict:
+    return {
+        settings.DEPLOY_KEY_SOURCE_DIR: "source/primary",
+        settings.DEPLOY_KEY_TARGET_DIR: "target/primary",
+        settings.DEPLOY_KEY_SOURCE_URL: "",
+        settings.DEPLOY_KEY_TARGET_URL: "",
+        settings.DEPLOY_KEY_TOKEN_OWNER: None,
+        settings.DEPLOY_KEY_DEPLOYED_ORG_ID: None,
+        "patch_target_org": False,
+        settings.DEPLOY_KEY_WORKSPACES: [{"id": 500001, "name": "WS1", "targets": [{"id": target_ws_id}]}],
+        settings.DEPLOY_KEY_QUEUES: [],
+        settings.DEPLOY_KEY_HOOKS: [],
+        settings.DEPLOY_KEY_STATE_PATH: state_path,
+        "unselected_hooks": [],
+    }
+
+
+async def _deploy_existing_workspace_with_conflict(tmp_path: Path, monkeypatch, state_name: str):
+    """No deploy state + existing target workspace → the workspace is reported as a conflict."""
+    monkeypatch.chdir(tmp_path)
+    _patch_prompts(monkeypatch, auto_apply=True)
+    monkeypatch.setattr(
+        "deployment_manager.commands.deploy.subcommands.run.run.download_destinations",
+        AsyncMock(return_value=None),
+    )
+
+    org = build_simple_org()
+    target_ws = org.add_workspace(name="Target WS", id_=700001)
+    await _write_project_config(tmp_path, org)
+    await _write_source_tree(tmp_path, org)
+
+    deploy_file_data = _existing_workspace_deploy_file(target_ws["id"], f"deploy_states/{state_name}.json")
+    deploy_file_data[settings.DEPLOY_KEY_SOURCE_URL] = org.base_url
+    deploy_file_data[settings.DEPLOY_KEY_TARGET_URL] = org.base_url
+    deploy_file_path = tmp_path / "deploy_files" / f"{state_name}.yaml"
+    _write_deploy_file(deploy_file_path, deploy_file_data)
+
+    client = VirtualRossumClient(org)
+    await deploy_release_file(
+        deploy_file_path=deploy_file_path,
+        project_path=Path("."),
+        source_client=client,
+        target_client=client,
+        auto_apply_plan=True,
+        prefer="",
+    )
+    return org, target_ws
+
+
+@pytest.mark.asyncio
+async def test_deploy_uses_conflict_resolved_on_disk(tmp_path: Path, monkeypatch):
+    """A conflict resolved in the source file during planning must be what gets deployed."""
+
+    async def resolve_on_disk(target_str, last_applied_str, object_path):
+        resolved = json.loads(await Path(object_path).read_text())
+        resolved["name"] = "Resolved by user"
+        await Path(object_path).write_text(json.dumps(resolved, indent=2))
+
+    monkeypatch.setattr(
+        "deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object.prompt_conflict_resolution",
+        resolve_on_disk,
+    )
+
+    org, target_ws = await _deploy_existing_workspace_with_conflict(tmp_path, monkeypatch, "resolved")
+
+    assert org._stores["workspaces"][target_ws["id"]]["name"] == "Resolved by user"
+
+
+@pytest.mark.asyncio
+async def test_deploy_aborts_when_conflict_markers_remain(tmp_path: Path, monkeypatch):
+    """Confirming without resolving the conflict markers aborts planning instead of deploying stale data."""
+    org, target_ws = await _deploy_existing_workspace_with_conflict(tmp_path, monkeypatch, "unresolved")
+
+    assert org._stores["workspaces"][target_ws["id"]]["name"] == "Target WS"
