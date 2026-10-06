@@ -7,7 +7,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from anyio import Path
+from rossum_api.domain_logic.resources import Resource
 
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object import DeployObject
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.email_template_deploy_object import (
     EmailTemplateDeployObject,
 )
@@ -20,8 +22,14 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.engine_fi
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.inbox_deploy_object import (
     InboxDeployObject,
 )
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.queue_deploy_object import (
+    QueueDeployObject,
+)
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.rule_deploy_object import (
     RuleDeployObject,
+)
+from deployment_manager.commands.deploy.subcommands.run.deploy_objects.schema_deploy_object import (
+    SchemaDeployObject,
 )
 
 # Trigger model rebuild for forward refs
@@ -32,9 +40,7 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_orchestrator.depl
 
 class TestEmailTemplateNonCreatableDetection:
     def test_initialize_marks_non_creatable_for_rejection_default(self, monkeypatch):
-        et = EmailTemplateDeployObject(
-            id=1, name="t", data={"type": "rejection_default", "queue": ""}
-        )
+        et = EmailTemplateDeployObject(id=1, name="t", data={"type": "rejection_default", "queue": ""})
 
         # The base class's initialize_deploy_object does a lot of setup we don't want here.
         # Patch it to a no-op that still sets the attributes the subclass mutates.
@@ -444,3 +450,162 @@ class TestRuleAutoLoadActionDependencies:
         fetch_mock.assert_not_awaited()
         assert {label.id for label in rule.deploy_file.labels} == {100}
         assert {et.id for et in rule.deploy_file.email_templates} == {77}
+
+
+@pytest.mark.asyncio
+class TestSubObjectComparison:
+    """Schemas and engine fields are not in the orchestrator's object list, so parents must compare them."""
+
+    @pytest.fixture
+    def compared(self, monkeypatch):
+        compared = []
+        # Flags each object should raise when compared, keyed by (type, id)
+        outcomes = {}
+
+        async def fake_compare(self):
+            compared.append((self.type, self.id))
+            for flag in outcomes.get((self.type, self.id), []):
+                setattr(self, flag, True)
+
+        monkeypatch.setattr(DeployObject, "compare_target_objects", fake_compare)
+        return SimpleNamespace(calls=compared, outcomes=outcomes)
+
+    def make_queue(self):
+        schema = SchemaDeployObject(id=2, name="s")
+        inbox = InboxDeployObject(id=3, name="i")
+        return QueueDeployObject.model_construct(
+            id=1, name="q", base_path="", schema_deploy_object=schema, inbox_deploy_object=inbox
+        )
+
+    async def test_queue_compares_schema_but_not_inbox(self, compared):
+        queue = self.make_queue()
+        await queue.compare_target_objects()
+        assert compared.calls == [(Resource.Queue, 1), (Resource.Schema, 2)]
+
+    async def test_queue_absorbs_schema_rebase_and_conflict(self, compared):
+        compared.outcomes[(Resource.Schema, 2)] = ["rebase_detected", "conflict_detected"]
+        queue = self.make_queue()
+        await queue.compare_target_objects()
+        assert queue.rebase_detected and queue.conflict_detected
+
+    async def test_queue_flags_untouched_without_schema_drift(self, compared):
+        queue = self.make_queue()
+        await queue.compare_target_objects()
+        assert not queue.rebase_detected and not queue.conflict_detected
+
+    async def test_engine_compares_all_engine_fields(self, compared):
+        engine = EngineDeployObject(id=1, name="e")
+        engine.engine_field_deploy_objects = [
+            EngineFieldDeployObject(id=10, name="a"),
+            EngineFieldDeployObject(id=11, name="b"),
+        ]
+        await engine.compare_target_objects()
+        assert compared.calls == [(Resource.Engine, 1), (Resource.EngineField, 10), (Resource.EngineField, 11)]
+
+    async def test_engine_absorbs_engine_field_rebase(self, compared):
+        compared.outcomes[(Resource.EngineField, 11)] = ["rebase_detected"]
+        engine = EngineDeployObject(id=1, name="e")
+        engine.engine_field_deploy_objects = [
+            EngineFieldDeployObject(id=10, name="a"),
+            EngineFieldDeployObject(id=11, name="b"),
+        ]
+        await engine.compare_target_objects()
+        assert engine.rebase_detected and not engine.conflict_detected
+
+
+@pytest.mark.asyncio
+class TestPlanChangesOnly:
+    def make_field(self, monkeypatch, remote: dict, plan: dict, exists_on_remote: bool, changes_only: bool):
+        from deployment_manager.commands.deploy.subcommands.run.models import Target
+
+        field = EngineFieldDeployObject(id=1, name="f")
+        target = Target(id=2)
+        target.exists_on_remote = exists_on_remote
+        target.visualized_plan_data = plan
+        field.targets = [target]
+        field.deploy_file = SimpleNamespace(changes_only=changes_only, unchanged_plan_objects_count=0)
+        monkeypatch.setattr(EngineFieldDeployObject, "get_remote_object", AsyncMock(return_value=dict(remote)))
+        printed = []
+        monkeypatch.setattr(
+            "deployment_manager.commands.deploy.subcommands.run.deploy_objects.base_deploy_object.pprint",
+            printed.append,
+        )
+        return field, printed
+
+    async def test_unchanged_object_hidden(self, monkeypatch):
+        data = {"id": 2, "name": "f", "label": "x"}
+        field, printed = self.make_field(monkeypatch, data, dict(data), exists_on_remote=True, changes_only=True)
+        await field.visualize_changes()
+        assert printed == []
+        assert field.deploy_file.unchanged_plan_objects_count == 1
+
+    async def test_changed_object_shown(self, monkeypatch):
+        remote = {"id": 2, "name": "f", "label": "x"}
+        plan = {"id": 2, "name": "f", "label": "y"}
+        field, printed = self.make_field(monkeypatch, remote, plan, exists_on_remote=True, changes_only=True)
+        await field.visualize_changes()
+        assert len(printed) == 1
+        assert field.deploy_file.unchanged_plan_objects_count == 0
+
+    async def test_created_object_always_shown(self, monkeypatch):
+        field, printed = self.make_field(
+            monkeypatch, {}, {"id": 2, "name": "f"}, exists_on_remote=False, changes_only=True
+        )
+        await field.visualize_changes()
+        assert len(printed) == 1
+
+    async def test_unchanged_object_shown_without_flag(self, monkeypatch):
+        data = {"id": 2, "name": "f", "label": "x"}
+        field, printed = self.make_field(monkeypatch, data, dict(data), exists_on_remote=True, changes_only=False)
+        await field.visualize_changes()
+        assert len(printed) == 1
+
+
+@pytest.mark.asyncio
+class TestReloadLocalData:
+    """After a conflict is resolved on disk, the reload must re-read the file instead of keeping cached data."""
+
+    async def test_reinitialize_picks_up_file_resolved_on_disk(self, tmp_path, monkeypatch):
+        await (Path(tmp_path) / "engine.json").write_text(json.dumps({"id": 1, "name": "e", "description": "resolved"}))
+        engine = EngineDeployObject(id=1, name="e", base_path=str(tmp_path), data={"id": 1, "description": "stale"})
+        engine.deploy_file = SimpleNamespace(is_same_org=True, no_rebase=False)
+        monkeypatch.setattr(EngineDeployObject, "get_object_in_yaml", lambda self: None)
+
+        await engine.reload_local_data()
+        await engine.initialize_deploy_object(deploy_file=engine.deploy_file)
+
+        assert engine.data["description"] == "resolved"
+
+    async def test_keeps_data_without_local_file(self, tmp_path):
+        engine = EngineDeployObject(id=1, name="e", base_path=str(tmp_path), data={"id": 1})
+        await engine.reload_local_data()
+        assert engine.data == {"id": 1}
+
+    async def test_queue_reloads_schema(self, monkeypatch):
+        reloaded = []
+
+        async def fake_reload(self):
+            reloaded.append((self.type, self.id))
+
+        monkeypatch.setattr(DeployObject, "reload_local_data", fake_reload)
+        queue = QueueDeployObject.model_construct(
+            id=1,
+            name="q",
+            base_path="",
+            schema_deploy_object=SchemaDeployObject(id=2, name="s"),
+            inbox_deploy_object=InboxDeployObject(id=3, name="i"),
+        )
+        await queue.reload_local_data()
+        assert reloaded == [(Resource.Queue, 1), (Resource.Schema, 2)]
+
+    async def test_engine_reloads_engine_fields(self, monkeypatch):
+        reloaded = []
+
+        async def fake_reload(self):
+            reloaded.append((self.type, self.id))
+
+        monkeypatch.setattr(DeployObject, "reload_local_data", fake_reload)
+        engine = EngineDeployObject(id=1, name="e")
+        engine.engine_field_deploy_objects = [EngineFieldDeployObject(id=10, name="a")]
+        await engine.reload_local_data()
+        assert reloaded == [(Resource.Engine, 1), (Resource.EngineField, 10)]

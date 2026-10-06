@@ -74,6 +74,9 @@ class DeployOrchestrator(BaseModel):
     auto_delete: bool = False
     prefer: str = None
     no_rebase: bool = False
+    # Plan shows only objects that will be created or changed
+    changes_only: bool = False
+    unchanged_plan_objects_count: int = 0
     # Local deploy: bypass all source-organization API calls/checks (credential validation,
     # rule label/email-template auto-loading, hook template & run_after lookups)
     local_deploy: bool = False
@@ -311,6 +314,7 @@ class DeployOrchestrator(BaseModel):
                 if not object.conflict_detected and not object.rebase_detected:
                     continue
 
+                await object.reload_local_data()
                 await object.initialize_deploy_object(deploy_file=self)
                 await object.initialize_target_objects()
                 await object.override_references(data_attribute="visualized_plan_data", use_dummy_references=True)
@@ -324,6 +328,9 @@ class DeployOrchestrator(BaseModel):
                 if isinstance(object, OrganizationDeployObject) and not self.patch_target_org:
                     continue
                 await object.visualize_changes()
+
+            if self.changes_only and self.unchanged_plan_objects_count:
+                display_info(f"Hidden {self.unchanged_plan_objects_count} unchanged object(s) from the plan.")
         except Exception as e:
             display_error(f"Error during visualization of deploy plan changes: {e}")
             raise

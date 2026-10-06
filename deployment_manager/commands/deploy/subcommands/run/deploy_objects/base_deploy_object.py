@@ -602,9 +602,23 @@ class DeployObject(BaseModel):
 
             plan_label = f"{settings.PLAN_PRINT_STR} {settings.UPDATE_PRINT_STR if target.exists_on_remote else settings.CREATE_PRINT_STR}"
             diff = DeployObjectDiffer.create_override_diff(overriden_object_data, target.visualized_plan_data)
+            if self.deploy_file.changes_only and target.exists_on_remote and not diff:
+                self.deploy_file.unchanged_plan_objects_count += 1
+                continue
             colorized_diff = DeployObjectDiffer.parse_diff(diff)
             message = f"{plan_label} {self.display_type} {self.create_source_to_target_string(target.visualized_plan_data)}:\n{colorized_diff if colorized_diff else ''}"
             pprint(Panel(message))
+
+    async def reload_local_data(self):
+        """Drops cached data so the next initialize re-reads the file, picking up conflict resolutions made on disk.
+        Objects without a local file (e.g., auto-loaded from the API) keep their data."""
+        if await self.path.exists():
+            self.data = {}
+
+    def absorb_subobject_compare_result(self, subobject: "DeployObject"):
+        """Sub-objects are not in the orchestrator's list, so the parent carries their flags for pause/reload."""
+        self.conflict_detected = self.conflict_detected or subobject.conflict_detected
+        self.rebase_detected = self.rebase_detected or subobject.rebase_detected
 
     async def resolve_code_conflict(self, attribute_path: str, last_applied: dict, target_val: str): ...
 

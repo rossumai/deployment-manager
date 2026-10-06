@@ -203,6 +203,17 @@ class QueueDeployObject(DeployObject):
             object_type=Resource.Engine,
         )
 
+    async def compare_target_objects(self):
+        await super().compare_target_objects()
+
+        # Inbox is intentionally not compared
+        await self.schema_deploy_object.compare_target_objects()
+        self.absorb_subobject_compare_result(self.schema_deploy_object)
+
+    async def reload_local_data(self):
+        await super().reload_local_data()
+        await self.schema_deploy_object.reload_local_data()
+
     async def visualize_changes(self):
         await super().visualize_changes()
 
