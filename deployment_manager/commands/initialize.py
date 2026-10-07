@@ -12,6 +12,10 @@ from deployment_manager.commands.deploy.subcommands.run.helpers import DeployYam
 from deployment_manager.utils.consts import settings
 from deployment_manager.utils.functions import coro
 
+MODIFIED_BY_FILTER_NAME = "prd-ignore-modified-by"
+# Replaces the value (not the line) so committed JSON stays valid even when modified_by is the last key
+MODIFIED_BY_FILTER_CLEAN_COMMAND = r"""sed -E 's/^([[:space:]]*"modified_by":[[:space:]]*)("[^"]*"|null)/\1null/'"""
+
 
 @click.command(
     name=settings.INITIALIZE_COMMAND_NAME,
@@ -44,6 +48,8 @@ async def init_project(name: Path):
         for ignore_line in credentials_ignore_lines:
             if ignore_line not in git_ignore_contents:
                 wf.write(ignore_line)
+
+    await setup_modified_by_filter(name)
 
     config_path = name / settings.CONFIG_FILENAME
     if await config_path.exists():
@@ -101,3 +107,25 @@ async def add_subdirs(directories: dict, org_dir_name: str):
         subdir_name = await questionary.text("SUBDIR name:").ask_async()
         subdir_regex = await questionary.text("subdir regex (OPTIONAL):").ask_async()
         subdirs[subdir_name] = {settings.DOWNLOAD_KEY_REGEX: subdir_regex}
+
+
+async def setup_modified_by_filter(project_path: Path):
+    """Makes git ignore modified_by changes in JSON files via a clean filter."""
+    attributes_path = project_path / ".gitattributes"
+    attribute_line = f"*.json filter={MODIFIED_BY_FILTER_NAME}"
+    attributes_contents = await attributes_path.read_text() if await attributes_path.exists() else ""
+    if attribute_line not in attributes_contents.splitlines():
+        separator = "\n" if attributes_contents and not attributes_contents.endswith("\n") else ""
+        await attributes_path.write_text(f"{attributes_contents}{separator}{attribute_line}\n")
+
+    # Filter drivers live in the local git config, which is not versioned - every clone needs this
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(project_path),
+            "config",
+            f"filter.{MODIFIED_BY_FILTER_NAME}.clean",
+            MODIFIED_BY_FILTER_CLEAN_COMMAND,
+        ]
+    )

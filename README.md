@@ -94,6 +94,8 @@ Follow the CLI instructions to initialize a new project. **You must setup at lea
 prd2 init <NAME-OF-PROJECT>
 ```
 
+`init` also sets up a git filter so that changes to `modified_by` in JSON files are not tracked. The filter driver lives in the local git config, so after cloning an existing project, run `prd2 init .` once in it to enable the filter.
+
 You will need Rossum API URL for your organization: take your Rossum URL (e.g., `https://rdttest.rossum.app/`) and append `/api/v1` to it (`https://rdttest.rossum.app/api/v1`).
 
 You will also need a username/password to generate a token, `curl` example:
