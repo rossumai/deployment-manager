@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import dataclasses
 import json
 from typing import Any
@@ -14,6 +15,53 @@ from deployment_manager.common.determine_path import determine_object_type_from_
 from deployment_manager.utils.consts import settings
 
 NON_VERSIONED_ATTRIBUTES_FILE_LOCK = asyncio.Lock()
+
+
+def _get_nested_value(obj: dict, dotted_path: str):
+    current = obj
+    for key in dotted_path.split("."):
+        if not isinstance(current, dict) or key not in current:
+            return None, False
+        current = current[key]
+    return current, True
+
+
+def _set_nested_value(obj: dict, dotted_path: str, value):
+    current = obj
+    keys = dotted_path.split(".")
+    for key in keys[:-1]:
+        current = current.setdefault(key, {})
+    current[keys[-1]] = value
+
+
+def sort_object_list_attributes(object_data: dict, object_type: Resource | None):
+    """Sort configured list attributes so persisted JSON remains deterministic."""
+    if not object_type or not isinstance(object_data, dict):
+        return object_data
+
+    sort_list_attributes = settings.DEPLOY_SORT_LIST_KEYS.get(object_type, [])
+    for key in sort_list_attributes:
+        value, found = _get_nested_value(object_data, key)
+        if not found or not isinstance(value, list):
+            continue
+
+        # Keep semantics for complex structures where list order may be meaningful.
+        if any(isinstance(item, (dict, list, tuple, set)) for item in value):
+            continue
+
+        _set_nested_value(
+            object_data,
+            key,
+            sorted(value, key=lambda item: (type(item).__name__, str(item))),
+        )
+
+    return object_data
+
+
+def normalize_object_for_comparison(object_data: dict, object_type: Resource | None):
+    """Create a normalized copy for safe equality checks."""
+    normalized = copy.deepcopy(object_data)
+    return sort_object_list_attributes(normalized, object_type)
 
 
 async def write_object_to_json(path: Path, object: dict, type: Resource = None, log_message: str = ""):
@@ -34,6 +82,7 @@ async def write_object_to_json(path: Path, object: dict, type: Resource = None, 
                     non_versioned_key_written = await write_non_versioned_attribute(path, object, key)
                     if non_versioned_key_written:
                         del object[key]
+        sort_object_list_attributes(object, type)
     with open(path, "w") as wf:
         json.dump(object, wf, indent=2)
 

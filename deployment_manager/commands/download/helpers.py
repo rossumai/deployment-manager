@@ -14,7 +14,11 @@ from anyio import Path
 from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.common.determine_path import determine_object_type_from_url
-from deployment_manager.common.read_write import NON_VERSIONED_ATTRIBUTES_FILE_LOCK, read_object_from_json
+from deployment_manager.common.read_write import (
+    NON_VERSIONED_ATTRIBUTES_FILE_LOCK,
+    normalize_object_for_comparison,
+    read_object_from_json,
+)
 from deployment_manager.utils.consts import display_warning, settings
 
 
@@ -43,13 +47,21 @@ async def should_write_object(
         local_file = await read_object_from_json(path)
 
         object_type = determine_object_type_from_url(local_file.get("url", ""))
+        normalized_local = normalize_object_for_comparison(local_file, object_type)
+        normalized_remote = normalize_object_for_comparison(remote_object, object_type)
         # Queues might have their hooks attribute changed. Same for schema.rules
         # This does not update the timestamp in the DB because this change is only done on hooks entities.
         if (
             (local_timestamp := local_file.get("modified_at", ""))
             != (remote_timestamp := remote_object.get("modified_at", ""))
-            or (object_type == Resource.Queue and local_file.get("hooks", []) != remote_object.get("hooks", []))
-            or (object_type == Resource.Schema and local_file.get("rules", []) != remote_object.get("rules", []))
+            or (
+                object_type == Resource.Queue
+                and normalized_local.get("hooks", []) != normalized_remote.get("hooks", [])
+            )
+            or (
+                object_type == Resource.Schema
+                and normalized_local.get("rules", []) != normalized_remote.get("rules", [])
+            )
         ):
             if path in changed_files and not parent_dir_reference.ignore_changed_file_warnings:
                 display_warning(
