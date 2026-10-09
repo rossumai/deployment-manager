@@ -1,6 +1,9 @@
 import importlib
+import importlib.metadata
+import json
 import subprocess
 import sys
+import time
 
 import click
 import httpx
@@ -120,3 +123,83 @@ async def get_specific_version(version_tag: str) -> str | None:
         for asset in release_info.get("assets", []):
             if asset["name"].endswith(".whl"):
                 return asset["browser_download_url"]
+
+
+def _read_version_check_cache() -> dict:
+    try:
+        return json.loads(settings.VERSION_CHECK_CACHE_PATH.read_text())
+    except Exception:
+        return {}
+
+
+def _write_version_check_cache(cache: dict) -> None:
+    try:
+        settings.VERSION_CHECK_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        settings.VERSION_CHECK_CACHE_PATH.write_text(json.dumps(cache))
+    except Exception:
+        pass
+
+
+def _fetch_latest_version_str() -> str | None:
+    repo_owner = settings.GITHUB_DEPLOYMENT_MANAGER_REPO_OWNER
+    repo_name = settings.GITHUB_DEPLOYMENT_MANAGER_REPO_NAME
+    api_url = settings.GITHUB_DEFAULT_LATEST_RELEASE_URL.format(repo_owner=repo_owner, repo_name=repo_name)
+    try:
+        response = httpx.get(api_url, timeout=3)
+        if response.status_code != httpx.codes.OK:
+            return None
+        return response.json().get("tag_name", "").lstrip("vV") or None
+    except Exception:
+        return None
+
+
+def notify_if_new_version_available() -> None:
+    """Print a non-intrusive notification when a newer release is available
+    """
+    try:
+        current_version = parse_version(importlib.metadata.version("deployment-manager"))
+    except Exception:
+        return
+
+    # Local/source install (poetry => 0.0.0, pip editable => devrelease):
+    if str(current_version) == "0.0.0" or current_version.is_devrelease:
+        return
+
+    cache = _read_version_check_cache()
+    now = time.time()
+
+    # Only hit the network at most once per interval, otherwise use cache
+    latest_version_str = cache.get("latest_version")
+    if now - cache.get("last_checked", 0) > settings.VERSION_CHECK_INTERVAL_SECONDS or not latest_version_str:
+        fetched = _fetch_latest_version_str()
+        if fetched:
+            latest_version_str = fetched
+        cache["latest_version"] = latest_version_str
+        cache["last_checked"] = now
+        _write_version_check_cache(cache)
+
+    if not latest_version_str:
+        return
+
+    try:
+        latest_version = parse_version(latest_version_str)
+    except Exception:
+        return
+
+    if latest_version <= current_version:
+        return
+
+    if (
+        cache.get("last_notified_version") == latest_version_str
+        and now - cache.get("last_notified_at", 0) < settings.VERSION_CHECK_INTERVAL_SECONDS
+    ):
+        return
+
+    cache["last_notified_version"] = latest_version_str
+    cache["last_notified_at"] = now
+    _write_version_check_cache(cache)
+
+    display_info(
+        f"A new version of deployment-manager is available: {latest_version} (you have {current_version}).\n"
+        f"Run `{settings.NEW_COMMAND_NAME} {settings.UPDATE_COMMAND_NAME}` to upgrade."
+    )
