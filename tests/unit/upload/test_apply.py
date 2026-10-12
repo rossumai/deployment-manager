@@ -244,6 +244,16 @@ class TestFormatApiError:
         assert "HTTP 500" in out
         assert "Internal Server Error" in out
 
+    def test_empty_412_body_explains_modified_at_mismatch(self):
+        err = APIClientError("PATCH", "https://x/api/v1/schemas/1", 412, "")
+        out = format_api_error(err)
+        assert out.startswith("[PATCH] https://x/api/v1/schemas/1 - HTTP 412 Precondition Failed: ")
+        assert "modified_at mismatch" in out
+
+    def test_empty_body_without_hint_uses_reason_phrase(self):
+        err = APIClientError("DELETE", "https://x/api/v1/queues/1", 409, "  ")
+        assert format_api_error(err) == "[DELETE] https://x/api/v1/queues/1 - HTTP 409 Conflict"
+
     def test_passes_through_non_api_exceptions(self):
         e = ValueError("nope")
         assert format_api_error(e) == "nope"

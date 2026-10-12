@@ -8,6 +8,7 @@ UPDATEs and DELETEs run with the existing concurrency primitive.
 from __future__ import annotations
 
 import asyncio
+import http
 import json
 import os
 import time
@@ -283,6 +284,26 @@ async def _delete_queue_hard(op, directory) -> None:
         await asyncio.sleep(QUEUE_HARD_DELETE_POLL_INTERVAL_S)
 
 
+# Hints for statuses Rossum returns with an empty body
+EMPTY_BODY_ERROR_HINTS = {
+    412: (
+        "Rossum rejected the write because the object changed since its local copy was pulled (modified_at mismatch). "
+        "Pull it, re-apply your changes and push again."
+    ),
+}
+
+
+def format_empty_body_error(e: APIClientError) -> str:
+    try:
+        reason = http.HTTPStatus(e.status_code).phrase
+    except ValueError:
+        reason = "Unknown error"
+    message = f"[{e.method}] {e.url} - HTTP {e.status_code} {reason}"
+    if hint := EMPTY_BODY_ERROR_HINTS.get(e.status_code):
+        message += f": {hint}"
+    return message
+
+
 def format_api_error(e: Exception) -> str:
     """Pretty-print an APIClientError so field-validation 4xx responses come
     out as a readable list. Falls back to str(e) if the body isn't a JSON
@@ -290,6 +311,8 @@ def format_api_error(e: Exception) -> str:
     """
     if not isinstance(e, APIClientError):
         return str(e)
+    if isinstance(e.error, str) and not e.error.strip():
+        return format_empty_body_error(e)
     body = e.error if isinstance(e.error, str) else None
     if not body:
         return str(e)
