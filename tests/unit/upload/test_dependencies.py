@@ -6,6 +6,7 @@ from rossum_api import APIClientError
 
 from deployment_manager.commands.upload.dependencies import (
     cascade_delete_ops,
+    dedup_changes_by_path,
     evaluate_delete_dependencies,
     is_change_existing,
     mark_unstaged_objects_as_updated,
@@ -316,3 +317,54 @@ class TestEvaluateDeleteDependencies:
         change = (GIT_CHARACTERS.UPDATED, Path("a.json"))
         result = await evaluate_delete_dependencies([change], Path("org"))
         assert result == [change]
+
+
+class TestDedupChangesByPath:
+    def test_keeps_one_change_per_path(self):
+        a, b = Path("a.json"), Path("b.json")
+        changes = [(GIT_CHARACTERS.PARTIALLY_UPADTED, a), (GIT_CHARACTERS.UPDATED, a), (GIT_CHARACTERS.UPDATED, b)]
+        assert dedup_changes_by_path(changes) == [(GIT_CHARACTERS.PARTIALLY_UPADTED, a), (GIT_CHARACTERS.UPDATED, b)]
+
+    def test_prefers_create_op(self):
+        a = Path("a.json")
+        changes = [(GIT_CHARACTERS.UPDATED, a), (GIT_CHARACTERS.CREATED, a)]
+        assert dedup_changes_by_path(changes) == [(GIT_CHARACTERS.CREATED, a)]
+
+
+@pytest.mark.asyncio
+class TestSchemaWithFormulasIsUpdatedOnce:
+    """A schema changed together with its formula files must be PATCHed once; a second concurrent PATCH gets 412."""
+
+    async def _write_schema_with_formula(self, org_path: Path) -> tuple[Path, Path]:
+        queue_dir = Path("dev") / "workspaces" / "ws_[1]" / "queues" / "q_[5]"
+        schema_path = queue_dir / "schema.json"
+        formula_path = queue_dir / settings.FORMULA_DIR_NAME / "f1.py"
+        await (org_path / formula_path).parent.mkdir(parents=True)
+        await write_object_to_json(
+            org_path / schema_path,
+            {
+                "id": 5,
+                "url": "https://api/v1/schemas/5",
+                "content": [{"id": "f1", "category": "datapoint", "formula": "old"}],
+            },
+        )
+        await write_str(org_path / formula_path, "new")
+        return schema_path, formula_path
+
+    @pytest.mark.parametrize(
+        "schema_op, formula_op",
+        [
+            (GIT_CHARACTERS.CREATED, GIT_CHARACTERS.CREATED),
+            (GIT_CHARACTERS.PARTIALLY_UPADTED, GIT_CHARACTERS.UPDATED),
+        ],
+    )
+    async def test_single_schema_change(self, tmp_path, monkeypatch, schema_op, formula_op):
+        monkeypatch.chdir(str(tmp_path))
+        org_path = Path(".")
+        schema_path, formula_path = await self._write_schema_with_formula(org_path)
+
+        changes = await merge_formula_changes([(schema_op, schema_path), (formula_op, formula_path)])
+        changes = await mark_unstaged_objects_as_updated(changes, org_path, _client_with_obj(remote_obj={"id": 5}))
+
+        schema_changes = [change for change in changes if str(change[1]) == str(schema_path)]
+        assert len(schema_changes) == 1

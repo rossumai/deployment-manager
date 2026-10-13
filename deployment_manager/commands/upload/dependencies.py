@@ -20,6 +20,25 @@ from deployment_manager.common.schema import find_schema_id
 from deployment_manager.utils.consts import GIT_CHARACTERS, display_warning, settings
 
 
+def dedup_changes_by_path(changes: list[tuple[str, Path]]) -> list[tuple[str, Path]]:
+    """Keeps one change per path, preferring a CREATE op, so no object is sent twice in one push."""
+    create_ops = {
+        GIT_CHARACTERS.CREATED,
+        GIT_CHARACTERS.CREATED_STAGED,
+        GIT_CHARACTERS.CREATED_STAGED_MODIFIED,
+    }
+    deduped: list[tuple[str, Path]] = []
+    seen: dict[str, int] = {}
+    for op, path in changes:
+        key = str(path)
+        if key not in seen:
+            seen[key] = len(deduped)
+            deduped.append((op, path))
+        elif op in create_ops and deduped[seen[key]][0] not in create_ops:
+            deduped[seen[key]] = (op, path)
+    return deduped
+
+
 def is_change_existing(change, changes):
     c_op, c_path = change
     for op, path in changes:
@@ -67,6 +86,9 @@ async def merge_formula_changes(changes: list[tuple[str, Path]]):
             merged_changes.append(change)
 
     # If code file was not among the changes, the JSON schemas file already has the new code thanks to the for loop above and no change is technically actually made.
+    # schema.json's own change and the one synthesized from its formula files may differ in op (e.g. "MM" vs "M")
+    merged_changes = dedup_changes_by_path(merged_changes)
+
     # In case code of a schema was changed directly in the JSON file, update the formula code file as well.
     for change in merged_changes:
         op, path = change
@@ -125,25 +147,8 @@ async def merge_hook_changes(changes: list[tuple[str, Path]], org_path: Path):
         elif not is_change_existing(change, merged_changes):
             merged_changes.append(change)
 
-    # Dedup by path: a brand-new hook may emit both (CREATE, json) directly
-    # and (UPDATE, json) synthesized from its .py companion. Prefer CREATE.
-    create_ops = {
-        GIT_CHARACTERS.CREATED,
-        GIT_CHARACTERS.CREATED_STAGED,
-        GIT_CHARACTERS.CREATED_STAGED_MODIFIED,
-    }
-    deduped: list[tuple[str, Path]] = []
-    seen: dict[str, int] = {}
-    for op, path in merged_changes:
-        key = str(path)
-        if key not in seen:
-            seen[key] = len(deduped)
-            deduped.append((op, path))
-        else:
-            existing_op = deduped[seen[key]][0]
-            if op in create_ops and existing_op not in create_ops:
-                deduped[seen[key]] = (op, path)
-    merged_changes = deduped
+    # A brand-new hook may emit both (CREATE, json) directly and (UPDATE, json) synthesized from its .py companion
+    merged_changes = dedup_changes_by_path(merged_changes)
 
     # If code file was not among the changes, the JSON hook file already has the new code thanks to the for loop above and no change is technically actually made.
     # In case code of a hook was changed directly in the JSON file, update the code file as well.
@@ -240,7 +245,8 @@ async def mark_unstaged_objects_as_updated(changes, org_path, client: AsyncRossu
         else:
             changes_updated.append(change)
 
-    return changes_updated
+    # Converting untracked files to UPDATE can collide with an UPDATE already present for the same path
+    return dedup_changes_by_path(changes_updated)
 
 
 async def cascade_delete_ops(path, change, changes_updated, org_path):
