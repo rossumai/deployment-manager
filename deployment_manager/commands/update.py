@@ -1,6 +1,8 @@
 import importlib
+import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 import click
 import httpx
@@ -58,15 +60,7 @@ async def update_application(version_tag: str = None):
         ).ask_async():
             return
 
-    install_command = [
-        sys.executable,
-        "-m",
-        "pip",
-        "install",
-        "--upgrade",
-        "--no-cache-dir",
-        latest_whl_url,
-    ]
+    install_command = build_install_command(latest_whl_url)
 
     try:
         subprocess.run(install_command, check=True, capture_output=True, text=True)
@@ -78,6 +72,13 @@ async def update_application(version_tag: str = None):
             f"Deployment manager update to version {selected_version} unsuccessful: {e}",
             e,
         )
+
+
+def build_install_command(whl_url: str) -> list[str]:
+    # Installed by install.sh / install.ps1 via `uv tool install`; reinstalling through uv keeps its receipt in sync.
+    if (Path(sys.prefix) / "uv-receipt.toml").exists() and shutil.which("uv"):
+        return ["uv", "tool", "install", "--force", "--python", "3.12", whl_url]
+    return [sys.executable, "-m", "pip", "install", "--upgrade", "--no-cache-dir", whl_url]
 
 
 async def get_latest_version() -> tuple[str | None, str | None]:
