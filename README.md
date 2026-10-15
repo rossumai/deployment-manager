@@ -16,6 +16,8 @@ Windows (PowerShell):
 ```
 powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/rossumai/deployment-manager/main/install.ps1 | iex"
 ```
+The installer verifies the wheel's SHA-256 against the checksum published with the release (and refuses to install if it does not match or is missing). If it has to install uv, it uses a pinned uv version.
+
 If GIT is missing, the installer opens the Command Line Tools dialog on macOS (run the command again once it finishes) or installs GIT via `winget` on Windows.
 
 To install a specific version:
