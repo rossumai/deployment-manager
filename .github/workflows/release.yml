@@ -29,6 +29,13 @@ jobs:
       - name: Build Wheel
         run: poetry build
 
+      - name: Generate Wheel Checksum
+        run: |
+          cd dist
+          for wheel in *.whl; do
+            sha256sum "$wheel" > "$wheel.sha256"
+          done
+
       - name: Install git-cliff (for Changelog)
         run: |
           CLIFF_URL=$(curl -s https://api.github.com/repos/orhun/git-cliff/releases/latest | jq -r '.assets[].browser_download_url' | grep '.deb' | head -n 1)
@@ -57,7 +64,9 @@ jobs:
         with:
           tag_name: ${{ env.latest_tag }}
           name: "${{ env.latest_tag }}"
-          files: dist/*.whl
+          files: |
+            dist/*.whl
+            dist/*.sha256
           body_path: CHANGELOG.md
           draft: false
           prerelease: false

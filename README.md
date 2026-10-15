@@ -4,11 +4,41 @@ This CLI tool aims to help users configure and manage projects on the Rossum pla
 
 ## Installation guide
 
-### Prerequisites
+### One-command installer (experimental)
+
+The quickest way to install. If it does not work for you, use the pip installation below. The only prerequisite is GIT - Python is installed automatically, in an isolated environment, via [uv](https://docs.astral.sh/uv/), and `prd2` is added to your PATH.
+
+macOS / Linux:
+```
+curl -LsSf https://raw.githubusercontent.com/rossumai/deployment-manager/main/install.sh | sh
+```
+Windows (PowerShell):
+```
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/rossumai/deployment-manager/main/install.ps1 | iex"
+```
+The installer verifies the wheel's SHA-256 against the checksum published with the release (and refuses to install if it does not match or is missing). If it has to install uv, it uses a pinned uv version.
+
+If GIT is missing, the installer opens the Command Line Tools dialog on macOS (run the command again once it finishes) or installs GIT via `winget` on Windows.
+
+To install a specific version:
+```
+# macOS / Linux
+curl -LsSf https://raw.githubusercontent.com/rossumai/deployment-manager/main/install.sh | sh -s -- v2.7.0a
+# Windows
+$env:PRD_VERSION = "v2.7.0a"; irm https://raw.githubusercontent.com/rossumai/deployment-manager/main/install.ps1 | iex
+```
+
+**Open a new terminal window afterwards** and check that `prd2 --help` works. To update, run the install command again or use `prd2 update`.
+
+If you already installed `prd2` with pip, uninstall it first (`pip uninstall deployment-manager`) so the two installations do not conflict on your PATH.
+
+### pip installation
+
+#### Prerequisites
 - Python 3.12
 - GIT
 
-### Linux/MacOS
+#### Linux/MacOS
 
 Install the latest version of the tool via pip:
 ```
@@ -38,7 +68,7 @@ export PATH="$PATH:$HOME/.deployment-manager-venv/bin"
 source ~/.zshrc
 ```
 
-### Windows
+#### Windows
 
 1. Install the latest version of tool via pip:
 ```
@@ -59,7 +89,6 @@ You can install a specific version by changing the URL, for instance, to install
 ```
 pip install https://github.com/rossumai/deployment-manager/releases/download/v2.7.0a/deployment_manager-2.7.0-py3-none-any.whl
 ```
-
 
 ### Updating to a new version
 You can use the same command as for installing the tool the first time. `pip` will recognize that you are installing a newer version and uninstall the previous one automatically.
