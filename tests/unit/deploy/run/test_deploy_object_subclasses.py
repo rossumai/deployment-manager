@@ -560,6 +560,32 @@ class TestPlanChangesOnly:
         await field.visualize_changes()
         assert len(printed) == 1
 
+    async def test_top_level_field_not_sent_is_not_a_change(self, monkeypatch):
+        # e.g., queue.inbox: null is popped from the PATCH, so the remote value stays as it is
+        remote = {"id": 2, "name": "f", "inbox": None}
+        plan = {"id": 2, "name": "f"}
+        field, printed = self.make_field(monkeypatch, remote, plan, exists_on_remote=True, changes_only=True)
+        await field.visualize_changes()
+        assert printed == []
+        assert field.deploy_file.unchanged_plan_objects_count == 1
+
+    async def test_top_level_field_not_sent_is_not_shown_in_diff(self, monkeypatch):
+        remote = {"id": 2, "name": "f", "inbox": None}
+        plan = {"id": 2, "name": "renamed"}
+        field, printed = self.make_field(monkeypatch, remote, plan, exists_on_remote=True, changes_only=False)
+        await field.visualize_changes()
+        assert "renamed" in printed[0].renderable
+        assert "inbox" not in printed[0].renderable
+
+    async def test_nested_field_not_sent_is_still_shown(self, monkeypatch):
+        # PATCH replaces nested objects as a whole, so a missing nested key is really removed
+        remote = {"id": 2, "name": "f", "settings": {"kept": 1, "dropped": 2}}
+        plan = {"id": 2, "name": "f", "settings": {"kept": 1}}
+        field, printed = self.make_field(monkeypatch, remote, plan, exists_on_remote=True, changes_only=True)
+        await field.visualize_changes()
+        assert len(printed) == 1
+        assert "dropped" in printed[0].renderable
+
 
 @pytest.mark.asyncio
 class TestReloadLocalData:

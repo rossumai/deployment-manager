@@ -596,6 +596,9 @@ class DeployObject(BaseModel):
                 overriden_object_data = {}
 
             self.remove_ignored_attributes(overriden_object_data)
+            # Updates are PATCHes, which leave top-level fields they don't send untouched (e.g., a popped empty queue.inbox)
+            for key in set(overriden_object_data) - set(target.visualized_plan_data):
+                del overriden_object_data[key]
             self.sort_lists(overriden_object_data)
 
             self.sort_lists(target.visualized_plan_data)
