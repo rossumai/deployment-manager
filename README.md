@@ -249,6 +249,7 @@ Inside the subdirectories, there is always one folder for `workspaces` and anoth
 A full example of a project directory structure with 2 organizations and 2 subdirectories in the `sandbox-org` can be found below:
 
 ```JSON
+├── .prd_logs                     
 ├── prd_config.yaml
 ├── prod-org
 │   ├── credentials.yaml
@@ -343,6 +344,27 @@ PRD commands almost always need credentials (Rossum API URL + token / password &
 3. If there are no credentials in the file, ask the user for a token without saving it.
 
 Some commands (e.g., `purge`) ask you for credentials every time because they can be used with any Rossum organization, not just the ones you have pulled locally.
+
+
+### Output log files
+
+By default, every PRD command also appends its output (including tracebacks) to a log file. The file is `.prd_logs/output-<timestamp>.log` in the directory where you run the command (usually the project root). PRD keeps only the 20 newest files there and deletes older ones.
+
+When PRD creates the log directory itself, it puts a `.gitignore` with `*` into it, so the logs are never committed. A directory that already exists is left as it is.
+
+- `--no-log-file` (or the env variable `PRD_NO_LOG_FILE=1`) turns logging off.
+- `--log-file <path>` (or `PRD_LOG_FILE=<path>`) appends to that file instead. Such files are never deleted.
+
+Both options work before or after the subcommand, e.g. `prd2 pull --no-log-file`.
+
+
+### Environment variables
+
+| Variable | Default | Effect |
+|---|---|---|
+| `PRD_LOG_FILE` | `.prd_logs/output-<timestamp>.log` | Same as `--log-file <path>`: append the output to this file. See [Output log files](#output-log-files). |
+| `PRD_NO_LOG_FILE` | not set | Set to `1` (same as `--no-log-file`) to turn off the output log file. |
+| `PRD2_CONCURRENCY` | `5` | Maximum concurrent API requests, must be at least 1. The `--concurrency` option of `pull`, `push`, `deploy` and `purge` takes precedence. |
 
 
 ## Full(er) Command Reference

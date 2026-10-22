@@ -227,6 +227,8 @@ class Settings:
     DEFAULT_DEPLOY_PARENT = "deploy_files"
     DEFAULT_DEPLOY_SECRETS_PARENT = "deploy_secrets"
     DEFAULT_DEPLOY_STATE_PARENT = "deploy_states"
+    DEFAULT_LOG_FILES_PARENT = ".prd_logs"
+    MAX_LOG_FILES = 20
     DEPLOY_KEY_SECRETS_PATH = "secrets_file"
     DEPLOY_KEY_STATE_PATH = "deploy_state_file"
     DEPLOY_KEY_TARGETS = "targets"
