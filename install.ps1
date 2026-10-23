@@ -22,6 +22,10 @@
     # it does not affect an already installed uv.
     $UvVersion = "0.13.1"
 
+    # Always x64 Python: ruamel-yaml-clib (pulled in by ruamel-yaml <0.19) publishes
+    # no Windows ARM64 wheels, and Windows 11 on ARM runs x64 Python under emulation.
+    $Python = "cpython-3.12-windows-x86_64-none"
+
     # The tag ends up in a URL, so accept only things that look like a version tag.
     if ($env:PRD_VERSION -and $env:PRD_VERSION -cnotmatch '^v[0-9][A-Za-z0-9._-]*$') {
         Write-Host "Error: Invalid version tag: $env:PRD_VERSION" -ForegroundColor Red
@@ -107,7 +111,7 @@
         }
         Write-Host "Checksum OK."
 
-        uv tool install --force --python 3.12 $WheelFile
+        uv tool install --force --python $Python $WheelFile
         if ($LASTEXITCODE -ne 0) {
             Write-Host "Error: installation failed." -ForegroundColor Red
             return
