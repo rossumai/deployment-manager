@@ -175,3 +175,20 @@ class TestShouldWriteObject:
             parent_dir_reference=parent_dir,
         )
         assert not result
+
+    @pytest.mark.parametrize("object_type, field", [("queues", "rules"), ("rules", "queues")])
+    @pytest.mark.parametrize("dirty, expected", [(False, True), (True, False)])
+    async def test_link_change_without_timestamp_change(self, tmp_path, object_type, field, dirty, expected):
+        file_path = Path(tmp_path / "obj.json")
+        local = {"url": f"https://x/api/v1/{object_type}/1", "modified_at": "2026-01-01", field: []}
+        with open(str(file_path), "w") as f:
+            json.dump(local, f)
+
+        with patch("sys.stdin.isatty", return_value=False):
+            result = await should_write_object(
+                path=file_path,
+                remote_object={**local, field: ["https://x/api/v1/linked/2"]},
+                changed_files=[file_path] if dirty else [],
+                parent_dir_reference=MagicMock(ignore_changed_file_warnings=False),
+            )
+        assert bool(result) == expected
