@@ -20,6 +20,11 @@ jobs:
           echo "Latest tag detected: $latest_tag"
           echo "latest_tag=$latest_tag" >> $GITHUB_ENV
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Install Poetry & Plugins
         run: pip install poetry poetry-dynamic-versioning
 
