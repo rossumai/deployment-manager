@@ -131,6 +131,12 @@ class UploadOrganizationDirectory(OrganizationDirectory):
             display_warning(f"No changes to {settings.UPLOAD_COMMAND_NAME} found in {self.org_path}.")
             return
 
+        # `git status -s` codes of files with unresolved merge conflicts
+        if unmerged_paths := [str(path) for op, path in changes if op in ("DD", "AU", "UD", "UA", "DU", "AA", "UU")]:
+            raise PushException(
+                "Resolve the merge conflicts and run `git add` on these files first:\n" + "\n".join(unmerged_paths)
+            )
+
         changes = await merge_hook_changes(changes, self.project_path)
         # changes = await evaluate_delete_dependencies(changes, org_path)
         changes = await merge_formula_changes(changes)

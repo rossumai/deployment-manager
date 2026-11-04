@@ -228,6 +228,8 @@ class Settings:
     DEFAULT_DEPLOY_SECRETS_PARENT = "deploy_secrets"
     DEFAULT_DEPLOY_STATE_PARENT = "deploy_states"
     DEFAULT_LOG_FILES_PARENT = ".prd_logs"
+    # Last pulled version of each object, used as the base for merging remote changes into local ones
+    PULL_BASE_DIRNAME = ".prd_base"
     MAX_LOG_FILES = 20
     DEPLOY_KEY_SECRETS_PATH = "secrets_file"
     DEPLOY_KEY_STATE_PATH = "deploy_state_file"

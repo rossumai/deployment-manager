@@ -1,10 +1,10 @@
 import os
-import subprocess
 
 import click
 from anyio import Path
 
 from deployment_manager.commands.download.directory import DownloadOrganizationDirectory
+from deployment_manager.common.git import commit_all_changes
 from deployment_manager.common.read_write import read_prd_project_config
 from deployment_manager.common.upload_download_setup import (
     check_unique_org_ids,
@@ -147,5 +147,4 @@ async def download_destinations(
     # TODO: org_path assumption test
 
     if commit:
-        subprocess.run(["git", "add", "."])
-        subprocess.run(["git", "commit", "-m", commit_message])
+        commit_all_changes(commit_message)

@@ -4,7 +4,20 @@ import subprocess
 
 from anyio import Path
 
-from deployment_manager.utils.consts import GIT_CHARACTERS
+from deployment_manager.utils.consts import GIT_CHARACTERS, display_warning
+
+
+def has_unmerged_files() -> bool:
+    return bool(subprocess.run(["git", "ls-files", "-u"], capture_output=True, text=True).stdout)
+
+
+def commit_all_changes(commit_message: str):
+    # `git add` would mark the conflicts from a pull merge as resolved
+    if has_unmerged_files():
+        display_warning("The changes were not committed: resolve the merge conflicts first.")
+        return
+    subprocess.run(["git", "add", "."])
+    subprocess.run(["git", "commit", "-m", commit_message])
 
 
 def get_changed_file_paths(destination: str, indexed_only=False) -> list[tuple[str, Path]]:

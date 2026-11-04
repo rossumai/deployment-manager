@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict
 from rossum_api.domain_logic.resources import Resource
 
 from deployment_manager.commands.download.helpers import delete_objects_non_versioned_attributes
+from deployment_manager.commands.download.merge import is_unmerged
 from deployment_manager.commands.download.subdirectory import Subdirectory
 from deployment_manager.common.determine_path import determine_object_type_from_url
 from deployment_manager.common.read_write import (
@@ -93,12 +94,14 @@ class SchemaRemover(ObjectRemover):
         if not removed_schema:
             remote_formula_fields = find_formula_fields_in_schema(self.remote_object["content"])
             remote_field_ids = [ff[0] for ff in remote_formula_fields]
+            # A kept local version (declined or conflicted merge) still needs its formula files
+            local_field_ids = [ff[0] for ff in find_formula_fields_in_schema(self.local_object["content"])]
             local_formula_dir = create_formula_directory_path(self.local_path)
             if not local_formula_dir or not await local_formula_dir.exists():
                 return
             async for formula_path in local_formula_dir.iterdir():
                 local_field_id = formula_path.stem
-                if local_field_id not in remote_field_ids:
+                if local_field_id not in [*remote_field_ids, *local_field_ids] and not is_unmerged(formula_path):
                     os.remove(formula_path)
 
     async def delete_object(self):

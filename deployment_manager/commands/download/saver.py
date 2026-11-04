@@ -32,8 +32,8 @@ class WorkspaceSaver(ObjectSaver):
 
     async def save_downloaded_object(self, workspace: dict, subdir: Subdirectory):
         object_path = self.construct_object_path(subdir=subdir, object=workspace)
-        if self.download_all or await should_write_object(
-            object_path, workspace, self.changed_files, self.parent_dir_reference
+        if await should_write_object(
+            object_path, workspace, self.changed_files, self.parent_dir_reference, self.download_all
         ):
             await write_object_to_json(
                 object_path,
@@ -83,8 +83,8 @@ class QueueSaver(ObjectSaver):
         object_path = self.construct_object_path(subdir=subdir, queue=queue)
         if not object_path:
             return
-        if self.download_all or await should_write_object(
-            object_path, queue, self.changed_files, self.parent_dir_reference
+        if await should_write_object(
+            object_path, queue, self.changed_files, self.parent_dir_reference, self.download_all
         ):
             await write_object_to_json(
                 object_path,
@@ -154,8 +154,8 @@ class EmailTemplateSaver(QueueSaver):
         object_path = self.construct_object_path(subdir=subdir, email_template=email_template)
         if not object_path:
             return
-        if self.download_all or await should_write_object(
-            object_path, email_template, self.changed_files, self.parent_dir_reference
+        if await should_write_object(
+            object_path, email_template, self.changed_files, self.parent_dir_reference, self.download_all
         ):
             await write_object_to_json(
                 object_path,
@@ -207,8 +207,8 @@ class InboxSaver(QueueSaver):
         object_path = self.construct_object_path(subdir=subdir, inbox=inbox)
         if not object_path:
             return
-        if self.download_all or await should_write_object(
-            object_path, inbox, self.changed_files, self.parent_dir_reference
+        if await should_write_object(
+            object_path, inbox, self.changed_files, self.parent_dir_reference, self.download_all
         ):
             await write_object_to_json(
                 object_path,
@@ -282,8 +282,8 @@ class SchemaSaver(QueueSaver):
         object_path = self.construct_object_path(subdir=subdir, schema=schema)
         if not object_path:
             return
-        if self.download_all or await should_write_object(
-            object_path, schema, self.changed_files, self.parent_dir_reference
+        if await should_write_object(
+            object_path, schema, self.changed_files, self.parent_dir_reference, self.download_all
         ):
             await write_object_to_json(
                 object_path,
@@ -364,8 +364,8 @@ class RuleSaver(ObjectSaver):
         object_path = self.construct_object_path(subdir=subdir, rule=rule)
         if not object_path:
             return
-        if self.download_all or await should_write_object(
-            object_path, rule, self.changed_files, self.parent_dir_reference
+        if await should_write_object(
+            object_path, rule, self.changed_files, self.parent_dir_reference, self.download_all
         ):
             await write_object_to_json(
                 object_path,
@@ -386,8 +386,8 @@ class HookSaver(ObjectSaver):
         object_path = self.construct_object_path(subdir=subdir, hook=hook)
         if not object_path:
             return
-        if self.download_all or await should_write_object(
-            object_path, hook, self.changed_files, self.parent_dir_reference
+        if await should_write_object(
+            object_path, hook, self.changed_files, self.parent_dir_reference, self.download_all
         ):
             await write_object_to_json(
                 object_path,
@@ -412,8 +412,8 @@ class LabelSaver(ObjectSaver):
         object_path = self.construct_object_path(subdir=subdir, label=label)
         if not object_path:
             return
-        if self.download_all or await should_write_object(
-            object_path, label, self.changed_files, self.parent_dir_reference
+        if await should_write_object(
+            object_path, label, self.changed_files, self.parent_dir_reference, self.download_all
         ):
             await write_object_to_json(
                 object_path,
@@ -438,8 +438,8 @@ class WorkflowSaver(ObjectSaver):
 
     async def save_downloaded_object(self, workflow: dict, subdir: Subdirectory):
         object_path = self.construct_object_path(subdir=subdir, object=workflow)
-        if self.download_all or await should_write_object(
-            object_path, workflow, self.changed_files, self.parent_dir_reference
+        if await should_write_object(
+            object_path, workflow, self.changed_files, self.parent_dir_reference, self.download_all
         ):
             await write_object_to_json(
                 object_path,
@@ -462,8 +462,8 @@ class EngineSaver(ObjectSaver):
         object_path = self.construct_object_path(subdir=subdir, engine=engine)
         if not object_path:
             return
-        if self.download_all or await should_write_object(
-            object_path, engine, self.changed_files, self.parent_dir_reference
+        if await should_write_object(
+            object_path, engine, self.changed_files, self.parent_dir_reference, self.download_all
         ):
             await write_object_to_json(
                 object_path,
@@ -517,8 +517,8 @@ class EngineFieldSaver(ObjectSaver):
         object_path = self.construct_object_path(subdir=subdir, engine_field=engine_field)
         if not object_path:
             return
-        if self.download_all or await should_write_object(
-            object_path, engine_field, self.changed_files, self.parent_dir_reference
+        if await should_write_object(
+            object_path, engine_field, self.changed_files, self.parent_dir_reference, self.download_all
         ):
             await write_object_to_json(
                 object_path,
@@ -567,8 +567,8 @@ class WorkflowStepSaver(ObjectSaver):
         object_path = self.construct_object_path(subdir=subdir, workflow_step=workflow_step)
         if not object_path:
             return
-        if self.download_all or await should_write_object(
-            object_path, workflow_step, self.changed_files, self.parent_dir_reference
+        if await should_write_object(
+            object_path, workflow_step, self.changed_files, self.parent_dir_reference, self.download_all
         ):
             await write_object_to_json(
                 object_path,

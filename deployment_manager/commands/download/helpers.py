@@ -13,6 +13,12 @@ if TYPE_CHECKING:
 from anyio import Path
 from rossum_api.domain_logic.resources import Resource
 
+from deployment_manager.commands.download.merge import (
+    is_unmerged,
+    merge_remote_into_local,
+    save_pull_base,
+    to_file_object,
+)
 from deployment_manager.common.determine_path import determine_object_type_from_url
 from deployment_manager.common.read_write import (
     NON_VERSIONED_ATTRIBUTES_FILE_LOCK,
@@ -42,38 +48,44 @@ async def should_write_object(
     remote_object: Any,
     changed_files: list,
     parent_dir_reference: "DownloadOrganizationDirectory",
+    download_all: bool = False,
 ):
-    if await path.exists():
-        local_file = await read_object_from_json(path)
+    if path in changed_files and await path.exists() and is_unmerged(path):
+        display_warning(f"File [green]{path}[/green] has unresolved merge conflicts, it was not pulled.")
+        return False
 
-        object_type = determine_object_type_from_url(local_file.get("url", ""))
-        normalized_local = normalize_object_for_comparison(local_file, object_type)
-        normalized_remote = normalize_object_for_comparison(remote_object, object_type)
-        # Queues might have their hooks attribute changed. Same for schema.rules
-        # This does not update the timestamp in the DB because this change is only done on hooks entities.
-        if (
-            (local_timestamp := local_file.get("modified_at", ""))
-            != (remote_timestamp := remote_object.get("modified_at", ""))
-            or (
-                object_type == Resource.Queue
-                and normalized_local.get("hooks", []) != normalized_remote.get("hooks", [])
-            )
-            or (
-                object_type == Resource.Schema
-                and normalized_local.get("rules", []) != normalized_remote.get("rules", [])
-            )
+    if download_all or not await path.exists():
+        object_type = determine_object_type_from_url(remote_object.get("url", ""))
+        await save_pull_base(parent_dir_reference, path, remote_object, object_type)
+        return True
+
+    local_file = await read_object_from_json(path)
+
+    object_type = determine_object_type_from_url(local_file.get("url", ""))
+    normalized_local = normalize_object_for_comparison(local_file, object_type)
+    normalized_remote = normalize_object_for_comparison(remote_object, object_type)
+    # Queues might have their hooks attribute changed. Same for schema.rules
+    # This does not update the timestamp in the DB because this change is only done on hooks entities.
+    if (
+        (local_timestamp := local_file.get("modified_at", ""))
+        != (remote_timestamp := remote_object.get("modified_at", ""))
+        or (object_type == Resource.Queue and normalized_local.get("hooks", []) != normalized_remote.get("hooks", []))
+        or (object_type == Resource.Schema and normalized_local.get("rules", []) != normalized_remote.get("rules", []))
+    ):
+        if path in changed_files and await merge_remote_into_local(
+            path, remote_object, object_type, parent_dir_reference, local_timestamp
         ):
-            if path in changed_files and not parent_dir_reference.ignore_changed_file_warnings:
-                display_warning(
-                    f"File [green]{path}[/green] has local unversioned changes [white](local: {local_timestamp} | remote: {remote_timestamp})[/white]."
-                )
-                # questionary crashes on non-TTY stdin; default to overwrite
-                # since auto-pull-after-push implies trust in the remote.
-                if not sys.stdin.isatty():
-                    display_warning(
-                        f"Non-interactive shell — defaulting to overwrite for [green]{path}[/green]."
-                    )
-                    return True
+            return False
+
+        if path in changed_files and not parent_dir_reference.ignore_changed_file_warnings:
+            display_warning(
+                f"File [green]{path}[/green] has local unversioned changes [white](local: {local_timestamp} | remote: {remote_timestamp})[/white]."
+            )
+            # questionary crashes on non-TTY stdin; default to overwrite
+            # since auto-pull-after-push implies trust in the remote.
+            if not sys.stdin.isatty():
+                display_warning(f"Non-interactive shell — defaulting to overwrite for [green]{path}[/green].")
+            else:
                 user_answer = await questionary.text(
                     message="Should the remote version overwrite the local one?",
                     instruction="(y/n/yy)",
@@ -82,12 +94,18 @@ async def should_write_object(
                 if user_answer.casefold() == "yy":
                     parent_dir_reference.ignore_changed_file_warnings = True
 
-                return user_answer == "y" or user_answer == "yy"
+                if not (user_answer == "y" or user_answer == "yy"):
+                    return False
 
-            return True
-
-    else:
+        await save_pull_base(parent_dir_reference, path, remote_object, object_type)
         return True
+
+    # The local file is in sync with the remote, so it is the base for future merges
+    if to_file_object(local_file, object_type) == to_file_object(remote_object, object_type):
+        await save_pull_base(parent_dir_reference, path, remote_object, object_type)
+    # The API can return attributes that the unchanged local file does not have yet (e.g., a new key)
+    elif path not in changed_files:
+        await save_pull_base(parent_dir_reference, path, local_file, object_type, only_if_missing=True)
 
 
 async def delete_objects_non_versioned_attributes(path: Path):

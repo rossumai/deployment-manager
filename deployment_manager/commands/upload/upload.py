@@ -1,5 +1,3 @@
-import subprocess
-
 import click
 from anyio import Path
 from rich import print as pprint
@@ -8,6 +6,7 @@ from rich.panel import Panel
 # from project_rossum_deploy.commands.download.download import download_project
 from deployment_manager.commands.download.download import download_destinations
 from deployment_manager.commands.upload.directory import UploadOrganizationDirectory
+from deployment_manager.common.git import commit_all_changes
 from deployment_manager.common.read_write import read_prd_project_config
 from deployment_manager.common.upload_download_setup import (
     check_unique_org_ids,
@@ -168,8 +167,7 @@ async def upload_destinations(
     await download_destinations(destinations=destinations)
 
     if commit:
-        subprocess.run(["git", "add", "."])
-        subprocess.run(["git", "commit", "-m", commit_message])
+        commit_all_changes(commit_message)
 
     pprint(
         Panel(

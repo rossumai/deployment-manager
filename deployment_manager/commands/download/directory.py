@@ -1,3 +1,4 @@
+import json
 from collections import defaultdict
 from typing import Optional
 
@@ -19,6 +20,7 @@ from deployment_manager.commands.download.helpers import (
     replace_code_paths,
     should_write_object,
 )
+from deployment_manager.commands.download.merge import is_unmerged, read_local_version_of_unmerged
 from deployment_manager.commands.download.remover import ObjectRemover
 from deployment_manager.commands.download.saver import (
     EmailTemplateSaver,
@@ -75,7 +77,15 @@ class OrganizationDirectory(BaseModel):
 
             object_ids = set()
             for object_path in object_paths:
-                object = await read_object_from_json(object_path)
+                try:
+                    object = await read_object_from_json(object_path)
+                except json.JSONDecodeError:
+                    # A file with merge conflict markers, its id is in the local version in the git index
+                    if not is_unmerged(object_path):
+                        raise
+                    object = read_local_version_of_unmerged(object_path)
+                    if object is None:
+                        continue
                 object_id = object.get("id", None)
                 if object_id:
                     object_ids.add(object_id)
@@ -92,6 +102,8 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
     download_all: bool = False
     skip_objects_without_subdir: bool = False
     ignore_changed_file_warnings: bool = False
+    # Answer to "apply the merge" for all remaining files (set by the yy/nn answers)
+    merge_answer_for_all: Optional[bool] = None
 
     workspace_saver: Optional["WorkspaceSaver"] = None
     queue_saver: Optional["QueueSaver"] = None
@@ -362,7 +374,7 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
         try:
             organization = await self.client._http_client.fetch_one(Resource.Organization, self.org_id)
             org_file_path = self.project_path / self.name / "organization.json"
-            if self.download_all or await should_write_object(org_file_path, organization, self.changed_files, self):
+            if await should_write_object(org_file_path, organization, self.changed_files, self, self.download_all):
                 await write_object_to_json(
                     org_file_path,
                     organization,
@@ -428,6 +440,9 @@ class DownloadOrganizationDirectory(OrganizationDirectory):
 
             await object_remover.remove_if_stale()
         except Exception as e:
+            # Conflict markers from a pull merge, the user resolves them first
+            if isinstance(e, json.JSONDecodeError) and is_unmerged(object_path):
+                return
             display_error(
                 f"Error while checking if object [green]{object_path}[/green] should be removed (skipping) ^",
                 e,
