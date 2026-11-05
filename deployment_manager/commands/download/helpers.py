@@ -49,20 +49,15 @@ async def should_write_object(
         object_type = determine_object_type_from_url(local_file.get("url", ""))
         normalized_local = normalize_object_for_comparison(local_file, object_type)
         normalized_remote = normalize_object_for_comparison(remote_object, object_type)
-        # Queues might have their hooks attribute changed. Same for schema.rules
-        # This does not update the timestamp in the DB because this change is only done on hooks entities.
-        if (
-            (local_timestamp := local_file.get("modified_at", ""))
-            != (remote_timestamp := remote_object.get("modified_at", ""))
-            or (
-                object_type == Resource.Queue
-                and normalized_local.get("hooks", []) != normalized_remote.get("hooks", [])
-            )
-            or (
-                object_type == Resource.Schema
-                and normalized_local.get("rules", []) != normalized_remote.get("rules", [])
-            )
-        ):
+        # Link changes do not update modified_at. In dirty files, a local edit and a remote change look the same.
+        link_fields = {Resource.Queue: ("hooks", "rules"), Resource.Rule: ("queues",), Resource.Schema: ("rules",)}
+        links_changed = path not in changed_files and any(
+            normalized_local.get(field, []) != normalized_remote.get(field, [])
+            for field in link_fields.get(object_type, ())
+        )
+        if (local_timestamp := local_file.get("modified_at", "")) != (
+            remote_timestamp := remote_object.get("modified_at", "")
+        ) or links_changed:
             if path in changed_files and not parent_dir_reference.ignore_changed_file_warnings:
                 display_warning(
                     f"File [green]{path}[/green] has local unversioned changes [white](local: {local_timestamp} | remote: {remote_timestamp})[/white]."
