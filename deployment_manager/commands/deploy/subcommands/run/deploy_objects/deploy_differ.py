@@ -1,7 +1,5 @@
 import difflib
 import json
-import subprocess
-import tempfile
 from copy import deepcopy
 
 from rich.markup import escape
@@ -39,20 +37,13 @@ class DeployObjectDiffer:
             if code_diff:
                 code_diff = f"{'*'*80}\nconfig.code diff:\n{'*'*80}\n{code_diff}"
 
-        with tempfile.NamedTemporaryFile() as tf1, tempfile.NamedTemporaryFile() as tf2:
-            tf1.write(bytes(json.dumps(before_object_copy, indent=2, sort_keys=True), "UTF-8"))
-            tf2.write(bytes(json.dumps(after_object_copy, indent=2, sort_keys=True), "UTF-8"))
-            # Has to be manually seeked back to start
-            tf1.seek(0)
-            tf2.seek(0)
-
-            diff = subprocess.run(
-                ["diff", tf1.name, tf2.name, "-U" "3"],
-                capture_output=True,
-                text=True,
-            )
-
-            return diff.stdout + code_diff
+        # difflib instead of the diff command, which Windows does not have
+        diff = difflib.unified_diff(
+            json.dumps(before_object_copy, indent=2, sort_keys=True).splitlines(),
+            json.dumps(after_object_copy, indent=2, sort_keys=True).splitlines(),
+            lineterm="",
+        )
+        return "".join(f"{line}\n" for line in diff) + code_diff
 
     @classmethod
     def parse_diff(cls, diff: str):

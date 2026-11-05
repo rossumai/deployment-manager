@@ -32,6 +32,23 @@ $env:PRD_VERSION = "v2.7.0a"; irm https://raw.githubusercontent.com/rossumai/dep
 
 If you already installed `prd2` with pip, uninstall it first (`pip uninstall deployment-manager`) so the two installations do not conflict on your PATH.
 
+### Standalone bundle for macOS and Windows (offline, experimental)
+
+A single archive with everything `prd2` needs - its own Python, all dependencies and GIT - so nothing has to be installed first and no internet connection is needed to install it. Built for Apple Silicon Macs (macOS 14 or newer) and 64-bit Windows 10/11.
+
+macOS: unpack `prd2-<version>-macos-arm64.tar.gz` and run the installer inside it:
+```
+tar -xzf prd2-<version>-macos-arm64.tar.gz
+sh prd2-<version>-macos-arm64/install.sh
+```
+It copies the bundle to `~/.local/share/prd2` and adds `prd2` to your PATH (`~/.local/bin`).
+
+Windows: unzip `prd2-<version>-windows-x64.zip` and double-click `install.cmd` inside it. It copies the bundle to `%LOCALAPPDATA%\Programs\prd2` and adds it to your user PATH.
+
+The bundled GIT is used only by `prd2`; it does not change the `git` command in your terminal. `prd2 update` does not apply to the bundle - install a newer bundle the same way instead.
+
+To build the bundles (on a Mac with Xcode Command Line Tools and internet access), run `standalone/macos/build.sh` and `standalone/windows/build.sh` - the Windows bundle is built on macOS too. You can also run the *Build Standalone Bundles* GitHub workflow, which also tests the Windows bundle on Windows. The archives land in `dist/`.
+
 ### pip installation
 
 #### Prerequisites

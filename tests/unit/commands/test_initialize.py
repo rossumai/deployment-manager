@@ -13,6 +13,7 @@ from anyio import Path
 from deployment_manager.commands.initialize import (
     MODIFIED_BY_FILTER_NAME,
     add_subdirs,
+    ensure_git_identity,
     setup_modified_by_filter,
 )
 from deployment_manager.utils.consts import settings
@@ -131,3 +132,42 @@ class TestModifiedByFilter:
 
         _write_json(path, {"id": 1, "name": "renamed", "modified_by": "https://x/users/9"})
         assert "queue.json" in _git(repo, "status", "--porcelain")
+
+
+@pytest.mark.asyncio
+class TestEnsureGitIdentity:
+    @pytest.fixture
+    def global_config(self, tmp_path, monkeypatch):
+        """Isolates git from the machine's config, like a fresh machine."""
+        config = pathlib.Path(str(tmp_path)) / "gitconfig"
+        monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(config))
+        monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+        return config
+
+    def _git_config(self, config: pathlib.Path, key: str) -> str:
+        return subprocess.run(
+            ["git", "config", "--file", str(config), key], capture_output=True, text=True
+        ).stdout.strip()
+
+    async def test_asks_and_saves_globally_when_missing(self, tmp_path, global_config, monkeypatch):
+        answers = iter(["Ada Lovelace", "ada@example.com"])
+
+        def text_factory(*a, **kw):
+            m = AsyncMock()
+            m.ask_async = AsyncMock(side_effect=lambda: next(answers))
+            return m
+
+        monkeypatch.setattr("deployment_manager.commands.initialize.questionary.text", text_factory)
+        await ensure_git_identity(Path(str(tmp_path)))
+
+        assert self._git_config(global_config, "user.name") == "Ada Lovelace"
+        assert self._git_config(global_config, "user.email") == "ada@example.com"
+
+    async def test_does_not_ask_when_configured(self, tmp_path, global_config, monkeypatch):
+        global_config.write_text("[user]\n\tname = Ada\n\temail = ada@example.com\n")
+
+        def text_factory(*a, **kw):
+            raise AssertionError("should not prompt")
+
+        monkeypatch.setattr("deployment_manager.commands.initialize.questionary.text", text_factory)
+        await ensure_git_identity(Path(str(tmp_path)))

@@ -339,6 +339,7 @@ class QueueDeployObject(DeployObject):
                 self.ignore_deploy_warnings = True
                 return
             elif user_answer.casefold() == "y":
+                self.ignore_deploy_warnings = True
                 return
 
     async def ignore_ai_fields(self, queue: dict, target: Target):

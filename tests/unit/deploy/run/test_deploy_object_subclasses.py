@@ -635,3 +635,43 @@ class TestReloadLocalData:
         engine.engine_field_deploy_objects = [EngineFieldDeployObject(id=10, name="a")]
         await engine.reload_local_data()
         assert reloaded == [(Resource.Engine, 1), (Resource.EngineField, 10)]
+
+
+@pytest.mark.asyncio
+class TestPromptPendingWarnings:
+    def make_queue(self, monkeypatch, answer: str):
+        module = "deployment_manager.commands.deploy.subcommands.run.deploy_objects.queue_deploy_object"
+        monkeypatch.setattr(f"{module}.display_warning", lambda *args, **kwargs: None)
+        monkeypatch.setattr(
+            f"{module}.questionary.text",
+            lambda *args, **kwargs: SimpleNamespace(ask_async=AsyncMock(return_value=answer)),
+        )
+        queue = QueueDeployObject.model_construct(
+            id=1,
+            name="q",
+            base_path="",
+            schema_deploy_object=SchemaDeployObject(id=2, name="s"),
+            inbox_deploy_object=InboxDeployObject(id=3, name="i"),
+            ignore_deploy_warnings=False,
+            pending_warnings=["first warning", "second warning"],
+        )
+        queue.deploy_file = SimpleNamespace(ignore_all_deploy_warnings=False)
+        return queue
+
+    async def test_yes_disables_warnings_for_this_queue(self, monkeypatch):
+        queue = self.make_queue(monkeypatch, "y")
+        await queue.prompt_pending_warnings()
+        assert queue.ignore_deploy_warnings is True
+        assert queue.deploy_file.ignore_all_deploy_warnings is False
+
+    async def test_yes_to_all_disables_warnings_everywhere(self, monkeypatch):
+        queue = self.make_queue(monkeypatch, "yy")
+        await queue.prompt_pending_warnings()
+        assert queue.ignore_deploy_warnings is True
+        assert queue.deploy_file.ignore_all_deploy_warnings is True
+
+    async def test_no_keeps_warnings(self, monkeypatch):
+        queue = self.make_queue(monkeypatch, "n")
+        await queue.prompt_pending_warnings()
+        assert queue.ignore_deploy_warnings is False
+        assert queue.deploy_file.ignore_all_deploy_warnings is False

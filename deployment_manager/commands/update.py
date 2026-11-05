@@ -1,4 +1,5 @@
 import importlib
+import json
 import shutil
 import subprocess
 import sys
@@ -22,6 +23,18 @@ Updates deployment-manager with the lastest version from github
 @click.argument("version_tag", type=click.STRING, required=False)
 @coro
 async def update_application(version_tag: str = None):
+    if bundle := get_bundle_manifest():
+        releases_url = settings.GITHUB_RELEASES_PAGE_URL.format(
+            repo_owner=settings.GITHUB_DEPLOYMENT_MANAGER_REPO_OWNER,
+            repo_name=settings.GITHUB_DEPLOYMENT_MANAGER_REPO_NAME,
+        )
+        display_info(
+            f"This prd2 is a standalone bundle ({bundle.get('platform', 'unknown platform')}) and cannot update itself. "
+            f"Download a newer bundle from {releases_url} and run the installer inside it "
+            "(install.sh on macOS, install.cmd on Windows)."
+        )
+        return
+
     if version_tag:
         latest_whl_url, selected_version = (
             await get_specific_version(version_tag),
@@ -72,6 +85,14 @@ async def update_application(version_tag: str = None):
             f"Deployment manager update to version {selected_version} unsuccessful: {e}",
             e,
         )
+
+
+def get_bundle_manifest() -> dict | None:
+    """Returns the manifest of the standalone bundle prd2 runs from, or None for pip/uv installations."""
+    manifest_path = Path(sys.prefix).parent / settings.BUNDLE_MANIFEST_FILENAME
+    if not manifest_path.is_file():
+        return None
+    return json.loads(manifest_path.read_text())
 
 
 def build_install_command(whl_url: str) -> list[str]:

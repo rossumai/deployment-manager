@@ -1,9 +1,10 @@
+import pathlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 
-from deployment_manager.commands.update import get_latest_version, get_specific_version
+from deployment_manager.commands.update import get_bundle_manifest, get_latest_version, get_specific_version
 
 
 def _make_async_client_mock(response_status: int, response_json: dict):
@@ -120,3 +121,15 @@ class TestGetSpecificVersion:
             inner_client.get = fake_get
             await get_specific_version("v7.8.9")
             assert "v7.8.9" in captured["url"]
+
+
+class TestGetBundleManifest:
+    def test_reads_manifest_next_to_bundled_python(self, tmp_path, monkeypatch):
+        bundle_dir = pathlib.Path(str(tmp_path))
+        (bundle_dir / "prd2-bundle.json").write_text('{"platform": "macos-arm64"}')
+        monkeypatch.setattr("sys.prefix", str(bundle_dir / "python"))
+        assert get_bundle_manifest() == {"platform": "macos-arm64"}
+
+    def test_none_outside_a_bundle(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("sys.prefix", str(tmp_path / "venv"))
+        assert get_bundle_manifest() is None

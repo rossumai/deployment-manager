@@ -315,6 +315,9 @@ class Settings:
     GITHUB_SPECIFIC_RELEASE_URL = "https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/{version_tag}"
     GITHUB_DEPLOYMENT_MANAGER_REPO_OWNER = "rossumai"
     GITHUB_DEPLOYMENT_MANAGER_REPO_NAME = "deployment-manager"
+    GITHUB_RELEASES_PAGE_URL = "https://github.com/{repo_owner}/{repo_name}/releases"
+    # Written into the root of a standalone bundle (standalone/macos/build.sh), next to its python/ dir
+    BUNDLE_MANIFEST_FILENAME = "prd2-bundle.json"
 
     GITLAB_SERVERLESS_FUNCTIONS_URL = (
         "https://gitlab.rossum.cloud/elis-connectors/elis-serverless-functions/-/blob/master"

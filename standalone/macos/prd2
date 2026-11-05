@@ -1,0 +1,21 @@
+#!/bin/sh
+# Starts prd2 with the Python and git bundled next to this script.
+set -e
+
+# Follow symlinks (e.g., ~/.local/bin/prd2) back to the bundle.
+SELF="$0"
+while [ -L "$SELF" ]; do
+    LINK="$(readlink "$SELF")"
+    case "$LINK" in
+        /*) SELF="$LINK" ;;
+        *) SELF="$(dirname "$SELF")/$LINK" ;;
+    esac
+done
+BUNDLE_DIR="$(cd "$(dirname "$SELF")" && pwd -P)"
+
+# The bundled git goes first: without Xcode tools, /usr/bin/git is only an installer stub.
+PATH="$BUNDLE_DIR/git/bin:$PATH"
+export PATH
+
+# -I keeps the user's PYTHONPATH, user site-packages and current directory out of the bundle.
+exec "$BUNDLE_DIR/python/bin/python3" -I -c 'from deployment_manager.main import main; main(prog_name="prd2")' "$@"

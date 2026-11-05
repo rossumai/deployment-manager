@@ -32,6 +32,7 @@ async def init_project(name: Path):
 
     # (re)initialize GIT
     subprocess.run(["git", "init", name])
+    await ensure_git_identity(name)
 
     git_ignore_path = name / ".gitignore"
     credentials_ignore_lines = [
@@ -107,6 +108,19 @@ async def add_subdirs(directories: dict, org_dir_name: str):
         subdir_name = await questionary.text("SUBDIR name:").ask_async()
         subdir_regex = await questionary.text("subdir regex (OPTIONAL):").ask_async()
         subdirs[subdir_name] = {settings.DOWNLOAD_KEY_REGEX: subdir_regex}
+
+
+async def ensure_git_identity(project_path: Path):
+    """Asks for the git author when none is configured (e.g., a fresh machine), so prd2's commits do not fail."""
+    for key, label in (("user.name", "name"), ("user.email", "email")):
+        configured = subprocess.run(
+            ["git", "-C", str(project_path), "config", key], capture_output=True, text=True
+        ).stdout.strip()
+        if configured:
+            continue
+        value = await questionary.text(f"Your {label} for git commits (saved to the global git config):").ask_async()
+        if value:
+            subprocess.run(["git", "config", "--global", key, value])
 
 
 async def setup_modified_by_filter(project_path: Path):

@@ -165,3 +165,17 @@ class TestUpdateApplication:
             result = runner.invoke(update_application, [])
             # Command should complete (exit 0) even though pip failed.
             assert result.exit_code == 0
+
+    def test_standalone_bundle_points_to_releases_instead_of_installing(self):
+        """A bundle has no pip/uv to reinstall itself with."""
+        runner = CliRunner()
+        with (
+            patch("deployment_manager.commands.update.get_bundle_manifest", return_value={"platform": "macos-arm64"}),
+            patch("deployment_manager.commands.update.get_latest_version", new=AsyncMock()) as mock_latest,
+            patch("deployment_manager.commands.update.subprocess.run") as mock_run,
+        ):
+            result = runner.invoke(update_application, [])
+            assert result.exit_code == 0
+            assert "releases" in result.output
+            mock_latest.assert_not_called()
+            mock_run.assert_not_called()

@@ -1,0 +1,81 @@
+name: Build Standalone Bundles
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  macos:
+    # Apple Silicon runner, so the bundle is built for arm64
+    runs-on: macos-14
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Build Bundle
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: standalone/macos/build.sh
+
+      - name: Upload Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: prd2-macos-arm64
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+
+  windows:
+    # Built on macOS like the macOS bundle; Windows programs only run in the test job below
+    runs-on: macos-14
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Build Bundle
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: standalone/windows/build.sh
+
+      - name: Upload Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: prd2-windows-x64
+          path: |
+            dist/*.zip
+            dist/*.sha256
+
+  windows-test:
+    needs: windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: prd2-windows-x64
+          path: artifact
+
+      - name: Unzip Bundle
+        run: |
+          $zip = Get-ChildItem artifact\prd2-*.zip | Select-Object -First 1
+          Expand-Archive $zip.FullName -DestinationPath $env:RUNNER_TEMP
+          "BUNDLE_DIR=$(Join-Path $env:RUNNER_TEMP $zip.BaseName)" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      # Windows PowerShell 5.1 on purpose: it is what every Windows machine has
+      - name: Smoke-test Bundle
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File standalone\windows\smoke-test.ps1 $env:BUNDLE_DIR
+
+      - name: Install Bundle
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $env:BUNDLE_DIR install.ps1)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & (Join-Path $env:LOCALAPPDATA Programs\prd2\prd2.cmd) --version

@@ -23,3 +23,6 @@ coverage.xml
 junit.xml
 .coverage
 htmlcov/
+
+# Standalone bundle builds (standalone/)
+/build/

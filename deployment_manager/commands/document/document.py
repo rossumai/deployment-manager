@@ -1,6 +1,7 @@
 import asyncio
 import json
 import subprocess
+import sys
 from collections import defaultdict
 
 import click
@@ -405,7 +406,8 @@ class DirectoryDocumentator:
         template = await read_txt(template_path)
         diagramming_code = await self.model.run(template.format(extensions=extensions_list_formatted))
 
-        subprocess.run(["python3", "-"], input=diagramming_code, capture_output=True, text=True)
+        # Use prd2's own interpreter: it has `diagrams` installed, and on a fresh Mac `python3` is only an installer stub
+        subprocess.run([sys.executable, "-"], input=diagramming_code, capture_output=True, text=True)
 
     async def document_schema_id(self, queue_id: str, schema_id: dict, base_path: Path, hook_docs_base_path: Path):
         template, matching_configs = await self.get_template_for_schema_id(schema_id, hook_docs_base_path)
