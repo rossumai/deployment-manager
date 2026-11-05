@@ -10,6 +10,7 @@ from deployment_manager.common.read_write import (
     create_formula_directory_path,
     create_formula_file,
     find_formula_fields_in_schema,
+    is_private_hook,
     write_object_to_json,
     write_str,
 )
@@ -399,6 +400,12 @@ class HookSaver(ObjectSaver):
             custom_hook_code_path = create_custom_hook_code_path(object_path, hook)
             if custom_hook_code_path:
                 await write_str(custom_hook_code_path, hook.get("config", {}).get("code", None))
+            elif is_private_hook(hook):
+                for stale_code_path in (object_path.with_suffix(".py"), object_path.with_suffix(".js")):
+                    if await stale_code_path.exists():
+                        display_warning(
+                            f"Hook [green]{object_path}[/green] is private, its code file [green]{stale_code_path}[/green] is no longer used. Delete it."
+                        )
 
 
 class LabelSaver(ObjectSaver):

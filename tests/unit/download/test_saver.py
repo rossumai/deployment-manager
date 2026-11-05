@@ -1,9 +1,10 @@
 import io
+from unittest.mock import patch
 
 import pytest
 from anyio import Path
 
-from deployment_manager.commands.download.saver import WorkspaceSaver
+from deployment_manager.commands.download.saver import HookSaver, WorkspaceSaver
 from deployment_manager.commands.download.subdirectory import Subdirectory
 from deployment_manager.common.read_write import read_object_from_json
 from deployment_manager.utils.functions import templatize_name_id
@@ -157,6 +158,24 @@ async def test_get_subdir_from_user(
     object_path = workspace_saver.construct_object_path(subdir=test_subdir, object=workspace_json)
     saved_object = await read_object_from_json(object_path)
     assert saved_object == workspace_json
+
+
+
+@pytest.mark.asyncio
+async def test_save_private_hook_warns_about_stale_code_file(tmp_path: Path, test_subdir: Subdirectory):
+    hook = {"id": 1, "name": "h", "type": "function", "extension_source": "custom", "config": {"private": True}}
+    hook_saver = HookSaver(base_path=tmp_path, objects=[hook], changed_files=[], download_all=True)
+    object_path = hook_saver.construct_object_path(subdir=test_subdir, hook=hook)
+    await object_path.parent.mkdir(parents=True)
+    stale_code_path = object_path.with_suffix(".py")
+    await stale_code_path.write_text("old code")
+
+    with patch("deployment_manager.commands.download.saver.display_warning") as warning:
+        await hook_saver.save_downloaded_object(hook, test_subdir)
+
+    warning.assert_called_once()
+    assert str(stale_code_path) in warning.call_args.args[0]
+    assert await stale_code_path.read_text() == "old code"
 
 
 # TODO: move Q into different WS -> queue, schema, inbox get put into the second WS and the first get removed

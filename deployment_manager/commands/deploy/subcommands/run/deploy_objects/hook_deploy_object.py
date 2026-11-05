@@ -10,7 +10,7 @@ from deployment_manager.commands.deploy.subcommands.run.deploy_objects.hook_refe
 )
 from deployment_manager.commands.deploy.subcommands.run.merge.merge import get_nested_value, prompt_conflict_resolution
 from deployment_manager.commands.deploy.subcommands.run.models import Target
-from deployment_manager.common.read_write import write_str
+from deployment_manager.common.read_write import create_custom_hook_code_path, write_str
 from deployment_manager.utils.consts import display_error, settings
 from deployment_manager.utils.functions import extract_id_from_url, templatize_name_id
 
@@ -212,9 +212,8 @@ class HookDeployObject(DeployObject):
         """Checks if there is not newer code in the associated file and uses that for release.
         The original hook file is not modified.
         """
-        if self.data.get("extension_source", "") != "rossum_store" and (self.data.get("config", {}).get("code", None)):
-            suffix = ".py" if "python" in self.data["config"].get("runtime") else ".js"
-            code_path = self.path.with_suffix(suffix)
+        code_path = create_custom_hook_code_path(self.path, self.data)
+        if code_path:
             new_code = await code_path.read_text()
             self.data["config"]["code"] = new_code
 
@@ -222,8 +221,9 @@ class HookDeployObject(DeployObject):
         if attribute_path != "config.code":
             return False
 
-        suffix = ".py" if "python" in self.data["config"].get("runtime") else ".js"
-        code_path = self.path.with_suffix(suffix)
+        code_path = create_custom_hook_code_path(self.path, self.data)
+        if not code_path:
+            return False
 
         last_applied_code = get_nested_value(last_applied, attribute_path)
 
@@ -239,8 +239,9 @@ class HookDeployObject(DeployObject):
         if attribute_path != "config.code":
             return False
 
-        suffix = ".py" if "python" in self.data["config"].get("runtime") else ".js"
-        code_path = self.path.with_suffix(suffix)
+        code_path = create_custom_hook_code_path(self.path, self.data)
+        if not code_path:
+            return False
 
         await write_str(code_path, target_val)
 
