@@ -192,12 +192,20 @@ def find_fields_in_schema(node: Any) -> list[tuple[dict]]:
     return fields
 
 
+def is_private_hook(hook: dict) -> bool:
+    return bool((hook.get("config") or {}).get("private"))
+
+
 def create_custom_hook_code_path(hook_path: Path, hook: object):
-    if hook.get("extension_source", "") != "rossum_store" and hook.get("config", {}).get("code", None):
-        hook_runtime = hook["config"].get("runtime")
-        extension = ".py" if "python" in hook_runtime else ".js"
-        return hook_path.with_suffix(extension)
-    return None
+    config = hook.get("config") or {}
+    # Private hooks expose no runtime and their code is not editable, so they have no code file.
+    if hook.get("extension_source", "") == "rossum_store" or is_private_hook(hook):
+        return None
+    hook_runtime = config.get("runtime")
+    if not config.get("code") or not hook_runtime:
+        return None
+    extension = ".py" if "python" in hook_runtime else ".js"
+    return hook_path.with_suffix(extension)
 
 
 def create_formula_directory_path(schema_path: Path):

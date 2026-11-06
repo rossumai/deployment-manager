@@ -62,6 +62,38 @@ class TestMergeHookChanges:
         updated = await read_object_from_json(hook_json_path)
         assert updated["config"]["code"] == "new_code_here"
 
+    async def test_updated_py_file_is_not_merged_into_private_hook(self, tmp_path):
+        hook_dir = tmp_path / "org" / "hooks"
+        await hook_dir.mkdir(parents=True)
+        hook_json_path = hook_dir / "h1.json"
+        hook_py_path = hook_dir / "h1.py"
+        private_hook = {"type": "function", "config": {"private": True}, "extension_source": "custom"}
+        await write_object_to_json(hook_json_path, private_hook)
+        await write_str(hook_py_path, "stale_code")
+
+        with patch("deployment_manager.commands.upload.dependencies.display_warning") as warning:
+            result = await merge_hook_changes([(GIT_CHARACTERS.UPDATED, hook_py_path)], tmp_path)
+
+        assert result == []
+        warning.assert_called_once()
+        assert "code" not in (await read_object_from_json(hook_json_path))["config"]
+
+    async def test_updated_private_hook_json_writes_no_code_file(self, tmp_path):
+        hook_dir = tmp_path / "org" / "hooks"
+        await hook_dir.mkdir(parents=True)
+        hook_json_path = hook_dir / "h1.json"
+        await write_object_to_json(
+            hook_json_path,
+            {"type": "function", "config": {"private": True, "code": "hidden"}, "extension_source": "custom"},
+        )
+
+        changes = [(GIT_CHARACTERS.UPDATED, hook_json_path)]
+        result = await merge_hook_changes(changes, tmp_path)
+
+        assert result == changes
+        assert not await (hook_dir / "h1.py").exists()
+        assert not await (hook_dir / "h1.js").exists()
+
     async def test_unrelated_change_is_passed_through(self, tmp_path):
         other_path = tmp_path / "workspace.json"
         change = (GIT_CHARACTERS.UPDATED, other_path)

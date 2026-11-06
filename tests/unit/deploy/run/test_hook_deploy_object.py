@@ -105,3 +105,37 @@ class TestFindTemplateForHook:
 
         hook.deploy_file.source_client.request_json.assert_awaited_once()
         assert result == "https://tgt.rossum.app/api/v1/hook_templates/900"
+
+
+@pytest.mark.asyncio
+class TestPrivateHookCode:
+    """Private hooks expose no runtime, so deploy must not look for a .py/.js companion file."""
+
+    def _hook(self, tmp_path, config):
+        hook = HookDeployObject(
+            id=7, name="h", data={"type": "function", "extension_source": "custom", "config": config}
+        )
+        hook.deploy_file = MagicMock()
+        hook.deploy_file.source_dir_path = str(tmp_path)
+        return hook
+
+    async def test_update_hook_code_skips_private_hook(self, tmp_path):
+        hook = self._hook(tmp_path, {"private": True, "code": "hidden"})
+
+        await hook.update_hook_code()
+
+        assert hook.data["config"]["code"] == "hidden"
+
+    async def test_apply_code_rebase_skips_private_hook(self, tmp_path):
+        hook = self._hook(tmp_path, {"private": True, "code": "hidden"})
+
+        assert await hook.apply_code_rebase("config.code", "remote") is False
+
+    async def test_update_hook_code_reads_companion_file(self, tmp_path):
+        hook = self._hook(tmp_path, {"code": "old", "runtime": "python3.12"})
+        await hook.path.parent.mkdir(parents=True)
+        await hook.path.with_suffix(".py").write_text("new")
+
+        await hook.update_hook_code()
+
+        assert hook.data["config"]["code"] == "new"

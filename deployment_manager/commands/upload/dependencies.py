@@ -11,6 +11,7 @@ from deployment_manager.common.read_write import (
     create_formula_directory_path,
     create_formula_file,
     find_formula_fields_in_schema,
+    is_private_hook,
     read_formula_file,
     read_object_from_json,
     write_object_to_json,
@@ -138,6 +139,11 @@ async def merge_hook_changes(changes: list[tuple[str, Path]], org_path: Path):
                 if not await object_path.exists():
                     continue
                 hook = await read_object_from_json(object_path)
+                if is_private_hook(hook):
+                    display_warning(
+                        f"Ignoring [green]{path}[/green]: hook is private and its code cannot be changed. Delete the file."
+                    )
+                    continue
                 hook.setdefault("config", {})["code"] = code_str
                 await write_object_to_json(object_path, hook)
                 new_change = (GIT_CHARACTERS.UPDATED, object_path)

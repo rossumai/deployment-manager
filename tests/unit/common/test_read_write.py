@@ -313,6 +313,23 @@ class TestCustomHookCodePath:
         path = Path("/tmp/hooks/myhook.json")
         assert create_custom_hook_code_path(path, hook) is None
 
+    def test_private_hook_returns_none(self):
+        hook = {
+            "type": "function",
+            "config": {"private": True, "code": "pass"},
+            "extension_source": "custom",
+        }
+        path = Path("/tmp/hooks/myhook.json")
+        assert create_custom_hook_code_path(path, hook) is None
+
+    def test_code_without_runtime_returns_none(self):
+        hook = {
+            "config": {"code": "pass", "runtime": None},
+            "extension_source": "custom",
+        }
+        path = Path("/tmp/hooks/myhook.json")
+        assert create_custom_hook_code_path(path, hook) is None
+
 
 class TestFormulaDirectoryPath:
     def test_directory_path(self):
