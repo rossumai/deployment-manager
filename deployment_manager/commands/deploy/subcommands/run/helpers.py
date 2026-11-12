@@ -149,6 +149,9 @@ def generate_deploy_timestamp():
 def remove_queue_attributes_for_cross_org(queue_copy: dict):
     # These attributes cannot be created through the API and so if used cross-org, they can only be ignored
     queue_copy.pop("workflows", None)
+    # NOTE: Legacy `rir_url` values can fail the API's current format validation on create, and the engine is
+    # assigned per organization anyway.
+    queue_copy.pop("rir_url", None)
     for attr in QUEUE_ENGINE_ATTRIBUTES:
         queue_copy.pop(attr, None)
 
