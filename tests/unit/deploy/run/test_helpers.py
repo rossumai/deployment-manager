@@ -142,6 +142,11 @@ class TestRemoveQueueAttributesForCrossOrg:
             assert attr not in queue
         assert queue["keep"] == "this"
 
+    def test_removes_rir_url(self):
+        queue = {"rir_url": "https://legacy.example.com/rir", "rir_params": "x=1", "name": "q"}
+        remove_queue_attributes_for_cross_org(queue)
+        assert queue == {"rir_params": "x=1", "name": "q"}
+
     def test_safe_if_missing(self):
         queue = {"name": "q"}
         remove_queue_attributes_for_cross_org(queue)

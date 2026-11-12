@@ -284,7 +284,7 @@ class Settings:
         ],
     }
     # Non-diffed only if cross-org
-    DEPLOY_CROSS_ORG_NON_DIFFED_KEYS: dict = {Resource.Queue: ["workflows", *QUEUE_ENGINE_ATTRIBUTES]}
+    DEPLOY_CROSS_ORG_NON_DIFFED_KEYS: dict = {Resource.Queue: ["workflows", "rir_url", *QUEUE_ENGINE_ATTRIBUTES]}
 
     # List attributes that should be sorted before diff so not get false positive diffs (e.g., hook.queues)
     # Only server-maintained reference/backref lists are sorted here: their order is never
