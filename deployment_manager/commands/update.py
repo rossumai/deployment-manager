@@ -67,6 +67,12 @@ async def update_application(version_tag: str = None):
         display_info(
             f"Deployment manager successfully updated to {'latest' if not version_tag else ''} version: {selected_version}"
         )
+    except subprocess.CalledProcessError as e:
+        detail = (e.stderr or e.stdout or "").strip()
+        msg = f"Deployment manager update to version {selected_version} unsuccessful: {e}"
+        if detail:
+            msg = f"{msg}\n{detail}"
+        display_error(msg, e)
     except Exception as e:
         display_error(
             f"Deployment manager update to version {selected_version} unsuccessful: {e}",
@@ -78,6 +84,9 @@ def build_install_command(whl_url: str) -> list[str]:
     # Installed by install.sh / install.ps1 via `uv tool install`; reinstalling through uv keeps its receipt in sync.
     if (Path(sys.prefix) / "uv-receipt.toml").exists() and shutil.which("uv"):
         return ["uv", "tool", "install", "--force", "--python", "3.12", whl_url]
+    # Installed via pipx (venvs created by pipx do not include pip by default).
+    if (Path(sys.prefix) / "pipx_metadata.json").exists() and shutil.which("pipx"):
+        return ["pipx", "install", "--force", "--python", sys.executable, whl_url]
     return [sys.executable, "-m", "pip", "install", "--upgrade", "--no-cache-dir", whl_url]
 
 
