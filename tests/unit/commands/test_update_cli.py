@@ -7,11 +7,13 @@ We mock out:
 - importlib.metadata.version (the currently installed version)
 """
 
+import sys
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from click.testing import CliRunner
 
-from deployment_manager.commands.update import update_application
+from deployment_manager.commands.update import build_install_command, update_application
 
 
 def _mock_questionary_answer(answer: bool):
@@ -159,9 +161,49 @@ class TestUpdateApplication:
             patch("deployment_manager.commands.update.importlib.metadata.version", return_value="1.0.0"),
             patch(
                 "deployment_manager.commands.update.subprocess.run",
-                side_effect=subprocess_mod.CalledProcessError(1, "pip"),
+                side_effect=subprocess_mod.CalledProcessError(1, "pip", stderr="No module named pip\n"),
             ),
+            patch("deployment_manager.commands.update.display_error") as mock_display_error,
         ):
             result = runner.invoke(update_application, [])
             # Command should complete (exit 0) even though pip failed.
             assert result.exit_code == 0
+            mock_display_error.assert_called_once()
+            assert "No module named pip" in mock_display_error.call_args[0][0]
+
+    def test_unexpected_exception_does_not_raise(self):
+        """Non-CalledProcessError exceptions are also caught and passed to display_error."""
+        runner = CliRunner()
+        with (
+            patch("deployment_manager.commands.update.get_latest_version", new=AsyncMock(return_value=("https://whl", "2.0.0"))),
+            patch("deployment_manager.commands.update.importlib.metadata.version", return_value="1.0.0"),
+            patch(
+                "deployment_manager.commands.update.subprocess.run",
+                side_effect=OSError("binary missing"),
+            ),
+            patch("deployment_manager.commands.update.display_error") as mock_display_error,
+        ):
+            result = runner.invoke(update_application, [])
+            assert result.exit_code == 0
+            mock_display_error.assert_called_once()
+            assert "binary missing" in mock_display_error.call_args[0][0]
+
+
+class TestBuildInstallCommand:
+    def test_uses_pipx_when_pipx_metadata_exists(self, tmp_path):
+        prefix_dir = Path(str(tmp_path))
+        (prefix_dir / "pipx_metadata.json").write_text("{}", encoding="utf-8")
+        with (
+            patch("deployment_manager.commands.update.sys.prefix", str(prefix_dir)),
+            patch("deployment_manager.commands.update.shutil.which", side_effect=lambda name: "/usr/bin/pipx" if name == "pipx" else None),
+        ):
+            cmd = build_install_command("https://example.com/pkg.whl")
+
+        assert cmd == ["pipx", "install", "--force", "--python", sys.executable, "https://example.com/pkg.whl"]
+
+    def test_falls_back_to_pip_without_uv_or_pipx_markers(self, tmp_path):
+        prefix_dir = Path(str(tmp_path))
+        with patch("deployment_manager.commands.update.sys.prefix", str(prefix_dir)):
+            cmd = build_install_command("https://example.com/pkg.whl")
+
+        assert cmd == [sys.executable, "-m", "pip", "install", "--upgrade", "--no-cache-dir", "https://example.com/pkg.whl"]
