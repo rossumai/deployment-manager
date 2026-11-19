@@ -21,7 +21,11 @@ def expand_destinations(
     project_path: Path,
     configured_directories: ConfiguredDirectories,
 ):
-    """Expands the given destinations to include all subdirectories"""
+    """Expands the given destinations to include all subdirectories.
+
+    Paths are returned with forward slashes on every OS because `mark_subdirectories_to_include` matches them
+    against `"<dir>/<subdir>"` keys. On Windows, `str(path)` would use backslashes and nothing would match.
+    """
     expanded_destinations = []
     for destination in destinations:
         dir_name = str(destination.name) if destination.parent == project_path else str(destination.parent)
@@ -34,11 +38,11 @@ def expand_destinations(
         if destination.parent == project_path:
             dir_config = configured_directories.get(destination.name, {})
             expanded_destinations.extend(
-                [str(project_path / destination / subdir) for subdir in dir_config.subdirectories.keys()]
+                [(project_path / destination / subdir).as_posix() for subdir in dir_config.subdirectories.keys()]
             )
 
         else:
-            expanded_destinations.append(str(destination))
+            expanded_destinations.append(destination.as_posix())
 
     return expanded_destinations
 
