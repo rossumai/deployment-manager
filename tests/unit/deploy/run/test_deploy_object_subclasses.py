@@ -554,6 +554,21 @@ class TestPlanChangesOnly:
         await field.visualize_changes()
         assert len(printed) == 1
 
+    async def test_large_created_object_is_truncated(self, monkeypatch):
+        plan = {"id": 2, "name": "f", **{f"key_{i}": i for i in range(50)}}
+        field, printed = self.make_field(monkeypatch, {}, plan, exists_on_remote=False, changes_only=False)
+        await field.visualize_changes()
+        assert "more lines not shown" in printed[0].renderable
+        assert "key_49" not in printed[0].renderable
+
+    async def test_large_updated_object_is_not_truncated(self, monkeypatch):
+        remote = {"id": 2, "name": "f"}
+        plan = {"id": 2, "name": "f", **{f"key_{i}": i for i in range(50)}}
+        field, printed = self.make_field(monkeypatch, remote, plan, exists_on_remote=True, changes_only=False)
+        await field.visualize_changes()
+        assert "more lines not shown" not in printed[0].renderable
+        assert "key_49" in printed[0].renderable
+
     async def test_unchanged_object_shown_without_flag(self, monkeypatch):
         data = {"id": 2, "name": "f", "label": "x"}
         field, printed = self.make_field(monkeypatch, data, dict(data), exists_on_remote=True, changes_only=False)

@@ -74,3 +74,16 @@ class TestParseDiff:
         assert "[red]" in parsed
         # ensure our original text appears in some form
         assert "brackets" in parsed
+
+
+class TestTruncateDiff:
+    def test_short_diff_unchanged(self):
+        diff = "\n".join(f"+line {i}" for i in range(20))
+        assert DeployObjectDiffer.truncate_diff(diff) == diff
+
+    def test_long_diff_truncated_with_note(self):
+        diff = "\n".join(f"+line {i}" for i in range(50))
+        lines = DeployObjectDiffer.truncate_diff(diff).splitlines()
+        assert len(lines) == 21
+        assert lines[19] == "+line 19"
+        assert "30 more lines not shown" in lines[-1]

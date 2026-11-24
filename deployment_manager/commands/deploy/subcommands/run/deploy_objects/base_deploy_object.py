@@ -609,6 +609,8 @@ class DeployObject(BaseModel):
                 self.deploy_file.unchanged_plan_objects_count += 1
                 continue
             colorized_diff = DeployObjectDiffer.parse_diff(diff)
+            if not target.exists_on_remote:
+                colorized_diff = DeployObjectDiffer.truncate_diff(colorized_diff)
             message = f"{plan_label} {self.display_type} {self.create_source_to_target_string(target.visualized_plan_data)}:\n{colorized_diff if colorized_diff else ''}"
             pprint(Panel(message))
 
