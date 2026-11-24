@@ -1,4 +1,5 @@
 from deployment_manager.commands.deploy.subcommands.run.deploy_objects.deploy_differ import (
+    NEW_OBJECT_PLAN_MAX_LINES,
     DeployObjectDiffer,
 )
 
@@ -74,3 +75,16 @@ class TestParseDiff:
         assert "[red]" in parsed
         # ensure our original text appears in some form
         assert "brackets" in parsed
+
+
+class TestTruncateDiff:
+    def test_short_diff_unchanged(self):
+        diff = "\n".join(f"+line {i}" for i in range(NEW_OBJECT_PLAN_MAX_LINES))
+        assert DeployObjectDiffer.truncate_diff(diff) == diff
+
+    def test_long_diff_truncated_with_note(self):
+        diff = "\n".join(f"+line {i}" for i in range(NEW_OBJECT_PLAN_MAX_LINES + 30))
+        lines = DeployObjectDiffer.truncate_diff(diff).splitlines()
+        assert len(lines) == NEW_OBJECT_PLAN_MAX_LINES + 1
+        assert lines[NEW_OBJECT_PLAN_MAX_LINES - 1] == f"+line {NEW_OBJECT_PLAN_MAX_LINES - 1}"
+        assert "30 more lines not shown" in lines[-1]

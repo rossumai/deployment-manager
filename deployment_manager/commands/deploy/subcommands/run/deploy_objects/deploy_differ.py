@@ -6,6 +6,9 @@ from copy import deepcopy
 
 from rich.markup import escape
 
+# New objects are diffed against {}, so the plan would otherwise print their whole content.
+NEW_OBJECT_PLAN_MAX_LINES = 7
+
 
 class DeployObjectDiffer:
     @classmethod
@@ -79,3 +82,11 @@ class DeployObjectDiffer:
                 colorized_line = line
             colorized_lines.append(colorized_line)
         return "\n".join(colorized_lines)
+
+    @classmethod
+    def truncate_diff(cls, diff: str, max_lines: int = NEW_OBJECT_PLAN_MAX_LINES) -> str:
+        lines = diff.splitlines()
+        if len(lines) <= max_lines:
+            return diff
+        hidden = len(lines) - max_lines
+        return "\n".join([*lines[:max_lines], f"[dim]... {hidden} more lines not shown[/dim]"])
